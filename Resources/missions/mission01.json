@@ -1,0 +1,62 @@
+{
+    "description": "Destroy all target drones in the airspace.",
+    "enemies": [
+        {
+            "aiType": "ChaseAttack",
+            "health": 50.0,
+            "modelPath": "Resources/planeplane.obj",
+            "position": {
+                "x": 100.0,
+                "y": 100.0,
+                "z": 200.0
+            }
+        },
+        {
+            "aiType": "ChaseAttack",
+            "health": 50.0,
+            "modelPath": "Resources/planeplane.obj",
+            "position": {
+                "x": -80.0,
+                "y": 100.0,
+                "z": 300.0
+            }
+        },
+        {
+            "aiType": "ChaseAttack",
+            "health": 50.0,
+            "modelPath": "Resources/planeplane.obj",
+            "position": {
+                "x": 200.0,
+                "y": 100.0,
+                "z": 450.0
+            }
+        },
+        {
+            "aiType": "CruiseEvade",
+            "health": 50.0,
+            "modelPath": "Resources/planeplane.obj",
+            "position": {
+                "x": -150.0,
+                "y": 100.0,
+                "z": 500.0
+            }
+        },
+        {
+            "aiType": "CruiseEvade",
+            "health": 50.0,
+            "modelPath": "Resources/planeplane.obj",
+            "position": {
+                "x": 50.0,
+                "y": 100.0,
+                "z": 700.0
+            }
+        }
+    ],
+    "name": "Mission 01: First Strike",
+    "playerHP": 100.0,
+    "playerPosition": {
+        "x": 0.0,
+        "y": 100.0,
+        "z": 0.0
+    }
+}

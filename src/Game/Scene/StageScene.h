@@ -17,6 +17,8 @@
 #include "../../engine/Physics/CollisionConfig.h"
 #include "../../engine/Graphics/PostProcess/PostEffect.h"
 
+#include "../System/MissionManager.h"
+
 /// @brief ゲーム本編のステージシーン
 class StageScene : public IScene {
 public:
@@ -24,6 +26,7 @@ public:
 	void Update() override;
 	void Draw() override;
 	void Finalize() override;
+	void Restart();
 
 private:
 	// フライトモデル（物理）
@@ -130,5 +133,14 @@ private:
 	float damageFlashTimer_ = 0.0f;         // 被弾フラッシュ制御タイマー
 	int manualSelectedEffect_ = 0;          // 手動・ImGuiテスト用エフェクトインデックス
 	ActivePostEffect manualEffectParams_{}; // 手動・ImGuiテスト用パラメータ
+
+	// ミッションエディタ用
+	bool isMissionEditorOpen_ = true;
+	char tempMissionName_[128] = "";
+	char tempMissionDesc_[256] = "";
+	char tempSaveFileName_[128] = "";
+	int selectedMissionIndex_ = 0;
+	int selectedEnemyIndex_ = -1;
+	void DrawMissionEditor();
 };
 

@@ -13,6 +13,7 @@
 #include "../../engine/Physics/Collision3DManager.h"
 #include <cmath>
 #include <algorithm>
+#include <filesystem>
 
 #ifdef USE_IMGUI
 #include "../../../external/imgui/imgui.h"
@@ -169,16 +170,31 @@ void StageScene::Initialize() {
 	// 弾丸マネージャー初期化
 	bulletManager_.Initialize(512);
 
-	// 敵の配置（ミッション01仕様）
-	std::vector<EnemySpawnData> mission01Enemies = {
-		{ {  100.0f, 100.0f,  200.0f }, "Resources/planeplane.obj", 50.0f, AIType::ChaseAttack },
-		{ {  -80.0f, 100.0f,  300.0f }, "Resources/planeplane.obj", 50.0f, AIType::ChaseAttack },
-		{ {  200.0f, 100.0f,  450.0f }, "Resources/planeplane.obj", 50.0f, AIType::ChaseAttack },
-		{ { -150.0f, 100.0f,  500.0f }, "Resources/planeplane.obj", 50.0f, AIType::CruiseEvade },
-		{ {   50.0f, 100.0f,  700.0f }, "Resources/planeplane.obj", 50.0f, AIType::CruiseEvade },
-	};
+	// ミッションデータのロード
+	auto& missionManager = MissionManager::GetInstance();
+	std::string loadPath = missionManager.GetCurrentFilePath();
+	if (loadPath.empty()) {
+		loadPath = "Resources/missions/mission01.json";
+	}
+	missionManager.Load(loadPath);
+
+	const auto& mission = missionManager.GetCurrentMission();
+
+	// プレイヤーパラメータの設定
+	playerMaxHP_ = mission.playerHP;
+	playerHP_ = mission.playerHP;
+	flightModel_.SetPosition(mission.playerPosition);
+
+	// エディタの一時バッファの初期化
+	strcpy_s(tempMissionName_, sizeof(tempMissionName_), mission.name.c_str());
+	strcpy_s(tempMissionDesc_, sizeof(tempMissionDesc_), mission.description.c_str());
+	if (tempSaveFileName_[0] == '\0') {
+		std::filesystem::path p(loadPath);
+		strcpy_s(tempSaveFileName_, sizeof(tempSaveFileName_), p.filename().string().c_str());
+	}
+
 	enemyManager_.Initialize(
-		mission01Enemies,
+		mission.enemies,
 		airframeData,
 		engineData,
 		gunpodData,
@@ -904,6 +920,8 @@ void StageScene::Update() {
 		ImGui::TextColored(ImVec4(1, 0, 0, 1), "*** MISSION FAILED ***");
 	}
 	ImGui::End();
+
+	DrawMissionEditor();
 #endif
 
 	// ============================
@@ -1340,4 +1358,184 @@ void StageScene::CheckPartDestructionEvents() {
 // そのrotateに合致するオイラー角(XYZ順)を逆算する
 // ジンバルロック対策: 真上・真下付近ではヨーを前フレームの値で維持
 // ===========================================================
+
+#ifdef USE_IMGUI
+void StageScene::DrawMissionEditor() {
+	auto& missionManager = MissionManager::GetInstance();
+	auto& currentMission = missionManager.GetCurrentMission();
+
+	if (ImGui::Begin("Mission Editor", &isMissionEditorOpen_)) {
+		
+		// 1. ミッションファイル管理
+		if (ImGui::CollapsingHeader("Mission File Management", ImGuiTreeNodeFlags_DefaultOpen)) {
+			// ロード
+			std::vector<std::string> missionFiles = missionManager.GetMissionList();
+			
+			// パスのみだと長いので、ファイル名だけを抽出して表示用のリストを作る
+			std::vector<std::string> fileNames;
+			std::vector<const char*> fileNamePtrs;
+			for (const auto& f : missionFiles) {
+				std::filesystem::path p(f);
+				fileNames.push_back(p.filename().string());
+			}
+			for (const auto& fn : fileNames) {
+				fileNamePtrs.push_back(fn.c_str());
+			}
+
+			if (ImGui::Combo("Select Mission", &selectedMissionIndex_, fileNamePtrs.data(), static_cast<int>(fileNamePtrs.size()))) {
+				// 選択変更
+			}
+
+			if (ImGui::Button("Load Selected")) {
+				if (selectedMissionIndex_ >= 0 && selectedMissionIndex_ < missionFiles.size()) {
+					std::string loadPath = missionFiles[selectedMissionIndex_];
+					if (missionManager.Load(loadPath)) {
+						Restart();
+					}
+				}
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("Reset File List")) {
+				selectedMissionIndex_ = 0;
+			}
+
+			ImGui::Separator();
+
+			// 新規作成
+			static char newFileName[64] = "new_mission.json";
+			ImGui::InputText("New JSON Name", newFileName, sizeof(newFileName));
+			if (ImGui::Button("Create New Mission")) {
+				std::string newPath = "Resources/missions/" + std::string(newFileName);
+				missionManager.CreateDefaultMission(newPath);
+				missionManager.Load(newPath);
+				
+				std::vector<std::string> scanFiles = missionManager.GetMissionList();
+				for (int i = 0; i < scanFiles.size(); ++i) {
+					if (scanFiles[i] == newPath) {
+						selectedMissionIndex_ = i;
+						break;
+					}
+				}
+				Restart();
+			}
+
+			ImGui::Separator();
+
+			// 保存
+			ImGui::InputText("Save File Name", tempSaveFileName_, sizeof(tempSaveFileName_));
+			if (ImGui::Button("Save (Overwrite)")) {
+				std::string savePath = "Resources/missions/" + std::string(tempSaveFileName_);
+				if (savePath.find(".json") == std::string::npos) {
+					savePath += ".json";
+				}
+				currentMission.name = tempMissionName_;
+				currentMission.description = tempMissionDesc_;
+				missionManager.Save(savePath);
+			}
+		}
+
+		// 2. ミッションの基本情報編集
+		if (ImGui::CollapsingHeader("Mission Properties", ImGuiTreeNodeFlags_DefaultOpen)) {
+			ImGui::InputText("Mission Name", tempMissionName_, sizeof(tempMissionName_));
+			ImGui::InputText("Description", tempMissionDesc_, sizeof(tempMissionDesc_));
+			
+			ImGui::SliderFloat("Player Initial HP", &currentMission.playerHP, 1.0f, 500.0f);
+			
+			ImGui::DragFloat3("Player Initial Pos", &currentMission.playerPosition.x, 1.0f);
+			if (ImGui::Button("Set to Current Player Pos")) {
+				currentMission.playerPosition = flightModel_.GetPosition();
+			}
+		}
+
+		// 3. 敵配置の編集
+		if (ImGui::CollapsingHeader("Enemy Spawns", ImGuiTreeNodeFlags_DefaultOpen)) {
+			ImGui::Text("Total Enemies: %d", static_cast<int>(currentMission.enemies.size()));
+			
+			if (ImGui::Button("Add New Enemy at Player Pos")) {
+				EnemySpawnData newEnemy;
+				newEnemy.position = flightModel_.GetPosition();
+				newEnemy.modelPath = "Resources/planeplane.obj";
+				newEnemy.health = 50.0f;
+				newEnemy.aiType = AIType::ChaseAttack;
+				currentMission.enemies.push_back(newEnemy);
+				selectedEnemyIndex_ = static_cast<int>(currentMission.enemies.size()) - 1;
+			}
+
+			ImGui::Separator();
+
+			std::vector<std::string> enemyLabels;
+			for (size_t i = 0; i < currentMission.enemies.size(); ++i) {
+				const auto& e = currentMission.enemies[i];
+				std::string aiName = (e.aiType == AIType::ChaseAttack) ? "Chase" : "Evade";
+				enemyLabels.push_back("Enemy " + std::to_string(i) + " [" + aiName + "] @ (" + 
+					std::to_string(static_cast<int>(e.position.x)) + ", " + 
+					std::to_string(static_cast<int>(e.position.y)) + ", " + 
+					std::to_string(static_cast<int>(e.position.z)) + ")");
+			}
+
+			std::vector<const char*> enemyLabelPtrs;
+			for (const auto& l : enemyLabels) {
+				enemyLabelPtrs.push_back(l.c_str());
+			}
+
+			if (ImGui::ListBox("Select Enemy to Edit", &selectedEnemyIndex_, enemyLabelPtrs.data(), static_cast<int>(enemyLabelPtrs.size()), 5)) {
+				// 選択変更
+			}
+
+			if (selectedEnemyIndex_ >= 0 && selectedEnemyIndex_ < static_cast<int>(currentMission.enemies.size())) {
+				ImGui::Separator();
+				ImGui::Text("--- Edit Enemy %d ---", selectedEnemyIndex_);
+				auto& enemy = currentMission.enemies[selectedEnemyIndex_];
+
+				ImGui::DragFloat3("Position", &enemy.position.x, 1.0f);
+				if (ImGui::Button("Move to Current Player")) {
+					enemy.position = flightModel_.GetPosition();
+				}
+
+				ImGui::SliderFloat("Health", &enemy.health, 10.0f, 500.0f);
+
+				int aiTypeInt = (enemy.aiType == AIType::ChaseAttack) ? 0 : 1;
+				const char* aiItems[] = { "ChaseAttack", "CruiseEvade" };
+				if (ImGui::Combo("AI Type", &aiTypeInt, aiItems, 2)) {
+					enemy.aiType = (aiTypeInt == 0) ? AIType::ChaseAttack : AIType::CruiseEvade;
+				}
+
+				static char modelPathBuf[256];
+				strcpy_s(modelPathBuf, sizeof(modelPathBuf), enemy.modelPath.c_str());
+				if (ImGui::InputText("Model Path", modelPathBuf, sizeof(modelPathBuf))) {
+					enemy.modelPath = modelPathBuf;
+				}
+
+				if (ImGui::Button("Duplicate Enemy")) {
+					EnemySpawnData dup = enemy;
+					dup.position.x += 20.0f;
+					currentMission.enemies.push_back(dup);
+					selectedEnemyIndex_ = static_cast<int>(currentMission.enemies.size()) - 1;
+				}
+				ImGui::SameLine();
+				if (ImGui::Button("Delete Enemy")) {
+					currentMission.enemies.erase(currentMission.enemies.begin() + selectedEnemyIndex_);
+					selectedEnemyIndex_ = -1;
+				}
+			}
+		}
+
+		ImGui::Separator();
+
+		if (ImGui::Button("Apply & Restart", ImVec2(-1, 40))) {
+			currentMission.name = tempMissionName_;
+			currentMission.description = tempMissionDesc_;
+			Restart();
+		}
+	}
+	ImGui::End();
+}
+#else
+void StageScene::DrawMissionEditor() {}
+#endif
+
+void StageScene::Restart() {
+	Finalize();
+	Initialize();
+}
 

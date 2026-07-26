@@ -270,6 +270,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="src\engine\Graphics\Model\PrimitiveGenerator.h" />
     <ClInclude Include="src\engine\Graphics\Model\PrimitiveModel.h" />
     <ClInclude Include="src\Game\System\Game.h" />
+    <ClInclude Include="src\Game\System\MissionManager.h" />
     <ClInclude Include="src\engine\Audio\AudioManager.h" />
     <ClInclude Include="src\engine\Debug\ImguiManager.h" />
     <ClInclude Include="src\engine\Graphics\Particle\ParticleEmitter.h" />
@@ -360,6 +361,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="src\engine\Graphics\Model\PrimitiveGenerator.cpp" />
     <ClCompile Include="src\engine\Graphics\Model\PrimitiveModel.cpp" />
     <ClCompile Include="src\Game\System\Game.cpp" />
+    <ClCompile Include="src\Game\System\MissionManager.cpp" />
     <ClCompile Include="src\engine\Graphics\Text\FontManager.cpp" />
     <ClCompile Include="src\engine\Graphics\Text\TextRenderer.cpp" />
     <ClCompile Include="src\engine\Audio\AudioManager.cpp" />
