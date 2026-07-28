@@ -6,6 +6,8 @@
 #include "../../engine/Graphics/Model/Skybox.h"
 #include <memory>
 
+#include "../../engine/Physics/Collider.h"
+
 /// エンジン機能テスト用のデバッグシーン
 class DebugScene : public IScene {
 public:
@@ -18,4 +20,7 @@ private:
 	std::unique_ptr<Object3d> terrainObject = nullptr;
 	std::unique_ptr<Skybox> skybox_ = nullptr;
 	bool isSkyboxVisible_ = true;
+
+	Ray debugRay_;
+	RaycastHit debugHit_;
 };

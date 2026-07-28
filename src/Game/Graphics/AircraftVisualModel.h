@@ -1,4 +1,9 @@
 #pragma once
+#define _USE_MATH_DEFINES
+#include <cmath>
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
 #include <memory>
 #include <unordered_map>
 #include <string>
@@ -18,8 +23,12 @@ public:
 	void Initialize(Object3dCommon* object3dCommon, Camera* camera);
 
 	/// @brief パーツモデルの設定
-	void SetModelForPart(DamagePart part, const std::string& modelFilePath);
-	void SetModelForPart(DamagePart part, Model* model);
+	void SetModelForPart(DamagePart part, const std::string& modelFilePath, const std::string& targetNodeName = "");
+	void SetModelForPart(DamagePart part, Model* model, const std::string& targetNodeName = "");
+
+	/// @brief 単一のモデルファイルから標準的なノード名で一括セットアップ
+	void SetupFromSingleModel(const std::string& modelFilePath);
+	void SetupFromSingleModel(Model* model);
 
 	/// @brief パーツのローカルオフセット設定
 	void SetPartLocalTransform(DamagePart part, const Vector3& scale, const Vector3& rotate, const Vector3& translate);
@@ -30,6 +39,10 @@ public:
 
 	/// @brief プロペラ回転速度の設定 (rad/sec)
 	void SetPropellerRpm(float rpm) { propellerRpm_ = rpm; }
+
+	/// @brief モデル全体の向き補正（ベース回転）の設定 (rad)
+	void SetBaseRotation(const Vector3& rotate) { baseRotation_ = rotate; }
+	Vector3 GetBaseRotation() const { return baseRotation_; }
 
 	/// @brief 更新（親ワールド行列からの階層合成）
 	void Update(const Matrix4x4& parentWorldMatrix, float deltaTime);
@@ -55,6 +68,7 @@ private:
 	Camera* camera_ = nullptr;
 	std::unordered_map<DamagePart, PartNode> partNodes_;
 
+	Vector3 baseRotation_ = { 0.0f, static_cast<float>(M_PI), 0.0f }; // デフォルトは前後逆補正(180度回転)
 	float propellerAngle_ = 0.0f;
 	float propellerRpm_ = 2000.0f; // デフォルトRPM
 };

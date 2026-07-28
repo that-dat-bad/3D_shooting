@@ -10,6 +10,7 @@
 /// @brief ダメージパーツ識別子
 enum class DamagePart : uint8_t {
 	Engine1,        // エンジン
+	Propeller1,     // プロペラ
 	Wing_L,         // 左翼（付け根）
 	Wing_R,         // 右翼（付け根）
 	Wing1_L,        // 左翼（中間）

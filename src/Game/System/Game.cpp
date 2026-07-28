@@ -20,7 +20,7 @@ void Game::Initialize() {
 	// 2. マネージャ類の初期化
 	SpriteCommon::GetInstance()->Initialize(DirectXCommon::GetInstance());
 	TextureManager::GetInstance()->Initialize(DirectXCommon::GetInstance(), srvManager.get());
-	ModelManager::GetInstance()->Initialize(DirectXCommon::GetInstance());
+	ModelManager::GetInstance()->Initialize(DirectXCommon::GetInstance(), srvManager.get());
 	CameraManager::GetInstance()->Initialize();
 	ParticleManager::GetInstance()->Initialize(DirectXCommon::GetInstance(), srvManager.get());
 	GPUParticleManager::GetInstance()->Initialize(DirectXCommon::GetInstance(), srvManager.get());

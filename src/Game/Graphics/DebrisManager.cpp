@@ -23,8 +23,13 @@ void DebrisObject::Update(float deltaTime) {
 	position = Add(position, Multiply(deltaTime, velocity));
 	rotation = Add(rotation, Multiply(deltaTime, angularVelocity));
 
-	// ワールド行列の更新
-	Matrix4x4 world = MakeAffineMatrix(scale, rotation, position);
+	// 自転行列 * 初期回転変換（切断時の位置・姿勢をベースにタンブリング回転）
+	Matrix4x4 rotMat = MakeAffineMatrix(scale, rotation, { 0.0f, 0.0f, 0.0f });
+	Matrix4x4 world = Multiply(rotMat, initialWorldMatrix);
+	world.m[3][0] = position.x;
+	world.m[3][1] = position.y;
+	world.m[3][2] = position.z;
+
 	if (object) {
 		object->UpdateWithWorldMatrix(world);
 	}
@@ -72,7 +77,7 @@ void DebrisManager::Clear() {
 	debrisList_.clear();
 }
 
-void DebrisManager::SpawnDebris(Model* model, const Matrix4x4& initialWorldMatrix, const Vector3& baseVelocity, const Vector3& ejectionForce) {
+void DebrisManager::SpawnDebris(Model* model, const Matrix4x4& initialWorldMatrix, const Vector3& baseVelocity, const Vector3& ejectionForce, const std::string& targetNodeName) {
 	if (!model || !object3dCommon_) return;
 
 	auto debris = std::make_unique<DebrisObject>();
@@ -82,10 +87,11 @@ void DebrisManager::SpawnDebris(Model* model, const Matrix4x4& initialWorldMatri
 		debris->object->SetCamera(camera_);
 	}
 	debris->object->SetModel(model);
+	debris->object->SetTargetNodeName(targetNodeName);
 
-	// 行列から位置抽出
+	debris->initialWorldMatrix = initialWorldMatrix;
 	debris->position = { initialWorldMatrix.m[3][0], initialWorldMatrix.m[3][1], initialWorldMatrix.m[3][2] };
-	debris->rotation = { 0.0f, 0.0f, 0.0f }; // 初期状態
+	debris->rotation = { 0.0f, 0.0f, 0.0f }; // 自転オフセット
 
 	// ランダムな自転角速度
 	static std::random_device rd;

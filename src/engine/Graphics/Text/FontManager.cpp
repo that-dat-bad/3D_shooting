@@ -34,8 +34,8 @@ void FontManager::LoadFont(const std::string& fontName, const std::string& fileP
 
     // パッキングコンテキストの準備
     stbtt_pack_context spc;
-    int texWidth = 1024;
-    int texHeight = 1024;
+    int texWidth = 2048;
+    int texHeight = 2048;
     std::vector<unsigned char> tempBitmap(texWidth * texHeight);
 
     stbtt_PackBegin(&spc, tempBitmap.data(), texWidth, texHeight, 0, 1, nullptr);

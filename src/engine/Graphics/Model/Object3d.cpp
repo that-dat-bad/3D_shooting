@@ -116,7 +116,11 @@ void Object3d::Draw() {
 		}
 	}
 
-	model_->Draw();
+	if (!targetNodeName_.empty()) {
+		model_->DrawNode(targetNodeName_);
+	} else {
+		model_->Draw();
+	}
 }
 
 void Object3d::SetModel(const std::string& filePath) {

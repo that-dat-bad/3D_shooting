@@ -24,7 +24,7 @@ void Object3dCommon::Initialize(DirectXCommon* dxCommon)
 	directionalLightResource_ = DirectXCommon::GetInstance()->CreateBufferResource(sizeof(DirectionalLight));
 	directionalLightResource_->Map(0, nullptr, reinterpret_cast<void**>(&directionalLightData));
 	directionalLightData->color = { 1.0f, 1.0f, 1.0f, 1.0f };
-	directionalLightData->direction = { 0.0f, -1.0f, 0.0f };
+	directionalLightData->direction = Normalize({ 0.5f, -1.0f, 0.5f });
 	directionalLightData->intensity = 1.0f;
 
 	pointLightResource_ = DirectXCommon::GetInstance()->CreateBufferResource(sizeof(PointLight));
@@ -49,9 +49,9 @@ void Object3dCommon::Initialize(DirectXCommon* dxCommon)
 
 	lightingSettingsResource_ = DirectXCommon::GetInstance()->CreateBufferResource(sizeof(LightingSettings));
 	lightingSettingsResource_->Map(0, nullptr, reinterpret_cast<void**>(&lightingSettingsData));
-	lightingSettingsData->shadingModel = 0;
-	lightingSettingsData->specularModel = 0;
-	lightingSettingsData->lightType = 0;
+	lightingSettingsData->shadingModel = 1; // 1: Half-Lambert (暗部も明るく照らす)
+	lightingSettingsData->specularModel = 0; // 鏡面反射OFF
+	lightingSettingsData->lightType = 1;     // 1: 平行光源 (Directional Light) 有効化
 	CreateRootSignature(dxCommon_);
 	CreateGraphicsPipeline(dxCommon_);
 }
@@ -149,11 +149,11 @@ void Object3dCommon::CreateGraphicsPipeline(DirectXCommon* dxCommon)
 {
 	CreateRootSignature(dxCommon);
 	D3D12_INPUT_ELEMENT_DESC inputElementDescs[5] = {};
-	inputElementDescs[0] = { "POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 };
-	inputElementDescs[1] = { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 };
-	inputElementDescs[2] = { "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 };
-	inputElementDescs[3] = { "WEIGHT", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 };
-	inputElementDescs[4] = { "BLENDINDICES", 0, DXGI_FORMAT_R32G32B32A32_SINT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 };
+	inputElementDescs[0] = { "POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 };
+	inputElementDescs[1] = { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 16, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 };
+	inputElementDescs[2] = { "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 };
+	inputElementDescs[3] = { "WEIGHT", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 48, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 };
+	inputElementDescs[4] = { "BLENDINDICES", 0, DXGI_FORMAT_R32G32B32A32_SINT, 0, 64, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 };
 
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC graphicsPipelineStateDesc{};
 	graphicsPipelineStateDesc.pRootSignature = rootSignature_.Get();

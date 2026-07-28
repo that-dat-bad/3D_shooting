@@ -40,6 +40,17 @@ public:
 	/// <summary>球とAABBの衝突判定</summary>
 	static bool CheckSphereAABB(const SphereCollider& sphere, const AABBCollider& aabb);
 
+	/// <summary>レイとAABBの衝突判定（高速アーリーアウト用）</summary>
+	static bool CheckRayAABB(const Ray& ray, const AABBCollider& aabb, float* outTMin = nullptr);
+
+	/// <summary>レイと三角形ポリゴンの Möller–Trumbore 交差判定</summary>
+	static bool RayTriangleIntersect(
+		const Ray& ray,
+		const MyMath::Vector3& v0,
+		const MyMath::Vector3& v1,
+		const MyMath::Vector3& v2,
+		RaycastHit* outHit = nullptr);
+
 	/// <summary>
 	/// 座標が地面より下かどうか
 	/// </summary>

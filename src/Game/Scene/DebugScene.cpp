@@ -48,6 +48,10 @@ void DebugScene::Initialize() {
 	CameraManager::GetInstance()->GetActiveCamera()->SetTranslate({ 0.0f, 0.0f, -10.0f });
 	CameraManager::GetInstance()->Update();
 
+	debugRay_.origin = { 0.0f, 2.0f, -5.0f };
+	debugRay_.direction = Normalize({ 0.0f, -0.2f, 1.0f });
+	debugRay_.maxDistance = 20.0f;
+
 	// --- Skybox ---
 	TextureManager::GetInstance()->LoadTexture("assets/textures/cedar_bridge_sunset_1_2k.dds");
 	skybox_ = std::make_unique<Skybox>();
@@ -467,6 +471,28 @@ void DebugScene::Update() {
 		if (ImGui::DragFloat3("Model Translate", &modelPos.x, 0.01f)) {
 			sphereObject->SetTranslate(modelPos);
 		}
+
+		if (ImGui::CollapsingHeader("Ray-Mesh Collision Debug")) {
+			ImGui::DragFloat3("Ray Origin", &debugRay_.origin.x, 0.1f);
+			if (ImGui::DragFloat3("Ray Direction", &debugRay_.direction.x, 0.01f)) {
+				debugRay_.direction = Normalize(debugRay_.direction);
+			}
+			ImGui::DragFloat("Ray MaxDistance", &debugRay_.maxDistance, 0.5f);
+
+			if (sphereObject && sphereObject->GetModel()) {
+				Matrix4x4 wMat = MakeAffineMatrix(sphereObject->GetScale(), sphereObject->GetRotate(), sphereObject->GetTranslate());
+				debugHit_ = {};
+				bool isHit = sphereObject->GetModel()->IntersectRay(debugRay_, wMat, &debugHit_);
+				ImGui::Text("Raycast Hit: %s", isHit ? "TRUE (HIT!)" : "FALSE");
+				if (isHit) {
+					ImGui::Text("Hit Distance: %.3f", debugHit_.distance);
+					ImGui::Text("Hit Point: (%.2f, %.2f, %.2f)", debugHit_.point.x, debugHit_.point.y, debugHit_.point.z);
+					ImGui::Text("Hit Normal: (%.2f, %.2f, %.2f)", debugHit_.normal.x, debugHit_.normal.y, debugHit_.normal.z);
+					ImGui::Text("Hit Node: %s", debugHit_.nodeName.c_str());
+					ImGui::Text("Hit Tri Index: %u", debugHit_.triangleIndex);
+				}
+			}
+		}
 	}
 
 	ImGui::End();
@@ -494,8 +520,16 @@ void DebugScene::Draw() {
 	// スケルトンのデバッグ描画テスト
 	sphereObject->DebugDrawSkeleton({ 1.0f, 1.0f, 1.0f, 1.0f });
 
-	// カスタムのライン描画テスト
-	PrimitiveModel::GetInstance()->DrawLine3D({ -5.0f, 0.0f, 0.0f }, { 5.0f, 5.0f, 0.0f }, { 0.0f, 1.0f, 0.0f, 1.0f }, CameraManager::GetInstance()->GetActiveCamera());
+	// Ray-Mesh デバッグ描画（レイ線 & ヒット時の法線ベクトル）
+	Camera* mainCamera = CameraManager::GetInstance()->GetActiveCamera();
+	Vector3 rayEnd = Add(debugRay_.origin, Multiply(debugRay_.maxDistance, debugRay_.direction));
+	Vector4 rayColor = debugHit_.hit ? Vector4{ 1.0f, 0.0f, 0.0f, 1.0f } : Vector4{ 0.0f, 1.0f, 1.0f, 1.0f };
+	PrimitiveModel::GetInstance()->DrawLine3D(debugRay_.origin, rayEnd, rayColor, mainCamera);
+
+	if (debugHit_.hit) {
+		Vector3 normalEnd = Add(debugHit_.point, Multiply(1.5f, debugHit_.normal));
+		PrimitiveModel::GetInstance()->DrawLine3D(debugHit_.point, normalEnd, { 1.0f, 1.0f, 0.0f, 1.0f }, mainCamera);
+	}
 
 	// エフェクト（プリミティブ）描画 (加算合成で光る柱のように描画)
 	uint32_t particleTex = TextureManager::GetInstance()->GetTextureIndexByFilePath("assets/textures/circle2.png");

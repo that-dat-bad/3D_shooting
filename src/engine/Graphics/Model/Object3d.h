@@ -63,6 +63,7 @@ public: // メンバ関数
 	void ClearLODLevels();
 	void SetCullScreenSize(float minScreenSize) { cullScreenSize_ = minScreenSize; }
 	void SetBoundingRadius(float radius) { boundingRadius_ = radius; }
+	void SetTargetNodeName(const std::string& name) { targetNodeName_ = name; }
 
 	// ゲッター
 	Vector3 GetScale() const { return transform_.scale; }
@@ -99,4 +100,5 @@ private:
 	float boundingRadius_ = 1.0f;  // オブジェクト境界半径
 	float currentScreenSize_ = 1.0f;
 	int activeLODIndex_ = 0;
+	std::string targetNodeName_ = "";
 };

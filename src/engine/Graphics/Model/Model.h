@@ -5,6 +5,7 @@
 #include <vector>
 #include <map>
 #include "../base/Math/MyMath.h"
+#include "../../Physics/Collider.h"
 
 using namespace MyMath;
 class ModelCommon;
@@ -30,6 +31,11 @@ public:
 	void Draw();
 
 	/// <summary>
+	/// 特定のノード（とその子孫）のみを描画するコマンド発行
+	/// </summary>
+	void DrawNode(const std::string& nodeName);
+
+	/// <summary>
 	/// デバッグ用: スケルトンの描画
 	/// </summary>
 	/// <param name="objectWorldMatrix">オブジェクトのワールド行列</param>
@@ -37,19 +43,20 @@ public:
 	/// <param name="color">描画色</param>
 	void DebugDrawSkeleton(const Matrix4x4& objectWorldMatrix, Camera* camera, const Vector4& color = { 1.0f, 1.0f, 1.0f, 1.0f });
 
-	void SetShininess(float shininess) { materialData_->shininess = shininess; }
-	float GetShininess() const { return materialData_->shininess; }
+	void SetShininess(float shininess) { for (auto* mat : materialDatas_) { if (mat) mat->shininess = shininess; } }
+	float GetShininess() const { return !materialDatas_.empty() && materialDatas_[0] ? materialDatas_[0]->shininess : 0.0f; }
 
-	void SetEnvironmentCoefficient(float coefficient) { materialData_->environmentCoefficient = coefficient; }
-	float GetEnvironmentCoefficient() const { return materialData_->environmentCoefficient; }
+	void SetEnvironmentCoefficient(float coefficient) { for (auto* mat : materialDatas_) { if (mat) mat->environmentCoefficient = coefficient; } }
+	float GetEnvironmentCoefficient() const { return !materialDatas_.empty() && materialDatas_[0] ? materialDatas_[0]->environmentCoefficient : 0.0f; }
 
-	void SetSpecularIntensity(float intensity) { materialData_->specularIntensity = intensity; }
-	float GetSpecularIntensity() const { return materialData_->specularIntensity; }
+	void SetSpecularIntensity(float intensity) { for (auto* mat : materialDatas_) { if (mat) mat->specularIntensity = intensity; } }
+	float GetSpecularIntensity() const { return !materialDatas_.empty() && materialDatas_[0] ? materialDatas_[0]->specularIntensity : 0.0f; }
 
 	struct VertexData {
 		Vector4 position;
 		Vector2 texcoord;
 		Vector3 normal;
+		float padding[3] = { 0.0f, 0.0f, 0.0f };
 		Vector4 weight;
 		int32_t indices[4];
 	};
@@ -65,6 +72,10 @@ public:
 	struct BoneMatrix {
 		Matrix4x4 matrices[100];
 	};
+	struct SkinningParams {
+		uint32_t numVertices;
+		float padding[3] = { 0.0f, 0.0f, 0.0f };
+	};
 	struct MaterialData {
 		std::string textureFilePath;
 		uint32_t textureIndex = 0;
@@ -73,15 +84,21 @@ public:
 		float environmentCoefficient = 0.0f; //環境マップの反射度合い
 		float specularIntensity = 1.0f;      // 反射強度
 	};
+	struct MeshInfo {
+		uint32_t indexOffset;
+		uint32_t indexCount;
+		uint32_t materialIndex = 0;
+	};
 	struct Node {
 		Matrix4x4 localMatrix = { 1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1 };
 		std::string name;
 		std::vector<Node> children;
+		std::vector<MeshInfo> meshes;
 	};
 	struct ModelData {
 		std::vector<VertexData> vertices;
 		std::vector<uint32_t> indices;
-		MaterialData material;
+		std::vector<MaterialData> materials;
 		Node rootNode;
 		struct BoneData {
 			std::string name;
@@ -120,6 +137,17 @@ public:
 
 	// 毎フレーム呼んでアニメーションを進める関数
 	void Update(float deltaTime);
+
+	/// <summary>
+	/// モデル全体のメッシュに対するレイキャスト判定
+	/// </summary>
+	bool IntersectRay(const Ray& ray, const Matrix4x4& worldMatrix, RaycastHit* outHit = nullptr) const;
+
+	/// <summary>
+	/// 特定ノードのメッシュに対するレイキャスト判定
+	/// </summary>
+	bool IntersectRayNode(const std::string& nodeName, const Ray& ray, const Matrix4x4& nodeWorldMatrix, RaycastHit* outHit = nullptr) const;
+
 private:
 
 	ModelCommon* modelCommon_ = nullptr;
@@ -135,13 +163,21 @@ private:
 	// バッファビュー
 	D3D12_VERTEX_BUFFER_VIEW vertexBufferView_{};
 
+	// CSスキニング用リソース
+	Microsoft::WRL::ComPtr<ID3D12Resource> skinnedVertexBuffer_ = nullptr;
+	D3D12_VERTEX_BUFFER_VIEW skinnedVertexBufferView_{};
+	Microsoft::WRL::ComPtr<ID3D12Resource> skinningParamsResource_ = nullptr;
+
+	uint32_t rawVertexSrvIndex_ = 0;
+	uint32_t skinnedVertexUavIndex_ = 0;
+
 	//--インデックスデータ--//
 	Microsoft::WRL::ComPtr<ID3D12Resource> indexBuffer_ = nullptr;
 	D3D12_INDEX_BUFFER_VIEW indexBufferView_{};
 
 	//--マテリアル--//
-	Microsoft::WRL::ComPtr<ID3D12Resource> materialResource_ = nullptr;
-	Material* materialData_ = nullptr;
+	std::vector<Microsoft::WRL::ComPtr<ID3D12Resource>> materialResources_;
+	std::vector<Material*> materialDatas_;
 
 
 	Microsoft::WRL::ComPtr<ID3D12Resource> boneResource_;
@@ -153,4 +189,5 @@ private:
 	float animationTime_ = 0.0f;
 	void UpdateNodeAnimation(const Node& node, const Matrix4x4& parentMatrix);
 	void DebugDrawNodeSkeleton(const Node& node, const Matrix4x4& parentMatrix, const Matrix4x4& objectWorldMatrix, Camera* camera, const Vector4& color);
+	void DrawNodeRecursive(const Node& node, const std::string& targetName, bool isTargetFound);
 };

@@ -1,6 +1,7 @@
 #include "ModelManager.h"
 #include "ModelCommon.h"
 #include "../System/DirectXCommon.h"
+#include "../System/SrvManager.h"
 #include <filesystem>
 
 std::unique_ptr<ModelManager> ModelManager::instance_ = nullptr;
@@ -16,10 +17,10 @@ ModelManager* ModelManager::GetInstance()
 	return instance_.get();
 }
 
-void ModelManager::Initialize(DirectXCommon* dxCommon)
+void ModelManager::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager)
 {
 	modelCommon_ = std::make_unique<ModelCommon>();
-	modelCommon_->Initialize(dxCommon);
+	modelCommon_->Initialize(dxCommon, srvManager);
 }
 
 void ModelManager::Finalize()

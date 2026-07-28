@@ -1,4 +1,6 @@
 #pragma once
+#include <string>
+#include <cstdint>
 #include "../base/Math/MyMath.h"
 
 // ============================================================
@@ -27,6 +29,27 @@ struct SphereCollider {
 struct AABBCollider {
 	MyMath::Vector3 min;
 	MyMath::Vector3 max;
+};
+
+/// <summary>
+/// レイ（光線）構造体
+/// </summary>
+struct Ray {
+	MyMath::Vector3 origin = { 0.0f, 0.0f, 0.0f };
+	MyMath::Vector3 direction = { 0.0f, 0.0f, 1.0f }; // 正規化推奨
+	float maxDistance = 10000.0f;
+};
+
+/// <summary>
+/// レイキャストヒット結果情報
+/// </summary>
+struct RaycastHit {
+	bool hit = false;
+	float distance = 0.0f;
+	MyMath::Vector3 point = { 0.0f, 0.0f, 0.0f };
+	MyMath::Vector3 normal = { 0.0f, 1.0f, 0.0f };
+	std::string nodeName;
+	uint32_t triangleIndex = 0;
 };
 
 // ============================================================

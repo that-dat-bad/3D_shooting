@@ -86,32 +86,35 @@ void StageScene::Initialize() {
 	TextureManager::GetInstance()->LoadTexture("assets/textures/circle2.png");
 
 	// 機体モデル
-	ModelManager::GetInstance()->LoadModel("Resources/planeplane.obj");
+	ModelManager::GetInstance()->LoadModel("Resources/models/m21.gltf");
 	aircraftObject_ = std::make_unique<Object3d>();
 	aircraftObject_->Initialize(Object3dCommon::GetInstance());
 	aircraftObject_->SetCamera(CameraManager::GetInstance()->GetActiveCamera());
-	aircraftObject_->SetModel("Resources/planeplane.obj");
-	aircraftObject_->GetModel()->SetEnvironmentCoefficient(0.6f); // 機体表面にスカイボックスの映り込み (強度引き上げ)
-	aircraftObject_->GetModel()->SetSpecularIntensity(2.5f);     // 鏡面反射強度を大幅に引き上げ
-	aircraftObject_->GetModel()->SetShininess(120.0f);            // シャープな光沢
+	aircraftObject_->SetModel("Resources/models/m21.gltf");
+	if (aircraftObject_->GetModel()) {
+		aircraftObject_->GetModel()->SetEnvironmentCoefficient(0.0f); // 金属反射(スカイボックス映り込み)をOFF
+		aircraftObject_->GetModel()->SetSpecularIntensity(1.0f);     // 標準的なスペキュラ強度
+		aircraftObject_->GetModel()->SetShininess(50.0f);
+	}
 
 	// --- 部位破壊対応マルチパーツビジュアルモデル初期化 ---
 	aircraftVisualModel_.Initialize(Object3dCommon::GetInstance(), CameraManager::GetInstance()->GetActiveCamera());
 	DebrisManager::GetInstance()->Initialize(Object3dCommon::GetInstance(), CameraManager::GetInstance()->GetActiveCamera());
 
-	// 各パーツに基本モデルをロード（分割モデルがない場合は planeplane.obj を配置し、ローカルオフセットを設定）
-	std::vector<DamagePart> parts = {
-		DamagePart::Fuse, DamagePart::Engine1, DamagePart::Wing_L, DamagePart::Wing_R,
-		DamagePart::Wing1_L, DamagePart::Wing1_R, DamagePart::Wing2_L, DamagePart::Wing2_R,
-		DamagePart::Tail, DamagePart::Rudder, DamagePart::Elevator0, DamagePart::Elevator1
-	};
-	for (auto p : parts) {
-		aircraftVisualModel_.SetModelForPart(p, "Resources/planeplane.obj");
+	// 1つのモデルファイルからノード名に基づいて自動セットアップ
+	aircraftVisualModel_.SetupFromSingleModel("Resources/models/m21.gltf");
+	
+	// フォールバックとして、もし何も読み込まれなかった場合（ノードが見つからなかった場合）のために
+	if (!aircraftVisualModel_.IsPartVisible(DamagePart::Fuse)) {
+		std::vector<DamagePart> parts = {
+			DamagePart::Fuse, DamagePart::Engine1, DamagePart::Wing_L, DamagePart::Wing_R,
+			DamagePart::Wing1_L, DamagePart::Wing1_R, DamagePart::Wing2_L, DamagePart::Wing2_R,
+			DamagePart::Tail, DamagePart::Rudder, DamagePart::Elevator0, DamagePart::Elevator1
+		};
+		for (auto p : parts) {
+			aircraftVisualModel_.SetModelForPart(p, "Resources/models/m21.gltf");
+		}
 	}
-	// 左右の翼パーツに僅かなオフセットを付けて位置関係をシミュレート
-	aircraftVisualModel_.SetPartLocalTransform(DamagePart::Wing_L, { 0.45f, 0.45f, 0.45f }, { 0.0f, 0.0f, 0.0f }, { -2.5f, 0.0f, -0.5f });
-	aircraftVisualModel_.SetPartLocalTransform(DamagePart::Wing_R, { 0.45f, 0.45f, 0.45f }, { 0.0f, 0.0f, 0.0f }, {  2.5f, 0.0f, -0.5f });
-	aircraftVisualModel_.SetPartLocalTransform(DamagePart::Engine1, { 0.5f, 0.5f, 0.5f }, { 0.0f, 0.0f, 0.0f }, {  0.0f, 0.0f,  2.0f });
 
 	// 地面テクスチャ
 	TextureManager::GetInstance()->LoadTexture("assets/textures/white1x1.png");
@@ -529,7 +532,11 @@ void StageScene::Update() {
 		if (pLight->intensity < 0.0f) { pLight->intensity = 0.0f; }
 	}
 
+	// 環境（太陽の位置・ライティング・ブルーム）の更新
+	environmentManager_.Update(CameraManager::GetInstance()->GetActiveCamera(), kDeltaTime);
+
 	// ============================
+	// 飛行モデルの更新
 	// ============================
 	flightModel_.Update(kDeltaTime);
 
@@ -1018,9 +1025,10 @@ void StageScene::Draw() {
 
 	// 3Dオブジェクト描画（Object3dパイプライン）
 	Object3dCommon::GetInstance()->SetupCommonState();
-	if (aircraftObject_) {
-		aircraftObject_->Draw();
-	}
+	// (レガシーの全結合単一モデル描画を無効化し、マルチパーツモデルのみ描画)
+	// if (aircraftObject_) {
+	// 	aircraftObject_->Draw();
+	// }
 
 	// 部位破壊対応ビジュアルモデルと飛散破片の描画
 	aircraftVisualModel_.Draw();
@@ -1316,8 +1324,25 @@ void StageScene::CheckPartDestructionEvents() {
 					ejectForce = Multiply(-6.0f, flightModel_.GetRightDirection());
 				}
 
-				Model* partModel = ModelManager::GetInstance()->FindModel("Resources/planeplane.obj");
-				DebrisManager::GetInstance()->SpawnDebris(partModel, partWorldMatrix, baseVelocity, ejectForce);
+				Model* mainModel = ModelManager::GetInstance()->FindModel("Resources/models/m21.gltf");
+				static const std::unordered_map<DamagePart, std::string> kPartNodeNameMap = {
+					{ DamagePart::Fuse, "Fuse" },
+					{ DamagePart::Wing_L, "Wing_L" },
+					{ DamagePart::Wing1_L, "Wing1_L" },
+					{ DamagePart::Wing2_L, "Wing2_L" },
+					{ DamagePart::Wing_R, "Wing_R" },
+					{ DamagePart::Wing1_R, "Wing1_R" },
+					{ DamagePart::Wing2_R, "Wing2_R" },
+					{ DamagePart::Tail, "Tail" },
+				};
+
+				std::string nodeName = "";
+				auto itMap = kPartNodeNameMap.find(part);
+				if (itMap != kPartNodeNameMap.end()) {
+					nodeName = itMap->second;
+				}
+
+				DebrisManager::GetInstance()->SpawnDebris(mainModel, partWorldMatrix, baseVelocity, ejectForce, nodeName);
 
 				// 3. 切断面からの破片発煙エフェクト
 				Vector3 partPos = aircraftVisualModel_.GetPartWorldPosition(part);

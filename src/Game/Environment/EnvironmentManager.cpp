@@ -1,36 +1,35 @@
 #include "EnvironmentManager.h"
 #include <cmath>
+#include <algorithm>
 
 void EnvironmentManager::Initialize() {
-	timeOfDay_ = 17.0f; // 夕方（17時）から開始
+	timeOfDay_ = 12.0f; // 昼間（12時）から開始
 	sun_.Initialize();
 }
 
 void EnvironmentManager::Update(Camera* camera, float deltaTime) {
-	// 時間の進行 (仮の昼夜サイクル: リアル時間1秒につきゲーム内0.05時間進む)
-	timeOfDay_ += deltaTime * 0.05f;
+	// 時間の進行 (仮の昼夜サイクル: リアル時間1秒につきゲーム内0.01時間進む)
+	timeOfDay_ += deltaTime * 0.01f;
 	if (timeOfDay_ > 24.0f) {
 		timeOfDay_ = 0.0f;
 	}
 
-	// 太陽の回転計算 (時間角度に基づく円軌道)
-	float angle = (timeOfDay_ / 24.0f) * 2.0f * 3.14159265f;
+	// 太陽の回転計算 (6:00日の出 〜 12:00南中 〜 18:00日の入り)
+	float angle = ((timeOfDay_ - 6.0f) / 12.0f) * 3.14159265f;
 	
-	// 太陽光の進行方向ベクトルを計算 (X-Y平面での円運動 + Z軸の傾き)
+	// 太陽光の進行方向ベクトルを計算
 	MyMath::Vector3 dir;
 	dir.x = std::cos(angle);
-	dir.y = -std::sin(angle); // 昼間は下向き（-1.0f近く）、夜間は上向き
-	dir.z = 0.3f;
+	dir.y = -std::sin(angle); // 昼間は下向き (太陽が空にある)
+	dir.z = -0.4f;
 	
 	sun_.SetDirection(MyMath::Normalize(dir));
 
-	// 太陽の高さ（地平線より上か下か）に応じて、明るさと色をコントロール
-	// ※ライトの方向が下を向いている (dir.y < 0) 状態が、太陽が空にある (高い) 状態
+	// 太陽の高さ（地平線より上か下か）に応じて明るさと色を調整
 	float sunHeight = -dir.y;
 	if (sunHeight > 0.0f) {
-		sun_.SetIntensity(sunHeight * 0.7f); // 高いほど明るい
+		sun_.SetIntensity(std::clamp(sunHeight * 1.2f, 0.4f, 1.0f)); // 昼間はしっかり照らす
 
-		// 夕方・朝方 (高さ 0.0 〜 0.3) は赤みを強くする (サンセット効果)
 		if (sunHeight < 0.3f) {
 			float lerpFactor = sunHeight / 0.3f;
 			sun_.SetColor({ 1.0f, 0.7f + 0.25f * lerpFactor, 0.4f + 0.45f * lerpFactor, 1.0f });
@@ -38,7 +37,7 @@ void EnvironmentManager::Update(Camera* camera, float deltaTime) {
 			sun_.SetColor({ 1.0f, 0.95f, 0.85f, 1.0f });
 		}
 	} else {
-		// 夜間は太陽光を0にする
+		// 夜間
 		sun_.SetIntensity(0.0f);
 	}
 

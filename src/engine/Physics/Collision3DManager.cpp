@@ -117,6 +117,109 @@ bool Collision3DManager::CheckSphereAABB(const SphereCollider& sphere, const AAB
 	return distSq <= sphere.radius * sphere.radius;
 }
 
+bool Collision3DManager::CheckRayAABB(const Ray& ray, const AABBCollider& aabb, float* outTMin) {
+	float tMin = 0.0f;
+	float tMax = ray.maxDistance;
+
+	// X軸
+	if (std::abs(ray.direction.x) < 1e-6f) {
+		if (ray.origin.x < aabb.min.x || ray.origin.x > aabb.max.x) return false;
+	} else {
+		float invD = 1.0f / ray.direction.x;
+		float t1 = (aabb.min.x - ray.origin.x) * invD;
+		float t2 = (aabb.max.x - ray.origin.x) * invD;
+		if (t1 > t2) std::swap(t1, t2);
+		tMin = std::max(tMin, t1);
+		tMax = std::min(tMax, t2);
+		if (tMin > tMax) return false;
+	}
+
+	// Y軸
+	if (std::abs(ray.direction.y) < 1e-6f) {
+		if (ray.origin.y < aabb.min.y || ray.origin.y > aabb.max.y) return false;
+	} else {
+		float invD = 1.0f / ray.direction.y;
+		float t1 = (aabb.min.y - ray.origin.y) * invD;
+		float t2 = (aabb.max.y - ray.origin.y) * invD;
+		if (t1 > t2) std::swap(t1, t2);
+		tMin = std::max(tMin, t1);
+		tMax = std::min(tMax, t2);
+		if (tMin > tMax) return false;
+	}
+
+	// Z軸
+	if (std::abs(ray.direction.z) < 1e-6f) {
+		if (ray.origin.z < aabb.min.z || ray.origin.z > aabb.max.z) return false;
+	} else {
+		float invD = 1.0f / ray.direction.z;
+		float t1 = (aabb.min.z - ray.origin.z) * invD;
+		float t2 = (aabb.max.z - ray.origin.z) * invD;
+		if (t1 > t2) std::swap(t1, t2);
+		tMin = std::max(tMin, t1);
+		tMax = std::min(tMax, t2);
+		if (tMin > tMax) return false;
+	}
+
+	if (outTMin) *outTMin = tMin;
+	return true;
+}
+
+bool Collision3DManager::RayTriangleIntersect(
+	const Ray& ray,
+	const MyMath::Vector3& v0,
+	const MyMath::Vector3& v1,
+	const MyMath::Vector3& v2,
+	RaycastHit* outHit)
+{
+	const float kEpsilon = 1e-6f;
+
+	MyMath::Vector3 edge1 = MyMath::Subtract(v1, v0);
+	MyMath::Vector3 edge2 = MyMath::Subtract(v2, v0);
+
+	MyMath::Vector3 h = MyMath::Cross(ray.direction, edge2);
+	float a = MyMath::Dot(edge1, h);
+
+	// 平行（レイとポリゴン平面が交差しない）の場合は即座にスキップ
+	if (a > -kEpsilon && a < kEpsilon) {
+		return false;
+	}
+
+	float f = 1.0f / a;
+	MyMath::Vector3 s = MyMath::Subtract(ray.origin, v0);
+	float u = f * MyMath::Dot(s, h);
+
+	// 重心座標 u が外側の場合、即座に早期脱出（アーリーアウト）
+	if (u < 0.0f || u > 1.0f) {
+		return false;
+	}
+
+	MyMath::Vector3 q = MyMath::Cross(s, edge1);
+	float v = f * MyMath::Dot(ray.direction, q);
+
+	// 重心座標 v および (u + v) が外側の場合、即座に早期脱出（アーリーアウト）
+	if (v < 0.0f || u + v > 1.0f) {
+		return false;
+	}
+
+	// 距離 t の算出
+	float t = f * MyMath::Dot(edge2, q);
+
+	if (t > kEpsilon && t <= ray.maxDistance) {
+		if (outHit) {
+			outHit->hit = true;
+			outHit->distance = t;
+			outHit->point = MyMath::Add(ray.origin, MyMath::Multiply(t, ray.direction));
+
+			// 法線ベクトルの計算 (edge1 x edge2)
+			MyMath::Vector3 n = MyMath::Cross(edge1, edge2);
+			outHit->normal = MyMath::Normalize(n);
+		}
+		return true;
+	}
+
+	return false;
+}
+
 bool Collision3DManager::CheckGroundCollision(const MyMath::Vector3& position, float groundY) {
 	return position.y <= groundY;
 }

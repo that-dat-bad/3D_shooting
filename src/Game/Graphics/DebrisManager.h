@@ -10,6 +10,7 @@ class Camera;
 /// @brief 切断・破壊されたパーツの破片物理オブジェクト
 struct DebrisObject {
 	std::unique_ptr<Object3d> object;
+	Matrix4x4 initialWorldMatrix = Identity4x4();
 	Vector3 position;
 	Vector3 rotation;
 	Vector3 velocity;
@@ -45,7 +46,8 @@ public:
 	/// @param initialWorldMatrix 切り離された瞬間のワールド行列
 	/// @param baseVelocity 機体の現在速度
 	/// @param ejectionForce 散乱方向の追加力
-	void SpawnDebris(Model* model, const Matrix4x4& initialWorldMatrix, const Vector3& baseVelocity, const Vector3& ejectionForce);
+	/// @param targetNodeName 描画対象ノード名（空の場合はモデル全体）
+	void SpawnDebris(Model* model, const Matrix4x4& initialWorldMatrix, const Vector3& baseVelocity, const Vector3& ejectionForce, const std::string& targetNodeName = "");
 
 private:
 	DebrisManager(const DebrisManager&) = delete;

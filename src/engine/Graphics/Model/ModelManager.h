@@ -5,6 +5,7 @@
 #include "Model.h"
 class ModelCommon;
 class DirectXCommon;
+class SrvManager;
 /// <summary>
 /// 3Dモデルアセット管理クラス
 /// </summary>
@@ -23,7 +24,7 @@ public:
 	/// </summary>
 	ModelManager();
 
-	void Initialize(DirectXCommon* dxCommon);
+	void Initialize(DirectXCommon* dxCommon, SrvManager* srvManager);
 	void Finalize();
 
 	/// <summary>

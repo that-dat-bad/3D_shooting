@@ -47,6 +47,7 @@ void DamageModel::Initialize()
 
 	//                     パーツ             HP      素材            ダメ倍率  切断可
 	SetDef(DamagePart::Engine1,     49.5f, ArmorMaterial::Armor,     1.6f,   false);
+	SetDef(DamagePart::Propeller1,  20.0f, ArmorMaterial::Dural,     1.0f,   true);
 	SetDef(DamagePart::Wing_L,      67.0f, ArmorMaterial::Dural,     0.3f,   false);  // 付け根は切断されにくい
 	SetDef(DamagePart::Wing_R,      67.0f, ArmorMaterial::Dural,     0.3f,   false);
 	SetDef(DamagePart::Wing1_L,     28.4f, ArmorMaterial::Dural,     0.5f,   true);
@@ -75,7 +76,8 @@ void DamageModel::Initialize()
 	subColliders_ = {
 		// パーツ                    中心座標                       半径（ハーフサイズ）
 		{ DamagePart::Engine1,  { 0.0f,  0.0f,   5.0f },  { 0.8f,  0.6f,  1.5f } },
-		{ DamagePart::Fuse,     { 0.0f,  0.2f,   2.0f },  { 0.7f,  0.7f,  1.5f } },
+		{ DamagePart::Propeller1, { 0.0f, 0.0f,  6.5f },  { 2.0f,  2.0f,  0.2f } },
+		{ DamagePart::Fuse,     { 0.0f,  0.0f,   0.0f },  { 0.95f, 0.95f, 7.5f } },
 		{ DamagePart::Pilot,    { 0.0f,  0.5f,   1.0f },  { 0.4f,  0.5f,  0.6f } },  // コクピット（Fuseと重なるが優先判定）
 		{ DamagePart::Fuse1,    { 0.0f,  0.1f,  -1.0f },  { 0.5f,  0.5f,  1.5f } },
 		{ DamagePart::Tail,     { 0.0f,  0.1f,  -4.0f },  { 0.3f,  0.3f,  2.0f } },
@@ -563,6 +565,9 @@ void DamageModel::ProcessGroundCollision(
 // ============================================================
 bool DamageModel::IsCriticallyDamaged() const
 {
+	// 胴体破壊 (HP=0で強制死亡)
+	if (IsPartDestroyed(DamagePart::Fuse)) return true;
+
 	// パイロット死亡
 	if (IsPartDestroyed(DamagePart::Pilot)) return true;
 
@@ -725,6 +730,7 @@ const char* DamageModel::GetPartName(DamagePart part)
 {
 	switch (part) {
 	case DamagePart::Engine1:     return "Engine";
+	case DamagePart::Propeller1:  return "Propeller";
 	case DamagePart::Wing_L:      return "Wing L (root)";
 	case DamagePart::Wing_R:      return "Wing R (root)";
 	case DamagePart::Wing1_L:     return "Wing1 L (mid)";
