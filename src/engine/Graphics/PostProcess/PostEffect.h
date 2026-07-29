@@ -25,6 +25,9 @@ enum class PostEffectType : uint32_t {
 	kLensDistortion,// レンズ歪み (Lens Distortion)
 	kChromaticAberration, // 色収差 (Chromatic Aberration)
 	kBloom,         // ブルーム (Bloom)
+	kColorIsolation,// カラーアイソレーション (Color Isolation / パートカラー)
+	kLuminanceOutline, // 輝度ベースアウトライン (Luminance Outline)
+	kDepthOutline,     // 深度ベースアウトライン (Depth Outline)
 	kCountOfPostEffects, // エフェクトの種類
 };
 

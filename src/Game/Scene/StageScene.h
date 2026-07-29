@@ -98,9 +98,15 @@ private:
 	float muzzleFlashRandomRoll_ = 0.0f;
 	float muzzleFlashRandomAlpha_ = 1.0f;
 
+	void TriggerGameOver();
+
 	// ゲーム状態
 	bool isMissionCleared_ = false;
 	bool isMissionFailed_ = false;
+	bool isGameOver_ = false;
+	float gameOverTimer_ = 0.0f;
+	static constexpr float kGameOverDuration = 2.0f;
+	float timeScale_ = 1.0f;
 
 	// プレイヤーのステータス
 	float playerMaxHP_ = 100.0f;

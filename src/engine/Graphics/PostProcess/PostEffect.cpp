@@ -198,6 +198,9 @@ void PostEffect::CreateGraphicsPipelines() {
 	Microsoft::WRL::ComPtr<IDxcBlob> psLensDistortion = dxCommon_->CompileShader(L"./assets/shaders/LensDistortion.PS.hlsl", L"ps_6_0");
 	Microsoft::WRL::ComPtr<IDxcBlob> psChromaticAberration = dxCommon_->CompileShader(L"./assets/shaders/ChromaticAberration.PS.hlsl", L"ps_6_0");
 	Microsoft::WRL::ComPtr<IDxcBlob> psBloom = dxCommon_->CompileShader(L"./assets/shaders/Bloom.PS.hlsl", L"ps_6_0");
+	Microsoft::WRL::ComPtr<IDxcBlob> psColorIsolation = dxCommon_->CompileShader(L"./assets/shaders/ColorIsolation.PS.hlsl", L"ps_6_0");
+	Microsoft::WRL::ComPtr<IDxcBlob> psLuminanceOutline = dxCommon_->CompileShader(L"./assets/shaders/LuminanceBasedOutline.PS.hlsl", L"ps_6_0");
+	Microsoft::WRL::ComPtr<IDxcBlob> psDepthOutline = dxCommon_->CompileShader(L"./assets/shaders/DepthBasedOutline.PS.hlsl", L"ps_6_0");
 
 	Microsoft::WRL::ComPtr<IDxcBlob> pixelShaders[static_cast<size_t>(PostEffectType::kCountOfPostEffects)];
 	pixelShaders[static_cast<size_t>(PostEffectType::kNone)] = psNone;
@@ -214,6 +217,9 @@ void PostEffect::CreateGraphicsPipelines() {
 	pixelShaders[static_cast<size_t>(PostEffectType::kLensDistortion)] = psLensDistortion;
 	pixelShaders[static_cast<size_t>(PostEffectType::kChromaticAberration)] = psChromaticAberration;
 	pixelShaders[static_cast<size_t>(PostEffectType::kBloom)] = psBloom;
+	pixelShaders[static_cast<size_t>(PostEffectType::kColorIsolation)] = psColorIsolation;
+	pixelShaders[static_cast<size_t>(PostEffectType::kLuminanceOutline)] = psLuminanceOutline;
+	pixelShaders[static_cast<size_t>(PostEffectType::kDepthOutline)] = psDepthOutline;
 
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc{};
 	psoDesc.pRootSignature = rootSignature_.Get();
@@ -533,6 +539,17 @@ void PostEffect::ApplyBuiltInPreset(const std::string& presetName) {
 		dist.type = PostEffectType::kLensDistortion;
 		dist.intensity = 0.1f;
 		activeEffects_.push_back(dist);
+	}
+	else if (presetName == "Color Isolation (Red Focus)") {
+		ActivePostEffect iso;
+		iso.type = PostEffectType::kColorIsolation;
+		iso.colorR = 0.9f;
+		iso.colorG = 0.1f;
+		iso.colorB = 0.1f;
+		iso.intensity = 0.45f; // Tolerance
+		iso.dirX = 0.15f;      // Smoothness
+		iso.dirY = 1.0f;       // Desaturation (Full monochrome for non-red)
+		activeEffects_.push_back(iso);
 	}
 }
 

@@ -227,11 +227,24 @@ void StageScene::Initialize() {
 	// ゲーム状態リセット
 	isMissionCleared_ = false;
 	isMissionFailed_ = false;
+	isGameOver_ = false;
+	gameOverTimer_ = 0.0f;
+	timeScale_ = 1.0f;
 	muzzleFlashTimer_ = 0.0f;
 	totalTime_ = 0.0f;
 
 	// プレイヤー当たり判定ボディの初期化
 	playerBody_.scene_ = this;
+}
+
+void StageScene::TriggerGameOver() {
+	if (isGameOver_) { return; }
+	isGameOver_ = true;
+	isMissionFailed_ = true;
+	gameOverTimer_ = 0.0f;
+	playerHP_ = 0.0f;
+	timeScale_ = 1.0f;
+	EffectManager::GetInstance()->EmitDestroyEffect(flightModel_.GetPosition());
 }
 
 // ============================================================
@@ -255,10 +268,7 @@ void StageScene::PlayerCollisionBody::OnCollision(ICollisionBody3D* other) {
 
 		// 致命的ダメージでゲームオーバー
 		if (scene_->flightModel_.GetAirframe().IsDestroyed()) {
-			scene_->playerHP_ = 0.0f;
-			scene_->isMissionFailed_ = true;
-			scene_->sceneID = SCENE::RESULT;
-			EffectManager::GetInstance()->EmitDestroyEffect(scene_->flightModel_.GetPosition());
+			scene_->TriggerGameOver();
 		}
 	}
 	// Enemy との衝突 → 胴体に大ダメージ
@@ -267,18 +277,31 @@ void StageScene::PlayerCollisionBody::OnCollision(ICollisionBody3D* other) {
 		EffectManager::GetInstance()->EmitHitEffect(scene_->flightModel_.GetPosition());
 
 		if (scene_->flightModel_.GetAirframe().IsDestroyed()) {
-			scene_->playerHP_ = 0.0f;
-			scene_->isMissionFailed_ = true;
-			scene_->sceneID = SCENE::RESULT;
-			EffectManager::GetInstance()->EmitDestroyEffect(scene_->flightModel_.GetPosition());
+			scene_->TriggerGameOver();
 		}
 	}
 }
 
 
 void StageScene::Update() {
+	// ゲームオーバー演出の更新（スローモーション & 画面遷移）
+	if (isGameOver_) {
+		gameOverTimer_ += kDeltaTime;
+		float progress = std::clamp(gameOverTimer_ / kGameOverDuration, 0.0f, 1.0f);
+		// 1.0 -> 0.15 にスローダウン
+		timeScale_ = 1.0f - progress * 0.85f;
+
+		if (progress >= 1.0f) {
+			sceneID = SCENE::RESULT;
+		}
+	} else {
+		timeScale_ = 1.0f;
+	}
+
+	float gameDeltaTime = kDeltaTime * timeScale_;
+
 	// 経過時間を更新
-	totalTime_ += kDeltaTime;
+	totalTime_ += gameDeltaTime;
 
 	// ============================
 	// プレイヤー入力 → FlightModel
@@ -287,10 +310,10 @@ void StageScene::Update() {
 
 	// --- スロットル ---
 	if (input->PushKey(DIK_W)) {
-		throttle_ += 0.8f * kDeltaTime;
+		throttle_ += 0.8f * gameDeltaTime;
 	}
 	if (input->PushKey(DIK_S)) {
-		throttle_ -= 0.8f * kDeltaTime;
+		throttle_ -= 0.8f * gameDeltaTime;
 	}
 	if (throttle_ < 0.0f) { throttle_ = 0.0f; }
 	if (throttle_ > 1.0f) { throttle_ = 1.0f; }
@@ -522,32 +545,32 @@ void StageScene::Update() {
 	}
 
 	if (muzzleFlashTimer_ > 0.0f) {
-		muzzleFlashTimer_ -= kDeltaTime;
+		muzzleFlashTimer_ -= gameDeltaTime;
 	}
 
 	// 動的ライトの減衰（毎フレーム少しずつ暗くする）
 	PointLight* pLight = Object3dCommon::GetInstance()->GetPointLightData();
 	if (pLight && pLight->intensity > 0.0f) {
-		pLight->intensity -= 200.0f * kDeltaTime; // 0.15秒程度で消えるペース
+		pLight->intensity -= 200.0f * gameDeltaTime; // 0.15秒程度で消えるペース
 		if (pLight->intensity < 0.0f) { pLight->intensity = 0.0f; }
 	}
 
 	// 環境（太陽の位置・ライティング・ブルーム）の更新
-	environmentManager_.Update(CameraManager::GetInstance()->GetActiveCamera(), kDeltaTime);
+	environmentManager_.Update(CameraManager::GetInstance()->GetActiveCamera(), gameDeltaTime);
 
 	// ============================
 	// 飛行モデルの更新
 	// ============================
-	flightModel_.Update(kDeltaTime);
+	flightModel_.Update(gameDeltaTime);
 
 	// --- 部位破壊イベントのチェックと破片放出 ---
 	CheckPartDestructionEvents();
 
 	// ビジュアルモデルの更新（自機のワールド変換行列を親として階層合成）
-	aircraftVisualModel_.Update(flightModel_.GetWorldMatrix(), kDeltaTime);
+	aircraftVisualModel_.Update(flightModel_.GetWorldMatrix(), gameDeltaTime);
 
 	// 破片オブジェクト群の物理シミュレーション更新
-	DebrisManager::GetInstance()->Update(kDeltaTime);
+	DebrisManager::GetInstance()->Update(gameDeltaTime);
 
 	// --- 翼端ボルテックスエフェクトの発生 ---
 	float currentG = flightModel_.GetCurrentG();
@@ -634,9 +657,9 @@ void StageScene::Update() {
 	// ============================
 	// 戦闘システム更新
 	// ============================
-	gunpod_.Update(kDeltaTime);
-	bulletManager_.Update(kDeltaTime);
-	enemyManager_.Update(kDeltaTime);
+	gunpod_.Update(gameDeltaTime);
+	bulletManager_.Update(gameDeltaTime);
+	enemyManager_.Update(gameDeltaTime);
 	EffectManager::GetInstance()->Update();
 
 
@@ -673,9 +696,7 @@ void StageScene::Update() {
 
 	// --- 機体全般の壊滅判定 (パーツ破壊・パイロット死亡等) ---
 	if (!isMissionFailed_ && flightModel_.GetAirframe().IsDestroyed()) {
-		isMissionFailed_ = true;
-		sceneID = SCENE::RESULT;
-		EffectManager::GetInstance()->EmitDestroyEffect(flightModel_.GetPosition());
+		TriggerGameOver();
 	}
 
 	// ============================
@@ -695,7 +716,7 @@ void StageScene::Update() {
 	// ============================
 	// 追従カメラ
 	// ============================
-	playerCamera_.Update(kDeltaTime, &flightModel_, &mouseAimController_, mouseAimEnabled_);
+	playerCamera_.Update(gameDeltaTime, &flightModel_, &mouseAimController_, mouseAimEnabled_);
 
 	// ============================
 	// ============================
@@ -1010,6 +1031,25 @@ void StageScene::Update() {
 		vig.colorG = 0.05f;
 		vig.colorB = 0.05f;
 		postEffect->AddActiveEffect(vig);
+	}
+
+	// 4. ゲームオーバー演出 (スローモー + 色収差 + ディゾルブ)
+	if (isGameOver_) {
+		float progress = std::clamp(gameOverTimer_ / kGameOverDuration, 0.0f, 1.0f);
+
+		// 色収差 (Chromatic Aberration)
+		ActivePostEffect ab;
+		ab.type = PostEffectType::kChromaticAberration;
+		ab.intensity = progress * 0.05f;
+		postEffect->AddActiveEffect(ab);
+
+		// ディゾルブ (Dissolve)
+		ActivePostEffect dissolve;
+		dissolve.type = PostEffectType::kDissolve;
+		dissolve.dissolveThreshold = progress;
+		dissolve.dissolveEdgeWidth = 0.08f;
+		dissolve.dissolveMaskIndex = 0; // assets/masks/noise0.png
+		postEffect->AddActiveEffect(dissolve);
 	}
 }
 

@@ -182,7 +182,7 @@ void DebugScene::Update() {
 		std::vector<ActivePostEffect>& effects = PostEffect::GetInstance()->GetActiveEffects();
 
 		// 内蔵プリセットの選択
-		const char* presetItems[] = { "Select Preset...", "NVD (Night Vision)", "VHS Retro", "Cinematic Bloom", "Digital Glitch" };
+		const char* presetItems[] = { "Select Preset...", "NVD (Night Vision)", "VHS Retro", "Cinematic Bloom", "Digital Glitch", "Color Isolation (Red Focus)", "Luminance Outline", "Depth Outline" };
 		static int currentPresetIndex = 0;
 		if (ImGui::Combo("Load Built-in Preset", &currentPresetIndex, presetItems, IM_ARRAYSIZE(presetItems))) {
 			if (currentPresetIndex > 0) {
@@ -241,7 +241,7 @@ void DebugScene::Update() {
 			}
 
 			int currentEffect = static_cast<int>(effects[i].type);
-			const char* effectItems[] = { "None", "ColorTint", "Vignette", "BoxFilter", "GaussBlur", "KawaseBlur", "RadialBlur", "Dissolve", "Noise (Random)", "ScanLine", "LightAmp", "LensDistortion", "Chromatic Aberration", "Bloom" };
+			const char* effectItems[] = { "None", "ColorTint", "Vignette", "BoxFilter", "GaussBlur", "KawaseBlur", "RadialBlur", "Dissolve", "Noise (Random)", "ScanLine", "LightAmp", "LensDistortion", "Chromatic Aberration", "Bloom", "Color Isolation", "Luminance Outline", "Depth Outline" };
 			if (ImGui::Combo("Type", &currentEffect, effectItems, IM_ARRAYSIZE(effectItems))) {
 				effects[i].type = static_cast<PostEffectType>(currentEffect);
 				
@@ -294,6 +294,18 @@ void DebugScene::Update() {
 					effects[i].intensity = 2.0f;  // 半径
 					effects[i].dirX = 1.5f;       // 強さ
 					effects[i].dirY = 0.8f;       // 閾値
+				} else if (effects[i].type == PostEffectType::kColorIsolation) {
+					effects[i].colorR = 0.9f;     // Target Red
+					effects[i].colorG = 0.1f;
+					effects[i].colorB = 0.1f;
+					effects[i].intensity = 0.45f; // Tolerance
+					effects[i].dirX = 0.15f;      // Smoothness
+					effects[i].dirY = 1.0f;       // Desaturation (Full monochrome)
+				} else if (effects[i].type == PostEffectType::kLuminanceOutline || effects[i].type == PostEffectType::kDepthOutline) {
+					effects[i].intensity = 6.0f;  // Outline Multiplier / Sensitivity
+					effects[i].colorR = 0.0f;     // Black Outline default
+					effects[i].colorG = 0.0f;
+					effects[i].colorB = 0.0f;
 				}
 			}
 
@@ -379,6 +391,24 @@ void DebugScene::Update() {
 					effects[i].colorG = color[1];
 					effects[i].colorB = color[2];
 				}
+			} else if (effects[i].type == PostEffectType::kColorIsolation) {
+				float isoColor[3] = { effects[i].colorR, effects[i].colorG, effects[i].colorB };
+				if (ImGui::ColorEdit3("Target Color to Keep", isoColor)) {
+					effects[i].colorR = isoColor[0];
+					effects[i].colorG = isoColor[1];
+					effects[i].colorB = isoColor[2];
+				}
+				ImGui::SliderFloat("Color Tolerance", &effects[i].intensity, 0.05f, 1.0f);
+				ImGui::SliderFloat("Edge Smoothness", &effects[i].dirX, 0.001f, 0.5f);
+				ImGui::SliderFloat("Background Desaturation", &effects[i].dirY, 0.0f, 1.0f);
+			} else if (effects[i].type == PostEffectType::kLuminanceOutline || effects[i].type == PostEffectType::kDepthOutline) {
+				float outColor[3] = { effects[i].colorR, effects[i].colorG, effects[i].colorB };
+				if (ImGui::ColorEdit3("Outline Color", outColor)) {
+					effects[i].colorR = outColor[0];
+					effects[i].colorG = outColor[1];
+					effects[i].colorB = outColor[2];
+				}
+				ImGui::SliderFloat("Outline Sensitivity", &effects[i].intensity, 0.5f, 20.0f);
 			}
 
 			ImGui::PopID();
