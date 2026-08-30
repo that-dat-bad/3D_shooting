@@ -1,4 +1,5 @@
 #include "EnemyManager.h"
+#include "../../engine/Graphics/Camera/CameraManager.h"
 
 void EnemyManager::Initialize(
 	const std::vector<EnemySpawnData>& spawnList,
@@ -6,7 +7,8 @@ void EnemyManager::Initialize(
 	const EngineData& engineData,
 	const GunPodData& gunpodData,
 	FlightModel* playerFlightModel,
-	BulletManager* bulletManager
+	BulletManager* bulletManager,
+	const std::vector<GroundEnemySpawnData>& groundSpawnList
 ) {
 	enemies_.clear();
 	enemies_.reserve(spawnList.size());
@@ -21,21 +23,46 @@ void EnemyManager::Initialize(
 		);
 		enemies_.push_back(std::move(enemy));
 	}
+
+	groundEnemies_.clear();
+	groundEnemies_.reserve(groundSpawnList.size());
+
+	for (const auto& data : groundSpawnList) {
+		auto groundEnemy = std::make_unique<GroundEnemy>();
+		groundEnemy->Initialize(
+			data.position,
+			data.aiType,
+			data.param,
+			playerFlightModel,
+			bulletManager
+		);
+		groundEnemies_.push_back(std::move(groundEnemy));
+	}
 }
 
 void EnemyManager::Update(float deltaTime) {
 	for (auto& enemy : enemies_) {
 		enemy->Update(deltaTime);
 	}
-}
-
-void EnemyManager::Draw() {
-	for (auto& enemy : enemies_) {
-		enemy->Draw();
+	for (auto& groundEnemy : groundEnemies_) {
+		groundEnemy->Update(deltaTime);
 	}
 }
 
-int EnemyManager::GetAliveCount() const {
+void EnemyManager::Draw(Camera* camera) {
+	// 空中敵の描画
+	for (auto& enemy : enemies_) {
+		enemy->Draw();
+	}
+
+	// 地上敵の描画
+	Camera* targetCam = camera ? camera : CameraManager::GetInstance()->GetActiveCamera();
+	for (auto& groundEnemy : groundEnemies_) {
+		groundEnemy->Draw(targetCam);
+	}
+}
+
+int EnemyManager::GetAliveAirCount() const {
 	int count = 0;
 	for (const auto& enemy : enemies_) {
 		if (enemy->IsAlive()) {
@@ -45,8 +72,22 @@ int EnemyManager::GetAliveCount() const {
 	return count;
 }
 
+int EnemyManager::GetAliveGroundCount() const {
+	int count = 0;
+	for (const auto& groundEnemy : groundEnemies_) {
+		if (groundEnemy->IsAlive()) {
+			++count;
+		}
+	}
+	return count;
+}
+
+int EnemyManager::GetAliveCount() const {
+	return GetAliveAirCount() + GetAliveGroundCount();
+}
+
 int EnemyManager::GetTotalCount() const {
-	return static_cast<int>(enemies_.size());
+	return static_cast<int>(enemies_.size() + groundEnemies_.size());
 }
 
 int EnemyManager::GetDestroyedCount() const {
@@ -66,3 +107,14 @@ std::vector<Enemy*> EnemyManager::GetAliveEnemies() {
 	}
 	return alive;
 }
+
+std::vector<GroundEnemy*> EnemyManager::GetAliveGroundEnemies() {
+	std::vector<GroundEnemy*> alive;
+	for (auto& groundEnemy : groundEnemies_) {
+		if (groundEnemy->IsAlive()) {
+			alive.push_back(groundEnemy.get());
+		}
+	}
+	return alive;
+}
+

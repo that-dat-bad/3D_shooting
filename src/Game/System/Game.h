@@ -8,6 +8,7 @@
 #include "AudioManager.h"
 #include "../../engine/Graphics/System/SrvManager.h"
 #include "ImguiManager.h"
+#include "../../engine/Debug/UIEditorWindow.h"
 #include "../../engine/Graphics/System/TextureManager.h"
 #include "../../engine/Graphics/Model/ModelManager.h"
 #include "../../engine/Graphics/Camera/CameraManager.h"
@@ -57,6 +58,7 @@ private:
 	std::unique_ptr<WinApp> winApp = nullptr;
 	std::unique_ptr<SrvManager> srvManager = nullptr;
 	std::unique_ptr<ImGuiManager> imguiManager = nullptr;
+
 
 
 

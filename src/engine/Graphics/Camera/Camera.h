@@ -39,6 +39,13 @@ public:
 	float GetNearClip() const { return nearClip_; }
 	float GetFarClip() const { return farClip_; }
 
+	/// <summary>
+	/// カメラを揺らす（カメラシェイク）
+	/// </summary>
+	/// <param name="duration">揺れる時間（秒）</param>
+	/// <param name="magnitude">揺れの大きさ</param>
+	void Shake(float duration, float magnitude);
+
 private:
 	Transform transform_;
 	Matrix4x4 worldMatrix_;
@@ -53,5 +60,9 @@ private:
 	float nearClip_;
 	//ファークリップ
 	float farClip_;
+
+	// カメラシェイク用
+	float shakeTimer_ = 0.0f;
+	float shakeMagnitude_ = 0.0f;
 };
 

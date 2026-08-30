@@ -1,18 +1,16 @@
 #include "SceneManager.h"
-#include "TitleScene.h"
-#include "StageScene.h"
-#include "ClearScene.h"
-#include "ResultScene.h"
-#include "DebugScene.h"
+// Removed concrete scene includes
 #include "IScene.h"
 
 #ifdef USE_IMGUI
 #include "../../../external/imgui/imgui.h"
+#include "../../engine/Debug/UIEditorWindow.h"
 #endif
 
-SceneManager::SceneManager() {
+SceneManager::SceneManager(std::unique_ptr<AbstractSceneFactory> factory) 
+	: sceneFactory_(std::move(factory)) {
 	// 初期シーン生成
-	currentScene = std::make_unique<TitleScene>();
+	currentScene = sceneFactory_->CreateScene(SCENE::TITLE);
 	currentScene->Initialize();
 	currentSceneID = SCENE::TITLE;
 	IScene::SetSceneID(SCENE::TITLE);
@@ -48,6 +46,13 @@ void SceneManager::Update() {
 			}
 			ImGui::EndMenu();
 		}
+		if (ImGui::BeginMenu("Tools")) {
+			bool isEditorVisible = UIEditorWindow::GetInstance()->IsVisible();
+			if (ImGui::MenuItem("Native UI Editor (F1)", nullptr, isEditorVisible)) {
+				UIEditorWindow::GetInstance()->Toggle();
+			}
+			ImGui::EndMenu();
+		}
 		ImGui::EndMainMenuBar();
 	}
 #endif
@@ -56,26 +61,12 @@ void SceneManager::Update() {
 	int nextSceneID = currentScene->GetSceneID();
 	if (nextSceneID != currentSceneID) {
 
-		switch (nextSceneID) {
-		case SCENE::TITLE:
-			currentScene = std::make_unique<TitleScene>();
-			break;
-		case SCENE::STAGE:
-			currentScene = std::make_unique<StageScene>();
-			break;
-		case SCENE::CLEAR:
-			currentScene = std::make_unique<ClearScene>();
-			break;
-		case SCENE::RESULT:
-			currentScene = std::make_unique<ResultScene>();
-			break;
-		case SCENE::DEBUG:
-			currentScene = std::make_unique<DebugScene>();
-			break;
-		default:
-			currentScene = nullptr;
-			break;
+		// 新しいシーンを生成する前に、現在のシーンの終了処理を呼ぶ
+		if (currentScene != nullptr) {
+			currentScene->Finalize();
 		}
+
+		currentScene = sceneFactory_->CreateScene(nextSceneID);
 
 		if (currentScene != nullptr) {
 			currentScene->Initialize();
@@ -88,5 +79,11 @@ void SceneManager::Update() {
 void SceneManager::Draw() {
 	if (currentScene != nullptr) {
 		currentScene->Draw();
+	}
+}
+
+void SceneManager::DrawUI() {
+	if (currentScene != nullptr) {
+		currentScene->DrawUI();
 	}
 }

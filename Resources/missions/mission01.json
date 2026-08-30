@@ -1,5 +1,5 @@
 {
-    "description": "Destroy all target drones in the airspace.",
+    "description": "Destroy all target drones and ground defense installations.",
     "enemies": [
         {
             "aiType": "ChaseAttack",
@@ -52,7 +52,105 @@
             }
         }
     ],
-    "name": "Mission 01: First Strike",
+    "groundEnemies": [
+        {
+            "aiType": "Turret",
+            "health": 60.0,
+            "param": {
+                "bulletDamage": 8.0,
+                "bulletSpeed": 600.0,
+                "burstCooldown": 2.0,
+                "burstCount": 6,
+                "collisionRadius": 8.0,
+                "fireInterval": 0.08,
+                "fireRange": 1500.0,
+                "maxElevationDeg": 85.0,
+                "maxHealth": 60.0,
+                "minElevationDeg": -5.0,
+                "moveSpeed": 15.0,
+                "patrolDistance": 200.0,
+                "turnSpeedDeg": 60.0
+            },
+            "position": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 400.0
+            }
+        },
+        {
+            "aiType": "Turret",
+            "health": 60.0,
+            "param": {
+                "bulletDamage": 8.0,
+                "bulletSpeed": 600.0,
+                "burstCooldown": 2.0,
+                "burstCount": 6,
+                "collisionRadius": 8.0,
+                "fireInterval": 0.08,
+                "fireRange": 1500.0,
+                "maxElevationDeg": 85.0,
+                "maxHealth": 60.0,
+                "minElevationDeg": -5.0,
+                "moveSpeed": 15.0,
+                "patrolDistance": 200.0,
+                "turnSpeedDeg": 60.0
+            },
+            "position": {
+                "x": -120.0,
+                "y": 0.0,
+                "z": 600.0
+            }
+        },
+        {
+            "aiType": "Structure",
+            "health": 120.0,
+            "param": {
+                "bulletDamage": 8.0,
+                "bulletSpeed": 600.0,
+                "burstCooldown": 2.0,
+                "burstCount": 6,
+                "collisionRadius": 14.0,
+                "fireInterval": 0.08,
+                "fireRange": 1500.0,
+                "maxElevationDeg": 85.0,
+                "maxHealth": 120.0,
+                "minElevationDeg": -5.0,
+                "moveSpeed": 15.0,
+                "patrolDistance": 200.0,
+                "turnSpeedDeg": 60.0
+            },
+            "position": {
+                "x": 150.0,
+                "y": 0.0,
+                "z": 550.0
+            }
+        },
+        {
+            "aiType": "PatrolVehicle",
+            "health": 45.0,
+            "param": {
+                "bulletDamage": 8.0,
+                "bulletSpeed": 500.0,
+                "burstCooldown": 2.5,
+                "burstCount": 4,
+                "collisionRadius": 6.0,
+                "fireInterval": 0.1,
+                "fireRange": 1200.0,
+                "maxElevationDeg": 80.0,
+                "maxHealth": 45.0,
+                "minElevationDeg": -2.0,
+                "moveSpeed": 15.0,
+                "patrolDistance": 250.0,
+                "turnSpeedDeg": 50.0
+            },
+            "position": {
+                "x": -50.0,
+                "y": 0.0,
+                "z": 300.0
+            }
+        }
+    ],
+    "name": "Mission 01: Combined Strike",
     "playerHP": 100.0,
     "playerPosition": {
         "x": 0.0,

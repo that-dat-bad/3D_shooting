@@ -53,6 +53,12 @@ public:
 	/// <returns>文字情報のポインタ (存在しない場合はnullptr)</returns>
     const CharacterInfo* GetCharacterInfo(const std::string& fontName) const;
 
+	/// <summary>
+	/// 登録済みの全フォント名を取得する（エディタ用）
+	/// </summary>
+	/// <returns>フォント名のリスト</returns>
+	std::vector<std::string> GetFontNames() const;
+
 private:
     FontManager() = default;
     ~FontManager() = default;

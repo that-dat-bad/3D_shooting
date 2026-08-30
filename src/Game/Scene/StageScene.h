@@ -1,10 +1,12 @@
 #pragma once
 #include "IScene.h"
 #include <memory>
+#include "StageHUD.h"
 #include "../Environment/EnvironmentManager.h"
 #include "../../engine/Graphics/Model/Object3d.h"
 #include "../../engine/Graphics/Model/Skybox.h"
 #include "../Camera/PlayerCamera.h"
+#include "FlightModel/AircraftConfig.h"
 #include "FlightModel/FlightModel.h"
 #include "FlightModel/FlightInstructor.h"
 #include "FlightModel/MouseAimController.h"
@@ -16,6 +18,7 @@
 #include "../../engine/Physics/CollisionSystem.h"
 #include "../../engine/Physics/CollisionConfig.h"
 #include "../../engine/Graphics/PostProcess/PostEffect.h"
+#include "../../engine/Graphics/UI/UIText.h"
 
 #include "../System/MissionManager.h"
 
@@ -25,6 +28,7 @@ public:
 	void Initialize() override;
 	void Update() override;
 	void Draw() override;
+	void DrawUI() override;
 	void Finalize() override;
 	void Restart();
 
@@ -108,6 +112,14 @@ private:
 	static constexpr float kGameOverDuration = 2.0f;
 	float timeScale_ = 1.0f;
 
+	// ミッション制限時間（非依存、5分固定）
+	float remainingTime_ = 300.0f;
+	UIText timeText_;
+
+	// 戦闘HUD（残弾数・照準・タイマー）
+	StageHUD hud_;
+	bool isFiringThisFrame_ = false;
+
 	// プレイヤーのステータス
 	float playerMaxHP_ = 100.0f;
 	float playerHP_ = 100.0f;
@@ -140,6 +152,13 @@ private:
 	int manualSelectedEffect_ = 0;          // 手動・ImGuiテスト用エフェクトインデックス
 	ActivePostEffect manualEffectParams_{}; // 手動・ImGuiテスト用パラメータ
 
+	// 機体設定（CFG）
+	AircraftConfig aircraftConfig_;
+	bool isAircraftTuningOpen_ = true;
+	int selectedAircraftConfigIndex_ = 0;
+	char tempAircraftConfigName_[128] = "mig21.cfg";
+	void DrawAircraftTuningEditor();
+
 	// ミッションエディタ用
 	bool isMissionEditorOpen_ = true;
 	char tempMissionName_[128] = "";
@@ -147,6 +166,7 @@ private:
 	char tempSaveFileName_[128] = "";
 	int selectedMissionIndex_ = 0;
 	int selectedEnemyIndex_ = -1;
+	int selectedGroundEnemyIndex_ = -1;
 	void DrawMissionEditor();
 };
 

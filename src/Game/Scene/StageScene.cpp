@@ -11,6 +11,8 @@
 #include "../../engine/Graphics/Particle/ParticleManager.h"
 #include "../../engine/Graphics/Particle/GPUParticleManager.h"
 #include "../../engine/Physics/Collision3DManager.h"
+#include "../Environment/TerrainSyncManager.h"
+#include "../../engine/Graphics/UI/UITextRegistry.h"
 #include <cmath>
 #include <algorithm>
 #include <filesystem>
@@ -29,40 +31,18 @@ void StageScene::Initialize() {
 	sceneID = SCENE::STAGE;
 
 	// ============================
+	// 機体設定（CFG）のロード
 	// ============================
-	AirframeData airframeData{};
-	airframeData.emptyFrameMass = 3000.0f;   // 3トン
-	airframeData.maxInternalFuel = 800.0f;
-	airframeData.baseDrag = 0.02f;            // 基本空気抵抗
-	airframeData.liftCoefficient = 0.4f;      // 迎え角0時の揚力係数（キャンバー翼）
-	airframeData.wingArea = 40.0f;            // 翼面積 20m^2
-	airframeData.maxHealth = 100.0f;          // 耐久値
-	// 揚力・失速
-	airframeData.criticalAoA = 0.5f;         // 臨界迎え角
-	airframeData.maxLiftCoefficient = 1.5f;   // 最大CL
-	airframeData.stallLiftCoefficient = 0.3f; // 失速後CL
-	// 誘導抵抗
-	airframeData.aspectRatio = 6.0f;
-	airframeData.oswaldEfficiency = 0.8f;
-	airframeData.positiveGLimit = 9.0f;
-	airframeData.negativeGLimit = -3.0f;
-	// フラップ
-	airframeData.flapLiftBonus = 0.5f;
-	airframeData.flapDragBonus = 0.08f;
-	airframeData.flapMaxSpeed = 97.0f;        // ≈350 km/h
-	airframeData.flapDeploySpeed = 2.0f;
-	// エアブレーキ
-	airframeData.airBrakeDragBonus = 0.15f;
-	airframeData.airBrakeDeploySpeed = 3.0f;
+	std::string aircraftCfgPath = aircraftConfig_.GetCurrentFilePath();
+	if (aircraftCfgPath.empty()) {
+		aircraftCfgPath = "Resources/aircraft/mig21.cfg";
+	}
+	aircraftConfig_.LoadFromCfg(aircraftCfgPath);
 
-	EngineData engineData{};
-	engineData.mass = 500.0f;                 // エンジン 500kg
-	engineData.baseThrust = 80000.0f;         // 推力 80kN
-	engineData.normalThrottleLimit = 1.0f;
-	engineData.wepThrottleLimit = 1.1f;       // WEPで110%
-	engineData.physicalSpoolSpeed = 0.5f;     // スプール速度
-	engineData.baseFuelFlowRate = 2.0f;       // 燃料消費率 2kg/s @ 100%
-	engineData.altitudeThrottleFactor = 0.00004f; // 高度推力低下率
+	const auto& airframeData = aircraftConfig_.GetAirframe();
+	const auto& engineData = aircraftConfig_.GetEngine();
+	const auto& gunpodData = aircraftConfig_.GetGunpod();
+	const auto& generalConfig = aircraftConfig_.GetGeneral();
 
 	flightModel_.Initialize(airframeData, engineData);
 
@@ -77,6 +57,10 @@ void StageScene::Initialize() {
 	throttle_ = 0.6f;
 	flightModel_.SetThrottle(throttle_);
 
+	// TerrainSyncManager の初期化と同期開始
+	TerrainSyncManager::GetInstance()->Initialize("localhost", 8765);
+	TerrainSyncManager::GetInstance()->StartSync();
+
 	// ============================
 	// 描画オブジェクトの初期化
 	// ============================
@@ -86,15 +70,15 @@ void StageScene::Initialize() {
 	TextureManager::GetInstance()->LoadTexture("assets/textures/circle2.png");
 
 	// 機体モデル
-	ModelManager::GetInstance()->LoadModel("Resources/models/m21.gltf");
+	ModelManager::GetInstance()->LoadModel(generalConfig.modelPath);
 	aircraftObject_ = std::make_unique<Object3d>();
 	aircraftObject_->Initialize(Object3dCommon::GetInstance());
 	aircraftObject_->SetCamera(CameraManager::GetInstance()->GetActiveCamera());
-	aircraftObject_->SetModel("Resources/models/m21.gltf");
+	aircraftObject_->SetModel(generalConfig.modelPath);
 	if (aircraftObject_->GetModel()) {
-		aircraftObject_->GetModel()->SetEnvironmentCoefficient(0.0f); // 金属反射(スカイボックス映り込み)をOFF
-		aircraftObject_->GetModel()->SetSpecularIntensity(1.0f);     // 標準的なスペキュラ強度
-		aircraftObject_->GetModel()->SetShininess(50.0f);
+		aircraftObject_->GetModel()->SetEnvironmentCoefficient(generalConfig.environmentCoefficient);
+		aircraftObject_->GetModel()->SetSpecularIntensity(generalConfig.specularIntensity);
+		aircraftObject_->GetModel()->SetShininess(generalConfig.shininess);
 	}
 
 	// --- 部位破壊対応マルチパーツビジュアルモデル初期化 ---
@@ -102,7 +86,7 @@ void StageScene::Initialize() {
 	DebrisManager::GetInstance()->Initialize(Object3dCommon::GetInstance(), CameraManager::GetInstance()->GetActiveCamera());
 
 	// 1つのモデルファイルからノード名に基づいて自動セットアップ
-	aircraftVisualModel_.SetupFromSingleModel("Resources/models/m21.gltf");
+	aircraftVisualModel_.SetupFromSingleModel(generalConfig.modelPath);
 	
 	// フォールバックとして、もし何も読み込まれなかった場合（ノードが見つからなかった場合）のために
 	if (!aircraftVisualModel_.IsPartVisible(DamagePart::Fuse)) {
@@ -162,12 +146,6 @@ void StageScene::Initialize() {
 	// 戦闘システムの初期化
 	// ============================
 
-	GunPodData gunpodData{};
-	gunpodData.baseMass = 50.0f;
-	gunpodData.drag = 0.005f;
-	gunpodData.ammoWeight = 0.1f;
-	gunpodData.maxAmmo = 500;
-	gunpodData.fireRate = 25.0f;  // 秒間25発（レートアップ）
 	gunpod_.Initialize(gunpodData);
 
 	// 弾丸マネージャー初期化
@@ -202,7 +180,8 @@ void StageScene::Initialize() {
 		engineData,
 		gunpodData,
 		&flightModel_,
-		&bulletManager_
+		&bulletManager_,
+		mission.groundEnemies
 	);
 
 	// エフェクトマネージャー初期化
@@ -235,6 +214,22 @@ void StageScene::Initialize() {
 
 	// プレイヤー当たり判定ボディの初期化
 	playerBody_.scene_ = this;
+
+	// ミッション制限時間の初期化
+	remainingTime_ = 300.0f;
+	timeText_.Initialize("Roboto", "TIME 05:00", 32.0f);
+	timeText_.SetAnchorPoint({ 0.5f, 0.0f });
+	timeText_.SetPosition({ WinApp::kClientWidth * 0.5f, 20.0f });
+	timeText_.SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
+
+	timeText_.SetCondition("Warning", [this]() { return remainingTime_ <= 30.0f; });
+
+	// UITextRegistryに登録
+	UITextRegistry::GetInstance()->Register("Stage_Time", &timeText_);
+
+	// 戦闘HUD初期化
+	hud_.Initialize(SpriteCommon::GetInstance());
+	isFiringThisFrame_ = false;
 }
 
 void StageScene::TriggerGameOver() {
@@ -262,6 +257,11 @@ void StageScene::PlayerCollisionBody::OnCollision(ICollisionBody3D* other) {
 		HitResult res = scene_->flightModel_.ProcessBulletHit(bulletPos, damage);
 		EffectManager::GetInstance()->EmitHitEffect(bulletPos);
 
+		// カメラシェイク（被弾）
+		if (CameraManager::GetInstance()->GetActiveCamera()) {
+			CameraManager::GetInstance()->GetActiveCamera()->Shake(0.5f, 2.0f);
+		}
+
 		if (res.fireStarted) {
 			EffectManager::GetInstance()->EmitDestroyEffect(bulletPos);
 		}
@@ -276,6 +276,11 @@ void StageScene::PlayerCollisionBody::OnCollision(ICollisionBody3D* other) {
 		scene_->flightModel_.GetDamageModel().ProcessHit(DamagePart::Fuse, 50.0f);
 		EffectManager::GetInstance()->EmitHitEffect(scene_->flightModel_.GetPosition());
 
+		// カメラシェイク（激突）
+		if (CameraManager::GetInstance()->GetActiveCamera()) {
+			CameraManager::GetInstance()->GetActiveCamera()->Shake(0.8f, 5.0f);
+		}
+
 		if (scene_->flightModel_.GetAirframe().IsDestroyed()) {
 			scene_->TriggerGameOver();
 		}
@@ -284,6 +289,24 @@ void StageScene::PlayerCollisionBody::OnCollision(ICollisionBody3D* other) {
 
 
 void StageScene::Update() {
+	// ミッション制限時間の更新
+	if (!isGameOver_ && !isMissionCleared_) {
+		remainingTime_ -= kDeltaTime;
+		if (remainingTime_ <= 0.0f) {
+			remainingTime_ = 0.0f;
+			TriggerGameOver();
+		}
+
+		int minutes = static_cast<int>(remainingTime_) / 60;
+		int seconds = static_cast<int>(remainingTime_) % 60;
+		char timeStr[32];
+		snprintf(timeStr, sizeof(timeStr), "TIME %02d:%02d", minutes, seconds);
+		timeText_.SetText(timeStr);
+
+		// 残り時間に応じたスタイル切り替えは timeText_ の Warning 条件（ラムダ）で自動処理
+	}
+	timeText_.Update();
+
 	// ゲームオーバー演出の更新（スローモーション & 画面遷移）
 	if (isGameOver_) {
 		gameOverTimer_ += kDeltaTime;
@@ -447,10 +470,12 @@ void StageScene::Update() {
 	}
 
 	// --- 射撃入力（マウス左クリック） ---
+	isFiringThisFrame_ = false;
 	if (input->PushMouse(0) && !isMissionCleared_ && !isMissionFailed_) {
 		int ammoBefore = gunpod_.GetCurrentAmmo();
 		gunpod_.Fire();
 		if (gunpod_.GetCurrentAmmo() < ammoBefore) {
+			isFiringThisFrame_ = true;
 			Vector3 aircraftPos = flightModel_.GetPosition();
 			Vector3 aircraftForward = flightModel_.GetForwardDirection();
 			Vector3 aircraftVelocity = flightModel_.GetVelocity();
@@ -526,6 +551,11 @@ void StageScene::Update() {
 				EffectManager::GetInstance()->EmitMuzzleFlash(firePos, fireDir);
 				muzzleFlashTimer_ = 0.08f; // 表示時間
 
+				// カメラシェイク（発砲時）
+				if (CameraManager::GetInstance()->GetActiveCamera()) {
+					CameraManager::GetInstance()->GetActiveCamera()->Shake(0.1f, 0.5f);
+				}
+
 				// ランダム化パラメータの設定
 				muzzleFlashRandomScale_ = 0.8f + (rand() % 40) / 100.0f; // 0.8 ~ 1.2
 				muzzleFlashRandomRoll_ = (rand() % 628) / 100.0f;        // 0 ~ 2PI
@@ -571,6 +601,9 @@ void StageScene::Update() {
 
 	// 破片オブジェクト群の物理シミュレーション更新
 	DebrisManager::GetInstance()->Update(gameDeltaTime);
+
+	// 地形パラメータのMCP同期更新
+	TerrainSyncManager::GetInstance()->Update();
 
 	// --- 翼端ボルテックスエフェクトの発生 ---
 	float currentG = flightModel_.GetCurrentG();
@@ -679,9 +712,14 @@ void StageScene::Update() {
 			collisionSystem_.Register(&bullet);
 		}
 
-		// 全敵を登録
+		// 全敵（空中敵）を登録
 		for (auto* enemy : enemyManager_.GetAliveEnemies()) {
 			collisionSystem_.Register(enemy);
+		}
+
+		// 全地上敵を登録
+		for (auto* groundEnemy : enemyManager_.GetAliveGroundEnemies()) {
+			collisionSystem_.Register(groundEnemy);
 		}
 
 		// 全判定実行（コールバックが自動で呼ばれる）
@@ -907,6 +945,74 @@ void StageScene::Update() {
 					drawList->AddLine(ImVec2(cx, cy), ImVec2(nx, ny), lineColor, 1.0f);
 				}
 			}
+
+			// ============================================
+			// 敵目標HUDマーカー（空中・地上）のスクリーン描画
+			// ============================================
+			// 1. 空中敵マーカー (赤いひし形)
+			for (auto* enemy : enemyManager_.GetAliveEnemies()) {
+				float ex, ey;
+				Vector3 enemyPos = enemy->GetPosition();
+				if (projectToScreen(enemyPos, ex, ey)) {
+					float dist = MyMath::Length(MyMath::Subtract(enemyPos, aircraftPos));
+					float diamondSize = 9.0f;
+					ImU32 airMarkerColor = IM_COL32(255, 60, 60, 220);
+
+					// ひし形アイコン
+					drawList->AddQuad(
+						ImVec2(ex, ey - diamondSize),
+						ImVec2(ex + diamondSize, ey),
+						ImVec2(ex, ey + diamondSize),
+						ImVec2(ex - diamondSize, ey),
+						airMarkerColor, 1.8f
+					);
+
+					// 距離表示
+					char distBuf[32];
+					snprintf(distBuf, sizeof(distBuf), "%dm", static_cast<int>(dist));
+					drawList->AddText(ImVec2(ex + diamondSize + 3.0f, ey - 7.0f), airMarkerColor, distBuf);
+				}
+			}
+
+			// 2. 地上目標マーカー (オレンジ/黄色のブラケット [TGT])
+			for (auto* ground : enemyManager_.GetAliveGroundEnemies()) {
+				float gx, gy;
+				Vector3 groundPos = ground->GetPosition();
+				Vector3 markerPos = { groundPos.x, groundPos.y + 2.0f, groundPos.z };
+				if (projectToScreen(markerPos, gx, gy)) {
+					float dist = MyMath::Length(MyMath::Subtract(groundPos, aircraftPos));
+					float boxSize = 10.0f;
+					
+					ImU32 groundColor = (ground->GetAIType() == GroundAIType::Turret) 
+						? IM_COL32(255, 120, 30, 220) 
+						: (ground->GetAIType() == GroundAIType::Structure)
+							? IM_COL32(255, 210, 40, 220)
+							: IM_COL32(80, 200, 255, 220);
+
+					// 角括弧 [ ] マーカー
+					float corner = 4.0f;
+					// 左上
+					drawList->AddLine(ImVec2(gx - boxSize, gy - boxSize), ImVec2(gx - boxSize + corner, gy - boxSize), groundColor, 1.8f);
+					drawList->AddLine(ImVec2(gx - boxSize, gy - boxSize), ImVec2(gx - boxSize, gy - boxSize + corner), groundColor, 1.8f);
+					// 右上
+					drawList->AddLine(ImVec2(gx + boxSize, gy - boxSize), ImVec2(gx + boxSize - corner, gy - boxSize), groundColor, 1.8f);
+					drawList->AddLine(ImVec2(gx + boxSize, gy - boxSize), ImVec2(gx + boxSize, gy - boxSize + corner), groundColor, 1.8f);
+					// 左下
+					drawList->AddLine(ImVec2(gx - boxSize, gy + boxSize), ImVec2(gx - boxSize + corner, gy + boxSize), groundColor, 1.8f);
+					drawList->AddLine(ImVec2(gx - boxSize, gy + boxSize), ImVec2(gx - boxSize, gy + boxSize - corner), groundColor, 1.8f);
+					// 右下
+					drawList->AddLine(ImVec2(gx + boxSize, gy + boxSize), ImVec2(gx + boxSize - corner, gy + boxSize), groundColor, 1.8f);
+					drawList->AddLine(ImVec2(gx + boxSize, gy + boxSize), ImVec2(gx + boxSize, gy + boxSize - corner), groundColor, 1.8f);
+
+					// 目標ラベル & 距離表示
+					char labelBuf[48];
+					snprintf(labelBuf, sizeof(labelBuf), "%s %dm", 
+						(ground->GetAIType() == GroundAIType::Turret) ? "AAA" :
+						(ground->GetAIType() == GroundAIType::Structure) ? "FACILITY" : "VEHICLE",
+						static_cast<int>(dist));
+					drawList->AddText(ImVec2(gx + boxSize + 4.0f, gy - 7.0f), groundColor, labelBuf);
+				}
+			}
 		}
 	}
 #endif
@@ -920,12 +1026,14 @@ void StageScene::Update() {
 	ImGui::TextColored(hpColor, "PLAYER HP: %.1f / %.1f", playerHP_, playerMaxHP_);
 	ImGui::Separator();
 
-	ImGui::Text("Enemies: %d / %d", enemyManager_.GetDestroyedCount(), enemyManager_.GetTotalCount());
+	ImGui::Text("Total Enemies: %d / %d (Air: %d, Ground: %d)", 
+		enemyManager_.GetDestroyedCount(), enemyManager_.GetTotalCount(),
+		enemyManager_.GetAliveAirCount(), enemyManager_.GetAliveGroundCount());
 	ImGui::Text("Ammo: %d / %d", gunpod_.GetCurrentAmmo(), gunpod_.GetMaxAmmo());
 	ImGui::Text("Bullets Active: %u", bulletManager_.GetActiveBulletCount());
 	
 	ImGui::Separator();
-	ImGui::Text("=== Alive Enemies ===");
+	ImGui::Text("=== Alive Air Enemies (%d) ===", enemyManager_.GetAliveAirCount());
 	int enemyIndex = 0;
 	for (auto* enemy : enemyManager_.GetAliveEnemies()) {
 		float dist = MyMath::Length(MyMath::Subtract(enemy->GetPosition(), flightModel_.GetPosition()));
@@ -936,9 +1044,22 @@ void StageScene::Update() {
 			ImGui::Text("[%d] Type B (Cruise/Evade)", enemyIndex);
 			ImGui::TextColored(stateColor, "   State: %s", enemy->GetTypeBStateString());
 		}
-		ImGui::Text("   Pos: (%.1f, %.1f, %.1f)", enemy->GetPosition().x, enemy->GetPosition().y, enemy->GetPosition().z);
-		ImGui::Text("   Dist: %.1f m", dist);
+		ImGui::Text("   Pos: (%.1f, %.1f, %.1f) | Dist: %.1f m", enemy->GetPosition().x, enemy->GetPosition().y, enemy->GetPosition().z, dist);
 		enemyIndex++;
+	}
+
+	ImGui::Separator();
+	ImGui::Text("=== Alive Ground Targets (%d) ===", enemyManager_.GetAliveGroundCount());
+	int groundIndex = 0;
+	for (auto* ground : enemyManager_.GetAliveGroundEnemies()) {
+		float dist = MyMath::Length(MyMath::Subtract(ground->GetPosition(), flightModel_.GetPosition()));
+		ImVec4 typeColor = (ground->GetAIType() == GroundAIType::Turret) ? ImVec4(1.0f, 0.4f, 0.4f, 1.0f) :
+			(ground->GetAIType() == GroundAIType::Structure) ? ImVec4(0.9f, 0.9f, 0.3f, 1.0f) : ImVec4(0.4f, 0.85f, 1.0f, 1.0f);
+		ImGui::TextColored(typeColor, "[%d] %s", groundIndex, ground->GetAITypeString());
+		ImGui::Text("   HP: %.1f/%.1f | Dist: %.1f m | InSight: %s", 
+			ground->GetHealth(), ground->GetMaxHealth(), dist, ground->IsTargetInSight() ? "YES" : "NO");
+		ImGui::Text("   Pos: (%.1f, %.1f, %.1f)", ground->GetPosition().x, ground->GetPosition().y, ground->GetPosition().z);
+		groundIndex++;
 	}
 
 	if (isMissionCleared_) {
@@ -950,6 +1071,7 @@ void StageScene::Update() {
 	ImGui::End();
 
 	DrawMissionEditor();
+	DrawAircraftTuningEditor();
 #endif
 
 	// ============================
@@ -1051,6 +1173,27 @@ void StageScene::Update() {
 		dissolve.dissolveMaskIndex = 0; // assets/masks/noise0.png
 		postEffect->AddActiveEffect(dissolve);
 	}
+
+	// ============================
+	// 戦闘HUDの更新
+	// ============================
+	Camera* cam = CameraManager::GetInstance()->GetActiveCamera();
+	StageHUDData hudData{};
+	hudData.remainingTime = remainingTime_;
+	hudData.currentAmmo = gunpod_.GetCurrentAmmo();
+	hudData.maxAmmo = gunpod_.GetMaxAmmo();
+	hudData.isFiring = isFiringThisFrame_;
+	hudData.aircraftPosition = flightModel_.GetPosition();
+	hudData.aircraftForward = flightModel_.GetForwardDirection();
+	hudData.mouseAimTargetDirection = mouseAimController_.GetTargetDirection();
+	hudData.mouseAimEnabled = mouseAimEnabled_;
+	if (cam) {
+		hudData.viewProjectionMatrix = cam->GetViewProjectionMatrix();
+	}
+	hudData.screenWidth = static_cast<float>(WinApp::kClientWidth);
+	hudData.screenHeight = static_cast<float>(WinApp::kClientHeight);
+
+	hud_.Update(gameDeltaTime, hudData);
 }
 
 
@@ -1074,14 +1217,14 @@ void StageScene::Draw() {
 	aircraftVisualModel_.Draw();
 	DebrisManager::GetInstance()->Draw();
 
-	// 敵描画
-	enemyManager_.Draw();
+	// 敵描画（空中敵＋地上敵）
+	Camera* cam = CameraManager::GetInstance()->GetActiveCamera();
+	enemyManager_.Draw(cam);
 
 	// 地面描画（PrimitiveModelパイプライン）
 	DrawGround();
 
 	// 弾丸描画
-	Camera* cam = CameraManager::GetInstance()->GetActiveCamera();
 	bulletManager_.Draw(cam);
 
 	// エフェクト描画
@@ -1263,7 +1406,15 @@ void StageScene::Draw() {
 }
 
 
+void StageScene::DrawUI() {
+	// HUD（タイマー・残弾数・照準）描画
+	hud_.Draw();
+}
+
+
 void StageScene::Finalize() {
+	TerrainSyncManager::GetInstance()->Finalize();
+	
 	// シーン終了時にカーソルを復帰
 	Input::GetInstance()->UnlockCursor();
 
@@ -1272,6 +1423,8 @@ void StageScene::Finalize() {
 
 	// ポストエフェクトをクリア
 	PostEffect::GetInstance()->ClearActiveEffects();
+
+	UITextRegistry::GetInstance()->Clear();
 }
 
 
@@ -1585,6 +1738,120 @@ void StageScene::DrawMissionEditor() {
 			}
 		}
 
+		// 4. 地上目標配置の編集
+		if (ImGui::CollapsingHeader("Ground Target Spawns", ImGuiTreeNodeFlags_DefaultOpen)) {
+			ImGui::Text("Total Ground Targets: %d", static_cast<int>(currentMission.groundEnemies.size()));
+
+			if (ImGui::Button("Add AAA Turret (Ground)")) {
+				GroundEnemySpawnData newGround;
+				Vector3 pPos = flightModel_.GetPosition();
+				newGround.position = { pPos.x, 0.0f, pPos.z };
+				newGround.aiType = GroundAIType::Turret;
+				newGround.health = 60.0f;
+				currentMission.groundEnemies.push_back(newGround);
+				selectedGroundEnemyIndex_ = static_cast<int>(currentMission.groundEnemies.size()) - 1;
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("Add Structure")) {
+				GroundEnemySpawnData newGround;
+				Vector3 pPos = flightModel_.GetPosition();
+				newGround.position = { pPos.x, 0.0f, pPos.z };
+				newGround.aiType = GroundAIType::Structure;
+				newGround.health = 120.0f;
+				newGround.param.collisionRadius = 14.0f;
+				currentMission.groundEnemies.push_back(newGround);
+				selectedGroundEnemyIndex_ = static_cast<int>(currentMission.groundEnemies.size()) - 1;
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("Add Patrol Vehicle")) {
+				GroundEnemySpawnData newGround;
+				Vector3 pPos = flightModel_.GetPosition();
+				newGround.position = { pPos.x, 0.0f, pPos.z };
+				newGround.aiType = GroundAIType::PatrolVehicle;
+				newGround.health = 45.0f;
+				currentMission.groundEnemies.push_back(newGround);
+				selectedGroundEnemyIndex_ = static_cast<int>(currentMission.groundEnemies.size()) - 1;
+			}
+
+			ImGui::Separator();
+
+			std::vector<std::string> groundLabels;
+			for (size_t i = 0; i < currentMission.groundEnemies.size(); ++i) {
+				const auto& g = currentMission.groundEnemies[i];
+				std::string typeStr = (g.aiType == GroundAIType::Turret) ? "Turret" :
+					(g.aiType == GroundAIType::Structure) ? "Structure" : "Vehicle";
+				groundLabels.push_back("Ground " + std::to_string(i) + " [" + typeStr + "] @ (" +
+					std::to_string(static_cast<int>(g.position.x)) + ", " +
+					std::to_string(static_cast<int>(g.position.y)) + ", " +
+					std::to_string(static_cast<int>(g.position.z)) + ")");
+			}
+
+			std::vector<const char*> groundLabelPtrs;
+			for (const auto& l : groundLabels) {
+				groundLabelPtrs.push_back(l.c_str());
+			}
+
+			if (ImGui::ListBox("Select Ground Target", &selectedGroundEnemyIndex_, groundLabelPtrs.data(), static_cast<int>(groundLabelPtrs.size()), 5)) {
+				// 選択変更
+			}
+
+			if (selectedGroundEnemyIndex_ >= 0 && selectedGroundEnemyIndex_ < static_cast<int>(currentMission.groundEnemies.size())) {
+				ImGui::Separator();
+				ImGui::Text("--- Edit Ground Target %d ---", selectedGroundEnemyIndex_);
+				auto& ground = currentMission.groundEnemies[selectedGroundEnemyIndex_];
+
+				ImGui::DragFloat3("Position", &ground.position.x, 1.0f);
+				if (ImGui::Button("Snap to Ground (Y=0)")) {
+					ground.position.y = 0.0f;
+				}
+				ImGui::SameLine();
+				if (ImGui::Button("Move to Player X/Z")) {
+					Vector3 pPos = flightModel_.GetPosition();
+					ground.position.x = pPos.x;
+					ground.position.y = 0.0f;
+					ground.position.z = pPos.z;
+				}
+
+				ImGui::SliderFloat("Health", &ground.health, 10.0f, 500.0f);
+				ground.param.maxHealth = ground.health;
+
+				int gTypeInt = (ground.aiType == GroundAIType::Turret) ? 0 :
+					(ground.aiType == GroundAIType::Structure) ? 1 : 2;
+				const char* gItems[] = { "AAA Turret", "Structure", "Patrol Vehicle" };
+				if (ImGui::Combo("AI Type", &gTypeInt, gItems, 3)) {
+					if (gTypeInt == 0) ground.aiType = GroundAIType::Turret;
+					else if (gTypeInt == 1) ground.aiType = GroundAIType::Structure;
+					else ground.aiType = GroundAIType::PatrolVehicle;
+				}
+
+				if (ground.aiType == GroundAIType::Turret || ground.aiType == GroundAIType::PatrolVehicle) {
+					ImGui::SliderFloat("Fire Range (m)", &ground.param.fireRange, 200.0f, 3000.0f);
+					ImGui::SliderFloat("Turn Speed (deg/s)", &ground.param.turnSpeedDeg, 10.0f, 180.0f);
+					ImGui::SliderFloat("Bullet Speed (m/s)", &ground.param.bulletSpeed, 200.0f, 1200.0f);
+					ImGui::SliderFloat("Bullet Damage", &ground.param.bulletDamage, 1.0f, 50.0f);
+					ImGui::SliderInt("Burst Count", &ground.param.burstCount, 1, 20);
+					ImGui::SliderFloat("Burst Cooldown (s)", &ground.param.burstCooldown, 0.5f, 5.0f);
+				}
+
+				if (ground.aiType == GroundAIType::PatrolVehicle) {
+					ImGui::SliderFloat("Move Speed (m/s)", &ground.param.moveSpeed, 2.0f, 50.0f);
+					ImGui::SliderFloat("Patrol Distance (m)", &ground.param.patrolDistance, 50.0f, 1000.0f);
+				}
+
+				if (ImGui::Button("Duplicate Ground Target")) {
+					GroundEnemySpawnData dup = ground;
+					dup.position.x += 30.0f;
+					currentMission.groundEnemies.push_back(dup);
+					selectedGroundEnemyIndex_ = static_cast<int>(currentMission.groundEnemies.size()) - 1;
+				}
+				ImGui::SameLine();
+				if (ImGui::Button("Delete Ground Target")) {
+					currentMission.groundEnemies.erase(currentMission.groundEnemies.begin() + selectedGroundEnemyIndex_);
+					selectedGroundEnemyIndex_ = -1;
+				}
+			}
+		}
+
 		ImGui::Separator();
 
 		if (ImGui::Button("Apply & Restart", ImVec2(-1, 40))) {
@@ -1595,12 +1862,166 @@ void StageScene::DrawMissionEditor() {
 	}
 	ImGui::End();
 }
+
+void StageScene::DrawAircraftTuningEditor() {
+	if (ImGui::Begin("Aircraft Tuning (CFG)", &isAircraftTuningOpen_)) {
+		// 1. CFGファイル管理
+		if (ImGui::CollapsingHeader("CFG File Management", ImGuiTreeNodeFlags_DefaultOpen)) {
+			std::vector<std::string> cfgFiles = AircraftConfig::GetAvailableAircraftList("Resources/aircraft");
+			std::vector<std::string> fileNames;
+			std::vector<const char*> fileNamePtrs;
+			for (const auto& f : cfgFiles) {
+				std::filesystem::path p(f);
+				fileNames.push_back(p.filename().string());
+			}
+			for (const auto& fn : fileNames) {
+				fileNamePtrs.push_back(fn.c_str());
+			}
+
+			if (ImGui::Combo("Select Aircraft CFG", &selectedAircraftConfigIndex_, fileNamePtrs.data(), static_cast<int>(fileNamePtrs.size()))) {
+				// 選択変更
+			}
+
+			if (ImGui::Button("Load Selected CFG")) {
+				if (selectedAircraftConfigIndex_ >= 0 && selectedAircraftConfigIndex_ < cfgFiles.size()) {
+					aircraftConfig_.LoadFromCfg(cfgFiles[selectedAircraftConfigIndex_]);
+					strcpy_s(tempAircraftConfigName_, sizeof(tempAircraftConfigName_), std::filesystem::path(cfgFiles[selectedAircraftConfigIndex_]).filename().string().c_str());
+					Restart();
+				}
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("Save (Overwrite)")) {
+				std::string savePath = aircraftConfig_.GetCurrentFilePath();
+				if (savePath.empty()) {
+					savePath = "Resources/aircraft/" + std::string(tempAircraftConfigName_);
+				}
+				aircraftConfig_.SaveToCfg(savePath);
+			}
+
+			ImGui::Separator();
+			ImGui::InputText("New CFG Name", tempAircraftConfigName_, sizeof(tempAircraftConfigName_));
+			if (ImGui::Button("Save As New CFG")) {
+				std::string newPath = "Resources/aircraft/" + std::string(tempAircraftConfigName_);
+				if (newPath.find(".cfg") == std::string::npos) {
+					newPath += ".cfg";
+				}
+				aircraftConfig_.SaveToCfg(newPath);
+				aircraftConfig_.SetCurrentFilePath(newPath);
+			}
+		}
+
+		auto& general = aircraftConfig_.GetGeneral();
+		auto& airframe = aircraftConfig_.GetAirframe();
+		auto& engine = aircraftConfig_.GetEngine();
+		auto& gunpod = aircraftConfig_.GetGunpod();
+
+		// 2. [General & Visual]
+		if (ImGui::CollapsingHeader("General & Visual", ImGuiTreeNodeFlags_DefaultOpen)) {
+			static char nameBuf[128];
+			strcpy_s(nameBuf, sizeof(nameBuf), general.name.c_str());
+			if (ImGui::InputText("Aircraft Name", nameBuf, sizeof(nameBuf))) {
+				general.name = nameBuf;
+			}
+
+			static char modelBuf[256];
+			strcpy_s(modelBuf, sizeof(modelBuf), general.modelPath.c_str());
+			if (ImGui::InputText("Model Path", modelBuf, sizeof(modelBuf))) {
+				general.modelPath = modelBuf;
+			}
+
+			ImGui::SliderFloat("Env Reflection", &general.environmentCoefficient, 0.0f, 1.0f);
+			ImGui::SliderFloat("Specular Intensity", &general.specularIntensity, 0.0f, 5.0f);
+			ImGui::SliderFloat("Shininess", &general.shininess, 1.0f, 200.0f);
+		}
+
+		// 3. [Airframe]
+		if (ImGui::CollapsingHeader("Airframe & Aerodynamics", ImGuiTreeNodeFlags_DefaultOpen)) {
+			ImGui::DragFloat("Empty Mass (kg)", &airframe.emptyFrameMass, 50.0f, 500.0f, 30000.0f);
+			ImGui::DragFloat("Max Fuel (kg)", &airframe.maxInternalFuel, 10.0f, 0.0f, 10000.0f);
+			ImGui::SliderFloat("Base Drag (Cd0)", &airframe.baseDrag, 0.001f, 0.2f, "%.4f");
+			ImGui::SliderFloat("Lift Coeff (CL0)", &airframe.liftCoefficient, 0.0f, 1.5f);
+			ImGui::DragFloat("Wing Area (m^2)", &airframe.wingArea, 0.5f, 5.0f, 200.0f);
+			ImGui::DragFloat("Max Health (HP)", &airframe.maxHealth, 5.0f, 10.0f, 2000.0f);
+
+			ImGui::Separator();
+			ImGui::Text("--- Lift & Stall Characteristics ---");
+			ImGui::SliderFloat("Critical AoA (rad)", &airframe.criticalAoA, 0.1f, 1.0f);
+			ImGui::SliderFloat("Max Lift Coeff (CLmax)", &airframe.maxLiftCoefficient, 0.5f, 3.5f);
+			ImGui::SliderFloat("Stall Lift Coeff", &airframe.stallLiftCoefficient, 0.05f, 1.0f);
+
+			ImGui::Separator();
+			ImGui::Text("--- Induced Drag & G Limits ---");
+			ImGui::SliderFloat("Aspect Ratio", &airframe.aspectRatio, 1.0f, 20.0f);
+			ImGui::SliderFloat("Oswald Efficiency", &airframe.oswaldEfficiency, 0.3f, 1.0f);
+			ImGui::SliderFloat("Positive G Limit", &airframe.positiveGLimit, 2.0f, 20.0f);
+			ImGui::SliderFloat("Negative G Limit", &airframe.negativeGLimit, -10.0f, 0.0f);
+
+			ImGui::Separator();
+			ImGui::Text("--- Flaps & Airbrake ---");
+			ImGui::SliderFloat("Flap Lift Bonus", &airframe.flapLiftBonus, 0.0f, 2.0f);
+			ImGui::SliderFloat("Flap Drag Bonus", &airframe.flapDragBonus, 0.0f, 0.5f);
+			ImGui::DragFloat("Flap Max Speed (m/s)", &airframe.flapMaxSpeed, 1.0f, 30.0f, 300.0f);
+			ImGui::SliderFloat("Flap Deploy Speed", &airframe.flapDeploySpeed, 0.5f, 10.0f);
+
+			ImGui::SliderFloat("Airbrake Drag Bonus", &airframe.airBrakeDragBonus, 0.0f, 1.0f);
+			ImGui::SliderFloat("Airbrake Deploy Speed", &airframe.airBrakeDeploySpeed, 0.5f, 10.0f);
+		}
+
+		// 4. [Engine]
+		if (ImGui::CollapsingHeader("Engine & Propulsion", ImGuiTreeNodeFlags_DefaultOpen)) {
+			ImGui::DragFloat("Engine Mass (kg)", &engine.mass, 10.0f, 50.0f, 5000.0f);
+			ImGui::DragFloat("Base Thrust (N)", &engine.baseThrust, 1000.0f, 1000.0f, 500000.0f, "%.0f N");
+			ImGui::SliderFloat("Normal Throttle Limit", &engine.normalThrottleLimit, 0.5f, 1.0f);
+			ImGui::SliderFloat("WEP Throttle Limit", &engine.wepThrottleLimit, 1.0f, 2.0f);
+			ImGui::SliderFloat("Spool Speed", &engine.physicalSpoolSpeed, 0.05f, 5.0f);
+			ImGui::SliderFloat("Fuel Flow Rate (kg/s)", &engine.baseFuelFlowRate, 0.1f, 20.0f);
+			ImGui::SliderFloat("Altitude Thrust Factor", &engine.altitudeThrottleFactor, 0.0f, 0.0002f, "%.6f");
+		}
+
+		// 5. [Gunpod]
+		if (ImGui::CollapsingHeader("Gunpod & Armament", ImGuiTreeNodeFlags_DefaultOpen)) {
+			ImGui::DragFloat("Gunpod Mass (kg)", &gunpod.baseMass, 5.0f, 10.0f, 500.0f);
+			ImGui::SliderFloat("Gunpod Drag (Cd)", &gunpod.drag, 0.0f, 0.05f, "%.4f");
+			ImGui::SliderFloat("Ammo Weight (kg/rd)", &gunpod.ammoWeight, 0.01f, 1.0f);
+			ImGui::DragInt("Max Ammo", &gunpod.maxAmmo, 10, 50, 5000);
+			ImGui::SliderFloat("Fire Rate (rds/s)", &gunpod.fireRate, 5.0f, 100.0f);
+		}
+
+		ImGui::Separator();
+
+		// 即座に適用
+		if (ImGui::Button("Apply to Current Aircraft", ImVec2(-1, 35))) {
+			Vector3 curPos = flightModel_.GetPosition();
+			Vector3 curVel = flightModel_.GetVelocity();
+			Quaternion curOri = flightModel_.GetOrientation();
+
+			flightModel_.Initialize(airframe, engine);
+			flightModel_.SetPosition(curPos);
+			flightModel_.SetVelocity(curVel);
+			flightModel_.SetOrientation(curOri);
+
+			gunpod_.Initialize(gunpod);
+		}
+
+		if (ImGui::Button("Save & Restart Stage", ImVec2(-1, 35))) {
+			std::string savePath = aircraftConfig_.GetCurrentFilePath();
+			if (savePath.empty()) {
+				savePath = "Resources/aircraft/mig21.cfg";
+			}
+			aircraftConfig_.SaveToCfg(savePath);
+			Restart();
+		}
+	}
+	ImGui::End();
+}
 #else
 void StageScene::DrawMissionEditor() {}
+void StageScene::DrawAircraftTuningEditor() {}
 #endif
 
 void StageScene::Restart() {
 	Finalize();
 	Initialize();
 }
+
 

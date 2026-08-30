@@ -6,6 +6,9 @@
 #include "../../engine/Graphics/Particle/GPUParticleManager.h"
 #include "../../engine/Graphics/Text/FontManager.h"
 #include "../../engine/Graphics/Text/TextRenderer.h"
+#include "../Scene/SceneFactory.h"
+
+
 
 void Game::Initialize() {
 	// 1. 基盤システムの初期化
@@ -32,7 +35,7 @@ void Game::Initialize() {
 
 	FontManager::GetInstance()->Initialize();
 	TextRenderer::GetInstance()->Initialize(SpriteCommon::GetInstance());
-	FontManager::GetInstance()->LoadFont("Roboto", "C:/Windows/Fonts/msgothic.ttc", 32.0f);
+	FontManager::GetInstance()->LoadFont("Roboto", "C:/Windows/Fonts/msgothic.ttc", 96.0f);
 
 	imguiManager = std::make_unique<ImGuiManager>();
 	imguiManager->Initialize(winApp.get(), DirectXCommon::GetInstance(), srvManager.get());
@@ -43,8 +46,10 @@ void Game::Initialize() {
 	PostEffect::GetInstance()->Initialize(DirectXCommon::GetInstance(), srvManager.get());
 
 	// 5. シーンマネージャの生成 (全ての準備が整ってから)
-	sceneManager = std::make_unique<SceneManager>(); // 内部でシーンの Initialize が走る
+	sceneManager = std::make_unique<SceneManager>(std::make_unique<SceneFactory>()); // 内部でシーンの Initialize が走る
 
+	// 6. Win32 ネイティブ UIエディタ別ウィンドウの初期化
+	UIEditorWindow::GetInstance()->Initialize(winApp->GetHwnd());
 }
 
 void Game::Update() {
@@ -84,6 +89,14 @@ void Game::Update() {
 	ImGui::End();
 #endif // USE_IMGUI
 
+	// Win32 ネイティブ UIエディタの更新
+	UIEditorWindow::GetInstance()->Update();
+
+	// F1キーでエディタウィンドウの表示/非表示切り替え
+	if (Input::GetInstance()->TriggerKey(DIK_F1)) {
+		UIEditorWindow::GetInstance()->Toggle();
+	}
+
 	// 終了リクエストの例 (Escキーで終了など)
 	if (Input::GetInstance()->TriggerKey(DIK_ESCAPE)) {
 		endRequest_ = true;
@@ -103,6 +116,7 @@ void Game::Draw() {
 	ParticleManager::GetInstance()->Draw();
 
 	SpriteCommon::GetInstance()->SetupCommonState();
+	sceneManager->DrawUI();
 	TextRenderer::GetInstance()->Draw();
 
 	// 描画後処理（ポストエフェクト適用、バックバッファに描画）
@@ -172,7 +186,10 @@ void Game::Finalize() {
 	// 6. 基盤システムの終了処理
 	DirectXCommon::GetInstance()->Finalize();
 
-	// 7. ウィンドウの終了処理
+	// 7. UIエディタウィンドウの終了
+	UIEditorWindow::GetInstance()->Finalize();
+
+	// 8. ウィンドウの終了処理
 	if (winApp) {
 		winApp->Finalize();
 		winApp.reset();

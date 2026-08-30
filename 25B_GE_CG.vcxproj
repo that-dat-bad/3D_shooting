@@ -88,7 +88,7 @@
       <TreatLinkerWarningAsErrors>true</TreatLinkerWarningAsErrors>
       <AdditionalOptions>/ignore:4049 /ignore:4098 /ignore:4099 %(AdditionalOptions)</AdditionalOptions>
       <AdditionalLibraryDirectories>$(SolutionDir)external\assimp\lib\Debug;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>assimp-vc143-mtd.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>winhttp.lib;assimp-vc143-mtd.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
       <Command>copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxcompiler.dll" "$(TargetDir)dxcompiler.dll"</Command>
@@ -113,7 +113,7 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalOptions>/ignore:4099 %(AdditionalOptions)</AdditionalOptions>
       <AdditionalLibraryDirectories>$(SolutionDir)external\assimp\lib\Release</AdditionalLibraryDirectories>
-      <AdditionalDependencies>assimp-vc143-mt.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>winhttp.lib;assimp-vc143-mt.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
       <Command>copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxcompiler.dll" "$(TargetDir)dxcompiler.dll"
@@ -142,7 +142,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
       <AdditionalOptions>/ignore:4099 %(AdditionalOptions)</AdditionalOptions>
       <LinkTimeCodeGeneration />
       <AdditionalLibraryDirectories>$(SolutionDir)external\assimp\lib\Release</AdditionalLibraryDirectories>
-      <AdditionalDependencies>assimp-vc143-mt.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>winhttp.lib;assimp-vc143-mt.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
       <Command>copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxcompiler.dll" "$(TargetDir)dxcompiler.dll"
@@ -273,6 +273,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="src\Game\System\MissionManager.h" />
     <ClInclude Include="src\engine\Audio\AudioManager.h" />
     <ClInclude Include="src\engine\Debug\ImguiManager.h" />
+    <ClInclude Include="src\engine\Debug\UIEditorWindow.h" />
     <ClInclude Include="src\engine\Graphics\Particle\ParticleEmitter.h" />
     <ClInclude Include="src\engine\Graphics\Particle\ParticleManager.h" />
     <ClInclude Include="src\engine\Graphics\Particle\GPUParticleManager.h" />
@@ -319,7 +320,10 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="src\Game\Scene\DebugScene.h" />
     <ClInclude Include="src\Game\Scene\Iscene.h" />
     <ClInclude Include="src\Game\Scene\SceneManager.h" />
+    <ClInclude Include="src\Game\Scene\AbstractSceneFactory.h" />
+    <ClInclude Include="src\Game\Scene\SceneFactory.h" />
     <ClInclude Include="src\Game\Scene\StageScene.h" />
+    <ClInclude Include="src\Game\Scene\StageHUD.h" />
     <ClInclude Include="src\Game\Camera\PlayerCamera.h" />
     <ClInclude Include="src\Game\Scene\TitleScene.h" />
     <ClInclude Include="src\engine\base\Math\Quaternion.h" />
@@ -333,6 +337,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="src\engine\Physics\ICollisionBody.h" />
     <ClInclude Include="src\Game\Enemy\Enemy.h" />
     <ClInclude Include="src\Game\Enemy\EnemyManager.h" />
+    <ClInclude Include="src\Game\Enemy\GroundEnemy.h" />
     <ClInclude Include="src\Game\Bullet\Bullet.h" />
     <ClInclude Include="src\Game\Bullet\BulletManager.h" />
     <ClInclude Include="src\Game\Environment\Sun.h" />
@@ -340,6 +345,17 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="src\Game\FlightModel\DamageModel.h" />
     <ClInclude Include="src\Game\Graphics\AircraftVisualModel.h" />
     <ClInclude Include="src\Game\Graphics\DebrisManager.h" />
+    <ClInclude Include="src\engine\Graphics\UI\UIElement.h" />
+    <ClInclude Include="src\engine\Graphics\UI\UIButton.h" />
+    <ClInclude Include="src\engine\Graphics\UI\UIText.h" />
+    <ClInclude Include="src\engine\Graphics\UI\UIPanel.h" />
+    <ClInclude Include="src\Game\System\GameResult.h" />
+    <ClInclude Include="src\engine\io\MCPClient.h" />
+    <ClInclude Include="src\engine\io\ConfigFile.h" />
+    <ClInclude Include="src\Game\FlightModel\AircraftConfig.h" />
+    <ClInclude Include="src\Game\Environment\TerrainSyncManager.h" />
+    <ClInclude Include="src\engine\Graphics\UI\UISelectionManager.h" />
+    <ClInclude Include="src\engine\Graphics\UI\UITextRegistry.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\Game\Graphics\AircraftVisualModel.cpp" />
@@ -366,6 +382,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="src\engine\Graphics\Text\TextRenderer.cpp" />
     <ClCompile Include="src\engine\Audio\AudioManager.cpp" />
     <ClCompile Include="src\engine\Debug\ImguiManager.cpp" />
+    <ClCompile Include="src\engine\Debug\UIEditorWindow.cpp" />
     <ClCompile Include="src\engine\Graphics\Particle\ParticleEmitter.cpp" />
     <ClCompile Include="src\engine\Graphics\Particle\ParticleManager.cpp" />
     <ClCompile Include="src\engine\Graphics\Particle\GPUParticleManager.cpp" />
@@ -431,7 +448,9 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="src\Game\Scene\DebugScene.cpp" />
     <ClCompile Include="src\Game\Scene\IScene.cpp" />
     <ClCompile Include="src\Game\Scene\SceneManager.cpp" />
+    <ClCompile Include="src\Game\Scene\SceneFactory.cpp" />
     <ClCompile Include="src\Game\Scene\StageScene.cpp" />
+    <ClCompile Include="src\Game\Scene\StageHUD.cpp" />
     <ClCompile Include="src\Game\Camera\PlayerCamera.cpp" />
     <ClCompile Include="src\Game\Scene\TitleScene.cpp" />
     <ClCompile Include="src\engine\base\Math\Quaternion.cpp" />
@@ -440,8 +459,19 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="src\engine\Physics\CollisionSystem.cpp" />
     <ClCompile Include="src\Game\Enemy\Enemy.cpp" />
     <ClCompile Include="src\Game\Enemy\EnemyManager.cpp" />
+    <ClCompile Include="src\Game\Enemy\GroundEnemy.cpp" />
     <ClCompile Include="src\Game\Bullet\Bullet.cpp" />
     <ClCompile Include="src\Game\Bullet\BulletManager.cpp" />
+    <ClCompile Include="src\engine\Graphics\UI\UIElement.cpp" />
+    <ClCompile Include="src\engine\Graphics\UI\UIButton.cpp" />
+    <ClCompile Include="src\engine\Graphics\UI\UIText.cpp" />
+    <ClCompile Include="src\engine\Graphics\UI\UIPanel.cpp" />
+    <ClCompile Include="src\engine\io\MCPClient.cpp" />
+    <ClCompile Include="src\engine\io\ConfigFile.cpp" />
+    <ClCompile Include="src\Game\FlightModel\AircraftConfig.cpp" />
+    <ClCompile Include="src\Game\Environment\TerrainSyncManager.cpp" />
+    <ClCompile Include="src\engine\Graphics\UI\UISelectionManager.cpp" />
+    <ClCompile Include="src\engine\Graphics\UI\UITextRegistry.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="external\imgui\LICENSE.txt" />

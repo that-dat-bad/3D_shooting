@@ -92,12 +92,12 @@ std::vector<std::string> MissionManager::GetMissionList() {
 
 void MissionManager::CreateDefaultMission(const std::string& filepath) {
 	currentMission_ = MissionData();
-	currentMission_.name = "Mission 01: First Strike";
-	currentMission_.description = "Destroy all target drones in the airspace.";
+	currentMission_.name = "Mission 01: Combined Strike";
+	currentMission_.description = "Destroy all target drones and ground defense installations.";
 	currentMission_.playerHP = 100.0f;
 	currentMission_.playerPosition = { 0.0f, 100.0f, 0.0f };
 	
-	// 元の StageScene::Initialize にあった配置
+	// 空中目標
 	currentMission_.enemies = {
 		{ {  100.0f, 100.0f,  200.0f }, "Resources/planeplane.obj", 50.0f, AIType::ChaseAttack },
 		{ {  -80.0f, 100.0f,  300.0f }, "Resources/planeplane.obj", 50.0f, AIType::ChaseAttack },
@@ -106,5 +106,29 @@ void MissionManager::CreateDefaultMission(const std::string& filepath) {
 		{ {   50.0f, 100.0f,  700.0f }, "Resources/planeplane.obj", 50.0f, AIType::CruiseEvade },
 	};
 
+	// 地上目標
+	GroundEnemySpawnData turret1;
+	turret1.position = { 0.0f, 0.0f, 400.0f };
+	turret1.aiType = GroundAIType::Turret;
+	turret1.health = 60.0f;
+
+	GroundEnemySpawnData turret2;
+	turret2.position = { -120.0f, 0.0f, 600.0f };
+	turret2.aiType = GroundAIType::Turret;
+	turret2.health = 60.0f;
+
+	GroundEnemySpawnData structure1;
+	structure1.position = { 150.0f, 0.0f, 550.0f };
+	structure1.aiType = GroundAIType::Structure;
+	structure1.health = 120.0f;
+
+	GroundEnemySpawnData vehicle1;
+	vehicle1.position = { -50.0f, 0.0f, 300.0f };
+	vehicle1.aiType = GroundAIType::PatrolVehicle;
+	vehicle1.health = 45.0f;
+
+	currentMission_.groundEnemies = { turret1, turret2, structure1, vehicle1 };
+
 	Save(filepath);
 }
+

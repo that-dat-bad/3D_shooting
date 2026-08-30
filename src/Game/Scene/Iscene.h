@@ -26,6 +26,8 @@ public:
 	virtual void Update() = 0;
 	/// <summary>描画処理</summary>
 	virtual void Draw() = 0;
+	/// <summary>2D UI描画処理</summary>
+	virtual void DrawUI() {}
 	/// <summary>終了処理</summary>
 	virtual void Finalize() = 0;
 	
