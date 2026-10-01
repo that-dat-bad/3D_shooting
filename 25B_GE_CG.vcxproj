@@ -271,6 +271,10 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="src\engine\Graphics\Model\PrimitiveModel.h" />
     <ClInclude Include="src\Game\System\Game.h" />
     <ClInclude Include="src\Game\System\MissionManager.h" />
+    <ClInclude Include="src\Game\System\MissionMapView.h" />
+    <ClInclude Include="src\Game\System\MissionObjective.h" />
+    <ClInclude Include="src\Game\System\MissionTrigger.h" />
+    <ClInclude Include="src\Game\System\Waypoint.h" />
     <ClInclude Include="src\engine\Audio\AudioManager.h" />
     <ClInclude Include="src\engine\Debug\ImguiManager.h" />
     <ClInclude Include="src\engine\Debug\UIEditorWindow.h" />
@@ -322,6 +326,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="src\Game\Scene\SceneManager.h" />
     <ClInclude Include="src\Game\Scene\AbstractSceneFactory.h" />
     <ClInclude Include="src\Game\Scene\SceneFactory.h" />
+    <ClInclude Include="src\Game\Scene\MissionEditorScene.h" />
     <ClInclude Include="src\Game\Scene\StageScene.h" />
     <ClInclude Include="src\Game\Scene\StageHUD.h" />
     <ClInclude Include="src\Game\Camera\PlayerCamera.h" />
@@ -378,6 +383,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="src\engine\Graphics\Model\PrimitiveModel.cpp" />
     <ClCompile Include="src\Game\System\Game.cpp" />
     <ClCompile Include="src\Game\System\MissionManager.cpp" />
+    <ClCompile Include="src\Game\System\MissionMapView.cpp" />
     <ClCompile Include="src\engine\Graphics\Text\FontManager.cpp" />
     <ClCompile Include="src\engine\Graphics\Text\TextRenderer.cpp" />
     <ClCompile Include="src\engine\Audio\AudioManager.cpp" />
@@ -449,6 +455,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="src\Game\Scene\IScene.cpp" />
     <ClCompile Include="src\Game\Scene\SceneManager.cpp" />
     <ClCompile Include="src\Game\Scene\SceneFactory.cpp" />
+    <ClCompile Include="src\Game\Scene\MissionEditorScene.cpp" />
     <ClCompile Include="src\Game\Scene\StageScene.cpp" />
     <ClCompile Include="src\Game\Scene\StageHUD.cpp" />
     <ClCompile Include="src\Game\Camera\PlayerCamera.cpp" />

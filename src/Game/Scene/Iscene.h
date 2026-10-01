@@ -10,6 +10,7 @@ enum SCENE {
 	CLEAR,
 	RESULT,
 	DEBUG,
+	MISSION_EDITOR,
 };
 
 /// <summary>

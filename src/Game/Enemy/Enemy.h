@@ -15,7 +15,8 @@ class Camera;
 
 enum class AIType {
 	ChaseAttack,
-	CruiseEvade
+	CruiseEvade,
+	FollowWaypoint
 };
 
 enum class TypeBState {

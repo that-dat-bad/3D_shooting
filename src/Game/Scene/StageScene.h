@@ -21,6 +21,7 @@
 #include "../../engine/Graphics/UI/UIText.h"
 
 #include "../System/MissionManager.h"
+#include "../System/MissionMapView.h"
 
 /// @brief ゲーム本編のステージシーン
 class StageScene : public IScene {
@@ -112,8 +113,9 @@ private:
 	static constexpr float kGameOverDuration = 2.0f;
 	float timeScale_ = 1.0f;
 
-	// ミッション制限時間（非依存、5分固定）
+	// ミッション制限時間（MissionData.timeLimitから設定）
 	float remainingTime_ = 300.0f;
+	float missionElapsedTime_ = 0.0f;  ///< ミッション経過時間（トリガー評価用）
 	UIText timeText_;
 
 	// 戦闘HUD（残弾数・照準・タイマー）
@@ -158,15 +160,7 @@ private:
 	int selectedAircraftConfigIndex_ = 0;
 	char tempAircraftConfigName_[128] = "mig21.cfg";
 	void DrawAircraftTuningEditor();
-
-	// ミッションエディタ用
-	bool isMissionEditorOpen_ = true;
-	char tempMissionName_[128] = "";
-	char tempMissionDesc_[256] = "";
-	char tempSaveFileName_[128] = "";
-	int selectedMissionIndex_ = 0;
-	int selectedEnemyIndex_ = -1;
-	int selectedGroundEnemyIndex_ = -1;
-	void DrawMissionEditor();
+	void DrawMissionObjectivesHUD();
+	void DrawMissionMessages();
 };
 

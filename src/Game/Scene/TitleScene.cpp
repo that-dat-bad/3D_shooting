@@ -57,8 +57,8 @@ void TitleScene::Initialize() {
 	float buttonWidth = 300.0f;
 	float buttonHeight = 55.0f;
 	float buttonX = (kScreenWidth - buttonWidth) * 0.5f;
-	float buttonStartY = 340.0f;
-	float buttonSpacing = 75.0f;
+	float buttonStartY = 320.0f;
+	float buttonSpacing = 70.0f;
 
 	// START ボタン
 	startButton_.Initialize(spriteCommon, "START", 30.0f);
@@ -71,9 +71,20 @@ void TitleScene::Initialize() {
 		sceneID = SCENE::STAGE;
 	});
 
+	// EDITOR ボタン
+	editorButton_.Initialize(spriteCommon, "MISSION EDITOR", 30.0f);
+	editorButton_.SetPosition({ buttonX, buttonStartY + buttonSpacing });
+	editorButton_.SetSize({ buttonWidth, buttonHeight });
+	editorButton_.SetNormalColor({ 0.10f, 0.12f, 0.18f, 0.85f });
+	editorButton_.SetHoverColor({ 0.15f, 0.45f, 0.25f, 0.95f });
+	editorButton_.SetSelectedColor({ 0.18f, 0.60f, 0.35f, 0.95f });
+	editorButton_.SetOnClick([this]() {
+		sceneID = SCENE::MISSION_EDITOR;
+	});
+
 	// SETTINGS ボタン
 	settingsButton_.Initialize(spriteCommon, "SETTINGS", 30.0f);
-	settingsButton_.SetPosition({ buttonX, buttonStartY + buttonSpacing });
+	settingsButton_.SetPosition({ buttonX, buttonStartY + buttonSpacing * 2.0f });
 	settingsButton_.SetSize({ buttonWidth, buttonHeight });
 	settingsButton_.SetNormalColor({ 0.10f, 0.12f, 0.18f, 0.85f });
 	settingsButton_.SetHoverColor({ 0.15f, 0.25f, 0.45f, 0.95f });
@@ -84,7 +95,7 @@ void TitleScene::Initialize() {
 
 	// EXIT ボタン
 	exitButton_.Initialize(spriteCommon, "EXIT", 30.0f);
-	exitButton_.SetPosition({ buttonX, buttonStartY + buttonSpacing * 2.0f });
+	exitButton_.SetPosition({ buttonX, buttonStartY + buttonSpacing * 3.0f });
 	exitButton_.SetSize({ buttonWidth, buttonHeight });
 	exitButton_.SetNormalColor({ 0.10f, 0.12f, 0.18f, 0.85f });
 	exitButton_.SetHoverColor({ 0.40f, 0.15f, 0.15f, 0.95f });
@@ -94,6 +105,7 @@ void TitleScene::Initialize() {
 	});
 
 	selectionManager_.AddButton(&startButton_);
+	selectionManager_.AddButton(&editorButton_);
 	selectionManager_.AddButton(&settingsButton_);
 	selectionManager_.AddButton(&exitButton_);
 

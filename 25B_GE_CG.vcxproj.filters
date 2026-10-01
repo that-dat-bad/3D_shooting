@@ -283,6 +283,18 @@
     <ClInclude Include="src\Game\System\MissionManager.h">
       <Filter>驛｢譎渉・･郢晢ｽ｣驛｢譏ｶ縺朱Δ譎｢・ｽ・ｼ 驛｢譎・ｽｼ譁撰ｼ憺Δ・ｧ繝ｻ・､驛｢譎｢・ｽ・ｫ</Filter>
     </ClInclude>
+    <ClInclude Include="src\Game\System\MissionMapView.h">
+      <Filter>驛｢譎渉・･郢晢ｽ｣驛｢譏ｶ縺朱Δ譎｢・ｽ・ｼ 驛｢譎・ｽｼ譁撰ｼ憺Δ・ｧ繝ｻ・､驛｢譎｢・ｽ・ｫ</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Game\System\MissionObjective.h">
+      <Filter>驛｢譎渉・･郢晢ｽ｣驛｢譏ｶ縺朱Δ譎｢・ｽ・ｼ 驛｢譎・ｽｼ譁撰ｼ憺Δ・ｧ繝ｻ・､驛｢譎｢・ｽ・ｫ</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Game\System\MissionTrigger.h">
+      <Filter>驛｢譎渉・･郢晢ｽ｣驛｢譏ｶ縺朱Δ譎｢・ｽ・ｼ 驛｢譎・ｽｼ譁撰ｼ憺Δ・ｧ繝ｻ・､驛｢譎｢・ｽ・ｫ</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Game\System\Waypoint.h">
+      <Filter>驛｢譎渉・･郢晢ｽ｣驛｢譏ｶ縺朱Δ譎｢・ｽ・ｼ 驛｢譎・ｽｼ譁撰ｼ憺Δ・ｧ繝ｻ・､驛｢譎｢・ｽ・ｫ</Filter>
+    </ClInclude>
     <ClInclude Include="src\engine\Audio\AudioManager.h">
       <Filter>驛｢譎渉・･郢晢ｽ｣驛｢譏ｶ縺朱Δ譎｢・ｽ・ｼ 驛｢譎・ｽｼ譁撰ｼ憺Δ・ｧ繝ｻ・､驛｢譎｢・ｽ・ｫ</Filter>
     </ClInclude>
@@ -475,6 +487,9 @@
       <Filter>驛｢・ｧ繝ｻ・ｽ驛｢譎｢・ｽ・ｼ驛｢・ｧ繝ｻ・ｹ 驛｢譎・ｽｼ譁撰ｼ憺Δ・ｧ繝ｻ・､驛｢譎｢・ｽ・ｫ</Filter>
     </ClCompile>
     <ClCompile Include="src\Game\System\MissionManager.cpp">
+      <Filter>驛｢・ｧ繝ｻ・ｽ驛｢譎｢・ｽ・ｼ驛｢・ｧ繝ｻ・ｹ 驛｢譎・ｽｼ譁撰ｼ憺Δ・ｧ繝ｻ・､驛｢譎｢・ｽ・ｫ</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Game\System\MissionMapView.cpp">
       <Filter>驛｢・ｧ繝ｻ・ｽ驛｢譎｢・ｽ・ｼ驛｢・ｧ繝ｻ・ｹ 驛｢譎・ｽｼ譁撰ｼ憺Δ・ｧ繝ｻ・､驛｢譎｢・ｽ・ｫ</Filter>
     </ClCompile>
     <ClCompile Include="src\engine\Debug\Dump.cpp">

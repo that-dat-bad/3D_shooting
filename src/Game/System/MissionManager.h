@@ -5,6 +5,9 @@
 #include "../../engine/base/Math/MyMath.h"
 #include "../Enemy/EnemyManager.h"
 #include "../../engine/io/json.hpp"
+#include "MissionObjective.h"
+#include "MissionTrigger.h"
+#include "Waypoint.h"
 
 /// @brief ミッションの構成データ
 struct MissionData {
@@ -14,9 +17,19 @@ struct MissionData {
 	MyMath::Vector3 playerPosition = { 0.0f, 100.0f, 0.0f };
 	std::vector<EnemySpawnData> enemies;
 	std::vector<GroundEnemySpawnData> groundEnemies;
+
+	// --- Phase 1: ミッション目標 & トリガーシステム ---
+	float timeLimit = 300.0f;                    ///< ミッション制限時間 (秒, 0 = 無制限)
+	std::vector<MissionObjective> objectives;    ///< ミッション目標リスト
+	std::vector<MissionTrigger> triggers;        ///< トリガーリスト
+
+	// --- Phase 2: ウェイポイント ---
+	std::vector<WaypointPath> waypointPaths;
 };
 
 // nlohmann/json 相互変換用の定義
+#ifndef MYMATH_VECTOR3_JSON_DEFINED
+#define MYMATH_VECTOR3_JSON_DEFINED
 namespace MyMath {
 	inline void to_json(nlohmann::json& j, const Vector3& v) {
 		j = nlohmann::json{ {"x", v.x}, {"y", v.y}, {"z", v.z} };
@@ -27,14 +40,19 @@ namespace MyMath {
 		j.at("z").get_to(v.z);
 	}
 }
+#endif
 
 inline void to_json(nlohmann::json& j, const EnemySpawnData& e) {
-	std::string aiStr = (e.aiType == AIType::ChaseAttack) ? "ChaseAttack" : "CruiseEvade";
+	std::string aiStr = "ChaseAttack";
+	if (e.aiType == AIType::CruiseEvade) aiStr = "CruiseEvade";
+	else if (e.aiType == AIType::FollowWaypoint) aiStr = "FollowWaypoint";
+
 	j = nlohmann::json{
 		{"position", e.position},
 		{"modelPath", e.modelPath},
 		{"health", e.health},
-		{"aiType", aiStr}
+		{"aiType", aiStr},
+		{"waypointPathName", e.waypointPathName}
 	};
 }
 
@@ -48,9 +66,12 @@ inline void from_json(const nlohmann::json& j, EnemySpawnData& e) {
 	}
 	if (aiStr == "CruiseEvade") {
 		e.aiType = AIType::CruiseEvade;
+	} else if (aiStr == "FollowWaypoint") {
+		e.aiType = AIType::FollowWaypoint;
 	} else {
 		e.aiType = AIType::ChaseAttack;
 	}
+	if (j.contains("waypointPathName")) j.at("waypointPathName").get_to(e.waypointPathName);
 }
 
 inline void to_json(nlohmann::json& j, const GroundEnemyParam& p) {
@@ -96,7 +117,8 @@ inline void to_json(nlohmann::json& j, const GroundEnemySpawnData& g) {
 		{"position", g.position},
 		{"aiType", aiStr},
 		{"health", g.health},
-		{"param", g.param}
+		{"param", g.param},
+		{"waypointPathName", g.waypointPathName}
 	};
 }
 
@@ -118,6 +140,7 @@ inline void from_json(const nlohmann::json& j, GroundEnemySpawnData& g) {
 		j.at("param").get_to(g.param);
 	}
 	g.param.maxHealth = g.health;
+	if (j.contains("waypointPathName")) j.at("waypointPathName").get_to(g.waypointPathName);
 }
 
 inline void to_json(nlohmann::json& j, const MissionData& m) {
@@ -127,7 +150,11 @@ inline void to_json(nlohmann::json& j, const MissionData& m) {
 		{"playerHP", m.playerHP},
 		{"playerPosition", m.playerPosition},
 		{"enemies", m.enemies},
-		{"groundEnemies", m.groundEnemies}
+		{"groundEnemies", m.groundEnemies},
+		{"timeLimit", m.timeLimit},
+		{"objectives", m.objectives},
+		{"triggers", m.triggers},
+		{"waypointPaths", m.waypointPaths}
 	};
 }
 
@@ -138,7 +165,17 @@ inline void from_json(const nlohmann::json& j, MissionData& m) {
 	if (j.contains("playerPosition")) j.at("playerPosition").get_to(m.playerPosition);
 	if (j.contains("enemies")) j.at("enemies").get_to(m.enemies);
 	if (j.contains("groundEnemies")) j.at("groundEnemies").get_to(m.groundEnemies);
+	if (j.contains("timeLimit")) j.at("timeLimit").get_to(m.timeLimit);
+	if (j.contains("objectives")) j.at("objectives").get_to(m.objectives);
+	if (j.contains("triggers")) j.at("triggers").get_to(m.triggers);
+	if (j.contains("waypointPaths")) j.at("waypointPaths").get_to(m.waypointPaths);
 }
+
+/// @brief ランタイム中に表示するメッセージ情報
+struct RuntimeMessage {
+	std::string text;
+	float remainingTime = 3.0f;
+};
 
 /// @brief ミッションの管理とJSONシリアライズ・デシリアライズを担当するクラス
 class MissionManager {
@@ -158,6 +195,59 @@ public:
 	/// @brief デフォルトのミッションデータを構築して保存
 	void CreateDefaultMission(const std::string& filepath);
 
+	// === Phase 1: 目標 & トリガー評価 ===
+
+	/// @brief ミッション開始時にランタイム状態をリセット
+	void ResetRuntimeState();
+
+	/// @brief 全目標のステータスを評価・更新する
+	/// @param playerPos プレイヤーの現在位置
+	/// @param playerHP プレイヤーの現在HP
+	/// @param destroyedCount 現在の撃破数
+	/// @param allDestroyed 全敵が殲滅されたか
+	/// @param elapsedTime ミッション経過時間
+	void EvaluateObjectives(
+		const MyMath::Vector3& playerPos,
+		float playerHP,
+		int destroyedCount,
+		bool allDestroyed,
+		float elapsedTime
+	);
+
+	/// @brief 全トリガーの条件をチェックし、該当するアクションを実行する
+	/// @param playerPos プレイヤーの現在位置
+	/// @param playerHP プレイヤーの現在HP
+	/// @param destroyedCount 現在の撃破数
+	/// @param elapsedTime ミッション経過時間
+	void EvaluateTriggers(
+		const MyMath::Vector3& playerPos,
+		float playerHP,
+		int destroyedCount,
+		float elapsedTime
+	);
+
+	/// @brief 全主目標が達成されたかを返す
+	bool AreAllPrimaryObjectivesCompleted() const;
+
+	/// @brief いずれかの主目標が失敗したかを返す
+	bool IsAnyPrimaryObjectiveFailed() const;
+
+	/// @brief トリガーによるミッション成功フラグ
+	bool IsTriggerMissionComplete() const { return triggerMissionComplete_; }
+
+	/// @brief トリガーによるミッション失敗フラグ
+	bool IsTriggerMissionFail() const { return triggerMissionFail_; }
+
+	/// @brief トリガーで出現した追加敵のリストを取得・クリア
+	std::vector<EnemySpawnData> PopPendingEnemySpawns();
+	std::vector<GroundEnemySpawnData> PopPendingGroundEnemySpawns();
+
+	/// @brief 表示中のメッセージを取得
+	const std::vector<RuntimeMessage>& GetActiveMessages() const { return activeMessages_; }
+
+	/// @brief メッセージのタイマーを更新
+	void UpdateMessages(float deltaTime);
+
 	// === ゲッター・セッター ===
 	const MissionData& GetCurrentMission() const { return currentMission_; }
 	MissionData& GetCurrentMission() { return currentMission_; }
@@ -170,6 +260,16 @@ private:
 	MissionManager(const MissionManager&) = delete;
 	MissionManager& operator=(const MissionManager&) = delete;
 
+	/// @brief トリガーアクションを実行する
+	void ExecuteAction(const TriggerAction& action);
+
 	MissionData currentMission_;
 	std::string currentFilePath_;
+
+	// --- ランタイム状態 ---
+	bool triggerMissionComplete_ = false;
+	bool triggerMissionFail_ = false;
+	std::vector<EnemySpawnData> pendingEnemySpawns_;
+	std::vector<GroundEnemySpawnData> pendingGroundEnemySpawns_;
+	std::vector<RuntimeMessage> activeMessages_;
 };

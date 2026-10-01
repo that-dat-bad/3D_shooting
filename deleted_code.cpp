@@ -1,247 +1,5 @@
-#include "StageScene.h"
-#include "../../engine/Graphics/Camera/CameraManager.h"
-#include "../../engine/Graphics/Model/Object3dCommon.h"
-#include "../../engine/Graphics/Model/SkyboxCommon.h"
-#include "../../engine/Graphics/System/TextureManager.h"
-#include "../../engine/Graphics/Model/ModelManager.h"
-#include "../../engine/Graphics/Model/PrimitiveModel.h"
-#include "WinApp.h"
-#include "../../engine/Graphics/PostProcess/PostEffect.h"
-#include "../../engine/Graphics/Particle/EffectManager.h"
-#include "../../engine/Graphics/Particle/ParticleManager.h"
-#include "../../engine/Graphics/Particle/GPUParticleManager.h"
-#include "../../engine/Physics/Collision3DManager.h"
-#include "../Environment/TerrainSyncManager.h"
-#include "../../engine/Graphics/UI/UITextRegistry.h"
-#include <cmath>
-#include <algorithm>
-#include <filesystem>
-
-#ifdef USE_IMGUI
-#include "../../../external/imgui/imgui.h"
-#endif
-
-using namespace MyMath;
-
-// 固定フレームレートの deltaTime (60FPS想定)
-static constexpr float kDeltaTime = 1.0f / 60.0f;
-
-
-void StageScene::Initialize() {
-	sceneID = SCENE::STAGE;
-
-	// ============================
-	// 機体設定（CFG）のロード
-	// ============================
-	std::string aircraftCfgPath = aircraftConfig_.GetCurrentFilePath();
-	if (aircraftCfgPath.empty()) {
-		aircraftCfgPath = "Resources/aircraft/mig21.cfg";
-	}
-	aircraftConfig_.LoadFromCfg(aircraftCfgPath);
-
-	const auto& airframeData = aircraftConfig_.GetAirframe();
-	const auto& engineData = aircraftConfig_.GetEngine();
-	const auto& gunpodData = aircraftConfig_.GetGunpod();
-	const auto& generalConfig = aircraftConfig_.GetGeneral();
-
-	flightModel_.Initialize(airframeData, engineData);
-
-	// 初期位置: 上空100mから開始
-	flightModel_.SetPosition({ 0.0f, 100.0f, 0.0f });
-
-	// 開始時の速度を250km/hに設定
-	float initialSpeed = 250.0f / 3.6f;
-	flightModel_.SetVelocity(Multiply(initialSpeed, flightModel_.GetForwardDirection()));
-
-	// スロットルを60%に初期化（速度維持のため）
-	throttle_ = 0.6f;
-	flightModel_.SetThrottle(throttle_);
-
-	// TerrainSyncManager の初期化と同期開始
-	TerrainSyncManager::GetInstance()->Initialize("localhost", 8765);
-	TerrainSyncManager::GetInstance()->StartSync();
-
-	// ============================
-	// 描画オブジェクトの初期化
-	// ============================
-
-	// テクスチャのプリロード（モデルのマテリアルが参照するテクスチャを先に読み込む）
-	TextureManager::GetInstance()->LoadTexture("assets/textures/uvChecker.png");
-	TextureManager::GetInstance()->LoadTexture("assets/textures/circle2.png");
-
-	// 機体モデル
-	ModelManager::GetInstance()->LoadModel(generalConfig.modelPath);
-	aircraftObject_ = std::make_unique<Object3d>();
-	aircraftObject_->Initialize(Object3dCommon::GetInstance());
-	aircraftObject_->SetCamera(CameraManager::GetInstance()->GetActiveCamera());
-	aircraftObject_->SetModel(generalConfig.modelPath);
-	if (aircraftObject_->GetModel()) {
-		aircraftObject_->GetModel()->SetEnvironmentCoefficient(generalConfig.environmentCoefficient);
-		aircraftObject_->GetModel()->SetSpecularIntensity(generalConfig.specularIntensity);
-		aircraftObject_->GetModel()->SetShininess(generalConfig.shininess);
-	}
-
-	// --- 部位破壊対応マルチパーツビジュアルモデル初期化 ---
-	aircraftVisualModel_.Initialize(Object3dCommon::GetInstance(), CameraManager::GetInstance()->GetActiveCamera());
-	DebrisManager::GetInstance()->Initialize(Object3dCommon::GetInstance(), CameraManager::GetInstance()->GetActiveCamera());
-
-	// 1つのモデルファイルからノード名に基づいて自動セットアップ
-	aircraftVisualModel_.SetupFromSingleModel(generalConfig.modelPath);
-	
-	// フォールバックとして、もし何も読み込まれなかった場合（ノードが見つからなかった場合）のために
-	if (!aircraftVisualModel_.IsPartVisible(DamagePart::Fuse)) {
-		std::vector<DamagePart> parts = {
-			DamagePart::Fuse, DamagePart::Engine1, DamagePart::Wing_L, DamagePart::Wing_R,
-			DamagePart::Wing1_L, DamagePart::Wing1_R, DamagePart::Wing2_L, DamagePart::Wing2_R,
-			DamagePart::Tail, DamagePart::Rudder, DamagePart::Elevator0, DamagePart::Elevator1
-		};
-		for (auto p : parts) {
-			aircraftVisualModel_.SetModelForPart(p, "Resources/models/m21.gltf");
-		}
-	}
-
-	// 地面テクスチャ
-	TextureManager::GetInstance()->LoadTexture("assets/textures/white1x1.png");
-	groundTextureIndex_ = TextureManager::GetInstance()->GetTextureIndexByFilePath("assets/textures/white1x1.png");
-
-
-
-	TextureManager::GetInstance()->LoadTexture("assets/textures/cedar_bridge_sunset_1_2k.dds");
-	skybox_ = std::make_unique<Skybox>();
-	skybox_->Initialize(SkyboxCommon::GetInstance());
-	skybox_->SetCamera(CameraManager::GetInstance()->GetActiveCamera());
-	uint32_t skyboxTexIndex = TextureManager::GetInstance()->GetTextureIndexByFilePath("assets/textures/cedar_bridge_sunset_1_2k.dds");
-	skybox_->SetTextureIndex(skyboxTexIndex);
-	Object3dCommon::GetInstance()->SetDefaultEnvTextureIndex(skyboxTexIndex);
-
-	// ============================
-	// ライティング設定（太陽・環境）
-	// ============================
-	environmentManager_.Initialize();
-	// ライティングモデル設定
-	Object3dCommon::GetInstance()->SetLightType(1);             // Directional Light 有効
-	Object3dCommon::GetInstance()->SetShadingModel(1);
-	Object3dCommon::GetInstance()->SetSpecularModel(2);
-
-	// ============================
-		// ============================
-	// カメラ初期位置（機体の後方）
-	// ============================
-	Vector3 initPos = flightModel_.GetPosition();
-	Vector3 initForward = flightModel_.GetForwardDirection();
-
-	playerCamera_.Initialize(initPos, initForward);
-	CameraManager::GetInstance()->Update();
-
-	// ============================
-	// マウスエイムコントローラの初期化
-	// ============================
-	mouseAimController_.Initialize();
-	mouseAimEnabled_ = true;
-
-	// マウスエイム開始時はOSカーソルを非表示＆ロック
-	Input::GetInstance()->LockCursor();
-
-	// ============================
-	// 戦闘システムの初期化
-	// ============================
-
-	gunpod_.Initialize(gunpodData);
-
-	// 弾丸マネージャー初期化
-	bulletManager_.Initialize(512);
-
-	// ミッションデータのロード
-	auto& missionManager = MissionManager::GetInstance();
-	std::string loadPath = missionManager.GetCurrentFilePath();
-	if (loadPath.empty()) {
-		loadPath = "Resources/missions/mission01.json";
-	}
-	missionManager.Load(loadPath);
-
-	const auto& mission = missionManager.GetCurrentMission();
-
-	// プレイヤーパラメータの設定
-	playerMaxHP_ = mission.playerHP;
-	playerHP_ = mission.playerHP;
-	flightModel_.SetPosition(mission.playerPosition);
-
-	enemyManager_.Initialize(
-		mission.enemies,
-		airframeData,
-		engineData,
-		gunpodData,
-		&flightModel_,
-		&bulletManager_,
-		mission.groundEnemies
-	);
-
-	// エフェクトマネージャー初期化
-	EffectManager::GetInstance()->Initialize();
-	ParticleManager::GetInstance()->CreateParticleGroup("HitSpark", "assets/textures/white1x1.png");
-	ParticleManager::GetInstance()->CreateParticleGroup("Vortex", "assets/textures/circle2.png");
-	ParticleManager::GetInstance()->CreateParticleGroup("Casing", "assets/textures/white1x1.png");
-
-	// 爆発用パーティクルグループの登録
-	TextureManager::GetInstance()->LoadTexture("assets/textures/circle.png");
-	ParticleManager::GetInstance()->CreateParticleGroup("ExplosionSpark", "assets/textures/circle.png");
-	ParticleManager::GetInstance()->SetBlendMode("ExplosionSpark", BlendMode::kAdd);
-
-	ParticleManager::GetInstance()->CreateParticleGroup("ExplosionFire", "assets/textures/circle2.png");
-	ParticleManager::GetInstance()->SetBlendMode("ExplosionFire", BlendMode::kAdd);
-
-	ParticleManager::GetInstance()->CreateParticleGroup("ExplosionSmoke", "assets/textures/circle2.png");
-	ParticleManager::GetInstance()->SetBlendMode("ExplosionSmoke", BlendMode::kNormal);
-
-	GPUParticleManager::GetInstance()->SetTexture(TextureManager::GetInstance()->GetTextureIndexByFilePath("assets/textures/circle.png"));
-
-	// ゲーム状態リセット
-	isMissionCleared_ = false;
-	isMissionFailed_ = false;
-	isGameOver_ = false;
-	gameOverTimer_ = 0.0f;
-	timeScale_ = 1.0f;
-	muzzleFlashTimer_ = 0.0f;
-	totalTime_ = 0.0f;
-	missionElapsedTime_ = 0.0f;
-
-	// プレイヤー当たり判定ボディの初期化
-	playerBody_.scene_ = this;
-
-	// ミッション制限時間の初期化（MissionDataから取得）
-	remainingTime_ = mission.timeLimit;
-	int initMin = static_cast<int>(remainingTime_) / 60;
-	int initSec = static_cast<int>(remainingTime_) % 60;
-	char initTimeStr[32];
-	snprintf(initTimeStr, sizeof(initTimeStr), "TIME %02d:%02d", initMin, initSec);
-	timeText_.Initialize("Roboto", initTimeStr, 32.0f);
-	timeText_.SetAnchorPoint({ 0.5f, 0.0f });
-	timeText_.SetPosition({ WinApp::kClientWidth * 0.5f, 20.0f });
-	timeText_.SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
-
-	timeText_.SetCondition("Warning", [this]() { return remainingTime_ <= 30.0f; });
-
-	// UITextRegistryに登録
-	UITextRegistry::GetInstance()->Register("Stage_Time", &timeText_);
-
-	// 戦闘HUD初期化
-	hud_.Initialize(SpriteCommon::GetInstance());
-	isFiringThisFrame_ = false;
-
-	// Phase 1: 目標・トリガーのランタイム状態リセット
-	missionManager.ResetRuntimeState();
-}
-
-void StageScene::TriggerGameOver() {
-	if (isGameOver_) { return; }
-	isGameOver_ = true;
-	isMissionFailed_ = true;
-	gameOverTimer_ = 0.0f;
-	playerHP_ = 0.0f;
-	timeScale_ = 1.0f;
 	EffectManager::GetInstance()->EmitDestroyEffect(flightModel_.GetPosition());
 }
-
 
 // ============================================================
 // PlayerCollisionBody のコールバック実装
@@ -696,25 +454,6 @@ void StageScene::Update() {
 	enemyManager_.Update(gameDeltaTime);
 	EffectManager::GetInstance()->Update();
 
-	// ============================
-	// ミッション目標 & トリガー評価 (Phase 1)
-	// ============================
-	auto& missionManager = MissionManager::GetInstance();
-	missionManager.EvaluateObjectives(
-		flightModel_.GetPosition(),
-		playerHP_,
-		enemyManager_.GetDestroyedCount(),
-		enemyManager_.GetAliveEnemies().empty(),
-		totalTime_
-	);
-	missionManager.EvaluateTriggers(
-		flightModel_.GetPosition(),
-		playerHP_,
-		enemyManager_.GetDestroyedCount(),
-		totalTime_
-	);
-	missionManager.UpdateMessages(gameDeltaTime);
-
 
 
 	// ============================
@@ -1090,6 +829,7 @@ void StageScene::Update() {
 	}
 	ImGui::End();
 
+	DrawMissionEditor();
 	DrawAircraftTuningEditor();
 #endif
 
@@ -1595,15 +1335,23 @@ void StageScene::CheckPartDestructionEvents() {
 // そのrotateに合致するオイラー角(XYZ順)を逆算する
 // ジンバルロック対策: 真上・真下付近ではヨーを前フレームの値で維持
 // ===========================================================
+
 #ifdef USE_IMGUI
-void StageScene::DrawAircraftTuningEditor() {
-	if (ImGui::Begin("Aircraft Tuning (CFG)", &isAircraftTuningOpen_)) {
-		// 1. CFGファイル管理
-		if (ImGui::CollapsingHeader("CFG File Management", ImGuiTreeNodeFlags_DefaultOpen)) {
-			std::vector<std::string> cfgFiles = AircraftConfig::GetAvailableAircraftList("Resources/aircraft");
+void StageScene::DrawMissionEditor() {
+	auto& missionManager = MissionManager::GetInstance();
+	auto& currentMission = missionManager.GetCurrentMission();
+
+	if (ImGui::Begin("Mission Editor", &isMissionEditorOpen_)) {
+		
+		// 1. ミッションファイル管理
+		if (ImGui::CollapsingHeader("Mission File Management", ImGuiTreeNodeFlags_DefaultOpen)) {
+			// ロード
+			std::vector<std::string> missionFiles = missionManager.GetMissionList();
+			
+			// パスのみだと長いので、ファイル名だけを抽出して表示用のリストを作る
 			std::vector<std::string> fileNames;
 			std::vector<const char*> fileNamePtrs;
-			for (const auto& f : cfgFiles) {
+			for (const auto& f : missionFiles) {
 				std::filesystem::path p(f);
 				fileNames.push_back(p.filename().string());
 			}
@@ -1611,225 +1359,269 @@ void StageScene::DrawAircraftTuningEditor() {
 				fileNamePtrs.push_back(fn.c_str());
 			}
 
-			if (ImGui::Combo("Select Aircraft CFG", &selectedAircraftConfigIndex_, fileNamePtrs.data(), static_cast<int>(fileNamePtrs.size()))) {
+			if (ImGui::Combo("Select Mission", &selectedMissionIndex_, fileNamePtrs.data(), static_cast<int>(fileNamePtrs.size()))) {
+				// 選択変更
 			}
 
-			if (ImGui::Button("Load Selected CFG")) {
-				if (selectedAircraftConfigIndex_ >= 0 && selectedAircraftConfigIndex_ < cfgFiles.size()) {
-					aircraftConfig_.LoadFromCfg(cfgFiles[selectedAircraftConfigIndex_]);
-					strcpy_s(tempAircraftConfigName_, sizeof(tempAircraftConfigName_), std::filesystem::path(cfgFiles[selectedAircraftConfigIndex_]).filename().string().c_str());
-					Restart();
+			if (ImGui::Button("Load Selected")) {
+				if (selectedMissionIndex_ >= 0 && selectedMissionIndex_ < missionFiles.size()) {
+					std::string loadPath = missionFiles[selectedMissionIndex_];
+					if (missionManager.Load(loadPath)) {
+						Restart();
+					}
 				}
 			}
 			ImGui::SameLine();
+			if (ImGui::Button("Reset File List")) {
+				selectedMissionIndex_ = 0;
+			}
+
+			ImGui::Separator();
+
+			// 新規作成
+			static char newFileName[64] = "new_mission.json";
+			ImGui::InputText("New JSON Name", newFileName, sizeof(newFileName));
+			if (ImGui::Button("Create New Mission")) {
+				std::string newPath = "Resources/missions/" + std::string(newFileName);
+				missionManager.CreateDefaultMission(newPath);
+				missionManager.Load(newPath);
+				
+				std::vector<std::string> scanFiles = missionManager.GetMissionList();
+				for (int i = 0; i < scanFiles.size(); ++i) {
+					if (scanFiles[i] == newPath) {
+						selectedMissionIndex_ = i;
+						break;
+					}
+				}
+				Restart();
+			}
+
+			ImGui::Separator();
+
+			// 保存
+			ImGui::InputText("Save File Name", tempSaveFileName_, sizeof(tempSaveFileName_));
 			if (ImGui::Button("Save (Overwrite)")) {
-				std::string savePath = aircraftConfig_.GetCurrentFilePath();
-				if (savePath.empty()) {
-					savePath = "Resources/aircraft/" + std::string(tempAircraftConfigName_);
+				std::string savePath = "Resources/missions/" + std::string(tempSaveFileName_);
+				if (savePath.find(".json") == std::string::npos) {
+					savePath += ".json";
 				}
-				aircraftConfig_.SaveToCfg(savePath);
+				currentMission.name = tempMissionName_;
+				currentMission.description = tempMissionDesc_;
+				missionManager.Save(savePath);
+			}
+		}
+
+		// 2. ミッションの基本情報編集
+		if (ImGui::CollapsingHeader("Mission Properties", ImGuiTreeNodeFlags_DefaultOpen)) {
+			ImGui::InputText("Mission Name", tempMissionName_, sizeof(tempMissionName_));
+			ImGui::InputText("Description", tempMissionDesc_, sizeof(tempMissionDesc_));
+			
+			ImGui::SliderFloat("Player Initial HP", &currentMission.playerHP, 1.0f, 500.0f);
+			
+			ImGui::DragFloat3("Player Initial Pos", &currentMission.playerPosition.x, 1.0f);
+			if (ImGui::Button("Set to Current Player Pos")) {
+				currentMission.playerPosition = flightModel_.GetPosition();
+			}
+		}
+
+		// 3. 敵配置の編集
+		if (ImGui::CollapsingHeader("Enemy Spawns", ImGuiTreeNodeFlags_DefaultOpen)) {
+			ImGui::Text("Total Enemies: %d", static_cast<int>(currentMission.enemies.size()));
+			
+			if (ImGui::Button("Add New Enemy at Player Pos")) {
+				EnemySpawnData newEnemy;
+				newEnemy.position = flightModel_.GetPosition();
+				newEnemy.modelPath = "Resources/planeplane.obj";
+				newEnemy.health = 50.0f;
+				newEnemy.aiType = AIType::ChaseAttack;
+				currentMission.enemies.push_back(newEnemy);
+				selectedEnemyIndex_ = static_cast<int>(currentMission.enemies.size()) - 1;
 			}
 
 			ImGui::Separator();
-			ImGui::InputText("New CFG Name", tempAircraftConfigName_, sizeof(tempAircraftConfigName_));
-			if (ImGui::Button("Save As New CFG")) {
-				std::string newPath = "Resources/aircraft/" + std::string(tempAircraftConfigName_);
-				if (newPath.find(".cfg") == std::string::npos) {
-					newPath += ".cfg";
+
+			std::vector<std::string> enemyLabels;
+			for (size_t i = 0; i < currentMission.enemies.size(); ++i) {
+				const auto& e = currentMission.enemies[i];
+				std::string aiName = (e.aiType == AIType::ChaseAttack) ? "Chase" : "Evade";
+				enemyLabels.push_back("Enemy " + std::to_string(i) + " [" + aiName + "] @ (" + 
+					std::to_string(static_cast<int>(e.position.x)) + ", " + 
+					std::to_string(static_cast<int>(e.position.y)) + ", " + 
+					std::to_string(static_cast<int>(e.position.z)) + ")");
+			}
+
+			std::vector<const char*> enemyLabelPtrs;
+			for (const auto& l : enemyLabels) {
+				enemyLabelPtrs.push_back(l.c_str());
+			}
+
+			if (ImGui::ListBox("Select Enemy to Edit", &selectedEnemyIndex_, enemyLabelPtrs.data(), static_cast<int>(enemyLabelPtrs.size()), 5)) {
+				// 選択変更
+			}
+
+			if (selectedEnemyIndex_ >= 0 && selectedEnemyIndex_ < static_cast<int>(currentMission.enemies.size())) {
+				ImGui::Separator();
+				ImGui::Text("--- Edit Enemy %d ---", selectedEnemyIndex_);
+				auto& enemy = currentMission.enemies[selectedEnemyIndex_];
+
+				ImGui::DragFloat3("Position", &enemy.position.x, 1.0f);
+				if (ImGui::Button("Move to Current Player")) {
+					enemy.position = flightModel_.GetPosition();
 				}
-				aircraftConfig_.SaveToCfg(newPath);
-				aircraftConfig_.SetCurrentFilePath(newPath);
+
+				ImGui::SliderFloat("Health", &enemy.health, 10.0f, 500.0f);
+
+				int aiTypeInt = (enemy.aiType == AIType::ChaseAttack) ? 0 : 1;
+				const char* aiItems[] = { "ChaseAttack", "CruiseEvade" };
+				if (ImGui::Combo("AI Type", &aiTypeInt, aiItems, 2)) {
+					enemy.aiType = (aiTypeInt == 0) ? AIType::ChaseAttack : AIType::CruiseEvade;
+				}
+
+				static char modelPathBuf[256];
+				strcpy_s(modelPathBuf, sizeof(modelPathBuf), enemy.modelPath.c_str());
+				if (ImGui::InputText("Model Path", modelPathBuf, sizeof(modelPathBuf))) {
+					enemy.modelPath = modelPathBuf;
+				}
+
+				if (ImGui::Button("Duplicate Enemy")) {
+					EnemySpawnData dup = enemy;
+					dup.position.x += 20.0f;
+					currentMission.enemies.push_back(dup);
+					selectedEnemyIndex_ = static_cast<int>(currentMission.enemies.size()) - 1;
+				}
+				ImGui::SameLine();
+				if (ImGui::Button("Delete Enemy")) {
+					currentMission.enemies.erase(currentMission.enemies.begin() + selectedEnemyIndex_);
+					selectedEnemyIndex_ = -1;
+				}
 			}
 		}
 
-		auto& general = aircraftConfig_.GetGeneral();
-		auto& airframe = aircraftConfig_.GetAirframe();
-		auto& engine = aircraftConfig_.GetEngine();
-		auto& gunpod = aircraftConfig_.GetGunpod();
+		// 4. 地上目標配置の編集
+		if (ImGui::CollapsingHeader("Ground Target Spawns", ImGuiTreeNodeFlags_DefaultOpen)) {
+			ImGui::Text("Total Ground Targets: %d", static_cast<int>(currentMission.groundEnemies.size()));
 
-		// 2. [General & Visual]
-		if (ImGui::CollapsingHeader("General & Visual", ImGuiTreeNodeFlags_DefaultOpen)) {
-			static char nameBuf[128];
-			strcpy_s(nameBuf, sizeof(nameBuf), general.name.c_str());
-			if (ImGui::InputText("Aircraft Name", nameBuf, sizeof(nameBuf))) {
-				general.name = nameBuf;
+			if (ImGui::Button("Add AAA Turret (Ground)")) {
+				GroundEnemySpawnData newGround;
+				Vector3 pPos = flightModel_.GetPosition();
+				newGround.position = { pPos.x, 0.0f, pPos.z };
+				newGround.aiType = GroundAIType::Turret;
+				newGround.health = 60.0f;
+				currentMission.groundEnemies.push_back(newGround);
+				selectedGroundEnemyIndex_ = static_cast<int>(currentMission.groundEnemies.size()) - 1;
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("Add Structure")) {
+				GroundEnemySpawnData newGround;
+				Vector3 pPos = flightModel_.GetPosition();
+				newGround.position = { pPos.x, 0.0f, pPos.z };
+				newGround.aiType = GroundAIType::Structure;
+				newGround.health = 120.0f;
+				newGround.param.collisionRadius = 14.0f;
+				currentMission.groundEnemies.push_back(newGround);
+				selectedGroundEnemyIndex_ = static_cast<int>(currentMission.groundEnemies.size()) - 1;
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("Add Patrol Vehicle")) {
+				GroundEnemySpawnData newGround;
+				Vector3 pPos = flightModel_.GetPosition();
+				newGround.position = { pPos.x, 0.0f, pPos.z };
+				newGround.aiType = GroundAIType::PatrolVehicle;
+				newGround.health = 45.0f;
+				currentMission.groundEnemies.push_back(newGround);
+				selectedGroundEnemyIndex_ = static_cast<int>(currentMission.groundEnemies.size()) - 1;
 			}
 
-			static char modelBuf[256];
-			strcpy_s(modelBuf, sizeof(modelBuf), general.modelPath.c_str());
-			if (ImGui::InputText("Model Path", modelBuf, sizeof(modelBuf))) {
-				general.modelPath = modelBuf;
+			ImGui::Separator();
+
+			std::vector<std::string> groundLabels;
+			for (size_t i = 0; i < currentMission.groundEnemies.size(); ++i) {
+				const auto& g = currentMission.groundEnemies[i];
+				std::string typeStr = (g.aiType == GroundAIType::Turret) ? "Turret" :
+					(g.aiType == GroundAIType::Structure) ? "Structure" : "Vehicle";
+				groundLabels.push_back("Ground " + std::to_string(i) + " [" + typeStr + "] @ (" +
+					std::to_string(static_cast<int>(g.position.x)) + ", " +
+					std::to_string(static_cast<int>(g.position.y)) + ", " +
+					std::to_string(static_cast<int>(g.position.z)) + ")");
 			}
 
-			ImGui::SliderFloat("Env Reflection", &general.environmentCoefficient, 0.0f, 1.0f);
-			ImGui::SliderFloat("Specular Intensity", &general.specularIntensity, 0.0f, 5.0f);
-			ImGui::SliderFloat("Shininess", &general.shininess, 1.0f, 200.0f);
-		}
+			std::vector<const char*> groundLabelPtrs;
+			for (const auto& l : groundLabels) {
+				groundLabelPtrs.push_back(l.c_str());
+			}
 
-		// 3. [Airframe]
-		if (ImGui::CollapsingHeader("Airframe & Aerodynamics", ImGuiTreeNodeFlags_DefaultOpen)) {
-			ImGui::DragFloat("Empty Mass (kg)", &airframe.emptyFrameMass, 50.0f, 500.0f, 30000.0f);
-			ImGui::DragFloat("Max Fuel (kg)", &airframe.maxInternalFuel, 10.0f, 0.0f, 10000.0f);
-			ImGui::SliderFloat("Base Drag (Cd0)", &airframe.baseDrag, 0.001f, 0.2f, "%.4f");
-			ImGui::SliderFloat("Lift Coeff (CL0)", &airframe.liftCoefficient, 0.0f, 1.5f);
-			ImGui::DragFloat("Wing Area (m^2)", &airframe.wingArea, 0.5f, 5.0f, 200.0f);
-			ImGui::DragFloat("Max Health (HP)", &airframe.maxHealth, 5.0f, 10.0f, 2000.0f);
+			if (ImGui::ListBox("Select Ground Target", &selectedGroundEnemyIndex_, groundLabelPtrs.data(), static_cast<int>(groundLabelPtrs.size()), 5)) {
+				// 選択変更
+			}
 
-			ImGui::Separator();
-			ImGui::Text("--- Lift & Stall Characteristics ---");
-			ImGui::SliderFloat("Critical AoA (rad)", &airframe.criticalAoA, 0.1f, 1.0f);
-			ImGui::SliderFloat("Max Lift Coeff (CLmax)", &airframe.maxLiftCoefficient, 0.5f, 3.5f);
-			ImGui::SliderFloat("Stall Lift Coeff", &airframe.stallLiftCoefficient, 0.05f, 1.0f);
+			if (selectedGroundEnemyIndex_ >= 0 && selectedGroundEnemyIndex_ < static_cast<int>(currentMission.groundEnemies.size())) {
+				ImGui::Separator();
+				ImGui::Text("--- Edit Ground Target %d ---", selectedGroundEnemyIndex_);
+				auto& ground = currentMission.groundEnemies[selectedGroundEnemyIndex_];
 
-			ImGui::Separator();
-			ImGui::Text("--- Induced Drag & G Limits ---");
-			ImGui::SliderFloat("Aspect Ratio", &airframe.aspectRatio, 1.0f, 20.0f);
-			ImGui::SliderFloat("Oswald Efficiency", &airframe.oswaldEfficiency, 0.3f, 1.0f);
-			ImGui::SliderFloat("Positive G Limit", &airframe.positiveGLimit, 2.0f, 20.0f);
-			ImGui::SliderFloat("Negative G Limit", &airframe.negativeGLimit, -10.0f, 0.0f);
+				ImGui::DragFloat3("Position", &ground.position.x, 1.0f);
+				if (ImGui::Button("Snap to Ground (Y=0)")) {
+					ground.position.y = 0.0f;
+				}
+				ImGui::SameLine();
+				if (ImGui::Button("Move to Player X/Z")) {
+					Vector3 pPos = flightModel_.GetPosition();
+					ground.position.x = pPos.x;
+					ground.position.y = 0.0f;
+					ground.position.z = pPos.z;
+				}
 
-			ImGui::Separator();
-			ImGui::Text("--- Flaps & Airbrake ---");
-			ImGui::SliderFloat("Flap Lift Bonus", &airframe.flapLiftBonus, 0.0f, 2.0f);
-			ImGui::SliderFloat("Flap Drag Bonus", &airframe.flapDragBonus, 0.0f, 0.5f);
-			ImGui::DragFloat("Flap Max Speed (m/s)", &airframe.flapMaxSpeed, 1.0f, 30.0f, 300.0f);
-			ImGui::SliderFloat("Flap Deploy Speed", &airframe.flapDeploySpeed, 0.5f, 10.0f);
+				ImGui::SliderFloat("Health", &ground.health, 10.0f, 500.0f);
+				ground.param.maxHealth = ground.health;
 
-			ImGui::SliderFloat("Airbrake Drag Bonus", &airframe.airBrakeDragBonus, 0.0f, 1.0f);
-			ImGui::SliderFloat("Airbrake Deploy Speed", &airframe.airBrakeDeploySpeed, 0.5f, 10.0f);
-		}
+				int gTypeInt = (ground.aiType == GroundAIType::Turret) ? 0 :
+					(ground.aiType == GroundAIType::Structure) ? 1 : 2;
+				const char* gItems[] = { "AAA Turret", "Structure", "Patrol Vehicle" };
+				if (ImGui::Combo("AI Type", &gTypeInt, gItems, 3)) {
+					if (gTypeInt == 0) ground.aiType = GroundAIType::Turret;
+					else if (gTypeInt == 1) ground.aiType = GroundAIType::Structure;
+					else ground.aiType = GroundAIType::PatrolVehicle;
+				}
 
-		// 4. [Engine]
-		if (ImGui::CollapsingHeader("Engine & Propulsion", ImGuiTreeNodeFlags_DefaultOpen)) {
-			ImGui::DragFloat("Engine Mass (kg)", &engine.mass, 10.0f, 50.0f, 5000.0f);
-			ImGui::DragFloat("Base Thrust (N)", &engine.baseThrust, 1000.0f, 1000.0f, 500000.0f, "%.0f N");
-			ImGui::SliderFloat("Normal Throttle Limit", &engine.normalThrottleLimit, 0.5f, 1.0f);
-			ImGui::SliderFloat("WEP Throttle Limit", &engine.wepThrottleLimit, 1.0f, 2.0f);
-			ImGui::SliderFloat("Spool Speed", &engine.physicalSpoolSpeed, 0.05f, 5.0f);
-			ImGui::SliderFloat("Fuel Flow Rate (kg/s)", &engine.baseFuelFlowRate, 0.1f, 20.0f);
-			ImGui::SliderFloat("Altitude Thrust Factor", &engine.altitudeThrottleFactor, 0.0f, 0.0002f, "%.6f");
-		}
+				if (ground.aiType == GroundAIType::Turret || ground.aiType == GroundAIType::PatrolVehicle) {
+					ImGui::SliderFloat("Fire Range (m)", &ground.param.fireRange, 200.0f, 3000.0f);
+					ImGui::SliderFloat("Turn Speed (deg/s)", &ground.param.turnSpeedDeg, 10.0f, 180.0f);
+					ImGui::SliderFloat("Bullet Speed (m/s)", &ground.param.bulletSpeed, 200.0f, 1200.0f);
+					ImGui::SliderFloat("Bullet Damage", &ground.param.bulletDamage, 1.0f, 50.0f);
+					ImGui::SliderInt("Burst Count", &ground.param.burstCount, 1, 20);
+					ImGui::SliderFloat("Burst Cooldown (s)", &ground.param.burstCooldown, 0.5f, 5.0f);
+				}
 
-		// 5. [Gunpod]
-		if (ImGui::CollapsingHeader("Gunpod & Armament", ImGuiTreeNodeFlags_DefaultOpen)) {
-			ImGui::DragFloat("Gunpod Mass (kg)", &gunpod.baseMass, 5.0f, 10.0f, 500.0f);
-			ImGui::SliderFloat("Gunpod Drag (Cd)", &gunpod.drag, 0.0f, 0.05f, "%.4f");
-			ImGui::SliderFloat("Ammo Weight (kg/rd)", &gunpod.ammoWeight, 0.01f, 1.0f);
-			ImGui::DragInt("Max Ammo", &gunpod.maxAmmo, 10, 50, 5000);
-			ImGui::SliderFloat("Fire Rate (rds/s)", &gunpod.fireRate, 5.0f, 100.0f);
+				if (ground.aiType == GroundAIType::PatrolVehicle) {
+					ImGui::SliderFloat("Move Speed (m/s)", &ground.param.moveSpeed, 2.0f, 50.0f);
+					ImGui::SliderFloat("Patrol Distance (m)", &ground.param.patrolDistance, 50.0f, 1000.0f);
+				}
+
+				if (ImGui::Button("Duplicate Ground Target")) {
+					GroundEnemySpawnData dup = ground;
+					dup.position.x += 30.0f;
+					currentMission.groundEnemies.push_back(dup);
+					selectedGroundEnemyIndex_ = static_cast<int>(currentMission.groundEnemies.size()) - 1;
+				}
+				ImGui::SameLine();
+				if (ImGui::Button("Delete Ground Target")) {
+					currentMission.groundEnemies.erase(currentMission.groundEnemies.begin() + selectedGroundEnemyIndex_);
+					selectedGroundEnemyIndex_ = -1;
+				}
+			}
 		}
 
 		ImGui::Separator();
 
-		// 即座に適用
-		if (ImGui::Button("Apply to Current Aircraft", ImVec2(-1, 35))) {
-			Vector3 curPos = flightModel_.GetPosition();
-			Vector3 curVel = flightModel_.GetVelocity();
-			Quaternion curOri = flightModel_.GetOrientation();
-
-			flightModel_.Initialize(airframe, engine);
-			flightModel_.SetPosition(curPos);
-			flightModel_.SetVelocity(curVel);
-			flightModel_.SetOrientation(curOri);
-
-			gunpod_.Initialize(gunpod);
-		}
-
-		if (ImGui::Button("Save & Restart Stage", ImVec2(-1, 35))) {
-			std::string savePath = aircraftConfig_.GetCurrentFilePath();
-			if (savePath.empty()) {
-				savePath = "Resources/aircraft/mig21.cfg";
-			}
-			aircraftConfig_.SaveToCfg(savePath);
+		if (ImGui::Button("Apply & Restart", ImVec2(-1, 40))) {
+			currentMission.name = tempMissionName_;
+			currentMission.description = tempMissionDesc_;
 			Restart();
 		}
 	}
 	ImGui::End();
 }
-#endif
 
-// ============================================================
-// Phase 1: ミッション目標のHUD表示（ゲーム中の進捗表示）
-// ============================================================
-void StageScene::DrawMissionObjectivesHUD() {
-	auto& mm = MissionManager::GetInstance();
-	const auto& objectives = mm.GetCurrentMission().objectives;
-
-	if (objectives.empty()) return;
-
-	// 画面右上に目標リストを表示
-	float startX = WinApp::kClientWidth - 350.0f;
-	float startY = 60.0f;
-
-#ifdef USE_IMGUI
-	ImGui::SetNextWindowPos(ImVec2(startX, startY), ImGuiCond_Always);
-	ImGui::SetNextWindowSize(ImVec2(340, 0), ImGuiCond_Always);
-	ImGui::SetNextWindowBgAlpha(0.5f);
-
-	ImGui::Begin("Mission Objectives", nullptr,
-		ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
-		ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar |
-		ImGuiWindowFlags_NoInputs);
-
-	ImGui::TextColored(ImVec4(1.0f, 0.9f, 0.3f, 1.0f), "MISSION OBJECTIVES");
-	ImGui::Separator();
-
-	for (const auto& obj : objectives) {
-		if (obj.isHidden && obj.status != ObjectiveStatus::Completed) continue;
-
-		ImVec4 color;
-		const char* statusIcon;
-		switch (obj.status) {
-		case ObjectiveStatus::Completed: color = ImVec4(0.2f, 1.0f, 0.2f, 1.0f); statusIcon = "[OK]"; break;
-		case ObjectiveStatus::Failed:    color = ImVec4(1.0f, 0.2f, 0.2f, 1.0f); statusIcon = "[X]"; break;
-		case ObjectiveStatus::Inactive:  continue; // 非表示
-		default:                         color = ImVec4(1.0f, 1.0f, 1.0f, 1.0f); statusIcon = "[ ]"; break;
-		}
-
-		std::string prefix = obj.isPrimary ? "" : "  ";
-		ImGui::TextColored(color, "%s%s %s", prefix.c_str(), statusIcon, obj.name.c_str());
-	}
-
-	ImGui::End();
-#endif
-}
-
-// ============================================================
-// Phase 1: トリガーメッセージのHUD表示
-// ============================================================
-void StageScene::DrawMissionMessages() {
-	auto& mm = MissionManager::GetInstance();
-	const auto& messages = mm.GetActiveMessages();
-
-	if (messages.empty()) return;
-
-#ifdef USE_IMGUI
-	// 画面中央上部にメッセージを表示
-	float centerX = WinApp::kClientWidth * 0.5f;
-	float msgY = 80.0f;
-
-	ImGui::SetNextWindowPos(ImVec2(centerX - 250.0f, msgY), ImGuiCond_Always);
-	ImGui::SetNextWindowSize(ImVec2(500, 0), ImGuiCond_Always);
-	ImGui::SetNextWindowBgAlpha(0.7f);
-
-	ImGui::Begin("MissionMessages", nullptr,
-		ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
-		ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar |
-		ImGuiWindowFlags_NoInputs);
-
-	for (const auto& msg : messages) {
-		// フェードアウト効果
-		float alpha = (std::min)(msg.remainingTime, 1.0f);
-		ImGui::TextColored(ImVec4(1.0f, 0.95f, 0.5f, alpha), "%s", msg.text.c_str());
-	}
-
-	ImGui::End();
-#endif
-}
-
-void StageScene::Restart() {
-	Finalize();
-	Initialize();
-}
-
-
+void StageScene::DrawAircraftTuningEditor() {
+	if (ImGui::Begin("Aircraft Tuning (CFG)", &isAircraftTuningOpen_)) {
+		// 1. CFGファイル管理

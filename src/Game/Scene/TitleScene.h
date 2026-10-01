@@ -22,6 +22,7 @@ private:
 	UIText titleText_;				///< ゲームタイトル「戦雷」
 	UIText subtitleText_;			///< サブタイトル
 	UIButton startButton_;			///< スタートボタン
+	UIButton editorButton_;         ///< エディタボタン
 	UIButton settingsButton_;		///< 設定ボタン
 	UIButton exitButton_;			///< 終了ボタン
 

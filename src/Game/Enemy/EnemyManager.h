@@ -14,6 +14,7 @@ struct EnemySpawnData {
 	std::string modelPath;
 	float health;
 	AIType aiType = AIType::ChaseAttack;
+	std::string waypointPathName = ""; // Phase 2: ウェイポイントパス名
 };
 
 /// @brief 地上敵の配置データ
@@ -22,6 +23,7 @@ struct GroundEnemySpawnData {
 	GroundAIType aiType = GroundAIType::Turret;
 	float health = 60.0f;
 	GroundEnemyParam param{};
+	std::string waypointPathName = ""; // Phase 2: ウェイポイントパス名
 };
 
 /// @brief 敵の生成・管理クラス
