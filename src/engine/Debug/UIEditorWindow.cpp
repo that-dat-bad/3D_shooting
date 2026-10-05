@@ -31,6 +31,8 @@ enum ControlIDs {
 	IDC_TRACK_ALPHA,
 	IDC_EDIT_ALPHA,
 	IDC_CHECK_VISIBLE,
+	IDC_CHECK_SHADOW,
+	IDC_CHECK_OUTLINE,
 	IDC_COMBO_STATE,
 	IDC_TRACK_STATESCALE,
 	IDC_EDIT_STATESCALE,
@@ -315,6 +317,8 @@ LRESULT UIEditorWindow::HandleMessage(HWND hwnd, UINT msg, WPARAM wParam, LPARAM
 			break;
 
 		case IDC_CHECK_VISIBLE:
+		case IDC_CHECK_SHADOW:
+		case IDC_CHECK_OUTLINE:
 			ApplyFieldsToText();
 			break;
 
@@ -509,7 +513,13 @@ void UIEditorWindow::CreateControls() {
 	SendMessageW(hCheckVisible_, WM_SETFONT, (WPARAM)hFont, TRUE);
 	SendMessageW(hCheckVisible_, BM_SETCHECK, BST_CHECKED, 0);
 
-	curY += 62;
+	hCheckShadow_ = CreateWindowW(L"BUTTON", L"Shadow", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX, padX + 15, curY + 44, 70, 20, hwnd_, (HMENU)IDC_CHECK_SHADOW, hInst, nullptr);
+	SendMessageW(hCheckShadow_, WM_SETFONT, (WPARAM)hFont, TRUE);
+
+	hCheckOutline_ = CreateWindowW(L"BUTTON", L"Outline", WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX, padX + 95, curY + 44, 70, 20, hwnd_, (HMENU)IDC_CHECK_OUTLINE, hInst, nullptr);
+	SendMessageW(hCheckOutline_, WM_SETFONT, (WPARAM)hFont, TRUE);
+
+	curY += 72;
 
 	// --- 5. ステート＆モーション設定（Tween, Pulse, Floating, Shake）---
 	hGroupMotion_ = CreateWindowW(L"BUTTON", L" 5. State & Motion (Hover, Condition, Anim) ", WS_CHILD | WS_VISIBLE | BS_GROUPBOX, padX, curY, width, 140, hwnd_, nullptr, hInst, nullptr);
@@ -747,8 +757,10 @@ void UIEditorWindow::PopulateFieldsFromText(UIText* text) {
 	SetWindowTextW(hEditAlpha_, ssAlpha.str().c_str());
 	SendMessageW(hTrackAlpha_, TBM_SETPOS, TRUE, (int)(col.w * 100.0f));
 
-	// 可視性
+	// 可視性・装飾
 	SendMessageW(hCheckVisible_, BM_SETCHECK, text->IsVisible() ? BST_CHECKED : BST_UNCHECKED, 0);
+	SendMessageW(hCheckShadow_, BM_SETCHECK, text->HasDropShadow() ? BST_CHECKED : BST_UNCHECKED, 0);
+	SendMessageW(hCheckOutline_, BM_SETCHECK, text->HasOutline() ? BST_CHECKED : BST_UNCHECKED, 0);
 
 	isUpdatingUI_ = false;
 
@@ -811,9 +823,15 @@ void UIEditorWindow::ApplyFieldsToText() {
 	float b = GetBValue(currentColorRef_) / 255.0f;
 	text->SetColor({ r, g, b, alphaVal });
 
-	// 可視性
+	// 可視性・装飾
 	LRESULT isChecked = SendMessageW(hCheckVisible_, BM_GETCHECK, 0, 0);
 	text->SetVisible(isChecked == BST_CHECKED);
+
+	LRESULT isShadowChecked = SendMessageW(hCheckShadow_, BM_GETCHECK, 0, 0);
+	text->SetDropShadow(isShadowChecked == BST_CHECKED);
+
+	LRESULT isOutlineChecked = SendMessageW(hCheckOutline_, BM_GETCHECK, 0, 0);
+	text->SetOutline(isOutlineChecked == BST_CHECKED);
 
 	// ステート＆モーション情報の反映
 	UIStateStyle st = text->GetStyle(selectedState_);

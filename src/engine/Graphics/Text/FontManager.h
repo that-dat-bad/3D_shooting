@@ -1,8 +1,8 @@
-#pragma once
+﻿#pragma once
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include "../../../external/stb/stb_truetype.h"
+#include "../../../external/imgui/imstb_truetype.h"
 #include "../base/Math/MyMath.h"
 
 using namespace MyMath;
@@ -13,8 +13,8 @@ using namespace MyMath;
 struct CharacterInfo {
     std::unordered_map<char32_t, stbtt_packedchar> glyphs;
     std::string textureName;
-    uint32_t textureIndex;
-    float size;
+    uint32_t textureIndex = 0;
+    float size = 0.0f;
 };
 
 /// <summary>

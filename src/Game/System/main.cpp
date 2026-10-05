@@ -20,7 +20,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int) {
 		game.Run();
 
 		game.Finalize();
-	} // ← game のデストラクタがここで動く（全 ComPtr メンバが解放される）
+	}
 
 	hr = MFShutdown();
 	assert(SUCCEEDED(hr));

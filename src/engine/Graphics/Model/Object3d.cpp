@@ -89,6 +89,8 @@ void Object3d::Draw() {
 	// コマンドリストの取得
 	ID3D12GraphicsCommandList* commandList = object3dCommon_->GetDirectXCommon()->GetCommandList();
 
+	commandList->SetGraphicsRootSignature(object3dCommon_->GetRootSignature());
+	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	object3dCommon_->SetBlendMode(blendMode_);
 
 	// 座標変換行列CBufferの設定 (RootParameter Index: 1)

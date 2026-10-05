@@ -30,9 +30,37 @@ public:
 	void SetAnchorPoint(const Vector2& anchor) { anchorPoint_ = anchor; }
 	const Vector2& GetAnchorPoint() const { return anchorPoint_; }
 
+	// --- 装飾（ドロップシャドウ） ---
+	void SetDropShadow(bool enable, const Vector2& offset = {2.0f, 2.0f}, const Vector4& color = {0.0f, 0.0f, 0.0f, 1.0f}) {
+		hasDropShadow_ = enable;
+		shadowOffset_ = offset;
+		shadowColor_ = color;
+	}
+	bool HasDropShadow() const { return hasDropShadow_; }
+	Vector2 GetShadowOffset() const { return shadowOffset_; }
+	Vector4 GetShadowColor() const { return shadowColor_; }
+
+	// --- 装飾（アウトライン） ---
+	void SetOutline(bool enable, float thickness = 1.0f, const Vector4& color = {0.0f, 0.0f, 0.0f, 1.0f}) {
+		hasOutline_ = enable;
+		outlineThickness_ = thickness;
+		outlineColor_ = color;
+	}
+	bool HasOutline() const { return hasOutline_; }
+	float GetOutlineThickness() const { return outlineThickness_; }
+	Vector4 GetOutlineColor() const { return outlineColor_; }
+
 private:
 	std::string fontName_ = "Roboto";
 	std::string text_;
 	float fontSize_ = 32.0f;
 	Vector2 anchorPoint_ = {0.0f, 0.0f};
+
+	bool hasDropShadow_ = false;
+	Vector2 shadowOffset_ = {2.0f, 2.0f};
+	Vector4 shadowColor_ = {0.0f, 0.0f, 0.0f, 1.0f};
+
+	bool hasOutline_ = false;
+	float outlineThickness_ = 1.0f;
+	Vector4 outlineColor_ = {0.0f, 0.0f, 0.0f, 1.0f};
 };

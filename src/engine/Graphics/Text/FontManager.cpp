@@ -1,7 +1,12 @@
-#include "FontManager.h"
+﻿#include "FontManager.h"
 
+#define STBRP_STATIC
+#define STB_RECT_PACK_IMPLEMENTATION
+#include "../../../external/imgui/imstb_rectpack.h"
+
+#define STBTT_STATIC
 #define STB_TRUETYPE_IMPLEMENTATION
-#include "../../../external/stb/stb_truetype.h"
+#include "../../../external/imgui/imstb_truetype.h"
 
 #include "../System/TextureManager.h"
 #include <fstream>
@@ -26,12 +31,20 @@ void FontManager::LoadFont(const std::string& fontName, const std::string& fileP
     if (fonts_.contains(fontName)) { return; }
 
     std::ifstream file(filePath, std::ios::binary | std::ios::ate);
-    assert(file.is_open() && "Failed to open font file.");
+    if (!file.is_open()) {
+        assert(false && "Failed to open font file.");
+        return;
+    }
     std::streamsize size = file.tellg();
+    if (size <= 0) {
+        assert(false && "Invalid font file size.");
+        return;
+    }
     file.seekg(0, std::ios::beg);
     std::vector<unsigned char> ttfBuffer(size);
     if (!file.read((char*)ttfBuffer.data(), size)) {
         assert(false && "Failed to read font file.");
+        return;
     }
 
     // 高解像度パッキング（4096 x 4096テクスチャで大文字サイズも極めてシャープに描画）
@@ -40,21 +53,11 @@ void FontManager::LoadFont(const std::string& fontName, const std::string& fileP
     int texHeight = 4096;
     std::vector<unsigned char> tempBitmap(texWidth * texHeight);
 
-    stbtt_PackBegin(&spc, tempBitmap.data(), texWidth, texHeight, 0, 1, nullptr);
+    if (!stbtt_PackBegin(&spc, tempBitmap.data(), texWidth, texHeight, 0, 1, nullptr)) {
+        assert(false && "Failed to begin packing.");
+        return;
+    }
     stbtt_PackSetOversampling(&spc, 1, 1);
-
-    // ベイクする範囲の定義
-    // 1. ASCII (32-126)
-    // 2. ひらがな (0x3040-0x309F)
-    // 3. カタカナ (0x30A0-0x30FF)
-    // 4. 全角記号 (0xFF00-0xFFEF)
-    // 5. CJK記号・句読点 (0x3000-0x303F)
-    // 6. 常用・ゲーム主要漢字
-    std::vector<stbtt_packedchar> asciiData(96);
-    std::vector<stbtt_packedchar> hiraganaData(96);
-    std::vector<stbtt_packedchar> katakanaData(96);
-    std::vector<stbtt_packedchar> fullwidthData(240);
-    std::vector<stbtt_packedchar> cjkSymbolsData(64);
 
     // 主要漢字のリスト
     static const std::u32string kCommonKanji =
@@ -67,64 +70,56 @@ void FontManager::LoadFont(const std::string& fontName, const std::string& fileP
         U"第章節段級位界宇宙星空陸海川山森都市街建物道路橋"
         U"自機僚機標的目標迎撃索敵追尾離脱接近交戦戦果作戦指令司令部防衛制圧";
 
-    std::vector<int> kanjiCodepoints;
+    // 必要な全コードポイントを1つの配列に集約（レンジ分割による stb_truetype の missing_glyph インデックス不整合バグを回避）
+    std::vector<int> codepoints;
+    codepoints.reserve(1024);
+
+    // 1. ASCII (32-126)
+    for (int c = 32; c <= 126; ++c) codepoints.push_back(c);
+
+    // 2. ひらがな (0x3040-0x309F)
+    for (int c = 0x3040; c <= 0x309F; ++c) codepoints.push_back(c);
+
+    // 3. カタカナ (0x30A0-0x30FF)
+    for (int c = 0x30A0; c <= 0x30FF; ++c) codepoints.push_back(c);
+
+    // 4. CJK記号・句読点 (0x3000-0x303F)
+    for (int c = 0x3000; c <= 0x303F; ++c) codepoints.push_back(c);
+
+    // 5. 全角記号・英数 (0xFF01-0xFF5E)
+    for (int c = 0xFF01; c <= 0xFF5E; ++c) codepoints.push_back(c);
+
+    // 6. 主要漢字
     for (char32_t c : kCommonKanji) {
-        kanjiCodepoints.push_back(static_cast<int>(c));
+        if (c > 0 && c <= 0x10FFFF) {
+            codepoints.push_back(static_cast<int>(c));
+        }
     }
-    std::sort(kanjiCodepoints.begin(), kanjiCodepoints.end());
-    kanjiCodepoints.erase(std::unique(kanjiCodepoints.begin(), kanjiCodepoints.end()), kanjiCodepoints.end());
 
-    std::vector<stbtt_packedchar> kanjiData(kanjiCodepoints.size());
+    std::sort(codepoints.begin(), codepoints.end());
+    codepoints.erase(std::unique(codepoints.begin(), codepoints.end()), codepoints.end());
 
-    stbtt_pack_range ranges[6] = {};
-    
-    ranges[0].font_size = pixelHeight;
-    ranges[0].first_unicode_codepoint_in_range = 32;
-    ranges[0].num_chars = 96;
-    ranges[0].chardata_for_range = asciiData.data();
+    std::vector<stbtt_packedchar> packedChars(codepoints.size());
 
-    ranges[1].font_size = pixelHeight;
-    ranges[1].first_unicode_codepoint_in_range = 0x3040;
-    ranges[1].num_chars = 96;
-    ranges[1].chardata_for_range = hiraganaData.data();
+    stbtt_pack_range range{};
+    range.font_size = pixelHeight;
+    range.first_unicode_codepoint_in_range = 0;
+    range.array_of_unicode_codepoints = codepoints.data();
+    range.num_chars = static_cast<int>(codepoints.size());
+    range.chardata_for_range = packedChars.data();
 
-    ranges[2].font_size = pixelHeight;
-    ranges[2].first_unicode_codepoint_in_range = 0x30A0;
-    ranges[2].num_chars = 96;
-    ranges[2].chardata_for_range = katakanaData.data();
-
-    ranges[3].font_size = pixelHeight;
-    ranges[3].first_unicode_codepoint_in_range = 0xFF00;
-    ranges[3].num_chars = 240;
-    ranges[3].chardata_for_range = fullwidthData.data();
-
-    ranges[4].font_size = pixelHeight;
-    ranges[4].first_unicode_codepoint_in_range = 0x3000;
-    ranges[4].num_chars = 64;
-    ranges[4].chardata_for_range = cjkSymbolsData.data();
-
-    ranges[5].font_size = pixelHeight;
-    ranges[5].first_unicode_codepoint_in_range = 0;
-    ranges[5].array_of_unicode_codepoints = kanjiCodepoints.data();
-    ranges[5].num_chars = static_cast<int>(kanjiCodepoints.size());
-    ranges[5].chardata_for_range = kanjiData.data();
-
-    // 0は最初のフォントインデックス (TTCの場合も0を指定)
-    stbtt_PackFontRanges(&spc, ttfBuffer.data(), 0, ranges, 6);
+    // 単一レンジでパッキング（stb_truetype の複数レンジ時 missing_glyph バッファオーバーランを完全に防止）
+    stbtt_PackFontRanges(&spc, ttfBuffer.data(), 0, &range, 1);
     stbtt_PackEnd(&spc);
 
     CharacterInfo info;
     info.size = pixelHeight;
     info.textureName = fontName + "_Tex";
+    info.textureIndex = 0;
 
     // ハッシュマップに格納
-    for (int i = 0; i < 96; ++i) info.glyphs[32 + i] = asciiData[i];
-    for (int i = 0; i < 96; ++i) info.glyphs[0x3040 + i] = hiraganaData[i];
-    for (int i = 0; i < 96; ++i) info.glyphs[0x30A0 + i] = katakanaData[i];
-    for (int i = 0; i < 240; ++i) info.glyphs[0xFF00 + i] = fullwidthData[i];
-    for (int i = 0; i < 64; ++i) info.glyphs[0x3000 + i] = cjkSymbolsData[i];
-    for (size_t i = 0; i < kanjiCodepoints.size(); ++i) {
-        info.glyphs[kanjiCodepoints[i]] = kanjiData[i];
+    for (size_t i = 0; i < codepoints.size(); ++i) {
+        info.glyphs[codepoints[i]] = packedChars[i];
     }
 
     std::vector<uint32_t> rgbaBitmap(texWidth * texHeight);

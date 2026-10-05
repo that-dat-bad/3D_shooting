@@ -69,6 +69,8 @@ private:
 		Vector2 anchorPoint = { 0.0f, 0.0f };
 		Vector4 color = { 1.0f, 1.0f, 1.0f, 1.0f };
 		bool visible = true;
+		bool hasShadow = false;
+		bool hasOutline = false;
 		bool isValid = false;
 	};
 	void TakeSnapshot(UIText* text);
@@ -118,6 +120,8 @@ private:
 	HWND hTrackAlpha_ = nullptr;
 	HWND hEditAlpha_ = nullptr;
 	HWND hCheckVisible_ = nullptr;
+	HWND hCheckShadow_ = nullptr;
+	HWND hCheckOutline_ = nullptr;
 
 	// --- モーション・状態グループ ---
 	HWND hGroupMotion_ = nullptr;

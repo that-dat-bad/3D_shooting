@@ -97,6 +97,7 @@ public:
 	
 	void SetDefaultEnvTextureIndex(uint32_t index) { defaultEnvTextureIndex_ = index; }
 	uint32_t GetDefaultEnvTextureIndex() const { return defaultEnvTextureIndex_; }
+	ID3D12RootSignature* GetRootSignature() const { return rootSignature_.Get(); }
 
 	~Object3dCommon() = default;
 private:
