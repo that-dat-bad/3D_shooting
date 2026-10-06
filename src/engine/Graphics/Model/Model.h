@@ -66,6 +66,8 @@ public:
 		float shininess;
 		float environmentCoefficient;
 		float specularIntensity; // 反射強度
+		Vector3 emissiveColor = { 0.0f, 0.0f, 0.0f }; // 自発光色
+		float emissiveIntensity = 0.0f;               // 自発光強度
 		Matrix4x4 uvTransform; // UV変換行列
 	};
 
@@ -83,6 +85,8 @@ public:
 		float shininess = 50.0f;
 		float environmentCoefficient = 0.0f; //環境マップの反射度合い
 		float specularIntensity = 1.0f;      // 反射強度
+		Vector3 emissiveColor = { 0.0f, 0.0f, 0.0f }; // 自発光色
+		float emissiveIntensity = 0.0f;               // 自発光強度
 	};
 	struct MeshInfo {
 		uint32_t indexOffset;
@@ -147,6 +151,15 @@ public:
 	/// 特定ノードのメッシュに対するレイキャスト判定
 	/// </summary>
 	bool IntersectRayNode(const std::string& nodeName, const Ray& ray, const Matrix4x4& nodeWorldMatrix, RaycastHit* outHit = nullptr) const;
+
+	/// @brief マテリアルのカラーを設定
+	void SetMaterialColor(uint32_t materialIndex, const Vector4& color);
+	/// @brief マテリアルのライティング有効/無効を設定
+	void SetMaterialEnableLighting(uint32_t materialIndex, bool enableLighting);
+	/// @brief マテリアルの反射強度を設定
+	void SetMaterialSpecularIntensity(uint32_t materialIndex, float intensity);
+	/// @brief マテリアルの自発光（エミッシブ）を設定
+	void SetMaterialEmissive(uint32_t materialIndex, const Vector3& color, float intensity);
 
 private:
 

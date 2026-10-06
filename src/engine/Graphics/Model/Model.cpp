@@ -153,6 +153,8 @@ void Model::Initialize(ModelCommon* modelCommon, const std::string& directorypat
 		matPtr->shininess = matData.shininess;
 		matPtr->environmentCoefficient = matData.environmentCoefficient;
 		matPtr->specularIntensity = matData.specularIntensity;
+		matPtr->emissiveColor = matData.emissiveColor;
+		matPtr->emissiveIntensity = matData.emissiveIntensity;
 		matPtr->uvTransform = Identity4x4();
 
 		if (!matData.textureFilePath.empty()) {
@@ -645,6 +647,12 @@ Model::ModelData Model::LoadModelFile(const std::string& directoryPath, const st
 				}
 			}
 
+			aiColor4D emissiveColor;
+			if (AI_SUCCESS == material->Get(AI_MATKEY_COLOR_EMISSIVE, emissiveColor)) {
+				matData.emissiveColor = { emissiveColor.r, emissiveColor.g, emissiveColor.b };
+				matData.emissiveIntensity = 1.0f;
+			}
+
 			modelData.materials.push_back(matData);
 		}
 	}
@@ -858,4 +866,29 @@ bool Model::IntersectRayNode(const std::string& nodeName, const Ray& ray, const 
 		return false;
 	}
 	return IntersectRayNodeMeshes(*targetNode, ray, nodeWorldMatrix, modelData_, outHit);
+}
+
+void Model::SetMaterialColor(uint32_t materialIndex, const Vector4& color) {
+	if (materialIndex < materialDatas_.size() && materialDatas_[materialIndex]) {
+		materialDatas_[materialIndex]->color = color;
+	}
+}
+
+void Model::SetMaterialEnableLighting(uint32_t materialIndex, bool enableLighting) {
+	if (materialIndex < materialDatas_.size() && materialDatas_[materialIndex]) {
+		materialDatas_[materialIndex]->enableLighting = enableLighting ? 1 : 0;
+	}
+}
+
+void Model::SetMaterialSpecularIntensity(uint32_t materialIndex, float intensity) {
+	if (materialIndex < materialDatas_.size() && materialDatas_[materialIndex]) {
+		materialDatas_[materialIndex]->specularIntensity = intensity;
+	}
+}
+
+void Model::SetMaterialEmissive(uint32_t materialIndex, const Vector3& color, float intensity) {
+	if (materialIndex < materialDatas_.size() && materialDatas_[materialIndex]) {
+		materialDatas_[materialIndex]->emissiveColor = color;
+		materialDatas_[materialIndex]->emissiveIntensity = intensity;
+	}
 }

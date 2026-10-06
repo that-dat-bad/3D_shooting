@@ -52,6 +52,7 @@ void Object3dCommon::Initialize(DirectXCommon* dxCommon)
 	lightingSettingsData->shadingModel = 1; // 1: Half-Lambert (暗部も明るく照らす)
 	lightingSettingsData->specularModel = 0; // 鏡面反射OFF
 	lightingSettingsData->lightType = 1;     // 1: 平行光源 (Directional Light) 有効化
+	lightingSettingsData->emissiveIntensityScale = 1.0f; // メッシュ自発光スケール初期値
 	CreateRootSignature(dxCommon_);
 	CreateGraphicsPipeline(dxCommon_);
 }

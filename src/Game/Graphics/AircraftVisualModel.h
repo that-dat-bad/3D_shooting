@@ -5,6 +5,7 @@
 #define M_PI 3.14159265358979323846
 #endif
 #include <memory>
+#include <vector>
 #include <unordered_map>
 #include <string>
 #include "../FlightModel/DamageModel.h"
@@ -25,6 +26,7 @@ public:
 	/// @brief パーツモデルの設定
 	void SetModelForPart(DamagePart part, const std::string& modelFilePath, const std::string& targetNodeName = "");
 	void SetModelForPart(DamagePart part, Model* model, const std::string& targetNodeName = "");
+	void SetModelForPart(DamagePart part, Model* model, const std::vector<std::string>& targetNodeNames);
 
 	/// @brief 単一のモデルファイルから標準的なノード名で一括セットアップ
 	void SetupFromSingleModel(const std::string& modelFilePath);

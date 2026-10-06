@@ -12,7 +12,7 @@
 #include "../Graphics/AircraftVisualModel.h"
 #include "../../engine/Graphics/PostProcess/PostEffect.h"
 
-/// @brief タイトルシーン。ゲームタイトルとメニューボタンを表示する。
+/// @brief タイトルシーン
 class TitleScene : public IScene {
 public:
 	void Initialize() override;
@@ -24,7 +24,7 @@ public:
 private:
 	// --- UI要素 ---
 	UIPanel backgroundPanel_;		///< 背景オーバーレイ
-	UIText titleText_;				///< ゲームタイトル「戦雷」
+	UIText titleText_;				///< ゲームタイトル
 	UIText subtitleText_;			///< サブタイトル
 	UIButton startButton_;			///< スタートボタン
 	UIButton editorButton_;         ///< エディタボタン
@@ -52,13 +52,19 @@ private:
 	UIText pressSpaceText_;
 	UIPanel scanlineOverlay_;
 
+	// --- OSD (ドローンカメラビュー枠) ---
+	std::vector<std::unique_ptr<Sprite>> osdSprites_;
+	std::unique_ptr<Sprite> recDotSprite_;
+	void InitializeOSD(SpriteCommon* spriteCommon);
+	void DrawOSD();
+
 	// ============================
-	// 3D背景ロケーション（ハンガー / 空母 / 墜落森）
+	// 3D背景ロケーション
 	// ============================
 	enum class TitleLocation : int {
-		Hangar,         ///< 格納庫（出撃前・静）
-		CarrierDeck,    ///< 空母飛行甲板（発艦・緊迫）
-		CrashedForest,  ///< 墜落済みの森（哀愁）
+		Hangar,         ///< 格納庫（大梁トラス鉄骨構造）
+		Tunnel,         ///< 地下トンネル基地
+		CrashedForest,  ///< 墜落済みの森
 		Count
 	};
 
@@ -95,7 +101,8 @@ private:
 		float heightSway = 0.5f;
 		float lookAtHeight = 0.5f;  ///< 注視点の機体からの高さ
 		float orbitSpeed = 0.1f;    ///< rad/sec
-		float shake = 0.002f;
+		float bankTilt = 0.40f;     ///< ドローンの移動傾き係数（ロール角）
+		bool isTunnelCamera = false; ///< トンネル内カメラ（壁突き抜け防止・正面構図）
 	};
 
 	/// @brief ロケーションごとのポストエフェクト色味
@@ -103,6 +110,18 @@ private:
 		MyMath::Vector3 tint = { 1.0f, 1.0f, 1.0f };
 		float tintIntensity = 0.0f;
 		float vignette = 0.0f;
+	};
+
+	/// @brief 追加の背景セットパーツ（道路、誘導灯、回転灯など）
+	struct ExtraEnvPart {
+		std::string modelPath;
+		std::unique_ptr<Object3d> object;
+		MyMath::Vector3 offset = { 0.0f, 0.0f, 0.0f };
+		MyMath::Vector3 rotation = { 0.0f, 0.0f, 0.0f };
+		MyMath::Vector3 scale = { 1.0f, 1.0f, 1.0f };
+		bool rotateY = false;          ///< 回転灯用Y軸自転フラグ
+		float rotateSpeed = 0.0f;      ///< 自転速度 (rad/s)
+		float currentAngle = 0.0f;
 	};
 
 	struct LocationData {
@@ -115,8 +134,10 @@ private:
 		std::unique_ptr<Object3d> envObject;
 		MyMath::Vector3 envScale = { 1.0f, 1.0f, 1.0f };
 		MyMath::Vector3 envRotation = { 0.0f, 0.0f, 0.0f };
+		std::vector<ExtraEnvPart> extraEnvParts; ///< 道路、誘導灯、回転灯などの追加パーツ
 
 		// 機体
+		std::string aircraftModelPath = "Resources/models/m21_wg.gltf";
 		MyMath::Vector3 aircraftOffset = { 0.0f, 0.0f, 0.0f }; ///< origin からの相対
 		MyMath::Vector3 aircraftRotation = { 0.0f, 0.0f, 0.0f };
 		float propellerRpm = 0.0f;
@@ -131,9 +152,6 @@ private:
 		// 環境
 		uint32_t skyboxTexIndex = 0;
 		MyMath::Vector4 skyboxColor = { 1.0f, 1.0f, 1.0f, 1.0f };
-		bool hasOcean = false;
-		float oceanHeight = 0.0f; ///< ワールドY
-
 		LocationLighting lighting;
 		LocationCamera camera;
 		LocationGrade grade;
@@ -150,7 +168,10 @@ private:
 	void ChangeLocation(int index);
 	LocationData& CurrentLocation() { return locations_[currentLocationIndex_]; }
 
-	std::unique_ptr<Object3d> oceanObject_ = nullptr;
 	std::unique_ptr<Skybox> skybox_ = nullptr;
 	float cameraTheta_ = 0.0f;
+
+	// 誘導灯の自発光パラメータ
+	MyMath::Vector3 guideEmissiveColor_ = { 0.2f, 1.8f, 2.8f }; // 鮮やかなエレクトリックシアン
+	float guideEmissiveIntensity_ = 2.5f;
 };

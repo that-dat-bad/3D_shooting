@@ -65,7 +65,7 @@ void StageScene::Initialize() {
 	// 描画オブジェクトの初期化
 	// ============================
 
-	// テクスチャのプリロード（モデルのマテリアルが参照するテクスチャを先に読み込む）
+	// テクスチャのプリロード
 	TextureManager::GetInstance()->LoadTexture("assets/textures/uvChecker.png");
 	TextureManager::GetInstance()->LoadTexture("assets/textures/circle2.png");
 
@@ -119,12 +119,13 @@ void StageScene::Initialize() {
 	// ============================
 	environmentManager_.Initialize();
 	// ライティングモデル設定
-	Object3dCommon::GetInstance()->SetLightType(1);             // Directional Light 有効
+	Object3dCommon::GetInstance()->SetLightType(1);
 	Object3dCommon::GetInstance()->SetShadingModel(1);
 	Object3dCommon::GetInstance()->SetSpecularModel(2);
 
 	// ============================
-		// ============================
+
+	// ============================
 	// カメラ初期位置（機体の後方）
 	// ============================
 	Vector3 initPos = flightModel_.GetPosition();

@@ -44,7 +44,7 @@ struct LightingSettings {
 	int32_t lightType;
 	float padding;
 	Vector3 cameraPosition;
-	float padding2;
+	float emissiveIntensityScale = 1.0f; ///< メッシュ自発光の全体強度スケール
 };
 
 /// <summary>
@@ -78,6 +78,8 @@ public:
 	void SetSpecularModel(int32_t model) { lightingSettingsData->specularModel = model; }
 	void SetLightType(int32_t type) { lightingSettingsData->lightType = type; }
 	void SetCameraPosition(const Vector3& position) { lightingSettingsData->cameraPosition = position; }
+	void SetEmissiveIntensityScale(float scale) { lightingSettingsData->emissiveIntensityScale = scale; }
+	float GetEmissiveIntensityScale() const { return lightingSettingsData->emissiveIntensityScale; }
 
 	DirectXCommon* GetDirectXCommon() { return dxCommon_; }
 

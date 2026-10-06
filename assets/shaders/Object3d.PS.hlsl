@@ -13,6 +13,8 @@ struct Material
     float shininess;
     float environmentCoefficient;
     float specularIntensity; // 反射強度
+    float32_t3 emissiveColor; // 自発光色
+    float emissiveIntensity;  // 自発光強度
     matrix uvTransform;
 };
 
@@ -32,7 +34,7 @@ struct LightingSettings
     int lightType;     // 0: Directional, 1: Point, 2: Both
     float padding;
     float32_t3 cameraPosition;
-    float padding2;
+    float emissiveIntensityScale; // メッシュ自発光の全体強度スケール
 };
 
 struct PointLight
@@ -276,14 +278,19 @@ PixelShaderOutput main(PixelInput input)
             }
         }
 
+        // 自発光（メッシュ自体の発光）
+        float32_t3 emissive = gMaterial.emissiveColor * gMaterial.emissiveIntensity * gLightingSettings.emissiveIntensityScale;
+
         // Combine
-        output.color.rgb = totalDiffuse + totalSpecular + envColor;
+        output.color.rgb = totalDiffuse + totalSpecular + envColor + emissive;
         output.color.a = gMaterial.color.a * texColor.a;
     }
     else
     {
         // ライティング無効時
-         output.color = texColor * gMaterial.color;
+        float32_t3 emissive = gMaterial.emissiveColor * gMaterial.emissiveIntensity * gLightingSettings.emissiveIntensityScale;
+        output.color.rgb = (texColor.rgb * gMaterial.color.rgb) + emissive;
+        output.color.a = gMaterial.color.a * texColor.a;
     }
 
     return output;

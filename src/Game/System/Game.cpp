@@ -108,19 +108,19 @@ void Game::Draw() {
 	DirectXCommon::GetInstance()->PreDraw();
 	srvManager->PreDraw();
 	PrimitiveModel::GetInstance()->Reset(); // プリミティブの描画カウントをリセット
-	// 3Dオブジェクト描画
+	// 3Dオブジェクト・パーティクル描画（中間レンダーターゲットへ描画）
 	Object3dCommon::GetInstance()->SetupCommonState();
-
-
 	sceneManager->Draw();
 	ParticleManager::GetInstance()->Draw();
 
+	// 描画後処理（3Dシーンにポストエフェクト適用し、バックバッファへ転送）
+	DirectXCommon::GetInstance()->PostDraw();
+
+	// 2D UI・テキスト描画（ポストエフェクト適用後のバックバッファに描画）
+	// これによりUIが走査線・色収差・レンズ歪み・ブルームでぼやけたり見づらくならない
 	SpriteCommon::GetInstance()->SetupCommonState();
 	sceneManager->DrawUI();
 	TextRenderer::GetInstance()->Draw();
-
-	// 描画後処理（ポストエフェクト適用、バックバッファに描画）
-	DirectXCommon::GetInstance()->PostDraw();
 
 	imguiManager->End();
 

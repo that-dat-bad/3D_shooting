@@ -2,6 +2,7 @@
 #include "../../engine/Graphics/Model/Object3dCommon.h"
 #include "../../engine/Graphics/Model/ModelManager.h"
 #include <numbers>
+#include <unordered_set>
 
 void AircraftVisualModel::Initialize(Object3dCommon* object3dCommon, Camera* camera) {
 	object3dCommon_ = object3dCommon;
@@ -18,6 +19,14 @@ void AircraftVisualModel::SetModelForPart(DamagePart part, const std::string& mo
 }
 
 void AircraftVisualModel::SetModelForPart(DamagePart part, Model* model, const std::string& targetNodeName) {
+	std::vector<std::string> names;
+	if (!targetNodeName.empty()) {
+		names.push_back(targetNodeName);
+	}
+	SetModelForPart(part, model, names);
+}
+
+void AircraftVisualModel::SetModelForPart(DamagePart part, Model* model, const std::vector<std::string>& targetNodeNames) {
 	auto& node = partNodes_[part];
 	if (!node.object) {
 		node.object = std::make_unique<Object3d>();
@@ -27,18 +36,36 @@ void AircraftVisualModel::SetModelForPart(DamagePart part, Model* model, const s
 		}
 	}
 	node.object->SetModel(model);
-	node.object->SetTargetNodeName(targetNodeName);
+	node.object->SetTargetNodeNames(targetNodeNames);
 	if (node.object->GetModel()) {
 		node.object->GetModel()->SetEnvironmentCoefficient(0.0f); // 金属反射をOFF
 	}
 }
 
-static bool HasNode(const Model::Node& node, const std::string& name) {
-	if (node.name == name) return true;
-	for (const auto& child : node.children) {
-		if (HasNode(child, name)) return true;
+static const Model::Node* FindMatchingNode(const Model::Node& node, const std::string& baseName) {
+	// 完全一致、または Blender の自動連番サフィックス（例: "Fuse.001"）に一致
+	if (node.name == baseName || node.name.starts_with(baseName + ".")) {
+		return &node;
 	}
-	return false;
+	for (const auto& child : node.children) {
+		if (const Model::Node* found = FindMatchingNode(child, baseName)) {
+			return found;
+		}
+	}
+	return nullptr;
+}
+
+static void CollectSubtreeNodesExcept(const Model::Node& node,
+                                      const std::unordered_set<std::string>& otherPartRootNames,
+                                      std::vector<std::string>& outNodeNames) {
+	outNodeNames.push_back(node.name);
+	for (const auto& child : node.children) {
+		// 他の部位のルートノードに該当する場合は、その部位の担当になるため収集しない
+		if (otherPartRootNames.contains(child.name)) {
+			continue;
+		}
+		CollectSubtreeNodesExcept(child, otherPartRootNames, outNodeNames);
+	}
 }
 
 void AircraftVisualModel::SetupFromSingleModel(const std::string& modelFilePath) {
@@ -72,11 +99,22 @@ void AircraftVisualModel::SetupFromSingleModel(Model* model) {
 
 	const auto& rootNode = model->GetModelData().rootNode;
 
-	for (const auto& [part, nodeName] : nameMap) {
-		// そのノードがモデル内に存在する場合のみ、部位として登録する
-		if (HasNode(rootNode, nodeName)) {
-			SetModelForPart(part, model, nodeName);
+	// 1. 各部位に対応する実ノードを特定
+	std::unordered_map<DamagePart, const Model::Node*> matchedNodes;
+	std::unordered_set<std::string> matchedRootNames;
+
+	for (const auto& [part, baseName] : nameMap) {
+		if (const Model::Node* node = FindMatchingNode(rootNode, baseName)) {
+			matchedNodes[part] = node;
+			matchedRootNames.insert(node->name);
 		}
+	}
+
+	// 2. 各部位について、サブツリー内の付随ノード（ギアや追加装備など、他の部位に含まれないノード）も含めて登録
+	for (const auto& [part, node] : matchedNodes) {
+		std::vector<std::string> partNodeNames;
+		CollectSubtreeNodesExcept(*node, matchedRootNames, partNodeNames);
+		SetModelForPart(part, model, partNodeNames);
 	}
 }
 

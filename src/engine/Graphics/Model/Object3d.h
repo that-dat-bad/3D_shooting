@@ -55,6 +55,9 @@ public: // メンバ関数
 	void SetCamera(Camera* camera) { camera_ = camera; }
 	void SetBlendMode(BlendMode mode) { blendMode_ = mode; }
 	void SetEnvTextureOverride(uint32_t textureIndex) { envTextureOverride_ = textureIndex; }
+	void SetMaterialEmissive(uint32_t materialIndex, const Vector3& color, float intensity);
+	void SetMaterialEnableLighting(uint32_t materialIndex, bool enable);
+	void SetMaterialColor(uint32_t materialIndex, const Vector4& color);
 
 	// LOD (Level of Detail) API
 	void SetLODEnabled(bool enabled) { isLODEnabled_ = enabled; }
@@ -63,7 +66,29 @@ public: // メンバ関数
 	void ClearLODLevels();
 	void SetCullScreenSize(float minScreenSize) { cullScreenSize_ = minScreenSize; }
 	void SetBoundingRadius(float radius) { boundingRadius_ = radius; }
-	void SetTargetNodeName(const std::string& name) { targetNodeName_ = name; }
+	void SetTargetNodeName(const std::string& name) {
+		targetNodeName_ = name;
+		targetNodeNames_.clear();
+		if (!name.empty()) {
+			targetNodeNames_.push_back(name);
+		}
+	}
+	void SetTargetNodeNames(const std::vector<std::string>& names) {
+		targetNodeNames_ = names;
+		targetNodeName_ = names.empty() ? "" : names[0];
+	}
+	void AddTargetNodeName(const std::string& name) {
+		targetNodeNames_.push_back(name);
+		if (targetNodeName_.empty()) {
+			targetNodeName_ = name;
+		}
+	}
+	const std::vector<std::string>& GetTargetNodeNames() const { return targetNodeNames_; }
+	const std::string& GetTargetNodeName() const { return targetNodeName_; }
+
+	// カスタムパイプラインステート（特殊シェーダー描画用）
+	void SetCustomPipelineState(ID3D12PipelineState* pso) { customPipelineState_ = pso; }
+	ID3D12PipelineState* GetCustomPipelineState() const { return customPipelineState_.Get(); }
 
 	// ゲッター
 	Vector3 GetScale() const { return transform_.scale; }
@@ -101,4 +126,6 @@ private:
 	float currentScreenSize_ = 1.0f;
 	int activeLODIndex_ = 0;
 	std::string targetNodeName_ = "";
+	std::vector<std::string> targetNodeNames_;
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> customPipelineState_ = nullptr;
 };

@@ -10,6 +10,8 @@
 #include "../../engine/Graphics/Model/SkyboxCommon.h"
 #include "../../engine/Graphics/Model/ModelManager.h"
 #include "../../engine/Graphics/PostProcess/PostEffect.h"
+#include "../../engine/Graphics/System/BlendMode.h"
+#include "../../engine/Graphics/System/DirectXCommon.h"
 #include "WinApp.h"
 #include <cmath>
 #include <filesystem>
@@ -53,28 +55,105 @@ void TitleScene::Initialize() {
 	skybox_->SetTextureIndex(skyboxTexIndex);
 	Object3dCommon::GetInstance()->SetDefaultEnvTextureIndex(skyboxTexIndex);
 
+	ModelManager::GetInstance()->LoadModel("Resources/models/m21_wg.gltf");
 	ModelManager::GetInstance()->LoadModel("Resources/models/m21.gltf");
-	ModelManager::GetInstance()->LoadModel("Resources/models/ocean.obj");
-	TextureManager::GetInstance()->LoadTexture("assets/textures/water_normal.jpg");
-
-	oceanObject_ = std::make_unique<Object3d>();
-	oceanObject_->Initialize(Object3dCommon::GetInstance());
-	oceanObject_->SetModel("Resources/models/ocean.obj");
-	oceanObject_->SetCamera(titleCamera);
-	oceanObject_->SetScale({ 1.0f, 1.0f, 1.0f });
-	oceanObject_->SetRotate({ 0.0f, 0.0f, 0.0f });
-	oceanObject_->SetTranslate({ 0.0f, 0.0f, 0.0f });
 
 	TextureManager* tm = TextureManager::GetInstance();
 	tm->LoadTexture("assets/textures/qwantani_dusk_2_puresky_2k.dds");
 	const uint32_t sunsetSky = tm->GetTextureIndexByFilePath("assets/textures/cedar_bridge_sunset_1_2k.dds");
 	const uint32_t duskSky = tm->GetTextureIndexByFilePath("assets/textures/qwantani_dusk_2_puresky_2k.dds");
+	const uint32_t whiteSky = tm->GetTextureIndexByFilePath("assets/textures/white1x1.png");
 
 	locations_.clear();
 	locations_.resize(static_cast<size_t>(TitleLocation::Count));
 
 	// ------------------------------------------------------------
-	// 1. 格納庫（ハンガー）: 暗がり + 真上からのスポットライト
+	// 1. 地下トンネル基地: トンネル + 道路 + 誘導灯（自発光） + 天井回転灯（飛行中M-21）
+	// ------------------------------------------------------------
+	{
+		LocationData& loc = locations_[static_cast<int>(TitleLocation::Tunnel)];
+		loc.id = TitleLocation::Tunnel;
+		loc.name = "Tunnel";
+		loc.aircraftModelPath = "Resources/models/m21.gltf"; // 車輪なし・ギア格納飛行モデル
+		loc.origin = { 0.0f, 0.0f, 0.0f };
+		loc.envModelPath = "Resources/models/title/Tunnel.obj";
+		loc.aircraftOffset = { 0.0f, 2.0f, 0.0f };          // トンネル中央の空中に浮上（高度2.0m）
+		loc.aircraftRotation = { 0.0f, 3.14159265f, 0.0f }; // 機首を手前（カメラ側）に向ける
+		loc.propellerRpm = 2500.0f;                          // 巡航飛行推力
+		loc.skyboxTexIndex = whiteSky;
+		loc.skyboxColor = { 0.0f, 0.0f, 0.0f, 1.0f }; // 天球を完全な黒にして暗黒空間にする
+
+		// 追加パーツ：道路、誘導灯、回転灯
+		loc.extraEnvParts.clear();
+		{
+			// 中央の道路と誘導灯、回転灯
+			ExtraEnvPart road;
+			road.modelPath = "Resources/models/title/Tunnel_road.obj";
+			loc.extraEnvParts.push_back(std::move(road));
+
+			ExtraEnvPart guide;
+			guide.modelPath = "Resources/models/title/Tunnel_guide.obj";
+			loc.extraEnvParts.push_back(std::move(guide));
+
+			ExtraEnvPart rotateLight;
+			rotateLight.modelPath = "Resources/models/title/Tunnel_rotate.obj";
+			rotateLight.rotateY = true;
+			rotateLight.rotateSpeed = 4.0f; // 回転灯のY軸自転 (rad/sec)
+			loc.extraEnvParts.push_back(std::move(rotateLight));
+
+			// トンネルを前後に大幅に連結（端に15個ずつ、中央と合わせて計31個、全長約1.25km）
+			constexpr float kTunnelLength = 40.383094f;
+			constexpr int kTunnelSegmentsPerSide = 15;
+			for (int i = 1; i <= kTunnelSegmentsPerSide; ++i) {
+				for (float dir : { -1.0f, 1.0f }) {
+					float zOffset = dir * kTunnelLength * static_cast<float>(i);
+
+					ExtraEnvPart tunnelPart;
+					tunnelPart.modelPath = "Resources/models/title/Tunnel.obj";
+					tunnelPart.offset = { 0.0f, 0.0f, zOffset };
+					loc.extraEnvParts.push_back(std::move(tunnelPart));
+
+					ExtraEnvPart roadPart;
+					roadPart.modelPath = "Resources/models/title/Tunnel_road.obj";
+					roadPart.offset = { 0.0f, 0.0f, zOffset };
+					loc.extraEnvParts.push_back(std::move(roadPart));
+
+					ExtraEnvPart guidePart;
+					guidePart.modelPath = "Resources/models/title/Tunnel_guide.obj";
+					guidePart.offset = { 0.0f, 0.0f, zOffset };
+					loc.extraEnvParts.push_back(std::move(guidePart));
+
+					// 2セグメントごと（約80m間隔）に天井警告回転灯を追加配置
+					if (i % 2 == 0) {
+						ExtraEnvPart rotatePart;
+						rotatePart.modelPath = "Resources/models/title/Tunnel_rotate.obj";
+						rotatePart.offset = { 0.0f, 0.0f, zOffset };
+						rotatePart.rotateY = true;
+						rotatePart.rotateSpeed = 4.0f;
+						loc.extraEnvParts.push_back(std::move(rotatePart));
+					}
+				}
+			}
+		}
+
+		LocationLighting& l = loc.lighting;
+		l.lightType = 2;                                  // トンネル内はポイントライト（回転灯）のみ。格納庫用の投光器や外光は排除
+		l.dirIntensity = 0.0f;
+		l.pointColor = { 1.0f, 0.42f, 0.12f, 1.0f };     // 天井の回転灯からのアンバー/赤警告光
+		l.pointOffset = { 0.0f, 4.8f, 0.0f };
+		l.pointIntensity = 1.8f;
+		l.pointRadius = 22.0f;
+		l.pointDecay = 1.0f;
+		l.pointFlicker = 0.45f;                           // 回転灯の明滅ゆらぎ
+		l.spotIntensity = 0.0f;                           // 格納庫用の投光器スポットライトは完全無効化
+
+		// トンネル正面から機体を捉えるシネマティックカメラ
+		loc.camera = { 14.0f, 1.5f, 0.2f, 0.4f, 0.2f, 0.2f, 0.45f, true };
+		loc.grade = { { 0.05f, 0.08f, 0.15f }, 0.08f, 0.6f };
+	}
+
+	// ------------------------------------------------------------
+	// 2. 格納庫: 元のハンガーモデル + 作業灯
 	// ------------------------------------------------------------
 	{
 		LocationData& loc = locations_[static_cast<int>(TitleLocation::Hangar)];
@@ -84,12 +163,12 @@ void TitleScene::Initialize() {
 		loc.envModelPath = "Resources/models/title/hangar.obj";
 		loc.aircraftOffset = { 0.0f, 0.0f, 0.0f };
 		loc.aircraftRotation = { 0.0f, 0.5f, 0.0f };
+		loc.propellerRpm = 0.0f;
 		loc.skyboxTexIndex = sunsetSky;
 		loc.skyboxColor = { 0.12f, 0.12f, 0.15f, 1.0f }; // 屋内なので空はほぼ見せない
-
 		LocationLighting& l = loc.lighting;
 		l.lightType = 1 | 2 | 4;
-		l.dirColor = { 0.55f, 0.62f, 0.75f, 1.0f };      // シャッター隙間からの青白い外光
+		l.dirColor = { 0.55f, 0.62f, 0.75f, 1.0f };      // シャッター隙間からの青白い光
 		l.dirDirection = MyMath::Normalize({ 0.4f, -0.6f, 0.7f });
 		l.dirIntensity = 0.35f;
 		l.pointColor = { 1.0f, 0.72f, 0.42f, 1.0f };     // 作業灯（暖色）
@@ -106,35 +185,8 @@ void TitleScene::Initialize() {
 		l.spotAngleDeg = 40.0f;
 		l.spotFalloffStartDeg = 22.0f;
 
-		loc.camera = { 11.0f, 1.0f, 1.2f, 0.3f, 1.0f, 0.08f, 0.0015f };
+		loc.camera = { 11.0f, 1.0f, 1.2f, 0.3f, 1.0f, 0.08f, 0.40f, false };
 		loc.grade = { { 0.05f, 0.08f, 0.15f }, 0.08f, 0.6f };
-	}
-
-	// ------------------------------------------------------------
-	// 2. 空母飛行甲板: 夕焼け + 海面。甲板高さ ≒ 海面 +18m
-	// ------------------------------------------------------------
-	{
-		LocationData& loc = locations_[static_cast<int>(TitleLocation::CarrierDeck)];
-		loc.id = TitleLocation::CarrierDeck;
-		loc.name = "CarrierDeck";
-		loc.origin = { -5000.0f, 18.0f, -5000.0f };
-		loc.envModelPath = "Resources/models/title/carrier_deck.obj";
-		loc.aircraftOffset = { 0.0f, 0.0f, 0.0f };
-		loc.aircraftRotation = { 0.0f, 3.14f, 0.0f };
-		loc.propellerRpm = 30.0f; // アイドリング
-		loc.skyboxTexIndex = sunsetSky;
-		loc.skyboxColor = { 1.0f, 1.0f, 1.0f, 1.0f };
-		loc.hasOcean = true;
-		loc.oceanHeight = 0.0f;
-
-		LocationLighting& l = loc.lighting;
-		l.lightType = 1;
-		l.dirColor = { 1.0f, 0.68f, 0.42f, 1.0f };       // 低い夕陽
-		l.dirDirection = MyMath::Normalize({ -0.7f, -0.25f, 0.65f });
-		l.dirIntensity = 1.2f;
-
-		loc.camera = { 13.0f, 1.5f, 2.5f, 0.6f, 0.8f, 0.12f, 0.003f };
-		loc.grade = { { 1.0f, 0.55f, 0.25f }, 0.10f, 0.35f };
 	}
 
 	// ------------------------------------------------------------
@@ -156,7 +208,6 @@ void TitleScene::Initialize() {
 		loc.debrisRotation = { 0.9f, 0.6f, -0.4f };
 		loc.skyboxTexIndex = duskSky;
 		loc.skyboxColor = { 0.45f, 0.5f, 0.55f, 1.0f };    // 曇天気味
-		loc.hasOcean = false;
 
 		LocationLighting& l = loc.lighting;
 		l.lightType = 1 | 2;
@@ -170,12 +221,26 @@ void TitleScene::Initialize() {
 		l.pointDecay = 1.3f;
 		l.pointFlicker = 0.35f;
 
-		loc.camera = { 9.0f, 1.0f, 2.0f, 0.4f, 0.6f, 0.06f, 0.004f };
+		loc.camera = { 9.0f, 1.0f, 2.0f, 0.4f, 0.6f, 0.06f, 0.40f, false };
 		loc.grade = { { 0.25f, 0.3f, 0.2f }, 0.12f, 0.8f };
 	}
 
 	for (auto& loc : locations_) {
 		SetupLocation(loc, titleCamera);
+	}
+
+	// 誘導灯・回転灯の自発光（エミッシブ）設定
+	Model* guideModel = ModelManager::GetInstance()->FindModel("Resources/models/title/Tunnel_guide.obj");
+	if (guideModel) {
+		guideModel->SetMaterialEnableLighting(0, false);
+		guideModel->SetMaterialColor(0, { guideEmissiveColor_.x, guideEmissiveColor_.y, guideEmissiveColor_.z, 1.0f });
+		guideModel->SetMaterialEmissive(0, guideEmissiveColor_, guideEmissiveIntensity_);
+	}
+	Model* rotateModel = ModelManager::GetInstance()->FindModel("Resources/models/title/Tunnel_rotate.obj");
+	if (rotateModel) {
+		rotateModel->SetMaterialEnableLighting(0, false);
+		rotateModel->SetMaterialColor(0, { 2.5f, 0.8f, 0.1f, 1.0f });
+		rotateModel->SetMaterialEmissive(0, { 2.5f, 0.8f, 0.1f }, 3.5f);
 	}
 
 	state_ = TitleState::DroneView;
@@ -292,6 +357,9 @@ void TitleScene::Initialize() {
 	UITextRegistry::GetInstance()->Register("Title_BtnSettings", settingsButton_.GetLabelText());
 	UITextRegistry::GetInstance()->Register("Title_BtnExit", exitButton_.GetLabelText());
 	UITextRegistry::GetInstance()->Register("Title_PressSpace", &pressSpaceText_);
+
+	// ドローンカメラOSD初期化
+	InitializeOSD(spriteCommon);
 }
 
 void TitleScene::Update() {
@@ -312,16 +380,70 @@ void TitleScene::Update() {
 	// 現在ロケーションの機体・残骸・背景を更新
 	{
 		MyMath::Vector3 pos = MyMath::Add(loc.origin, loc.aircraftOffset);
-		loc.visualModel->Update(MyMath::MakeAffineMatrix({ 1.0f, 1.0f, 1.0f }, loc.aircraftRotation, pos), dt);
+		MyMath::Vector3 rot = loc.aircraftRotation;
+
+		// トンネル内の飛行モーション（低空巡航飛行の浮遊動揺・バンク・推力微振動）
+		if (loc.id == TitleLocation::Tunnel) {
+			float swayY = std::sin(animTimer_ * 2.2f) * 0.08f + std::sin(animTimer_ * 4.5f) * 0.02f;
+			float swayX = std::sin(animTimer_ * 1.3f) * 0.18f;
+			float engineVibe = std::sin(animTimer_ * 48.0f) * 0.003f;
+			pos.x += swayX;
+			pos.y += swayY + engineVibe;
+
+			// 機体の姿勢（バンク傾き ＆ 迎え角ピッチ）
+			float roll = -std::cos(animTimer_ * 1.3f) * 0.045f;
+			float pitch = 0.025f + std::sin(animTimer_ * 2.2f) * 0.015f;
+			rot.x += pitch;
+			rot.z += roll;
+		}
+
+		loc.visualModel->Update(MyMath::MakeAffineMatrix({ 1.0f, 1.0f, 1.0f }, rot, pos), dt);
 		if (loc.debrisModel) {
 			MyMath::Vector3 debrisPos = MyMath::Add(loc.origin, loc.debrisOffset);
 			loc.debrisModel->Update(MyMath::MakeAffineMatrix({ 1.0f, 1.0f, 1.0f }, loc.debrisRotation, debrisPos), dt);
 		}
+
+		// トンネル専用：手前から奥へ高速スクロールして飛行感を演出（時速約160km/h）
+		float tunnelScrollZ = 0.0f;
+		if (loc.id == TitleLocation::Tunnel) {
+			constexpr float kTunnelLength = 40.383094f;
+			constexpr float kFlightSpeed = 45.0f; // 飛行速度 (m/s)
+			tunnelScrollZ = std::fmod(animTimer_ * kFlightSpeed, kTunnelLength);
+		}
+
 		if (loc.envObject) {
-			loc.envObject->SetTranslate(loc.origin);
+			MyMath::Vector3 envPos = loc.origin;
+			envPos.z += tunnelScrollZ;
+			loc.envObject->SetTranslate(envPos);
 			loc.envObject->SetRotate(loc.envRotation);
 			loc.envObject->SetScale(loc.envScale);
 			loc.envObject->Update();
+		}
+		for (auto& extra : loc.extraEnvParts) {
+			if (extra.object) {
+				if (extra.rotateY) {
+					extra.currentAngle += extra.rotateSpeed * dt;
+					if (extra.currentAngle > 6.2831853f) {
+						extra.currentAngle -= 6.2831853f;
+					}
+				}
+				MyMath::Vector3 partRot = MyMath::Add(extra.rotation, { 0.0f, extra.currentAngle, 0.0f });
+				MyMath::Vector3 partPos = MyMath::Add(loc.origin, extra.offset);
+				partPos.z += tunnelScrollZ;
+				extra.object->SetTranslate(partPos);
+				extra.object->SetRotate(partRot);
+				extra.object->SetScale(extra.scale);
+				extra.object->Update();
+			}
+		}
+
+		if (loc.id == TitleLocation::Tunnel) {
+			Model* guideModel = ModelManager::GetInstance()->FindModel("Resources/models/title/Tunnel_guide.obj");
+			if (guideModel) {
+				guideModel->SetMaterialEnableLighting(0, false);
+				guideModel->SetMaterialColor(0, { guideEmissiveColor_.x, guideEmissiveColor_.y, guideEmissiveColor_.z, 1.0f });
+				guideModel->SetMaterialEmissive(0, guideEmissiveColor_, guideEmissiveIntensity_);
+			}
 		}
 	}
 
@@ -337,23 +459,31 @@ void TitleScene::Update() {
 			stateTimer_ = 0.0f;
 		}
 
-		// ポストエフェクト (ドローン風)
+		// ポストエフェクト (ドローン風 + ブルーム発光)
 		PostEffect* postEffect = PostEffect::GetInstance();
 		postEffect->ClearActiveEffects();
 
+		// ブルーム（誘導灯や警告回転灯の鮮烈な発光グロー）
+		ActivePostEffect bloom;
+		bloom.type = PostEffectType::kBloom;
+		bloom.intensity = 4.0f; // ブラー半径
+		bloom.dirX = 2.2f;      // ブルーム強度 (strength)
+		bloom.dirY = 0.55f;     // 輝度閾値 (threshold)
+		postEffect->AddActiveEffect(bloom);
+
 		ActivePostEffect scanline;
 		scanline.type = PostEffectType::kScanLine;
-		scanline.intensity = 0.15f;
+		scanline.intensity = 0.12f;
 		postEffect->AddActiveEffect(scanline);
 
 		ActivePostEffect chromatic;
 		chromatic.type = PostEffectType::kChromaticAberration;
-		chromatic.intensity = 0.03f;
+		chromatic.intensity = 0.025f;
 		postEffect->AddActiveEffect(chromatic);
 
 		ActivePostEffect lens;
 		lens.type = PostEffectType::kLensDistortion;
-		lens.intensity = 0.02f;
+		lens.intensity = 0.015f;
 		postEffect->AddActiveEffect(lens);
 
 		// ロケーション固有の色味（ビネット + カラーオーバーレイ）
@@ -380,12 +510,14 @@ void TitleScene::Update() {
 		// 現在のロケーションをゆっくりOrbitする
 		UpdateLocationCamera(loc, dt, true);
 
-		// メニュー用のクリーンなポストエフェクト
+		// メニュー用のクリーンなポストエフェクト（ブルームを正しく発光）
 		PostEffect* postEffect = PostEffect::GetInstance();
 		postEffect->ClearActiveEffects();
 		ActivePostEffect bloom;
 		bloom.type = PostEffectType::kBloom;
-		bloom.intensity = 0.8f;
+		bloom.intensity = 4.0f;
+		bloom.dirX = 2.0f;
+		bloom.dirY = 0.55f;
 		postEffect->AddActiveEffect(bloom);
 
 		backgroundPanel_.Update();
@@ -393,15 +525,11 @@ void TitleScene::Update() {
 		subtitleText_.Update();
 	}
 
-	// 環境切り替え（SkyboxとOcean）
+	// 環境切り替え（Skybox）
 	if (skybox_) {
 		skybox_->SetTextureIndex(loc.skyboxTexIndex);
 		skybox_->SetColor(loc.skyboxColor);
 		skybox_->Update();
-	}
-	if (oceanObject_ && loc.hasOcean) {
-		oceanObject_->SetTranslate({ loc.origin.x, loc.oceanHeight, loc.origin.z });
-		oceanObject_->Update();
 	}
 
 #ifdef USE_IMGUI
@@ -427,7 +555,6 @@ void TitleScene::Update() {
 			ImGui::DragFloat3("Debris Offset", &dbg.debrisOffset.x, 0.05f);
 			ImGui::DragFloat3("Debris Rotation", &dbg.debrisRotation.x, 0.01f);
 		}
-		ImGui::DragFloat("Ocean Height", &dbg.oceanHeight, 0.1f);
 		ImGui::TreePop();
 	}
 	if (ImGui::TreeNode("Camera")) {
@@ -437,7 +564,7 @@ void TitleScene::Update() {
 		ImGui::DragFloat("Height Sway", &dbg.camera.heightSway, 0.05f, 0.0f, 10.0f);
 		ImGui::DragFloat("LookAt Height", &dbg.camera.lookAtHeight, 0.05f);
 		ImGui::DragFloat("Orbit Speed", &dbg.camera.orbitSpeed, 0.005f);
-		ImGui::DragFloat("Shake", &dbg.camera.shake, 0.0005f, 0.0f, 0.05f);
+		ImGui::DragFloat("Bank Tilt", &dbg.camera.bankTilt, 0.01f, 0.0f, 2.0f);
 		ImGui::TreePop();
 	}
 	if (ImGui::TreeNode("Lighting")) {
@@ -473,25 +600,38 @@ void TitleScene::Update() {
 		ImGui::ColorEdit4("Skybox Color", &dbg.skyboxColor.x);
 		ImGui::TreePop();
 	}
+	if (ImGui::TreeNode("Guide Light (Emissive)")) {
+		ImGui::ColorEdit3("Guide Color", &guideEmissiveColor_.x);
+		ImGui::DragFloat("Guide Intensity", &guideEmissiveIntensity_, 0.1f, 0.0f, 20.0f);
+		ImGui::TreePop();
+	}
 	ImGui::End();
 #endif
 }
 
 void TitleScene::Draw() {
+	LocationData& loc = CurrentLocation();
 	if (skybox_) {
+		if (loc.id == TitleLocation::Tunnel) {
+			// 地下トンネル内は完全な暗黒空間（開口部の外側も漆黒にして天球を完全遮蔽）
+			skybox_->SetColor({ 0.0f, 0.0f, 0.0f, 1.0f });
+		} else {
+			skybox_->SetColor(loc.skyboxColor);
+		}
 		SkyboxCommon::GetInstance()->SetupCommonState();
 		skybox_->Draw();
 	}
 
 	Object3dCommon::GetInstance()->SetupCommonState();
 
-	LocationData& loc = CurrentLocation();
-	if (oceanObject_ && loc.hasOcean) {
-		oceanObject_->Draw();
-	}
 	// 背景セット（モデル未作成ならスキップ）
 	if (loc.envObject) {
 		loc.envObject->Draw();
+	}
+	for (auto& extra : loc.extraEnvParts) {
+		if (extra.object) {
+			extra.object->Draw();
+		}
 	}
 	// 機体・残骸は現在のロケーションのみ描画
 	loc.visualModel->Draw();
@@ -528,10 +668,26 @@ void TitleScene::SetupLocation(LocationData& loc, Camera* camera) {
 		}
 	}
 
+	// 追加の環境パーツ（道路、誘導灯、回転灯など）
+	for (auto& extra : loc.extraEnvParts) {
+		if (!extra.modelPath.empty()) {
+			if (TitleAssetExists(extra.modelPath)) {
+				ModelManager::GetInstance()->LoadModel(extra.modelPath);
+				extra.object = std::make_unique<Object3d>();
+				extra.object->Initialize(common);
+				extra.object->SetModel(extra.modelPath);
+				extra.object->SetCamera(camera);
+				extra.object->SetBoundingRadius(200.0f);
+			} else {
+				OutputDebugStringA(("[TitleScene] Extra env model not found (skip): " + extra.modelPath + "\n").c_str());
+			}
+		}
+	}
+
 	// 機体
 	loc.visualModel = std::make_unique<AircraftVisualModel>();
 	loc.visualModel->Initialize(common, camera);
-	loc.visualModel->SetupFromSingleModel("Resources/models/m21.gltf");
+	loc.visualModel->SetupFromSingleModel(loc.aircraftModelPath);
 	loc.visualModel->SetPropellerRpm(loc.propellerRpm);
 	for (DamagePart part : loc.hiddenParts) {
 		loc.visualModel->SetPartVisible(part, false);
@@ -541,7 +697,7 @@ void TitleScene::SetupLocation(LocationData& loc, Camera* camera) {
 	if (!loc.hiddenParts.empty()) {
 		loc.debrisModel = std::make_unique<AircraftVisualModel>();
 		loc.debrisModel->Initialize(common, camera);
-		loc.debrisModel->SetupFromSingleModel("Resources/models/m21.gltf");
+		loc.debrisModel->SetupFromSingleModel(loc.aircraftModelPath);
 		loc.debrisModel->SetPropellerRpm(0.0f);
 		for (int i = 0; i < static_cast<int>(DamagePart::Count); ++i) {
 			loc.debrisModel->SetPartVisible(static_cast<DamagePart>(i), false);
@@ -595,13 +751,46 @@ void TitleScene::ApplyLocationLighting(const LocationData& loc) {
 void TitleScene::UpdateLocationCamera(const LocationData& loc, float dt, bool menuMode) {
 	const LocationCamera& c = loc.camera;
 
-	// メニュー中は少し引いてゆっくり、揺れなし
+	// メニュー中は少し引いてゆっくり、傾きも穏やかに
 	float orbitSpeed = menuMode ? c.orbitSpeed * 1.5f : c.orbitSpeed;
 	float distance = menuMode ? c.distance * 1.15f : c.distance + std::sin(animTimer_ * 1.5f) * c.distanceSway;
 	float height = c.height + std::sin(animTimer_ * (menuMode ? 0.5f : 2.0f)) * c.heightSway;
-	float shake = menuMode ? 0.0f : c.shake;
+	float bankTilt = menuMode ? c.bankTilt * 0.4f : c.bankTilt;
 
 	cameraTheta_ += orbitSpeed * dt;
+
+	if (c.isTunnelCamera) {
+		// トンネル専用カメラワーク：トンネル内開口部から機体正面を捉え、壁突き抜けを防止
+		float swayX = std::sin(cameraTheta_) * 1.8f;
+		float currentDist = menuMode ? c.distance * 1.15f : (c.distance + std::sin(animTimer_ * 0.8f) * c.distanceSway);
+		float currentH = c.height + std::sin(animTimer_ * 1.2f) * c.heightSway;
+
+		MyMath::Vector3 target = MyMath::Add(loc.origin, loc.aircraftOffset);
+		target.y += c.lookAtHeight;
+
+		MyMath::Vector3 camPos;
+		camPos.x = target.x + swayX;
+		camPos.y = target.y + currentH;
+		camPos.z = target.z - currentDist; // 手前（-Z側）から奥の機体正面（+Z側）を見通す
+
+		float dx = target.x - camPos.x;
+		float dy = target.y - camPos.y;
+		float dz = target.z - camPos.z;
+		float yaw = std::atan2(dx, dz);
+		float pitch = std::atan2(-dy, std::sqrt(dx * dx + dz * dz));
+
+		// ドローン挙動：左右移動速度（cos）に合わせて機体をバンク傾き（手ぶれ・振動はゼロ）
+		float swayVx = std::cos(cameraTheta_) * 1.8f;
+		float droneRoll = -swayVx * bankTilt * 0.05f;
+
+		Camera* titleCamera = CameraManager::GetInstance()->GetActiveCamera();
+		if (titleCamera) {
+			titleCamera->SetTranslate(camPos);
+			titleCamera->SetRotate({ pitch, yaw, droneRoll });
+			titleCamera->Update();
+		}
+		return;
+	}
 
 	MyMath::Vector3 target = MyMath::Add(loc.origin, loc.aircraftOffset);
 	target.y += c.lookAtHeight;
@@ -617,12 +806,14 @@ void TitleScene::UpdateLocationCamera(const LocationData& loc, float dt, bool me
 	float yaw = std::atan2(dx, dz);
 	float pitch = std::atan2(-dy, std::sqrt(dx * dx + dz * dz));
 
+	// ドローン挙動：旋回移動による向心バンク傾き（手ぶれ・振動はゼロ、滑らかな旋回傾き）
+	float baseRoll = -orbitSpeed * bankTilt * 1.2f;
+	float dynamicRoll = baseRoll + std::cos(cameraTheta_) * 0.015f * bankTilt;
+
 	Camera* titleCamera = CameraManager::GetInstance()->GetActiveCamera();
 	if (titleCamera) {
 		titleCamera->SetTranslate(camPos);
-		float shakeX = std::sin(animTimer_ * 20.0f) * shake;
-		float shakeY = std::cos(animTimer_ * 18.0f) * shake;
-		titleCamera->SetRotate({ pitch + shakeY, yaw + shakeX, 0.0f });
+		titleCamera->SetRotate({ pitch, yaw, dynamicRoll });
 		titleCamera->Update();
 	}
 }
@@ -632,11 +823,146 @@ void TitleScene::ChangeLocation(int index) {
 	currentLocationIndex_ = index % static_cast<int>(locations_.size());
 	cutTimer_ = 0.0f;
 	cameraTheta_ = static_cast<float>(rand() % 628) * 0.01f; // ランダムな角度から映す
-	ApplyLocationLighting(CurrentLocation());
+	LocationData& loc = CurrentLocation();
+	ApplyLocationLighting(loc);
+	if (skybox_) {
+		skybox_->SetTextureIndex(loc.skyboxTexIndex);
+		skybox_->SetColor(loc.skyboxColor);
+	}
+}
+
+void TitleScene::InitializeOSD(SpriteCommon* spriteCommon) {
+	osdSprites_.clear();
+
+	auto addBar = [this, spriteCommon](const Vector2& pos, const Vector2& size, const MyMath::Vector4& color) {
+		auto sp = std::make_unique<Sprite>();
+		sp->Initialize(spriteCommon, "assets/textures/white1x1.png");
+		sp->SetAnchorPoint({ 0.0f, 0.0f });
+		sp->SetPosition(pos);
+		sp->SetSize(size);
+		sp->SetColor(color);
+		sp->Update();
+		osdSprites_.push_back(std::move(sp));
+	};
+
+	const float left = 48.0f;
+	const float right = kScreenWidth - 48.0f;
+	const float top = 36.0f;
+	const float bottom = kScreenHeight - 36.0f;
+	const float len = 44.0f;
+	const float thick = 2.0f;
+	const MyMath::Vector4 cornerColor = { 0.85f, 0.95f, 1.0f, 0.70f };
+
+	// 四隅のL字ブラケット
+	// 左上 ┌
+	addBar({ left, top }, { len, thick }, cornerColor);
+	addBar({ left, top }, { thick, len }, cornerColor);
+	// 右上 ┐
+	addBar({ right - len, top }, { len, thick }, cornerColor);
+	addBar({ right - thick, top }, { thick, len }, cornerColor);
+	// 左下 └
+	addBar({ left, bottom - thick }, { len, thick }, cornerColor);
+	addBar({ left, bottom - len }, { thick, len }, cornerColor);
+	// 右下 ┘
+	addBar({ right - len, bottom - thick }, { len, thick }, cornerColor);
+	addBar({ right - thick, bottom - len }, { thick, len }, cornerColor);
+
+	// 左右の水平マーカー（ピッチラダー風）
+	const float cy = kScreenHeight * 0.5f;
+	const MyMath::Vector4 markerColor = { 0.85f, 0.95f, 1.0f, 0.35f };
+	addBar({ left, cy - 0.5f }, { 14.0f, 1.0f }, markerColor);
+	addBar({ right - 14.0f, cy - 0.5f }, { 14.0f, 1.0f }, markerColor);
+
+	// 中央十字レティクル
+	const float cx = kScreenWidth * 0.5f;
+	const MyMath::Vector4 reticleColor = { 0.85f, 0.95f, 1.0f, 0.40f };
+	addBar({ cx - 0.5f, cy - 16.0f }, { 1.0f, 8.0f }, reticleColor);
+	addBar({ cx - 0.5f, cy + 8.0f }, { 1.0f, 8.0f }, reticleColor);
+	addBar({ cx - 16.0f, cy - 0.5f }, { 8.0f, 1.0f }, reticleColor);
+	addBar({ cx + 8.0f, cy - 0.5f }, { 8.0f, 1.0f }, reticleColor);
+	// センタードット
+	addBar({ cx - 1.0f, cy - 1.0f }, { 2.0f, 2.0f }, { 0.85f, 0.95f, 1.0f, 0.60f });
+
+	// REC点滅インジケータ（赤ランプ）
+	recDotSprite_ = std::make_unique<Sprite>();
+	recDotSprite_->Initialize(spriteCommon, "assets/textures/white1x1.png");
+	recDotSprite_->SetAnchorPoint({ 0.0f, 0.0f });
+	recDotSprite_->SetPosition({ left + 10.0f, top + 13.0f });
+	recDotSprite_->SetSize({ 8.0f, 8.0f });
+	recDotSprite_->SetColor({ 1.0f, 0.15f, 0.15f, 0.95f });
+	recDotSprite_->Update();
+}
+
+void TitleScene::DrawOSD() {
+	const float left = 48.0f;
+	const float right = kScreenWidth - 48.0f;
+	const float top = 36.0f;
+	const float bottom = kScreenHeight - 36.0f;
+
+	// RECランプの点滅更新
+	if (recDotSprite_) {
+		bool recBlink = (std::fmod(animTimer_, 1.0f) < 0.6f);
+		recDotSprite_->SetColor(recBlink ? MyMath::Vector4{ 1.0f, 0.15f, 0.15f, 0.95f } : MyMath::Vector4{ 0.3f, 0.05f, 0.05f, 0.20f });
+		recDotSprite_->Update();
+	}
+
+	// 枠・レティクル描画
+	for (auto& sp : osdSprites_) {
+		sp->Draw();
+	}
+	if (recDotSprite_) {
+		recDotSprite_->Draw();
+	}
+
+	TextRenderer* tr = TextRenderer::GetInstance();
+
+	// --- 左上: REC & タイムコード ---
+	tr->Print("Roboto", "REC", left + 24.0f, top + 9.0f, 15.0f, { 1.0f, 0.95f, 0.95f, 0.95f });
+
+	char timeBuf[32];
+	int totalSec = static_cast<int>(animTimer_);
+	int hours = (totalSec / 3600) % 24;
+	int mins = (totalSec / 60) % 60;
+	int secs = totalSec % 60;
+	int frames = static_cast<int>((animTimer_ - totalSec) * 60.0f);
+	snprintf(timeBuf, sizeof(timeBuf), "%02d:%02d:%02d:%02d", hours, mins, secs, frames);
+	tr->Print("Roboto", timeBuf, left + 64.0f, top + 9.0f, 15.0f, { 0.85f, 0.95f, 1.0f, 0.85f });
+
+	// --- 右上: バッテリー / シグナル / 解像度 ---
+	tr->Print("Roboto", "BAT 94%   SIG ||||   4K/60P", right - 220.0f, top + 9.0f, 14.0f, { 0.85f, 0.95f, 1.0f, 0.75f });
+
+	// --- 左下: カメラ番号 & ロケーション（ユーザー画像再現） ---
+	std::string camName;
+	std::string camCoord;
+	switch (CurrentLocation().id) {
+	case TitleLocation::Hangar:
+		camName = "CAM 01 // HANGAR - BAY 4";
+		camCoord = "LAT 35.6895 N  LON 139.6917 E  ALT +12m";
+		break;
+	case TitleLocation::Tunnel:
+		camName = "CAM 02 // SUBTERRANEAN TUNNEL";
+		camCoord = "LAT 35.6912 N  LON 139.6880 E  ALT -24m";
+		break;
+	case TitleLocation::CrashedForest:
+		camName = "CAM 03 // CRASH SITE - SECTOR 7";
+		camCoord = "LAT 35.6780 N  LON 139.7102 E  ALT +340m";
+		break;
+	default:
+		camName = "CAM 01 // RECON DRONE";
+		camCoord = "LAT --.-- N  LON ---.-- E";
+		break;
+	}
+	tr->Print("Roboto", camName, left + 8.0f, bottom - 38.0f, 17.0f, { 0.85f, 0.95f, 1.0f, 0.90f });
+	tr->Print("Roboto", camCoord, left + 8.0f, bottom - 18.0f, 12.0f, { 0.65f, 0.75f, 0.85f, 0.60f });
+
+	// --- 右下: 光学系 & リンク情報 ---
+	tr->Print("Roboto", "ZOOM 1.0x   F/2.8   ISO 400", right - 210.0f, bottom - 38.0f, 14.0f, { 0.85f, 0.95f, 1.0f, 0.75f });
+	tr->Print("Roboto", "LINK: SECURE LIVE FEED", right - 210.0f, bottom - 18.0f, 12.0f, { 0.45f, 0.85f, 0.55f, 0.70f });
 }
 
 void TitleScene::DrawUI() {
 	if (state_ == TitleState::DroneView) {
+		DrawOSD();
 		pressSpaceText_.Draw();
 	} else if (state_ == TitleState::Menu) {
 		// 背景パネル

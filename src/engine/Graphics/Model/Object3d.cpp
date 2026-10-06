@@ -91,7 +91,11 @@ void Object3d::Draw() {
 
 	commandList->SetGraphicsRootSignature(object3dCommon_->GetRootSignature());
 	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	object3dCommon_->SetBlendMode(blendMode_);
+	if (customPipelineState_) {
+		commandList->SetPipelineState(customPipelineState_.Get());
+	} else {
+		object3dCommon_->SetBlendMode(blendMode_);
+	}
 
 	// 座標変換行列CBufferの設定 (RootParameter Index: 1)
 	commandList->SetGraphicsRootConstantBufferView(1, transformationMatrixResource_->GetGPUVirtualAddress());
@@ -118,7 +122,11 @@ void Object3d::Draw() {
 		}
 	}
 
-	if (!targetNodeName_.empty()) {
+	if (!targetNodeNames_.empty()) {
+		for (const auto& nodeName : targetNodeNames_) {
+			model_->DrawNode(nodeName);
+		}
+	} else if (!targetNodeName_.empty()) {
 		model_->DrawNode(targetNodeName_);
 	} else {
 		model_->Draw();
@@ -200,4 +208,22 @@ void Object3d::UpdateLOD() {
 	}
 
 	model_ = lodLevels_[activeLODIndex_].model;
+}
+
+void Object3d::SetMaterialEmissive(uint32_t materialIndex, const Vector3& color, float intensity) {
+	if (model_) {
+		model_->SetMaterialEmissive(materialIndex, color, intensity);
+	}
+}
+
+void Object3d::SetMaterialEnableLighting(uint32_t materialIndex, bool enable) {
+	if (model_) {
+		model_->SetMaterialEnableLighting(materialIndex, enable);
+	}
+}
+
+void Object3d::SetMaterialColor(uint32_t materialIndex, const Vector4& color) {
+	if (model_) {
+		model_->SetMaterialColor(materialIndex, color);
+	}
 }
