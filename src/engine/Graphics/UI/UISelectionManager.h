@@ -25,6 +25,9 @@ public:
 	/// @brief 現在の入力モードの取得
 	UIInputMode GetInputMode() const { return inputMode_; }
 
+	/// @brief 現在選択されているボタンのインデックスを取得
+	int GetSelectedIndex() const { return selectedIndex_; }
+
 	/// @brief 毎フレームの更新処理（入力とフォーカスの反映）
 	void Update();
 

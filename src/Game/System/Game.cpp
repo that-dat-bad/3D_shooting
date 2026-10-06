@@ -13,7 +13,7 @@
 void Game::Initialize() {
 	// 1. 基盤システムの初期化
 	winApp = std::make_unique<WinApp>();
-	winApp->Initialize(L"戦雷", L"1.0");
+	winApp->Initialize(L"Dawn", L"1.0");
 	DirectXCommon::GetInstance()->Initialize(winApp.get());
 	Input::GetInstance()->Initialize(GetModuleHandle(nullptr), winApp->GetHwnd());
 
@@ -36,6 +36,8 @@ void Game::Initialize() {
 	FontManager::GetInstance()->Initialize();
 	TextRenderer::GetInstance()->Initialize(SpriteCommon::GetInstance());
 	FontManager::GetInstance()->LoadFont("Roboto", "C:/Windows/Fonts/msgothic.ttc", 96.0f);
+	FontManager::GetInstance()->LoadFont("Consolas", "C:/Windows/Fonts/consolab.ttf", 64.0f);
+	FontManager::GetInstance()->LoadFont("TitleJp", "C:/Windows/Fonts/meiryob.ttc", 96.0f);
 
 	imguiManager = std::make_unique<ImGuiManager>();
 	imguiManager->Initialize(winApp.get(), DirectXCommon::GetInstance(), srvManager.get());

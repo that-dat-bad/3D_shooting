@@ -55,16 +55,32 @@ void PrimitiveModel::DrawRing(const Vector3& scale, const Vector3& rotate, const
 	CallDrawCommand(ringVertexBufferView_, ringVertexCount_, scale, rotate, translate, color, textureIndex, camera, blendMode);
 }
 
+void PrimitiveModel::DrawRing(const Matrix4x4& worldMatrix, const Vector4& color, uint32_t textureIndex, Camera* camera, BlendMode blendMode) {
+	CallDrawCommand(ringVertexBufferView_, ringVertexCount_, worldMatrix, color, textureIndex, camera, blendMode);
+}
+
 void PrimitiveModel::DrawCylinder(const Vector3& scale, const Vector3& rotate, const Vector3& translate, const Vector4& color, uint32_t textureIndex, Camera* camera, BlendMode blendMode) {
 	CallDrawCommand(cylinderVertexBufferView_, cylinderVertexCount_, scale, rotate, translate, color, textureIndex, camera, blendMode);
+}
+
+void PrimitiveModel::DrawCylinder(const Matrix4x4& worldMatrix, const Vector4& color, uint32_t textureIndex, Camera* camera, BlendMode blendMode) {
+	CallDrawCommand(cylinderVertexBufferView_, cylinderVertexCount_, worldMatrix, color, textureIndex, camera, blendMode);
 }
 
 void PrimitiveModel::DrawPlane(const Vector3& scale, const Vector3& rotate, const Vector3& translate, const Vector4& color, uint32_t textureIndex, Camera* camera, BlendMode blendMode) {
 	CallDrawCommand(planeVertexBufferView_, planeVertexCount_, scale, rotate, translate, color, textureIndex, camera, blendMode);
 }
 
+void PrimitiveModel::DrawPlane(const Matrix4x4& worldMatrix, const Vector4& color, uint32_t textureIndex, Camera* camera, BlendMode blendMode) {
+	CallDrawCommand(planeVertexBufferView_, planeVertexCount_, worldMatrix, color, textureIndex, camera, blendMode);
+}
+
 void PrimitiveModel::DrawCone(const Vector3& scale, const Vector3& rotate, const Vector3& translate, const Vector4& color, uint32_t textureIndex, Camera* camera, BlendMode blendMode) {
 	CallDrawCommand(coneVertexBufferView_, coneVertexCount_, scale, rotate, translate, color, textureIndex, camera, blendMode);
+}
+
+void PrimitiveModel::DrawCone(const Matrix4x4& worldMatrix, const Vector4& color, uint32_t textureIndex, Camera* camera, BlendMode blendMode) {
+	CallDrawCommand(coneVertexBufferView_, coneVertexCount_, worldMatrix, color, textureIndex, camera, blendMode);
 }
 
 void PrimitiveModel::DrawCone(const Vector3& scale, const Quaternion& rotate, const Vector3& translate, const Vector4& color, uint32_t textureIndex, Camera* camera, BlendMode blendMode) {
@@ -200,6 +216,50 @@ void PrimitiveModel::CallDrawCommand(D3D12_VERTEX_BUFFER_VIEW& vbView, uint32_t 
 
 	commandList->SetGraphicsRootConstantBufferView(0, materialBuffer_->GetGPUVirtualAddress() + (index * kCbAlignment));
 	
+	commandList->SetGraphicsRootConstantBufferView(1, transformBuffer_->GetGPUVirtualAddress() + (index * kCbAlignment));
+
+	uint32_t texIndex = textureIndex;
+	if (texIndex == 0) { texIndex = TextureManager::GetInstance()->GetTextureIndexByFilePath("assets/textures/uvChecker.png"); }
+	if (texIndex != 0) {
+		commandList->SetGraphicsRootDescriptorTable(2, TextureManager::GetInstance()->GetSrvHandleGPU(texIndex));
+	}
+
+	// 描画
+	commandList->DrawInstanced(vertexCount, 1, 0, 0);
+}
+
+void PrimitiveModel::CallDrawCommand(D3D12_VERTEX_BUFFER_VIEW& vbView, uint32_t vertexCount, const Matrix4x4& wMatrix, const Vector4& color, uint32_t textureIndex, Camera* camera, BlendMode blendMode) {
+	if (currentDrawCount_ >= kMaxDrawCount) { return; }
+	if (vertexCount == 0 || !camera) { return; }
+
+	Matrix4x4 wvpMatrix = wMatrix * camera->GetViewProjectionMatrix();
+
+	uint32_t index = currentDrawCount_;
+	currentDrawCount_++;
+
+	TransformationMatrix* transformData = reinterpret_cast<TransformationMatrix*>(&transformMappedData_[index * kCbAlignment]);
+	transformData->WVP = wvpMatrix;
+	transformData->World = wMatrix;
+	transformData->WorldInverseTranspose = wMatrix; 
+
+	MaterialData* materialData = reinterpret_cast<MaterialData*>(&materialMappedData_[index * kCbAlignment]);
+	materialData->color = color;
+	materialData->enableLighting = 0; // 常に0
+	materialData->shininess = 50.0f;
+	materialData->uvTransform = Identity4x4();
+
+	// --- 描画コマンドの発行 ---
+	ID3D12GraphicsCommandList* commandList = dxCommon_->GetCommandList();
+
+	// パイプライン状態の設定
+	commandList->SetPipelineState(pipelineStates_[static_cast<size_t>(blendMode)].Get());
+	commandList->SetGraphicsRootSignature(rootSignature_.Get());
+	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	
+	// 頂点バッファの設定
+	commandList->IASetVertexBuffers(0, 1, &vbView);
+
+	commandList->SetGraphicsRootConstantBufferView(0, materialBuffer_->GetGPUVirtualAddress() + (index * kCbAlignment));
 	commandList->SetGraphicsRootConstantBufferView(1, transformBuffer_->GetGPUVirtualAddress() + (index * kCbAlignment));
 
 	uint32_t texIndex = textureIndex;

@@ -111,7 +111,7 @@ void DirectXCommon::PreDraw()
 	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = GetDSVHandle();
 	commandList_->OMSetRenderTargets(1, &renderTextureRtvHandles_[0], false, &dsvHandle);
 
-	float clearColor[] = { 1.0f, 0.0f, 0.0f, 1.0f };
+	float clearColor[] = { 0.02f, 0.02f, 0.03f, 1.0f };
 	commandList_->ClearRenderTargetView(renderTextureRtvHandles_[0], clearColor, 0, nullptr);
 	commandList_->ClearDepthStencilView(GetDSVHandle(), D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, nullptr);
 
@@ -732,7 +732,7 @@ void DirectXCommon::CreateRenderTargetTextures()
     rtvDesc.Format = rtvFormat_;
     rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
 
-    Vector4 defaultClear = { 1.0f, 0.0f, 0.0f, 1.0f };
+    Vector4 defaultClear = { 0.02f, 0.02f, 0.03f, 1.0f };
     uint32_t descriptorSize = device_->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 
     for (uint32_t i = 0; i < kRenderTextureCount_; ++i) {

@@ -46,7 +46,8 @@ void Object3d::Update() {
 		// カメラがセットされていれば、そのカメラの ViewProjection 行列をもらう
 		const Matrix4x4& viewProjectionMatrix = camera_->GetViewProjectionMatrix();
 		worldViewProjectionMatrix = Multiply(worldMatrix, viewProjectionMatrix);
-	} else {
+	}
+	else {
 		// カメラが無い場合はとりあえずWorld行列だけ（または単位行列など）
 		worldViewProjectionMatrix = worldMatrix;
 	}
@@ -67,7 +68,8 @@ void Object3d::UpdateWithWorldMatrix(const Matrix4x4& worldMatrix) {
 	if (camera_) {
 		const Matrix4x4& viewProjectionMatrix = camera_->GetViewProjectionMatrix();
 		worldViewProjectionMatrix = Multiply(worldMatrix, viewProjectionMatrix);
-	} else {
+	}
+	else {
 		worldViewProjectionMatrix = worldMatrix;
 	}
 
@@ -93,7 +95,8 @@ void Object3d::Draw() {
 	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	if (customPipelineState_) {
 		commandList->SetPipelineState(customPipelineState_.Get());
-	} else {
+	}
+	else {
 		object3dCommon_->SetBlendMode(blendMode_);
 	}
 
@@ -104,7 +107,7 @@ void Object3d::Draw() {
 	commandList->SetGraphicsRootConstantBufferView(3, object3dCommon_->GetDirectionalLightResource()->GetGPUVirtualAddress());
 
 	commandList->SetGraphicsRootConstantBufferView(4, object3dCommon_->GetLightingSettingsResource()->GetGPUVirtualAddress());
-	
+
 	commandList->SetGraphicsRootConstantBufferView(5, object3dCommon_->GetPointLightResource()->GetGPUVirtualAddress());
 
 	commandList->SetGraphicsRootConstantBufferView(6, object3dCommon_->GetSpotLightResource()->GetGPUVirtualAddress());
@@ -113,9 +116,9 @@ void Object3d::Draw() {
 	uint32_t useEnvTexIndex = (envTextureOverride_ != 0) ? envTextureOverride_ : object3dCommon_->GetDefaultEnvTextureIndex();
 	if (useEnvTexIndex != 0) {
 		commandList->SetGraphicsRootDescriptorTable(8, TextureManager::GetInstance()->GetSrvHandleGPU(useEnvTexIndex));
-	} else {
-		// 0だとバインドできずD3D12のエラーになる可能性があるため、ダミーやuvCheckerなどの安全なテクスチャをバインドする。
-		// ここではuvChecker（インデックス未指定時のTextureManagerのデフォルトなどにフォールバック）をダミーとして利用。
+	}
+	else {
+		// 0だとバインドできずD3D12のエラーになる可能性があるため、ダミーテクスチャをバインド
 		uint32_t dummyIndex = TextureManager::GetInstance()->GetTextureIndexByFilePath("assets/textures/uvChecker.png");
 		if (dummyIndex != 0) {
 			commandList->SetGraphicsRootDescriptorTable(8, TextureManager::GetInstance()->GetSrvHandleGPU(dummyIndex));
@@ -126,9 +129,11 @@ void Object3d::Draw() {
 		for (const auto& nodeName : targetNodeNames_) {
 			model_->DrawNode(nodeName);
 		}
-	} else if (!targetNodeName_.empty()) {
+	}
+	else if (!targetNodeName_.empty()) {
 		model_->DrawNode(targetNodeName_);
-	} else {
+	}
+	else {
 		model_->Draw();
 	}
 }
@@ -150,7 +155,7 @@ void Object3d::AddLODLevel(Model* model, float minScreenSize) {
 	// minScreenSize の降順（スクリーンサイズが大きい順＝高詳細順）でソート
 	std::sort(lodLevels_.begin(), lodLevels_.end(), [](const LODLevel& a, const LODLevel& b) {
 		return a.minScreenSize > b.minScreenSize;
-	});
+		});
 	isLODEnabled_ = true;
 }
 

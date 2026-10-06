@@ -349,6 +349,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="src\Game\Environment\EnvironmentManager.h" />
     <ClInclude Include="src\Game\FlightModel\DamageModel.h" />
     <ClInclude Include="src\Game\Graphics\AircraftVisualModel.h" />
+    <ClInclude Include="src\Game\Graphics\Afterburner.h" />
     <ClInclude Include="src\Game\Graphics\DebrisManager.h" />
     <ClInclude Include="src\engine\Graphics\UI\UIElement.h" />
     <ClInclude Include="src\engine\Graphics\UI\UIButton.h" />
@@ -364,6 +365,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\Game\Graphics\AircraftVisualModel.cpp" />
+    <ClCompile Include="src\Game\Graphics\Afterburner.cpp" />
     <ClCompile Include="src\Game\Graphics\DebrisManager.cpp" />
     <ClCompile Include="src\Game\Environment\Sun.cpp" />
     <ClCompile Include="src\Game\Environment\EnvironmentManager.cpp" />

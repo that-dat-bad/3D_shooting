@@ -1,0 +1,13 @@
+{
+  "isTwinEngine": false,
+  "singleNozzleOffset": [0.0, 0.011, 14.95],
+  "leftNozzleOffset": [-0.407, 0.011, 14.95],
+  "rightNozzleOffset": [0.396, 0.011, 14.95],
+  "baseFlameLength": 6.2,
+  "baseFlameRadius": 0.38,
+  "shockDiamondCount": 5,
+  "baseFlameColor": [0.28, 0.65, 1.0],
+  "coreColor": [0.88, 0.95, 1.0],
+  "nozzleRotation": [0.0, 0.0, 0.0],
+  "currentIntensity": 1.35
+}

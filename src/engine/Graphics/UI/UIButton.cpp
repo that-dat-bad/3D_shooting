@@ -15,13 +15,16 @@ void UIButton::Initialize(SpriteCommon* spriteCommon, const std::string& label, 
 	backgroundPanel_.Initialize(spriteCommon);
 	backgroundPanel_.SetColor(normalColor_);
 	backgroundPanel_.SetStyle("Normal",   UIStateStyle{ normalColor_,   1.00f, { 0.0f,  0.0f }, UILoopMotion::None, 1.0f, 1.0f });
-	backgroundPanel_.SetStyle("Hovered",  UIStateStyle{ hoverColor_,    1.03f, { 0.0f, -3.0f }, UILoopMotion::None, 1.0f, 1.0f });
-	backgroundPanel_.SetStyle("Selected", UIStateStyle{ selectedColor_, 1.02f, { 0.0f, -2.0f }, UILoopMotion::None, 1.0f, 1.0f });
+	backgroundPanel_.SetStyle("Hovered",  UIStateStyle{ hoverColor_,    1.00f, { 0.0f,  0.0f }, UILoopMotion::None, 1.0f, 1.0f });
+	backgroundPanel_.SetStyle("Selected", UIStateStyle{ selectedColor_, 1.00f, { 0.0f,  0.0f }, UILoopMotion::None, 1.0f, 1.0f });
 
 	// ラベルテキストの初期化
 	labelText_.Initialize("Roboto", label, fontSize);
 	labelText_.SetAnchorPoint({ 0.5f, 0.5f });
 	labelText_.SetColor(textColor_);
+	labelText_.SetStyle("Normal",   UIStateStyle{ textColor_,         1.00f, { 0.0f, 0.0f }, UILoopMotion::None, 1.0f, 1.0f });
+	labelText_.SetStyle("Hovered",  UIStateStyle{ selectedTextColor_, 1.00f, { 0.0f, 0.0f }, UILoopMotion::None, 1.0f, 1.0f });
+	labelText_.SetStyle("Selected", UIStateStyle{ selectedTextColor_, 1.00f, { 0.0f, 0.0f }, UILoopMotion::None, 1.0f, 1.0f });
 }
 
 void UIButton::SetLabel(const std::string& label) {
@@ -33,9 +36,31 @@ const std::string& UIButton::GetLabel() const {
 	return labelText_.GetText();
 }
 
+void UIButton::SetNormalColor(const Vector4& color) {
+	normalColor_ = color;
+	backgroundPanel_.SetStyle("Normal", UIStateStyle{ normalColor_, 1.00f, { 0.0f, 0.0f }, UILoopMotion::None, 1.0f, 1.0f });
+}
+
+void UIButton::SetHoverColor(const Vector4& color) {
+	hoverColor_ = color;
+	backgroundPanel_.SetStyle("Hovered", UIStateStyle{ hoverColor_, 1.00f, { 0.0f, 0.0f }, UILoopMotion::None, 1.0f, 1.0f });
+}
+
+void UIButton::SetSelectedColor(const Vector4& color) {
+	selectedColor_ = color;
+	backgroundPanel_.SetStyle("Selected", UIStateStyle{ selectedColor_, 1.00f, { 0.0f, 0.0f }, UILoopMotion::None, 1.0f, 1.0f });
+}
+
 void UIButton::SetTextColor(const Vector4& color) {
 	textColor_ = color;
 	labelText_.SetColor(color);
+	labelText_.SetStyle("Normal", UIStateStyle{ textColor_, 1.00f, { 0.0f, 0.0f }, UILoopMotion::None, 1.0f, 1.0f });
+}
+
+void UIButton::SetSelectedTextColor(const Vector4& color) {
+	selectedTextColor_ = color;
+	labelText_.SetStyle("Hovered", UIStateStyle{ selectedTextColor_, 1.00f, { 0.0f, 0.0f }, UILoopMotion::None, 1.0f, 1.0f });
+	labelText_.SetStyle("Selected", UIStateStyle{ selectedTextColor_, 1.00f, { 0.0f, 0.0f }, UILoopMotion::None, 1.0f, 1.0f });
 }
 
 void UIButton::Update() {

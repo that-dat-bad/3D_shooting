@@ -10,6 +10,7 @@
 #include "../../engine/Graphics/Model/Skybox.h"
 #include "../../engine/Graphics/Camera/Camera.h"
 #include "../Graphics/AircraftVisualModel.h"
+#include "../Graphics/Afterburner.h"
 #include "../../engine/Graphics/PostProcess/PostEffect.h"
 
 /// @brief タイトルシーン
@@ -39,11 +40,18 @@ private:
 	// --- モード管理 ---
 	enum class TitleState {
 		DroneView,
+		ConsoleBoot,
 		Menu
 	};
 	TitleState state_ = TitleState::DroneView;
 	float stateTimer_ = 0.0f;
 	float cutTimer_ = 0.0f;
+	float transitionTimer_ = 0.0f;      ///< カメラ切替時のノイズトランジションタイマー
+	static constexpr float kTransitionDuration = 0.15f; ///< 0.15秒の一瞬の切り替え（テンポ向上）
+	float consoleBootTimer_ = 0.0f;     ///< クリック後のハッカー風コンソール演出タイマー
+	static constexpr float kConsoleBootDuration = 1.15f;
+	float consoleExitTimer_ = 0.0f;     ///< コンソールからメニューへのスムーズなフェード移行タイマー
+	static constexpr float kConsoleExitDuration = 0.28f;
 	int currentLocationIndex_ = 0;
 	bool lockLocation_ = false;          ///< デバッグ用：カット切替を停止
 	static constexpr float kCutDuration = 6.0f; ///< 1カットの長さ(秒)
@@ -51,6 +59,25 @@ private:
 	// --- UI追加要素 ---
 	UIText pressSpaceText_;
 	UIPanel scanlineOverlay_;
+	UIPanel menuCardPanel_;                         ///< メニュー中央のコンソール端末ウィンドウ
+	UIPanel menuHeaderPanel_;                       ///< コンソール端末上部ヘッダーバー
+	std::unique_ptr<Sprite> headerLampSprite_;      ///< ヘッダーの点滅LEDランプ
+	std::unique_ptr<Sprite> titleLogoSprite_;       ///< DAWN ロゴスプライト（白文字 + MiG-21通過）
+	std::vector<std::unique_ptr<Sprite>> menuBorderSprites_;   ///< メニューカード枠線・アクセント・走査線
+
+	struct ButtonBorderGroup {
+		std::vector<std::unique_ptr<Sprite>> outlines;   ///< 外周細線
+		std::vector<std::unique_ptr<Sprite>> brackets;   ///< 四隅ブラケット
+		std::unique_ptr<Sprite> indicator;               ///< 左端アクティブバー
+	};
+	std::vector<ButtonBorderGroup> buttonBorders_;             ///< ボタンごとのサイバー枠線
+	std::vector<std::unique_ptr<Sprite>> glitchSprites_;       ///< カメラ切替グリッチ用スプライト
+
+	void InitializeMenuCard(SpriteCommon* spriteCommon);
+	void UpdateMenuConsoleVisuals();
+	void DrawMenuCard();
+	void DrawTransitionGlitch();
+	void DrawConsoleBoot();
 
 	// --- OSD (ドローンカメラビュー枠) ---
 	std::vector<std::unique_ptr<Sprite>> osdSprites_;
@@ -174,4 +201,25 @@ private:
 	// 誘導灯の自発光パラメータ
 	MyMath::Vector3 guideEmissiveColor_ = { 0.2f, 1.8f, 2.8f }; // 鮮やかなエレクトリックシアン
 	float guideEmissiveIntensity_ = 2.5f;
+	uint32_t whiteTexIndex_ = 0;
+	uint32_t softShadowTexIndex_ = 0;
+	uint32_t crashScorchTexIndex_ = 0;
+	uint32_t tunnelWallTexIndex_ = 0;
+
+	// 墜落現場用パーティクルタイマー
+	float crashSmokeTimer_ = 0.0f;
+	float crashSparkTimer_ = 0.0f;
+
+	// 高品位アフターバーナーエフェクト
+	std::unique_ptr<Afterburner> afterburner_ = nullptr;
+	MyMath::Matrix4x4 currentAircraftMatrix_ = MyMath::Identity4x4(); ///< 機体の最新動的ワールド行列（A/Bと完全同期）
+	bool enableTunnelMotion_ = true;                                  ///< トンネル内浮遊・バンク動揺アニメ有効フラグ
+
+#ifdef USE_IMGUI
+	bool showAfterburnerEditor_ = true;
+	std::string afterburnerConfigPath_ = "assets/configs/afterburner_m21.json";
+	std::string abEditorStatusMsg_ = "";
+	float abEditorStatusTimer_ = 0.0f;
+	void DrawAfterburnerEditor();
+#endif
 };

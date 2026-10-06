@@ -54,10 +54,11 @@ public:
 	State GetState() const { return state_; }
 
 	// 色設定
-	void SetNormalColor(const Vector4& color) { normalColor_ = color; }
-	void SetHoverColor(const Vector4& color) { hoverColor_ = color; }
-	void SetSelectedColor(const Vector4& color) { selectedColor_ = color; }
+	void SetNormalColor(const Vector4& color);
+	void SetHoverColor(const Vector4& color);
+	void SetSelectedColor(const Vector4& color);
 	void SetTextColor(const Vector4& color);
+	void SetSelectedTextColor(const Vector4& color);
 
 	/// @brief マウスが矩形の範囲内にいるかチェック
 	bool IsMouseInside() const;
@@ -83,6 +84,7 @@ private:
 	Vector4 hoverColor_ = { 0.25f, 0.30f, 0.45f, 0.95f };
 	Vector4 selectedColor_ = { 0.20f, 0.35f, 0.55f, 0.95f };
 	Vector4 textColor_ = { 1.0f, 1.0f, 1.0f, 1.0f };
+	Vector4 selectedTextColor_ = { 0.0f, 0.0f, 0.0f, 1.0f };
 
 	// アニメーション
 	float hoverAlpha_ = 0.0f; // 0.0〜1.0のホバーブレンド値

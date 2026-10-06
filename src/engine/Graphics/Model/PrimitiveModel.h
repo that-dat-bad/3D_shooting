@@ -37,15 +37,19 @@ public:
 
 	/// <summary>エフェクト描画関数 (Ring)</summary>
 	void DrawRing(const Vector3& scale, const Vector3& rotate, const Vector3& translate, const Vector4& color, uint32_t textureIndex, Camera* camera, BlendMode blendMode = BlendMode::kNormal);
+	void DrawRing(const Matrix4x4& worldMatrix, const Vector4& color, uint32_t textureIndex, Camera* camera, BlendMode blendMode = BlendMode::kNormal);
 
 	/// <summary>エフェクト描画関数 (Cylinder)</summary>
 	void DrawCylinder(const Vector3& scale, const Vector3& rotate, const Vector3& translate, const Vector4& color, uint32_t textureIndex, Camera* camera, BlendMode blendMode = BlendMode::kNormal);
+	void DrawCylinder(const Matrix4x4& worldMatrix, const Vector4& color, uint32_t textureIndex, Camera* camera, BlendMode blendMode = BlendMode::kNormal);
 
 	/// <summary>エフェクト描画関数 (Plane)</summary>
 	void DrawPlane(const Vector3& scale, const Vector3& rotate, const Vector3& translate, const Vector4& color, uint32_t textureIndex, Camera* camera, BlendMode blendMode = BlendMode::kNormal);
+	void DrawPlane(const Matrix4x4& worldMatrix, const Vector4& color, uint32_t textureIndex, Camera* camera, BlendMode blendMode = BlendMode::kNormal);
 
 	/// <summary>エフェクト描画関数 (Cone)</summary>
 	void DrawCone(const Vector3& scale, const Vector3& rotate, const Vector3& translate, const Vector4& color, uint32_t textureIndex, Camera* camera, BlendMode blendMode = BlendMode::kNormal);
+	void DrawCone(const Matrix4x4& worldMatrix, const Vector4& color, uint32_t textureIndex, Camera* camera, BlendMode blendMode = BlendMode::kNormal);
 
 	/// <summary>エフェクト描画関数 (Cone - クォータニオン版)</summary>
 	void DrawCone(const Vector3& scale, const Quaternion& rotate, const Vector3& translate, const Vector4& color, uint32_t textureIndex, Camera* camera, BlendMode blendMode = BlendMode::kNormal);
@@ -134,4 +138,5 @@ private:
 	// 描画実行の共通部分
 	void CallDrawCommand(D3D12_VERTEX_BUFFER_VIEW& vbView, uint32_t vertexCount, const Vector3& scale, const Vector3& rotate, const Vector3& translate, const Vector4& color, uint32_t textureIndex, Camera* camera, BlendMode blendMode);
 	void CallDrawCommand(D3D12_VERTEX_BUFFER_VIEW& vbView, uint32_t vertexCount, const Vector3& scale, const Quaternion& rotate, const Vector3& translate, const Vector4& color, uint32_t textureIndex, Camera* camera, BlendMode blendMode);
+	void CallDrawCommand(D3D12_VERTEX_BUFFER_VIEW& vbView, uint32_t vertexCount, const Matrix4x4& wMatrix, const Vector4& color, uint32_t textureIndex, Camera* camera, BlendMode blendMode);
 };
