@@ -48,7 +48,7 @@ void ClearScene::Initialize() {
 	// ============================
 	// 「MISSION COMPLETE」テキスト
 	// ============================
-	missionCompleteText_.Initialize("Roboto", "MISSION COMPLETE", 56.0f);
+	missionCompleteText_.Initialize("HackGen", "MISSION COMPLETE", 56.0f);
 	missionCompleteText_.SetAnchorPoint({ 0.5f, 0.0f });
 	missionCompleteText_.SetPosition({ kScreenWidth * 0.5f, 60.0f });
 	missionCompleteText_.SetColor({ 0.90f, 0.85f, 0.40f, 1.0f }); // ゴールド
@@ -76,19 +76,19 @@ void ClearScene::Initialize() {
 	Vector4 valueColor = { 1.0f, 1.0f, 1.0f, 1.0f };
 
 	// 撃破数
-	enemiesDestroyedLabel_.Initialize("Roboto", "ENEMIES DESTROYED", fontSize);
+	enemiesDestroyedLabel_.Initialize("HackGen", "ENEMIES DESTROYED", fontSize);
 	enemiesDestroyedLabel_.SetPosition({ labelX, startY });
 	enemiesDestroyedLabel_.SetColor(labelColor);
 
 	char enemyBuf[32];
 	snprintf(enemyBuf, sizeof(enemyBuf), "%d", result.enemiesDestroyed);
-	enemiesDestroyedValue_.Initialize("Roboto", enemyBuf, 32.0f);
+	enemiesDestroyedValue_.Initialize("HackGen", enemyBuf, 32.0f);
 	enemiesDestroyedValue_.SetAnchorPoint({ 1.0f, 0.0f });
 	enemiesDestroyedValue_.SetPosition({ panelX + panelWidth - 40.0f, startY - 2.0f });
 	enemiesDestroyedValue_.SetColor(valueColor);
 
 	// クリアタイム
-	clearTimeLabel_.Initialize("Roboto", "CLEAR TIME", fontSize);
+	clearTimeLabel_.Initialize("HackGen", "CLEAR TIME", fontSize);
 	clearTimeLabel_.SetPosition({ labelX, startY + rowHeight });
 	clearTimeLabel_.SetColor(labelColor);
 
@@ -96,13 +96,13 @@ void ClearScene::Initialize() {
 	int seconds = static_cast<int>(result.clearTimeSeconds) % 60;
 	char timeBuf[32];
 	snprintf(timeBuf, sizeof(timeBuf), "%02d:%02d", minutes, seconds);
-	clearTimeValue_.Initialize("Roboto", timeBuf, 32.0f);
+	clearTimeValue_.Initialize("HackGen", timeBuf, 32.0f);
 	clearTimeValue_.SetAnchorPoint({ 1.0f, 0.0f });
 	clearTimeValue_.SetPosition({ panelX + panelWidth - 40.0f, startY + rowHeight - 2.0f });
 	clearTimeValue_.SetColor(valueColor);
 
 	// 残りHP
-	hpRemainingLabel_.Initialize("Roboto", "HP REMAINING", fontSize);
+	hpRemainingLabel_.Initialize("HackGen", "HP REMAINING", fontSize);
 	hpRemainingLabel_.SetPosition({ labelX, startY + rowHeight * 2.0f });
 	hpRemainingLabel_.SetColor(labelColor);
 
@@ -112,7 +112,7 @@ void ClearScene::Initialize() {
 	}
 	char hpBuf[32];
 	snprintf(hpBuf, sizeof(hpBuf), "%d%%", hpPercent);
-	hpRemainingValue_.Initialize("Roboto", hpBuf, 32.0f);
+	hpRemainingValue_.Initialize("HackGen", hpBuf, 32.0f);
 	hpRemainingValue_.SetAnchorPoint({ 1.0f, 0.0f });
 	hpRemainingValue_.SetPosition({ panelX + panelWidth - 40.0f, startY + rowHeight * 2.0f - 2.0f });
 	// HPに応じて色を変更
@@ -232,7 +232,7 @@ void ClearScene::DrawUI() {
 
 	// 操作ガイド
 	TextRenderer::GetInstance()->Print(
-		"Roboto",
+		"HackGen",
 		"←→: SELECT   SPACE/ENTER: DECIDE",
 		kScreenWidth * 0.5f - 170.0f,
 		kScreenHeight - 50.0f,

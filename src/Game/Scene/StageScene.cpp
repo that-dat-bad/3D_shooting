@@ -215,7 +215,7 @@ void StageScene::Initialize() {
 	int initSec = static_cast<int>(remainingTime_) % 60;
 	char initTimeStr[32];
 	snprintf(initTimeStr, sizeof(initTimeStr), "TIME %02d:%02d", initMin, initSec);
-	timeText_.Initialize("Roboto", initTimeStr, 32.0f);
+	timeText_.Initialize("HackGen", initTimeStr, 32.0f);
 	timeText_.SetAnchorPoint({ 0.5f, 0.0f });
 	timeText_.SetPosition({ WinApp::kClientWidth * 0.5f, 20.0f });
 	timeText_.SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });

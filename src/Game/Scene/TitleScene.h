@@ -40,6 +40,7 @@ private:
 	// --- モード管理 ---
 	enum class TitleState {
 		DroneView,
+		WindowClose,
 		ConsoleBoot,
 		Menu
 	};
@@ -48,10 +49,14 @@ private:
 	float cutTimer_ = 0.0f;
 	float transitionTimer_ = 0.0f;      ///< カメラ切替時のノイズトランジションタイマー
 	static constexpr float kTransitionDuration = 0.15f; ///< 0.15秒の一瞬の切り替え（テンポ向上）
+	float windowCloseTimer_ = 0.0f;     ///< カメラ映像ウィンドウ最小化・閉じる演出タイマー
+	static constexpr float kWindowCloseDuration = 0.42f; ///< カメラ映像ウィンドウ最小化・閉じる演出タイマー（視認可能なアニメーション時間）
+	std::vector<std::unique_ptr<Sprite>> windowCloseMaskSprites_;   ///< 最小化時の外側4黒マスク
+	std::vector<std::unique_ptr<Sprite>> windowCloseBorderSprites_; ///< 最小化ウィンドウのOSタイトルバー＆サイバー枠線
 	float consoleBootTimer_ = 0.0f;     ///< クリック後のハッカー風コンソール演出タイマー
-	static constexpr float kConsoleBootDuration = 1.15f;
-	float consoleExitTimer_ = 0.0f;     ///< コンソールからメニューへのスムーズなフェード移行タイマー
-	static constexpr float kConsoleExitDuration = 0.28f;
+	static constexpr float kConsoleBootDuration = 2.20f; ///< テキストタイピング完了後に十分読める余韻を持たせる
+	float consoleExitTimer_ = 0.0f;     ///< コンソールからメニューへのスムーズな接続アニメーションタイマー
+	static constexpr float kConsoleExitDuration = 0.50f; ///< 文字グリッチ＆UI枠形成の接続アニメーション時間
 	float menuEnterTimer_ = 0.0f;       ///< メニュー展開トランジションタイマー
 	static constexpr float kMenuEnterDuration = 0.35f;
 	bool isCursorShown_ = false;
@@ -86,6 +91,8 @@ private:
 	void DrawMenuCard();
 	void DrawTransitionGlitch();
 	void DrawConsoleBoot();
+	void InitializeWindowCloseVisuals(SpriteCommon* spriteCommon);
+	void DrawWindowClose();
 
 	// --- OSD (ドローンカメラビュー枠) ---
 	std::vector<std::unique_ptr<Sprite>> osdSprites_;
@@ -206,9 +213,9 @@ private:
 	std::unique_ptr<Skybox> skybox_ = nullptr;
 	float cameraTheta_ = 0.0f;
 
-	// 誘導灯の自発光パラメータ
-	MyMath::Vector3 guideEmissiveColor_ = { 0.2f, 1.8f, 2.8f }; // 鮮やかなエレクトリックシアン
-	float guideEmissiveIntensity_ = 2.5f;
+	// 誘導灯の自発光パラメータ（過剰発光・白飛びを抑制：項目1）
+	MyMath::Vector3 guideEmissiveColor_ = { 0.15f, 0.90f, 1.40f };
+	float guideEmissiveIntensity_ = 1.15f;
 	uint32_t whiteTexIndex_ = 0;
 	uint32_t softShadowTexIndex_ = 0;
 	uint32_t crashScorchTexIndex_ = 0;

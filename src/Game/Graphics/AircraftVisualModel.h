@@ -64,6 +64,9 @@ public:
 	/// @brief 全パーツのベースカラー乗算色を設定（焦げ跡・ダメージ変色用）
 	void SetMaterialColor(const Vector4& color);
 
+	/// @brief コクピットキャノピー（ガラス部）に半透明・高環境反射・シャープなスペキュラを設定（項目4）
+	void SetupCanopyMaterial();
+
 private:
 	struct PartNode {
 		std::unique_ptr<Object3d> object = nullptr;

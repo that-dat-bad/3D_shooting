@@ -186,7 +186,7 @@ void StageHUD::DrawTimer() {
 
 	// テキスト描画 (TextRenderer)
 	TextRenderer::GetInstance()->Print(
-		"Roboto",
+		"HackGen",
 		timeStr,
 		hudData_.screenWidth * 0.5f,
 		panelY + 10.0f,
@@ -238,7 +238,7 @@ void StageHUD::DrawAmmo() {
 
 	// ヘッダーラベル
 	TextRenderer::GetInstance()->Print(
-		"Roboto",
+		"HackGen",
 		"GUN 20MM",
 		panelX + 16.0f,
 		panelY + 8.0f,
@@ -255,7 +255,7 @@ void StageHUD::DrawAmmo() {
 	}
 
 	TextRenderer::GetInstance()->Print(
-		"Roboto",
+		"HackGen",
 		ammoStr,
 		panelX + panelW - 16.0f,
 		panelY + 18.0f,

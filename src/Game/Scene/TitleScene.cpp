@@ -27,9 +27,17 @@ static constexpr float kScreenWidth = static_cast<float>(WinApp::kClientWidth); 
 static constexpr float kScreenHeight = static_cast<float>(WinApp::kClientHeight); // 720
 
 void TitleScene::SetCursorVisible(bool visible) {
-	if (isCursorShown_ == visible) { return; }
 	isCursorShown_ = visible;
-	ShowCursor(visible ? TRUE : FALSE);
+#ifdef USE_IMGUI
+	ImGui::SetMouseCursor(visible ? ImGuiMouseCursor_Arrow : ImGuiMouseCursor_None);
+#endif
+	if (visible) {
+		while (ShowCursor(TRUE) < 0) {}
+		::SetCursor(LoadCursor(nullptr, IDC_ARROW));
+	} else {
+		while (ShowCursor(FALSE) >= 0) {}
+		::SetCursor(nullptr);
+	}
 }
 
 void TitleScene::Initialize() {
@@ -95,6 +103,7 @@ void TitleScene::Initialize() {
 
 	ModelManager::GetInstance()->LoadModel("Resources/models/m21_wg.gltf");
 	ModelManager::GetInstance()->LoadModel("Resources/models/m21.gltf");
+	ModelManager::GetInstance()->LoadModel("Resources/models/m21_crashed.gltf");
 
 	tm->LoadTexture("assets/textures/qwantani_dusk_2_puresky_2k.dds");
 	const uint32_t sunsetSky = tm->GetTextureIndexByFilePath("assets/textures/cedar_bridge_sunset_1_2k.dds");
@@ -174,32 +183,32 @@ void TitleScene::Initialize() {
 		}
 
 		LocationLighting& l = loc.lighting;
-		l.lightType = 2 | 4;                              // ポイントライト＋後方投光スポットライトでトンネル壁面・路面を強力に照り返す（項目8）
+		l.lightType = 2 | 4;                              // ポイントライト＋後方投光スポットライトでトンネル壁面・路面を照らす
 		l.dirIntensity = 0.0f;
-		// スラスターノズル位置（Z=-3.8m）からの強烈なエレクトリックブルー照り返し
-		l.pointColor = { 0.22f, 0.75f, 1.0f, 1.0f };
+		// スラスターノズル位置（Z=-3.8m）からのエレクトリックブルー照り返し（白飛び抑制：項目1）
+		l.pointColor = { 0.18f, 0.60f, 0.95f, 1.0f };
 		l.pointOffset = { 0.0f, 1.95f, -3.8f };
-		l.pointIntensity = 4.2f;
-		l.pointRadius = 26.0f;
-		l.pointDecay = 1.0f;
-		l.pointFlicker = 0.25f;                           // ジェット燃焼の動的フリッカーで青い光が波打つ
+		l.pointIntensity = 1.8f;                          // 過剰発光を抑え、機体ディテールを保つ
+		l.pointRadius = 22.0f;
+		l.pointDecay = 1.2f;
+		l.pointFlicker = 0.15f;                           // ジェット燃焼の動的フリッカー
 		// 後方および壁面・床面へのスラスター照射
-		l.spotColor = { 0.35f, 0.82f, 1.0f, 1.0f };
+		l.spotColor = { 0.25f, 0.68f, 0.95f, 1.0f };
 		l.spotOffset = { 0.0f, 2.0f, -2.5f };
 		l.spotDirection = MyMath::Normalize({ 0.0f, -0.35f, -0.93f });
-		l.spotIntensity = 3.6f;
-		l.spotDistance = 36.0f;
-		l.spotDecay = 1.0f;
-		l.spotAngleDeg = 52.0f;
-		l.spotFalloffStartDeg = 26.0f;
+		l.spotIntensity = 1.5f;                           // 過剰発光を抑制
+		l.spotDistance = 30.0f;
+		l.spotDecay = 1.2f;
+		l.spotAngleDeg = 48.0f;
+		l.spotFalloffStartDeg = 24.0f;
 
-		// トンネル後方チェイスカメラ（機体テールの双発アフターバーナー＆ショックダイヤモンドを克明に捉える）
+		// トンネル後方チェイスカメラ（機体テールの単発アフターバーナー＆ショックダイヤモンドを克明に捉える）
 		loc.camera = { 8.2f, 0.7f, 1.05f, 0.20f, 0.15f, 0.22f, 0.45f, true };
-		loc.grade = { { 0.05f, 0.08f, 0.15f }, 0.08f, 0.6f };
+		loc.grade = { { 0.05f, 0.08f, 0.15f }, 0.08f, 0.50f };
 	}
 
 	// ------------------------------------------------------------
-	// 2. 格納庫: 元のハンガーモデル + 作業灯 + 天井投光器（金属質感とスペキュラ反射を強調：項目5）
+	// 2. 格納庫: 元のハンガーモデル + 作業灯 + 天井投光器（金属質感とスペキュラ反射を適正化：項目4, 5, 9）
 	// ------------------------------------------------------------
 	{
 		LocationData& loc = locations_[static_cast<int>(TitleLocation::Hangar)];
@@ -219,34 +228,36 @@ void TitleScene::Initialize() {
 		l.dirIntensity = 0.55f;
 		l.pointColor = { 1.0f, 0.85f, 0.65f, 1.0f };     // 作業灯（暖色投光）
 		l.pointOffset = { -4.5f, 2.5f, -3.5f };
-		l.pointIntensity = 2.0f;
+		l.pointIntensity = 1.6f;
 		l.pointRadius = 22.0f;
 		l.pointDecay = 1.2f;
-		l.spotColor = { 0.98f, 0.99f, 1.0f, 1.0f };       // 天井投光器（機体キャノピー・主翼への鋭いスペキュラ光）
+		l.spotColor = { 0.95f, 0.98f, 1.0f, 1.0f };       // 天井投光器（キャノピー白飛び明滅バグ防止：強度抑制：項目4）
 		l.spotOffset = { -2.0f, 10.5f, 2.5f };
 		l.spotDirection = MyMath::Normalize({ 0.18f, -0.95f, -0.22f });
-		l.spotIntensity = 3.4f;
-		l.spotDistance = 30.0f;
-		l.spotDecay = 1.0f;
-		l.spotAngleDeg = 48.0f;
-		l.spotFalloffStartDeg = 25.0f;
+		l.spotIntensity = 1.4f;                           // 3.4fから1.4fに抑制！これでキャノピーに白いポリゴンが焼き付かない
+		l.spotDistance = 28.0f;
+		l.spotDecay = 1.2f;
+		l.spotAngleDeg = 42.0f;
+		l.spotFalloffStartDeg = 24.0f;
 
-		// 安定した見下ろし・見上げの周回カメラ（項目3: 振動・距離揺れゼロで完全な接地安定性を実現、ガタつきを根絶）
-		loc.camera = { 12.0f, 0.0f, 2.2f, 0.0f, 1.2f, 0.05f, 0.0f, false };
-		loc.grade = { { 0.05f, 0.08f, 0.15f }, 0.08f, 0.6f };
+		// 安定した見下ろし・見上げの周回カメラ（注視点高さを持ち上げ、下部バナーとの主翼被りを物理的に解消：項目5）
+		loc.camera = { 11.5f, 0.0f, 2.4f, 0.0f, 1.55f, 0.05f, 0.0f, false };
+		loc.grade = { { 0.05f, 0.08f, 0.15f }, 0.08f, 0.55f };
 	}
 
 	// ------------------------------------------------------------
-	// 3. 墜落済みの森: 車輪格納モデル使用 + 激しい破損・左翼喪失・尾翼破損・煤煙ダメージ（項目6）
+	// 3. 墜落現場: 広大な荒野地形モデル + 夕暮れ・黄昏天球 + 激突焦げ跡（項目2, 8）
 	// ------------------------------------------------------------
 	{
 		LocationData& loc = locations_[static_cast<int>(TitleLocation::CrashedForest)];
 		loc.id = TitleLocation::CrashedForest;
 		loc.name = "CrashedForest";
 		loc.origin = { 5000.0f, 0.0f, 5000.0f };
-		loc.envModelPath = "";
-		loc.aircraftModelPath = "Resources/models/m21.gltf"; // 脚格納飛行モデル（無傷で脚展開されたままの不自然さを解消！）
-		loc.aircraftOffset = { 0.0f, 0.28f, 0.0f };         // 機体が地面に激突し食い込む
+		loc.envModelPath = "assets/models/terrain.obj"; // 起伏のある荒野・地面テクスチャモデル（背景の虚無を解消：項目2）
+		loc.envScale = { 15.0f, 2.5f, 15.0f };
+		loc.envRotation = { 0.0f, 0.0f, 0.0f };
+		loc.aircraftModelPath = "Resources/models/m21_crashed.gltf"; // 激突・焦げ跡テクスチャ適用モデル（項目8）
+		loc.aircraftOffset = { 0.0f, 0.32f, 0.0f };         // 機体が地面に激突し食い込む
 		loc.aircraftRotation = { 0.22f, -0.85f, 0.38f };    // 機首突っ込み + 左に激しく傾斜
 		loc.hiddenParts = {
 			DamagePart::Wing_L, DamagePart::Wing1_L, DamagePart::Wing2_L,
@@ -255,18 +266,9 @@ void TitleScene::Initialize() {
 		};
 		loc.debrisOffset = { -6.5f, 0.38f, 4.2f };          // 千切れた左翼が激突痕に突き刺さる
 		loc.debrisRotation = { 0.95f, 0.70f, -0.45f };
-		loc.skyboxTexIndex = whiteSky;
-		loc.skyboxColor = { 0.07f, 0.08f, 0.11f, 1.0f };
-
-		// 墜落現場の地面パーツ（不時着滑走路・アスファルト敷地）
+		loc.skyboxTexIndex = duskSky;                       // 暗黒の虚無を解消し、夕暮れ・黄昏の空を配置（項目2）
+		loc.skyboxColor = { 0.38f, 0.32f, 0.36f, 1.0f };   // 哀愁のある夕暮れトーン
 		loc.extraEnvParts.clear();
-		{
-			ExtraEnvPart ground;
-			ground.modelPath = "Resources/models/title/Tunnel_road.obj";
-			ground.offset = { 0.0f, -0.05f, 0.0f };
-			ground.scale = { 3.0f, 1.0f, 3.0f };
-			loc.extraEnvParts.push_back(std::move(ground));
-		}
 
 		LocationLighting& l = loc.lighting;
 		l.lightType = 1 | 2;
@@ -329,7 +331,7 @@ void TitleScene::Initialize() {
 	// ============================
 	// タイトルテキスト（コンソールプロジェクト識別バナー: 鮮烈なターミナルグリーン）
 	// ============================
-	titleText_.Initialize("Consolas", "DAWN", 48.0f);
+	titleText_.Initialize("HackGen", "DAWN", 48.0f);
 	titleText_.SetAnchorPoint({ 0.5f, 0.0f });
 	titleText_.SetPosition({ kScreenWidth * 0.5f, 106.0f });
 	titleText_.SetColor({ 0.22f, 1.0f, 0.52f, 1.0f }); // 鮮烈なエレクトリック・ターミナルグリーン
@@ -339,7 +341,7 @@ void TitleScene::Initialize() {
 	// ============================
 	// サブタイトルテキスト（ターミナルグリーン統一＆重なり解消）
 	// ============================
-	subtitleText_.Initialize("Consolas", "- OPERATION : DAWN -", 14.0f);
+	subtitleText_.Initialize("HackGen", "- OPERATION : DAWN -", 14.0f);
 	subtitleText_.SetAnchorPoint({ 0.5f, 0.0f });
 	subtitleText_.SetPosition({ kScreenWidth * 0.5f, 196.0f });
 	subtitleText_.SetColor({ 0.35f, 0.95f, 0.60f, 0.95f }); // ターミナルグリーン
@@ -362,7 +364,7 @@ void TitleScene::Initialize() {
 
 	// START ボタン
 	startButton_.Initialize(spriteCommon, "   [01] EXECUTE SORTIE  ", 21.0f);
-	startButton_.GetLabelText()->SetFontName("Consolas");
+	startButton_.GetLabelText()->SetFontName("HackGen");
 	startButton_.SetPosition({ buttonX, buttonStartY });
 	startButton_.SetSize({ buttonWidth, buttonHeight });
 	startButton_.SetNormalColor(btnNormalBg);
@@ -376,7 +378,7 @@ void TitleScene::Initialize() {
 
 	// EDITOR ボタン
 	editorButton_.Initialize(spriteCommon, "   [02] MISSION EDITOR  ", 21.0f);
-	editorButton_.GetLabelText()->SetFontName("Consolas");
+	editorButton_.GetLabelText()->SetFontName("HackGen");
 	editorButton_.SetPosition({ buttonX, buttonStartY + buttonSpacing });
 	editorButton_.SetSize({ buttonWidth, buttonHeight });
 	editorButton_.SetNormalColor(btnNormalBg);
@@ -390,7 +392,7 @@ void TitleScene::Initialize() {
 
 	// SETTINGS ボタン
 	settingsButton_.Initialize(spriteCommon, "   [03] SYSTEM CONFIG   ", 21.0f);
-	settingsButton_.GetLabelText()->SetFontName("Consolas");
+	settingsButton_.GetLabelText()->SetFontName("HackGen");
 	settingsButton_.SetPosition({ buttonX, buttonStartY + buttonSpacing * 2.0f });
 	settingsButton_.SetSize({ buttonWidth, buttonHeight });
 	settingsButton_.SetNormalColor(btnNormalBg);
@@ -404,7 +406,7 @@ void TitleScene::Initialize() {
 
 	// EXIT ボタン
 	exitButton_.Initialize(spriteCommon, "   [04] ABORT / EXIT    ", 21.0f);
-	exitButton_.GetLabelText()->SetFontName("Consolas");
+	exitButton_.GetLabelText()->SetFontName("HackGen");
 	exitButton_.SetPosition({ buttonX, buttonStartY + buttonSpacing * 3.0f });
 	exitButton_.SetSize({ buttonWidth, buttonHeight });
 	exitButton_.SetNormalColor(btnNormalBg);
@@ -425,19 +427,20 @@ void TitleScene::Initialize() {
 	InitializeMenuCard(spriteCommon);
 
 	// ============================
-	// 操作案内テキスト＆半透明ダーク帯（項目9: 主翼や車輪との被りを100%防止する安全バナー）
 	// ============================
-	const float bannerW = 620.0f;
-	const float bannerH = 38.0f;
+	// 操作案内テキスト＆ミリタリー黒帯（枠線中央にジャストフィット配置：UIずれ解消）
+	// ============================
+	const float bannerW = 600.0f;
+	const float bannerH = 34.0f; // 高さを34pxに設定し、テキストが上下枠線に重ならない余裕を確保
 	const float bannerX = (kScreenWidth - bannerW) * 0.5f;
-	const float bannerY = 660.0f; // 画面下部の安全エリア
+	const float bannerY = 672.0f; // 画面最下部（672～706px）の安全領域
 
 	pressSpaceBannerBg_ = std::make_unique<Sprite>();
 	pressSpaceBannerBg_->Initialize(spriteCommon, "assets/textures/white1x1.png");
 	pressSpaceBannerBg_->SetAnchorPoint({ 0.0f, 0.0f });
 	pressSpaceBannerBg_->SetPosition({ bannerX, bannerY });
 	pressSpaceBannerBg_->SetSize({ bannerW, bannerH });
-	pressSpaceBannerBg_->SetColor({ 0.02f, 0.05f, 0.03f, 0.82f }); // 深いダークミリタリー半透明
+	pressSpaceBannerBg_->SetColor({ 0.01f, 0.02f, 0.01f, 0.98f }); // 完全不透明に近い漆黒ミリタリー帯
 	pressSpaceBannerBg_->Update();
 
 	pressSpaceBorders_.clear();
@@ -465,9 +468,10 @@ void TitleScene::Initialize() {
 	addBannerLine({ bannerX + bannerW - 8.0f, bannerY + bannerH - 2.0f }, { 8.0f, 2.0f }, bannerLineCol);
 	addBannerLine({ bannerX + bannerW - 2.0f, bannerY + bannerH - 8.0f }, { 2.0f, 8.0f }, bannerLineCol);
 
-	pressSpaceText_.Initialize("Consolas", "[ PRESS SPACE OR CLICK TO START / SKIP ]", 15.0f);
+	// フォントベースラインの浮き上がりを相殺するため、Y中心に +4.5f を加えてバナー枠の中央にジャストフィット
+	pressSpaceText_.Initialize("HackGen", "[ PRESS SPACE OR CLICK TO START / SKIP ]", 14.0f);
 	pressSpaceText_.SetAnchorPoint({ 0.5f, 0.5f });
-	pressSpaceText_.SetPosition({ kScreenWidth * 0.5f, bannerY + bannerH * 0.5f });
+	pressSpaceText_.SetPosition({ kScreenWidth * 0.5f, bannerY + bannerH * 0.5f + 4.5f });
 	pressSpaceText_.SetColor({ 0.35f, 1.0f, 0.65f, 0.95f });
 	pressSpaceText_.SetDropShadow(true, { 1.5f, 1.5f }, { 0.0f, 0.0f, 0.0f, 0.95f });
 	UIStateStyle pulseStyle;
@@ -500,6 +504,9 @@ void TitleScene::Initialize() {
 	// ドローンカメラOSD初期化
 	InitializeOSD(spriteCommon);
 
+	// カメラ映像ウィンドウ閉じる演出の初期化（項目1）
+	InitializeWindowCloseVisuals(spriteCommon);
+
 	// 高品位アフターバーナーの初期化（Mig-21 単発エンジン・ショックダイヤモンド）
 	afterburner_ = std::make_unique<Afterburner>();
 	afterburner_->Initialize();
@@ -524,6 +531,14 @@ void TitleScene::Update() {
 	animTimer_ += dt;
 	stateTimer_ += dt;
 
+	// マウスカーソルが非表示モードの場合、毎フレーム確実に消去（ImGuiの復活処理を抑止：項目3）
+	if (!isCursorShown_) {
+#ifdef USE_IMGUI
+		ImGui::SetMouseCursor(ImGuiMouseCursor_None);
+#endif
+		::SetCursor(nullptr);
+	}
+
 	if (afterburner_) {
 		afterburner_->Update(dt, afterburner_->GetIntensity());
 	}
@@ -544,7 +559,7 @@ void TitleScene::Update() {
 	LocationData& loc = CurrentLocation();
 
 	// ★ 重要：カメラ更新を機体・背景モデルの行列計算より「先」に実行！
-	if (state_ == TitleState::DroneView || state_ == TitleState::ConsoleBoot) {
+	if (state_ == TitleState::DroneView || state_ == TitleState::WindowClose || state_ == TitleState::ConsoleBoot) {
 		UpdateLocationCamera(loc, dt, false);
 	} else if (state_ == TitleState::Menu) {
 		UpdateLocationCamera(loc, dt, true);
@@ -598,9 +613,10 @@ void TitleScene::Update() {
 				ParticleParameters smokeParams;
 				smokeParams.minVelocity = { -0.012f, 0.028f, -0.012f };
 				smokeParams.maxVelocity = {  0.012f, 0.065f,  0.012f };
-				// リアルな重厚黒煙・煤煙ダークグレー（ポップな球体・シャボン玉色を完全排除）
-				smokeParams.minColor = { 0.08f, 0.08f, 0.09f, 0.90f };
-				smokeParams.maxColor = { 0.20f, 0.20f, 0.22f, 0.95f };
+				// R=G=Bを厳格に完全同値化し、ピンクや緑の偏色を100%根絶（項目6: 漆黒・チャコールグレー重煙）
+				float g = 0.08f + static_cast<float>(rand() % 100) / 100.0f * 0.10f; // 0.08～0.18
+				smokeParams.minColor = { g, g, g, 0.88f };
+				smokeParams.maxColor = { g, g, g, 0.94f };
 				smokeParams.minLifeTime = 3.5f;
 				smokeParams.maxLifeTime = 5.2f;
 				smokeParams.minScale = 1.2f;
@@ -675,23 +691,23 @@ void TitleScene::Update() {
 	if (state_ == TitleState::DroneView) {
 		SetCursorVisible(false); // ドローン画面中はマウスカーソル非表示（項目7）
 
-		// スペースキーまたはクリックでハッカー風コンソール演出（項目2）を経てメニューへ
+		// スペースキーまたはクリックでOSウィンドウ最小化演出を経てコンソールへ（項目1）
 		Input* input = Input::GetInstance();
 		if (input->TriggerKey(DIK_SPACE) || input->TriggerMouse(0)) {
-			state_ = TitleState::ConsoleBoot;
-			consoleBootTimer_ = 0.0f;
+			state_ = TitleState::WindowClose;
+			windowCloseTimer_ = 0.0f;
 		}
 
 		// ポストエフェクト (ドローン風 + ブルーム発光)
 		PostEffect* postEffect = PostEffect::GetInstance();
 		postEffect->ClearActiveEffects();
 
-		// ブルーム（適正なしきい値で高輝度部のみ自然に光らせる：項目1, 9）
+		// ブルーム（過剰発光・白飛びを抑制し、機体ディテールを鮮明に保つ：項目1）
 		ActivePostEffect bloom;
 		bloom.type = PostEffectType::kBloom;
-		bloom.intensity = 3.5f; // ブラー半径
-		bloom.dirX = 1.6f;      // ブルーム強度 (strength)
-		bloom.dirY = 0.72f;     // 輝度閾値 (threshold: キャノピーの白飛び残像を防止)
+		bloom.intensity = (loc.id == TitleLocation::Tunnel) ? 2.6f : 2.8f; // ブラー半径
+		bloom.dirX = (loc.id == TitleLocation::Tunnel) ? 1.05f : 1.15f;    // ブルーム強度 (過剰な2.4fから適正な1.05fへ抑制)
+		bloom.dirY = (loc.id == TitleLocation::Tunnel) ? 0.78f : 0.74f;    // 輝度閾値 (0.60fから0.78fに引き上げ、高輝度部のみ自然に光らせる)
 		postEffect->AddActiveEffect(bloom);
 
 		// カメラ切替時の砂嵐ノイズトランジション演出（項目10）
@@ -745,6 +761,30 @@ void TitleScene::Update() {
 			sp->Update();
 		}
 		pressSpaceText_.Update();
+
+	} else if (state_ == TitleState::WindowClose) {
+		SetCursorVisible(false); // ウィンドウ縮小中もOSカーソル非表示（項目3）
+		windowCloseTimer_ += dt;
+		if (windowCloseTimer_ >= kWindowCloseDuration) {
+			state_ = TitleState::ConsoleBoot;
+			consoleBootTimer_ = 0.0f;
+			consoleExitTimer_ = 0.0f;
+		}
+
+		PostEffect* postEffect = PostEffect::GetInstance();
+		postEffect->ClearActiveEffects();
+
+		// ウィンドウ縮小に伴う走査線とシャットダウンCRTグリッチ（項目1）
+		float t = (std::min)(1.0f, windowCloseTimer_ / kWindowCloseDuration);
+		ActivePostEffect scanline;
+		scanline.type = PostEffectType::kScanLine;
+		scanline.intensity = 0.08f + 0.16f * t;
+		postEffect->AddActiveEffect(scanline);
+
+		ActivePostEffect noise;
+		noise.type = PostEffectType::kRandom;
+		noise.intensity = 0.14f * t;
+		postEffect->AddActiveEffect(noise);
 
 	} else if (state_ == TitleState::ConsoleBoot) {
 		SetCursorVisible(false); // コンソール演出中もマウスカーソル完全非表示（項目7）
@@ -800,8 +840,8 @@ void TitleScene::Update() {
 		// 現在のロケーションをゆっくりOrbitする
 		UpdateLocationCamera(loc, dt, true);
 
-		// 背景を暗くするフェードイン（背景の3Dを適度に暗く沈めてウィンドウを引き立てる）
-		float bgAlpha = (std::min)(stateTimer_ * 2.0f, 0.62f);
+		// 背景を暗くするフェードイン（背景映像の透けを排除し、ネオングリーンUIの視認性を最大化：項目6）
+		float bgAlpha = (std::min)(stateTimer_ * 2.5f, 0.96f);
 		backgroundPanel_.SetBackgroundColor({ 0.0f, 0.0f, 0.0f, bgAlpha });
 		backgroundPanel_.Update();
 
@@ -1003,25 +1043,37 @@ void TitleScene::Draw() {
 	if (loc.id == TitleLocation::Tunnel && titleCamera) {
 		PrimitiveModel* pm = PrimitiveModel::GetInstance();
 
-		// 高速で壁面・天井・路面を前方に流れるリニア誘導指標ライト（時速約470km/hの猛烈な後方疾走感）
+		// 高速で壁面・天井・路面を前方に流れるリニア誘導指標ライト（過剰発光・白飛びを抑制：項目1）
 		constexpr float kFlightSpeed = 130.0f;
 		constexpr float kMarkerSpacing = 2.4f;
 		float scrollZ = -std::fmod(animTimer_ * kFlightSpeed, kMarkerSpacing);
 		for (float z = -40.0f; z <= 40.0f; z += kMarkerSpacing) {
 			float markerZ = z + scrollZ;
-			// 左右の壁面（X = ±6.25m, Y = 1.8m）
-			pm->DrawPlane({ 0.16f, 1.0f, 3.2f }, { 0.0f, 0.0f, 1.5707963f }, { -6.25f, 1.8f, markerZ }, { 0.15f, 0.90f, 1.0f, 0.85f }, whiteTexIndex_, titleCamera, BlendMode::kAdd);
-			pm->DrawPlane({ 0.16f, 1.0f, 3.2f }, { 0.0f, 0.0f, 1.5707963f }, { 6.25f, 1.8f, markerZ }, { 0.15f, 0.90f, 1.0f, 0.85f }, whiteTexIndex_, titleCamera, BlendMode::kAdd);
-			// 天井誘導ライン（X = 0.0m, Y = 4.8m）
-			pm->DrawPlane({ 0.8f, 1.0f, 2.8f }, { 3.14159265f, 0.0f, 0.0f }, { 0.0f, 4.8f, markerZ }, { 0.95f, 0.70f, 0.15f, 0.75f }, whiteTexIndex_, titleCamera, BlendMode::kAdd);
-			// 路面高速流動マーカー（X = ±2.5m, Y = 0.03m）
-			pm->DrawPlane({ 0.12f, 1.0f, 2.2f }, { 0.0f, 0.0f, 0.0f }, { -2.5f, 0.03f, markerZ }, { 0.95f, 0.75f, 0.15f, 0.60f }, whiteTexIndex_, titleCamera, BlendMode::kAdd);
-			pm->DrawPlane({ 0.12f, 1.0f, 2.2f }, { 0.0f, 0.0f, 0.0f }, {  2.5f, 0.03f, markerZ }, { 0.95f, 0.75f, 0.15f, 0.60f }, whiteTexIndex_, titleCamera, BlendMode::kAdd);
+			// 左右の壁面（X = ±6.25m, Y = 1.8m）: 適正なシアンガイドライン（項目1）
+			pm->DrawPlane({ 0.14f, 1.0f, 2.8f }, { 0.0f, 0.0f, 1.5707963f }, { -6.25f, 1.8f, markerZ }, { 0.15f, 0.65f, 1.4f, 0.85f }, whiteTexIndex_, titleCamera, BlendMode::kAdd);
+			pm->DrawPlane({ 0.14f, 1.0f, 2.8f }, { 0.0f, 0.0f, 1.5707963f }, {  6.25f, 1.8f, markerZ }, { 0.15f, 0.65f, 1.4f, 0.85f }, whiteTexIndex_, titleCamera, BlendMode::kAdd);
+
+			// 天井誘導ライン（X = 0.0m, Y = 4.8m）: 適正な黄色ライン（白飛び防止：項目1）
+			pm->DrawPlane({ 0.50f, 1.0f, 2.4f }, { 3.14159265f, 0.0f, 0.0f }, { 0.0f, 4.8f, markerZ }, { 1.25f, 0.95f, 0.25f, 0.85f }, whiteTexIndex_, titleCamera, BlendMode::kAdd);
+			pm->DrawPlane({ 1.10f, 1.0f, 2.6f }, { 3.14159265f, 0.0f, 0.0f }, { 0.0f, 4.805f, markerZ }, { 0.45f, 0.35f, 0.08f, 0.35f }, softShadowTexIndex_ != 0 ? softShadowTexIndex_ : whiteTexIndex_, titleCamera, BlendMode::kAdd);
+
+			// 路面高速流動マーカー（X = ±2.5m, Y = 0.03m）: 適正な黄色マーカー
+			pm->DrawPlane({ 0.12f, 1.0f, 1.8f }, { 0.0f, 0.0f, 0.0f }, { -2.5f, 0.03f, markerZ }, { 1.10f, 0.85f, 0.20f, 0.80f }, whiteTexIndex_, titleCamera, BlendMode::kAdd);
+			pm->DrawPlane({ 0.12f, 1.0f, 1.8f }, { 0.0f, 0.0f, 0.0f }, {  2.5f, 0.03f, markerZ }, { 1.10f, 0.85f, 0.20f, 0.80f }, whiteTexIndex_, titleCamera, BlendMode::kAdd);
 		}
 
 		// スラスター推進器噴射炎（Afterburner クラスによる単発エンジン・ショックダイヤモンド高品位描画）
 		if (afterburner_) {
 			afterburner_->Draw(currentAircraftMatrix_, titleCamera);
+
+			// ノズル開口部内部のプラズマ発光ディスク＆照り返しグロー（過剰発光を抑え、機体形状をくっきり見せる：項目1）
+			MyMath::Vector3 localNozzleCore = { 0.0f, 0.011f, 14.85f };
+			MyMath::Vector3 worldNozzleCore = MyMath::TransformV3(localNozzleCore, currentAircraftMatrix_);
+			MyMath::Vector3 nozzleRot = loc.aircraftRotation;
+			// ノズル中心のプラズマディスク（開口部サイズジャストに調整）
+			pm->DrawPlane({ 0.35f, 1.0f, 0.35f }, { 1.5707963f, nozzleRot.y, 0.0f }, worldNozzleCore, { 1.2f, 1.6f, 2.2f, 0.85f }, softShadowTexIndex_ != 0 ? softShadowTexIndex_ : whiteTexIndex_, titleCamera, BlendMode::kAdd);
+			// ノズル外周の控えめなグローハロ
+			pm->DrawPlane({ 0.70f, 1.0f, 0.70f }, { 1.5707963f, nozzleRot.y, 0.0f }, worldNozzleCore, { 0.15f, 0.45f, 1.0f, 0.35f }, softShadowTexIndex_ != 0 ? softShadowTexIndex_ : whiteTexIndex_, titleCamera, BlendMode::kAdd);
 		}
 	}
 }
@@ -1097,22 +1149,27 @@ void TitleScene::SetupLocation(LocationData& loc, Camera* camera) {
 		}
 	}
 
-	// ロケーション別マテリアルの質感設定（項目5: 格納庫のメタリック反射、項目6: 墜落現場の焦げ跡）
+	// キャノピー（ガラス部分）の半透明・高環境反射・鋭角スペキュラ設定（項目4）
+	loc.visualModel->SetupCanopyMaterial();
+
+	// ロケーション別マテリアルの質感設定（項目8: 墜落現場ダメージ、項目9: 重厚なジュラルミン金属感とパネルライン強調）
 	if (loc.id == TitleLocation::Hangar) {
-		// 格納庫: 軍用機らしい重厚なジュラルミン・メタリック質感と高輝度スペキュラ
-		loc.visualModel->SetMaterialProperties(72.0f, 2.6f, 0.60f);
-		loc.visualModel->SetMaterialColor({ 1.0f, 1.0f, 1.0f, 1.0f });
+		// 格納庫: 軍用機らしいジュラルミン・メタリック質感（モデル本来のカラーを保護）
+		loc.visualModel->SetMaterialProperties(48.0f, 1.35f, 0.45f);
 	} else if (loc.id == TitleLocation::Tunnel) {
-		// トンネル: スラスター光を反射する金属肌
-		loc.visualModel->SetMaterialProperties(64.0f, 2.2f, 0.50f);
-		loc.visualModel->SetMaterialColor({ 1.0f, 1.0f, 1.0f, 1.0f });
+		// トンネル: スラスター光を反射する金属肌（モデル本来のカラーを保護）
+		loc.visualModel->SetMaterialProperties(40.0f, 1.20f, 0.40f);
 	} else if (loc.id == TitleLocation::CrashedForest) {
-		// 墜落現場: 激突・炎上による黒焦げ・煤煙ダークトーン、鈍い低光沢
-		loc.visualModel->SetMaterialProperties(16.0f, 0.35f, 0.08f);
-		loc.visualModel->SetMaterialColor({ 0.32f, 0.30f, 0.30f, 1.0f });
+		// 墜落現場: 激突・炎上による黒焦げ・煤煙テクスチャを鮮明に映し出すダークトーン（項目8）
+		loc.visualModel->SetMaterialProperties(16.0f, 0.25f, 0.05f);
+		loc.visualModel->SetMaterialColor({ 0.70f, 0.68f, 0.68f, 1.0f });
+		// 残存した右主翼や昇降舵を激突の衝撃力で歪ませる（激突の説得力向上：項目8）
+		loc.visualModel->SetPartLocalTransform(DamagePart::Wing_R, { 1.0f, 1.0f, 1.0f }, { 0.08f, -0.05f, 0.12f }, { 0.0f, 0.04f, -0.02f });
+		loc.visualModel->SetPartLocalTransform(DamagePart::Wing1_R, { 1.0f, 1.0f, 1.0f }, { 0.10f, -0.06f, 0.15f }, { 0.0f, 0.06f, -0.03f });
+		loc.visualModel->SetPartLocalTransform(DamagePart::Elevator1, { 1.0f, 1.0f, 1.0f }, { -0.22f, 0.0f, 0.08f }, { 0.0f, -0.03f, 0.0f });
 		if (loc.debrisModel) {
-			loc.debrisModel->SetMaterialProperties(14.0f, 0.30f, 0.06f);
-			loc.debrisModel->SetMaterialColor({ 0.28f, 0.26f, 0.26f, 1.0f });
+			loc.debrisModel->SetMaterialProperties(14.0f, 0.22f, 0.05f);
+			loc.debrisModel->SetMaterialColor({ 0.65f, 0.63f, 0.63f, 1.0f });
 		}
 	}
 }
@@ -1500,6 +1557,17 @@ void TitleScene::DrawMenuCard() {
 		for (auto& sp : group.brackets) { sp->Draw(); }
 		if (group.indicator) { group.indicator->Draw(); }
 	}
+
+	// メニュー初期展開時のレーザー走査線＆枠形成エフェクト（項目2）
+	if (menuEnterTimer_ > 0.0f) {
+		float enterRatio = 1.0f - (menuEnterTimer_ / kMenuEnterDuration);
+		enterRatio = (std::min)((std::max)(enterRatio, 0.0f), 1.0f);
+		float cardY = 52.0f;
+		float laserY = cardY + 616.0f * enterRatio;
+
+		TextRenderer* tr = TextRenderer::GetInstance();
+		tr->Print("HackGen", ">> CONSTRUCTING TACTICAL UI FRAMEWORK... 100% <<", kScreenWidth * 0.5f, laserY - 14.0f, 12.0f, { 0.40f, 1.0f, 0.70f, 0.90f }, { 0.5f, 0.5f });
+	}
 }
 
 void TitleScene::DrawTransitionGlitch() {
@@ -1541,8 +1609,8 @@ void TitleScene::DrawTransitionGlitch() {
 	// 画面中央の警告テキスト（ミリタリー通信同期アラート）
 	TextRenderer* tr = TextRenderer::GetInstance();
 	if (std::fmod(transitionTimer_, 0.09f) < 0.06f) {
-		tr->Print("Consolas", ">> OPTICAL FEED DISRUPTED - CHANNEL SYNCHRONIZING <<", kScreenWidth * 0.5f - 240.0f, kScreenHeight * 0.5f - 40.0f, 17.0f, { 1.0f, 0.82f, 0.15f, 0.95f });
-		tr->Print("Consolas", "/// SENSOR RE-ACQUISITION IN PROGRESS - STAND BY ///", kScreenWidth * 0.5f - 230.0f, kScreenHeight * 0.5f - 16.0f, 13.0f, { 0.2f, 0.92f, 1.0f, 0.85f });
+		tr->Print("HackGen", ">> OPTICAL FEED DISRUPTED - CHANNEL SYNCHRONIZING <<", kScreenWidth * 0.5f - 240.0f, kScreenHeight * 0.5f - 40.0f, 17.0f, { 1.0f, 0.82f, 0.15f, 0.95f });
+		tr->Print("HackGen", "/// SENSOR RE-ACQUISITION IN PROGRESS - STAND BY ///", kScreenWidth * 0.5f - 230.0f, kScreenHeight * 0.5f - 16.0f, 13.0f, { 0.2f, 0.92f, 1.0f, 0.85f });
 	}
 }
 
@@ -1672,8 +1740,8 @@ void TitleScene::DrawOSD() {
 
 	TextRenderer* tr = TextRenderer::GetInstance();
 
-	// --- 左上: REC & タイムコード (Consolas) ---
-	tr->Print("Consolas", "REC", left + 24.0f, top + 9.0f, 15.0f, { 1.0f, 0.95f, 0.95f, 0.95f });
+	// --- 左上: REC & タイムコード (HackGen) ---
+	tr->Print("HackGen", "REC", left + 24.0f, top + 9.0f, 15.0f, { 1.0f, 0.95f, 0.95f, 0.95f });
 
 	char timeBuf[32];
 	int totalSec = static_cast<int>(animTimer_);
@@ -1682,7 +1750,7 @@ void TitleScene::DrawOSD() {
 	int secs = totalSec % 60;
 	int frames = static_cast<int>((animTimer_ - totalSec) * 60.0f);
 	snprintf(timeBuf, sizeof(timeBuf), "%02d:%02d:%02d:%02d", hours, mins, secs, frames);
-	tr->Print("Consolas", timeBuf, left + 64.0f, top + 9.0f, 15.0f, { 0.85f, 0.95f, 1.0f, 0.85f });
+	tr->Print("HackGen", timeBuf, left + 64.0f, top + 9.0f, 15.0f, { 0.85f, 0.95f, 1.0f, 0.85f });
 
 	// ドローン姿勢・ジャイロテレメトリ（項目10: カメラの揺れと連動してリアルタイム変動）
 	float dronePitch = 2.4f * std::sin(animTimer_ * 0.6f);
@@ -1690,7 +1758,7 @@ void TitleScene::DrawOSD() {
 	float droneAlt = 12.0f + 0.4f * std::sin(animTimer_ * 0.4f);
 	char telemBuf[64];
 	snprintf(telemBuf, sizeof(telemBuf), "PITCH %+.1f deg  ROLL %+.1f deg  ALT %.1fm", dronePitch, droneRoll, droneAlt);
-	tr->Print("Consolas", telemBuf, left + 8.0f, top + 30.0f, 11.5f, { 0.25f, 0.88f, 0.55f, 0.70f });
+	tr->Print("HackGen", telemBuf, left + 8.0f, top + 30.0f, 11.5f, { 0.25f, 0.88f, 0.55f, 0.70f });
 
 	// --- 右上: バッテリー / シグナル / データレート動的表示（項目10）---
 	int batPercent = 94 - ((static_cast<int>(animTimer_ * 0.04f)) % 2); // 94% ↔ 93% 微小放電シミュレーション
@@ -1698,9 +1766,9 @@ void TitleScene::DrawOSD() {
 	float dataRate = 48.2f + 0.35f * std::sin(animTimer_ * 2.2f);
 	char rightHudBuf[64];
 	snprintf(rightHudBuf, sizeof(rightHudBuf), "BAT %d%%  SIG [%s]  %.1fMb/s  4K/60P", batPercent, sigBars, dataRate);
-	tr->Print("Consolas", rightHudBuf, right - 280.0f, top + 9.0f, 13.5f, { 0.85f, 0.95f, 1.0f, 0.80f });
+	tr->Print("HackGen", rightHudBuf, right - 280.0f, top + 9.0f, 13.5f, { 0.85f, 0.95f, 1.0f, 0.80f });
 
-	// --- 左下: カメラ番号 & ロケーション (Consolas) ---
+	// --- 左下: カメラ番号 & ロケーション (HackGen) ---
 	std::string camName;
 	std::string camCoord;
 	if (transitionTimer_ > 0.0f) {
@@ -1726,16 +1794,126 @@ void TitleScene::DrawOSD() {
 			break;
 		}
 	}
-	tr->Print("Consolas", camName, left + 8.0f, bottom - 38.0f, 17.0f, { 0.85f, 0.95f, 1.0f, 0.90f });
-	tr->Print("Consolas", camCoord, left + 8.0f, bottom - 18.0f, 12.0f, { 0.65f, 0.75f, 0.85f, 0.60f });
+	tr->Print("HackGen", camName, left + 8.0f, bottom - 38.0f, 17.0f, { 0.85f, 0.95f, 1.0f, 0.90f });
+	tr->Print("HackGen", camCoord, left + 8.0f, bottom - 18.0f, 12.0f, { 0.65f, 0.75f, 0.85f, 0.60f });
 
-	// --- 右下: 光学系 & リンク情報 (Consolas) ---
-	tr->Print("Consolas", "ZOOM 1.0x   F/2.8   ISO 400", right - 210.0f, bottom - 38.0f, 14.0f, { 0.85f, 0.95f, 1.0f, 0.75f });
-	tr->Print("Consolas", "LINK: SECURE LIVE FEED", right - 210.0f, bottom - 18.0f, 12.0f, { 0.45f, 0.85f, 0.55f, 0.70f });
+	// --- 右下: 光学系 & リンク情報 (HackGen) ---
+	tr->Print("HackGen", "ZOOM 1.0x   F/2.8   ISO 400", right - 210.0f, bottom - 38.0f, 14.0f, { 0.85f, 0.95f, 1.0f, 0.75f });
+	tr->Print("HackGen", "LINK: SECURE LIVE FEED", right - 210.0f, bottom - 18.0f, 12.0f, { 0.45f, 0.85f, 0.55f, 0.70f });
+}
+
+void TitleScene::InitializeWindowCloseVisuals(SpriteCommon* spriteCommon) {
+	windowCloseMaskSprites_.clear();
+	// 4枚のマスクスプライト（上下左右の黒枠）
+	for (int i = 0; i < 4; ++i) {
+		auto sp = std::make_unique<Sprite>();
+		sp->Initialize(spriteCommon, "assets/textures/white1x1.png");
+		sp->SetAnchorPoint({ 0.0f, 0.0f });
+		sp->SetColor({ 0.0f, 0.0f, 0.0f, 1.0f });
+		sp->Update();
+		windowCloseMaskSprites_.push_back(std::move(sp));
+	}
+
+	windowCloseBorderSprites_.clear();
+	// ウィンドウタイトルバーと枠線（計6本）
+	for (int i = 0; i < 6; ++i) {
+		auto sp = std::make_unique<Sprite>();
+		sp->Initialize(spriteCommon, "assets/textures/white1x1.png");
+		sp->SetAnchorPoint({ 0.0f, 0.0f });
+		sp->SetColor({ 0.20f, 0.90f, 0.50f, 0.85f });
+		sp->Update();
+		windowCloseBorderSprites_.push_back(std::move(sp));
+	}
+}
+
+void TitleScene::DrawWindowClose() {
+	float t = windowCloseTimer_ / kWindowCloseDuration;
+	t = (std::min)((std::max)(t, 0.0f), 1.0f);
+	// スムーズなイージング (Smoothstep: 最初滑らかに動き始め、中央へ吸い込まれるように最小化：項目7)
+	float shrink = t * t * (3.0f - 2.0f * t);
+	float curW = (kScreenWidth - 32.0f) * (1.0f - shrink);
+	float curH = (kScreenHeight - 32.0f) * (1.0f - shrink);
+	float curX = (kScreenWidth - curW) * 0.5f;
+	float curY = (kScreenHeight - curH) * 0.5f;
+
+	if (windowCloseMaskSprites_.size() >= 4) {
+		// 上マスク: (0, 0) ～ (kScreenWidth, curY)
+		windowCloseMaskSprites_[0]->SetPosition({ 0.0f, 0.0f });
+		windowCloseMaskSprites_[0]->SetSize({ kScreenWidth, (std::max)(0.0f, curY) });
+		windowCloseMaskSprites_[0]->Update();
+		windowCloseMaskSprites_[0]->Draw();
+
+		// 下マスク: (0, curY + curH) ～ (kScreenWidth, kScreenHeight - (curY + curH))
+		float bottomY = curY + curH;
+		windowCloseMaskSprites_[1]->SetPosition({ 0.0f, bottomY });
+		windowCloseMaskSprites_[1]->SetSize({ kScreenWidth, (std::max)(0.0f, kScreenHeight - bottomY) });
+		windowCloseMaskSprites_[1]->Update();
+		windowCloseMaskSprites_[1]->Draw();
+
+		// 左マスク: (0, curY) ～ (curX, curH)
+		windowCloseMaskSprites_[2]->SetPosition({ 0.0f, curY });
+		windowCloseMaskSprites_[2]->SetSize({ (std::max)(0.0f, curX), (std::max)(0.0f, curH) });
+		windowCloseMaskSprites_[2]->Update();
+		windowCloseMaskSprites_[2]->Draw();
+
+		// 右マスク: (curX + curW, curY) ～ (kScreenWidth - (curX + curW), curH)
+		float rightX = curX + curW;
+		windowCloseMaskSprites_[3]->SetPosition({ rightX, curY });
+		windowCloseMaskSprites_[3]->SetSize({ (std::max)(0.0f, kScreenWidth - rightX), (std::max)(0.0f, curH) });
+		windowCloseMaskSprites_[3]->Update();
+		windowCloseMaskSprites_[3]->Draw();
+	}
+
+	if (curW > 16.0f && curH > 16.0f && windowCloseBorderSprites_.size() >= 5) {
+		// OSウィンドウタイトルバー
+		float titleBarH = 24.0f;
+		windowCloseBorderSprites_[0]->SetPosition({ curX, curY - titleBarH });
+		windowCloseBorderSprites_[0]->SetSize({ curW, titleBarH });
+		windowCloseBorderSprites_[0]->SetColor({ 0.03f, 0.12f, 0.06f, 0.98f });
+		windowCloseBorderSprites_[0]->Update();
+		windowCloseBorderSprites_[0]->Draw();
+
+		// 枠線4辺 (鮮烈なエレクトリックネオングリーン)
+		MyMath::Vector4 borderCol = { 0.25f, 0.98f, 0.58f, 0.95f };
+		windowCloseBorderSprites_[1]->SetPosition({ curX, curY });
+		windowCloseBorderSprites_[1]->SetSize({ curW, 2.0f }); // 上
+		windowCloseBorderSprites_[1]->SetColor(borderCol);
+		windowCloseBorderSprites_[1]->Update();
+		windowCloseBorderSprites_[1]->Draw();
+
+		windowCloseBorderSprites_[2]->SetPosition({ curX, curY + curH - 2.0f });
+		windowCloseBorderSprites_[2]->SetSize({ curW, 2.0f }); // 下
+		windowCloseBorderSprites_[2]->SetColor(borderCol);
+		windowCloseBorderSprites_[2]->Update();
+		windowCloseBorderSprites_[2]->Draw();
+
+		windowCloseBorderSprites_[3]->SetPosition({ curX, curY });
+		windowCloseBorderSprites_[3]->SetSize({ 2.0f, curH }); // 左
+		windowCloseBorderSprites_[3]->SetColor(borderCol);
+		windowCloseBorderSprites_[3]->Update();
+		windowCloseBorderSprites_[3]->Draw();
+
+		windowCloseBorderSprites_[4]->SetPosition({ curX + curW - 2.0f, curY });
+		windowCloseBorderSprites_[4]->SetSize({ 2.0f, curH }); // 右
+		windowCloseBorderSprites_[4]->SetColor(borderCol);
+		windowCloseBorderSprites_[4]->Update();
+		windowCloseBorderSprites_[4]->Draw();
+
+		// タイトルバーテキスト（最小化アニメーション中：項目7）
+		if (curW > 220.0f) {
+			TextRenderer* tr = TextRenderer::GetInstance();
+			tr->Print("HackGen", "[CAM-01 : OPTICAL FEED - MINIMIZING TO SYSTEM CONSOLE...]", curX + 10.0f, curY - 19.0f, 11.5f, { 0.35f, 1.0f, 0.65f, 0.95f });
+			tr->Print("HackGen", "[ _ ] [口] [X]", curX + curW - 86.0f, curY - 19.0f, 11.5f, { 0.85f, 0.85f, 0.85f, 0.95f });
+		}
+	}
+
+	// 画面奥のデスクトップ・ターミナル開始メッセージ
+	TextRenderer* tr = TextRenderer::GetInstance();
+	tr->Print("HackGen", "/// VIDEO LINK DISENGAGED // BOOTING DAWN TERMINAL ///", kScreenWidth * 0.5f, kScreenHeight * 0.5f - 8.0f, 14.5f, { 0.20f, 0.90f, 0.48f, 0.75f * t }, { 0.5f, 0.5f });
 }
 
 void TitleScene::DrawConsoleBoot() {
-	// 背景の完全漆黒コンソールスプライト（項目1: 格納庫の透けを100%遮蔽）
+	// 背景の完全漆黒コンソールスプライト（格納庫の透けを100%遮蔽）
 	if (consoleBgSprite_) {
 		consoleBgSprite_->Draw();
 	}
@@ -1747,6 +1925,20 @@ void TitleScene::DrawConsoleBoot() {
 		textAlpha = (std::max)(0.0f, 1.0f - consoleExitTimer_ / kConsoleExitDuration);
 	}
 
+	// コンソールからメニューへの切り替え時の一瞬の文字グリッチノイズ演出（項目10）
+	auto glitchText = [this](const std::string& orig) -> std::string {
+		if (consoleExitTimer_ <= 0.0f) { return orig; }
+		std::string s = orig;
+		float glitchRatio = consoleExitTimer_ / kConsoleExitDuration;
+		static const char kGlitchChars[] = "01#*/_[]><X$!%&~";
+		for (size_t i = 0; i < s.size(); ++i) {
+			if (s[i] != ' ' && ((rand() % 100) < static_cast<int>(glitchRatio * 65.0f))) {
+				s[i] = kGlitchChars[rand() % (sizeof(kGlitchChars) - 1)];
+			}
+		}
+		return s;
+	};
+
 	TextRenderer* tr = TextRenderer::GetInstance();
 	const float startX = 140.0f;
 	float currentY = 140.0f;
@@ -1754,41 +1946,57 @@ void TitleScene::DrawConsoleBoot() {
 	const MyMath::Vector4 greenCol = { 0.20f, 0.95f, 0.45f, 0.96f * textAlpha };
 	const MyMath::Vector4 cyanCol  = { 0.25f, 0.90f, 1.0f, 0.90f * textAlpha };
 
-	// ターミナルヘッダー（項目2: 等幅フォントConsolasによる本格的UNIX/コマンドプロンプト画面）
-	tr->Print("Consolas", "/// TACTICAL DEFENSE MAINFRAME // SECURE TERMINAL v4.12 ///", startX, currentY, 15.0f, cyanCol);
+	// ターミナルヘッダー
+	tr->Print("HackGen", glitchText("/// TACTICAL DEFENSE MAINFRAME // SECURE TERMINAL v4.12 ///"), startX, currentY, 15.0f, cyanCol);
 	currentY += 34.0f;
-	tr->Print("Consolas", "===================================================================", startX, currentY, 12.0f, { 0.18f, 0.70f, 0.40f, 0.45f * textAlpha });
+	tr->Print("HackGen", glitchText("==================================================================="), startX, currentY, 12.0f, { 0.18f, 0.70f, 0.40f, 0.45f * textAlpha });
 	currentY += 24.0f;
 
 	if (consoleBootTimer_ >= 0.05f) {
-		tr->Print("Consolas", "[0x0040] BOOT_SEQ: INITIATING TACTICAL SUBSYSTEMS... OK", startX, currentY, fontSize, greenCol);
+		tr->Print("HackGen", glitchText("[0x0040] BOOT_SEQ: INITIATING TACTICAL SUBSYSTEMS... OK"), startX, currentY, fontSize, greenCol);
 		currentY += 32.0f;
 	}
 	if (consoleBootTimer_ >= 0.25f) {
-		tr->Print("Consolas", "[0x008A] SCAN_FEED: ACQUIRING 3-AXIS DRONE TELEMETRY... [ONLINE]", startX, currentY, fontSize, greenCol);
+		tr->Print("HackGen", glitchText("[0x008A] SCAN_FEED: ACQUIRING 3-AXIS DRONE TELEMETRY... [ONLINE]"), startX, currentY, fontSize, greenCol);
 		currentY += 32.0f;
 	}
 	if (consoleBootTimer_ >= 0.50f) {
-		tr->Print("Consolas", "[0x012F] MOUNT_FS : OPERATION DIRECTIVE 'DAWN' DATABASE... OK", startX, currentY, fontSize, greenCol);
+		tr->Print("HackGen", glitchText("[0x012F] MOUNT_FS : OPERATION DIRECTIVE 'DAWN' DATABASE... OK"), startX, currentY, fontSize, greenCol);
 		currentY += 32.0f;
 	}
 	if (consoleBootTimer_ >= 0.72f) {
 		bool blink = (std::fmod(consoleBootTimer_, 0.24f) < 0.12f);
 		std::string passLine = "root@dawn-core:~$ ./authenticate_sortie --key **********";
 		if (blink) { passLine += " _"; }
-		tr->Print("Consolas", passLine, startX, currentY, fontSize, { 0.35f, 1.0f, 0.55f, 1.0f * textAlpha });
+		tr->Print("HackGen", glitchText(passLine), startX, currentY, fontSize, { 0.35f, 1.0f, 0.55f, 1.0f * textAlpha });
 		currentY += 38.0f;
 	}
 	if (consoleBootTimer_ >= 0.95f) {
-		tr->Print("Consolas", ">> [ ACCESS GRANTED : WELCOME TO THE COMBAT ZONE ] <<", startX, currentY, 20.0f, { 1.0f, 0.92f, 0.25f, 0.95f * textAlpha });
+		tr->Print("HackGen", glitchText(">> [ ACCESS GRANTED : WELCOME TO THE COMBAT ZONE ] <<"), startX, currentY, 20.0f, { 1.0f, 0.92f, 0.25f, 0.95f * textAlpha });
 	}
 
 	// 画面下部にスキップ案内
-	tr->Print("Consolas", "[ PRESS SPACE OR CLICK TO SKIP ]", kScreenWidth * 0.5f, kScreenHeight - 45.0f, 14.0f, { 0.45f, 0.75f, 0.55f, 0.75f * textAlpha }, { 0.5f, 0.5f });
+	tr->Print("HackGen", "[ PRESS SPACE OR CLICK TO SKIP ]", kScreenWidth * 0.5f, kScreenHeight - 45.0f, 14.0f, { 0.45f, 0.75f, 0.55f, 0.75f * textAlpha }, { 0.5f, 0.5f });
 
-	// トランジション進行中のグリッチノイズ（項目3）
+	// トランジション進行中：文字グリッチ＋中央メニューUI枠のレーザー形成演出（項目10）
 	if (consoleExitTimer_ > 0.0f) {
 		DrawTransitionGlitch();
+
+		// メニューカードの位置（中央 460x400）に向かってUI枠をレーザースキャン形成
+		float exitProg = consoleExitTimer_ / kConsoleExitDuration;
+		const float cardW = 460.0f;
+		const float cardH = 400.0f;
+		const float cardX = (kScreenWidth - cardW) * 0.5f;
+		const float cardY = (kScreenHeight - cardH) * 0.5f + 25.0f;
+
+		float scanY = cardY + cardH * exitProg;
+		float drawnH = cardH * exitProg;
+
+		// 走査線（レーザーライン）
+		if (pressSpaceBannerBg_) {
+			// レーザースイープ線
+			tr->Print("HackGen", "-->> FORMING TACTICAL UI INTERFACE FRAME <<--", kScreenWidth * 0.5f, scanY - 14.0f, 12.0f, { 0.35f, 1.0f, 0.65f, 0.95f }, { 0.5f, 0.5f });
+		}
 	}
 }
 
@@ -1804,6 +2012,8 @@ void TitleScene::DrawUI() {
 		}
 		pressSpaceText_.Draw();
 		DrawTransitionGlitch();
+	} else if (state_ == TitleState::WindowClose) {
+		DrawWindowClose();
 	} else if (state_ == TitleState::ConsoleBoot) {
 		DrawConsoleBoot();
 	} else if (state_ == TitleState::Menu) {
@@ -1824,11 +2034,11 @@ void TitleScene::DrawUI() {
 		const float cardX = (kScreenWidth - cardWidth) * 0.5f;
 		const float cardY = 52.0f;
 
-		// 端末ヘッダーテキスト (Consolas 13.0f) - タイトルバー左側
-		tr->Print("Consolas", "TERMINAL : DAWN_OS [v4.12]", cardX + 28.0f, cardY + 9.0f, 13.0f, { 0.35f, 1.0f, 0.60f, 0.95f });
+		// 端末ヘッダーテキスト (HackGen 13.0f) - タイトルバー左側
+		tr->Print("HackGen", "TERMINAL : DAWN_OS [v4.12]", cardX + 28.0f, cardY + 9.0f, 13.0f, { 0.35f, 1.0f, 0.60f, 0.95f });
 
 		// 作戦指令ヘッダーラベル - すべて緑文字に統一
-		tr->Print("Consolas", "/// CLASSIFIED OPERATION DIRECTIVE ///", kScreenWidth * 0.5f, 74.0f, 11.0f, { 0.22f, 0.78f, 0.45f, 0.80f }, { 0.5f, 0.0f });
+		tr->Print("HackGen", "/// CLASSIFIED OPERATION DIRECTIVE ///", kScreenWidth * 0.5f, 74.0f, 11.0f, { 0.22f, 0.78f, 0.45f, 0.80f }, { 0.5f, 0.0f });
 
 		// メインタイトル：DAWN ロゴスプライト（白文字 + MiG-21通過）
 		if (titleLogoSprite_) {
@@ -1839,7 +2049,7 @@ void TitleScene::DrawUI() {
 		subtitleText_.Draw();
 
 		// システム認証ステータス行 - すべて緑文字に統一
-		tr->Print("Consolas", "AUTH LEVEL 5 GRANTED // READY FOR MISSION INPUT", kScreenWidth * 0.5f, 214.0f, 10.5f, { 0.22f, 0.78f, 0.45f, 0.85f }, { 0.5f, 0.0f });
+		tr->Print("HackGen", "AUTH LEVEL 5 GRANTED // READY FOR MISSION INPUT", kScreenWidth * 0.5f, 214.0f, 10.5f, { 0.22f, 0.78f, 0.45f, 0.85f }, { 0.5f, 0.0f });
 
 		// メニューボタン（コマンド行）
 		startButton_.Draw();
@@ -1847,9 +2057,9 @@ void TitleScene::DrawUI() {
 		settingsButton_.Draw();
 		exitButton_.Draw();
 
-		// 操作ガイド (Consolas 14.0f) - フッター枠（Y=482〜520）の中央にピッタリ収まる緑文字統一
+		// 操作ガイド (HackGen 14.0f) - フッター枠（Y=482〜520）の中央にピッタリ収まる緑文字統一
 		tr->Print(
-			"Consolas",
+			"HackGen",
 			"[ UP / DOWN ] SELECT     [ ENTER / SPACE ] EXECUTE",
 			kScreenWidth * 0.5f,
 			501.0f,
@@ -1858,9 +2068,9 @@ void TitleScene::DrawUI() {
 			{ 0.5f, 0.5f }
 		);
 
-		// ウィンドウ最下部ステータスバー (Consolas 10.5f) - 緑文字に統一
+		// ウィンドウ最下部ステータスバー (HackGen 10.5f) - 緑文字に統一
 		tr->Print(
-			"Consolas",
+			"HackGen",
 			"ROOT@TACTICAL_OS: ONLINE",
 			cardX + 16.0f,
 			cardY + cardHeight - 18.0f,
@@ -1868,7 +2078,7 @@ void TitleScene::DrawUI() {
 			{ 0.25f, 0.82f, 0.45f, 0.85f }
 		);
 		tr->Print(
-			"Consolas",
+			"HackGen",
 			"PORT: 115200 BAUD // UTF-8",
 			cardX + cardWidth - 16.0f,
 			cardY + cardHeight - 18.0f,

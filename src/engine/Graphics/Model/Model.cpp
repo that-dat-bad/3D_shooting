@@ -892,3 +892,16 @@ void Model::SetMaterialEmissive(uint32_t materialIndex, const Vector3& color, fl
 		materialDatas_[materialIndex]->emissiveIntensity = intensity;
 	}
 }
+
+void Model::SetMaterialShininess(uint32_t materialIndex, float shininess) {
+	if (materialIndex < materialDatas_.size() && materialDatas_[materialIndex]) {
+		materialDatas_[materialIndex]->shininess = shininess;
+	}
+}
+
+void Model::SetMaterialEnvironmentCoefficient(uint32_t materialIndex, float coefficient) {
+	if (materialIndex < materialDatas_.size() && materialDatas_[materialIndex]) {
+		materialDatas_[materialIndex]->environmentCoefficient = coefficient;
+	}
+}
+

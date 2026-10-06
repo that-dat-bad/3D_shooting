@@ -51,7 +51,7 @@ public:
 	Vector4 GetOutlineColor() const { return outlineColor_; }
 
 private:
-	std::string fontName_ = "Roboto";
+	std::string fontName_ = "HackGen";
 	std::string text_;
 	float fontSize_ = 32.0f;
 	Vector2 anchorPoint_ = {0.0f, 0.0f};

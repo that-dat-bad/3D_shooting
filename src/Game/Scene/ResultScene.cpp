@@ -47,7 +47,7 @@ void ResultScene::Initialize() {
 	// ============================
 	// 「GAME OVER」テキスト
 	// ============================
-	gameOverText_.Initialize("Roboto", "GAME OVER", 64.0f);
+	gameOverText_.Initialize("HackGen", "GAME OVER", 64.0f);
 	gameOverText_.SetAnchorPoint({ 0.5f, 0.0f });
 	gameOverText_.SetPosition({ kScreenWidth * 0.5f, 150.0f });
 	gameOverText_.SetColor({ 0.90f, 0.20f, 0.20f, 1.0f }); // 真紅

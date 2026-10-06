@@ -91,12 +91,9 @@
 			"doubleSided":true,
 			"name":"\u30de\u30c6\u30ea\u30a2\u30eb.003",
 			"pbrMetallicRoughness":{
-				"baseColorFactor":[
-					0.8000074625015259,
-					0.031183980405330658,
-					0.022793501615524292,
-					1
-				],
+				"baseColorTexture":{
+					"index":0
+				},
 				"metallicFactor":0,
 				"roughnessFactor":0.5
 			}
@@ -105,8 +102,11 @@
 			"doubleSided":true,
 			"name":"\u30de\u30c6\u30ea\u30a2\u30eb",
 			"pbrMetallicRoughness":{
-				"metallicFactor":0.4732142686843872,
-				"roughnessFactor":0.2946428656578064
+				"baseColorTexture":{
+					"index":0
+				},
+				"metallicFactor":0,
+				"roughnessFactor":0.5
 			}
 		}
 	],
@@ -270,7 +270,7 @@
 		{
 			"mimeType":"image/png",
 			"name":"m21",
-			"uri":"m21.png"
+			"uri":"m21_crashed.png"
 		}
 	],
 	"accessors":[

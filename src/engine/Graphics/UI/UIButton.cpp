@@ -19,7 +19,7 @@ void UIButton::Initialize(SpriteCommon* spriteCommon, const std::string& label, 
 	backgroundPanel_.SetStyle("Selected", UIStateStyle{ selectedColor_, 1.00f, { 0.0f,  0.0f }, UILoopMotion::None, 1.0f, 1.0f });
 
 	// ラベルテキストの初期化
-	labelText_.Initialize("Roboto", label, fontSize);
+	labelText_.Initialize("HackGen", label, fontSize);
 	labelText_.SetAnchorPoint({ 0.5f, 0.5f });
 	labelText_.SetColor(textColor_);
 	labelText_.SetStyle("Normal",   UIStateStyle{ textColor_,         1.00f, { 0.0f, 0.0f }, UILoopMotion::None, 1.0f, 1.0f });

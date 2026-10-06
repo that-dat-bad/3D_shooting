@@ -162,6 +162,12 @@ public:
 	void SetMaterialSpecularIntensity(uint32_t materialIndex, float intensity);
 	/// @brief マテリアルの自発光（エミッシブ）を設定
 	void SetMaterialEmissive(uint32_t materialIndex, const Vector3& color, float intensity);
+	/// @brief マテリアルの光沢度（シャープさ）を設定
+	void SetMaterialShininess(uint32_t materialIndex, float shininess);
+	/// @brief マテリアルの環境反射係数を設定
+	void SetMaterialEnvironmentCoefficient(uint32_t materialIndex, float coefficient);
+	/// @brief マテリアル数を取得
+	size_t GetMaterialCount() const { return materialDatas_.size(); }
 
 private:
 
