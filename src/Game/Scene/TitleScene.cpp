@@ -26,13 +26,29 @@
 static constexpr float kScreenWidth = static_cast<float>(WinApp::kClientWidth);   // 1280
 static constexpr float kScreenHeight = static_cast<float>(WinApp::kClientHeight); // 720
 
+void TitleScene::SetCursorVisible(bool visible) {
+	if (isCursorShown_ == visible) { return; }
+	isCursorShown_ = visible;
+	ShowCursor(visible ? TRUE : FALSE);
+}
+
 void TitleScene::Initialize() {
-	Input::GetInstance()->UnlockCursor(); // メニュー用にマウスを表示・ロック解除
+	SetCursorVisible(false); // ドローン視点・コンソール画面ではOSカーソルを完全非表示（項目7）
 	sceneID = SCENE::TITLE;
 	selectionManager_.Clear();
 	animTimer_ = 0.0f;
+	menuEnterTimer_ = 0.0f;
 
 	SpriteCommon* spriteCommon = SpriteCommon::GetInstance();
+
+	// コンソールブート時の完全漆黒背景スプライト（項目1: 格納庫の透けを100%遮蔽）
+	consoleBgSprite_ = std::make_unique<Sprite>();
+	consoleBgSprite_->Initialize(spriteCommon, "assets/textures/white1x1.png");
+	consoleBgSprite_->SetAnchorPoint({ 0.0f, 0.0f });
+	consoleBgSprite_->SetPosition({ 0.0f, 0.0f });
+	consoleBgSprite_->SetSize({ kScreenWidth, kScreenHeight });
+	consoleBgSprite_->SetColor({ 0.0f, 0.0f, 0.0f, 1.0f });
+	consoleBgSprite_->Update();
 
 	// 必須テクスチャのロード
 	TextureManager* tm = TextureManager::GetInstance();
@@ -158,15 +174,24 @@ void TitleScene::Initialize() {
 		}
 
 		LocationLighting& l = loc.lighting;
-		l.lightType = 2;                                  // トンネル内はポイントライト（回転灯）のみ。格納庫用の投光器や外光は排除
+		l.lightType = 2 | 4;                              // ポイントライト＋後方投光スポットライトでトンネル壁面・路面を強力に照り返す（項目8）
 		l.dirIntensity = 0.0f;
-		l.pointColor = { 1.0f, 0.42f, 0.12f, 1.0f };     // 天井の回転灯からのアンバー/赤警告光
-		l.pointOffset = { 0.0f, 4.8f, 0.0f };
-		l.pointIntensity = 1.8f;
-		l.pointRadius = 22.0f;
+		// スラスターノズル位置（Z=-3.8m）からの強烈なエレクトリックブルー照り返し
+		l.pointColor = { 0.22f, 0.75f, 1.0f, 1.0f };
+		l.pointOffset = { 0.0f, 1.95f, -3.8f };
+		l.pointIntensity = 4.2f;
+		l.pointRadius = 26.0f;
 		l.pointDecay = 1.0f;
-		l.pointFlicker = 0.45f;                           // 回転灯の明滅ゆらぎ
-		l.spotIntensity = 0.0f;                           // 格納庫用の投光器スポットライトは完全無効化
+		l.pointFlicker = 0.25f;                           // ジェット燃焼の動的フリッカーで青い光が波打つ
+		// 後方および壁面・床面へのスラスター照射
+		l.spotColor = { 0.35f, 0.82f, 1.0f, 1.0f };
+		l.spotOffset = { 0.0f, 2.0f, -2.5f };
+		l.spotDirection = MyMath::Normalize({ 0.0f, -0.35f, -0.93f });
+		l.spotIntensity = 3.6f;
+		l.spotDistance = 36.0f;
+		l.spotDecay = 1.0f;
+		l.spotAngleDeg = 52.0f;
+		l.spotFalloffStartDeg = 26.0f;
 
 		// トンネル後方チェイスカメラ（機体テールの双発アフターバーナー＆ショックダイヤモンドを克明に捉える）
 		loc.camera = { 8.2f, 0.7f, 1.05f, 0.20f, 0.15f, 0.22f, 0.45f, true };
@@ -174,7 +199,7 @@ void TitleScene::Initialize() {
 	}
 
 	// ------------------------------------------------------------
-	// 2. 格納庫: 元のハンガーモデル + 作業灯
+	// 2. 格納庫: 元のハンガーモデル + 作業灯 + 天井投光器（金属質感とスペキュラ反射を強調：項目5）
 	// ------------------------------------------------------------
 	{
 		LocationData& loc = locations_[static_cast<int>(TitleLocation::Hangar)];
@@ -189,22 +214,22 @@ void TitleScene::Initialize() {
 
 		LocationLighting& l = loc.lighting;
 		l.lightType = 1 | 2 | 4;
-		l.dirColor = { 0.55f, 0.62f, 0.75f, 1.0f };      // シャッター隙間からの青白い光
-		l.dirDirection = MyMath::Normalize({ 0.4f, -0.6f, 0.7f });
-		l.dirIntensity = 0.45f;
-		l.pointColor = { 1.0f, 0.75f, 0.45f, 1.0f };     // 作業灯（暖色）
-		l.pointOffset = { -6.0f, 3.0f, -5.0f };
-		l.pointIntensity = 1.1f;
-		l.pointRadius = 20.0f;
-		l.pointDecay = 1.3f;
-		l.spotColor = { 1.0f, 0.98f, 0.92f, 1.0f };       // 天井投光器（斜め上方からのソフト照射）
-		l.spotOffset = { -3.5f, 9.5f, 4.0f };
-		l.spotDirection = MyMath::Normalize({ 0.25f, -0.90f, -0.35f });
-		l.spotIntensity = 1.6f;
-		l.spotDistance = 28.0f;
-		l.spotDecay = 1.1f;
+		l.dirColor = { 0.60f, 0.70f, 0.88f, 1.0f };      // シャッター隙間からの青白い外光
+		l.dirDirection = MyMath::Normalize({ 0.45f, -0.65f, 0.60f });
+		l.dirIntensity = 0.55f;
+		l.pointColor = { 1.0f, 0.85f, 0.65f, 1.0f };     // 作業灯（暖色投光）
+		l.pointOffset = { -4.5f, 2.5f, -3.5f };
+		l.pointIntensity = 2.0f;
+		l.pointRadius = 22.0f;
+		l.pointDecay = 1.2f;
+		l.spotColor = { 0.98f, 0.99f, 1.0f, 1.0f };       // 天井投光器（機体キャノピー・主翼への鋭いスペキュラ光）
+		l.spotOffset = { -2.0f, 10.5f, 2.5f };
+		l.spotDirection = MyMath::Normalize({ 0.18f, -0.95f, -0.22f });
+		l.spotIntensity = 3.4f;
+		l.spotDistance = 30.0f;
+		l.spotDecay = 1.0f;
 		l.spotAngleDeg = 48.0f;
-		l.spotFalloffStartDeg = 28.0f;
+		l.spotFalloffStartDeg = 25.0f;
 
 		// 安定した見下ろし・見上げの周回カメラ（項目3: 振動・距離揺れゼロで完全な接地安定性を実現、ガタつきを根絶）
 		loc.camera = { 12.0f, 0.0f, 2.2f, 0.0f, 1.2f, 0.05f, 0.0f, false };
@@ -212,7 +237,7 @@ void TitleScene::Initialize() {
 	}
 
 	// ------------------------------------------------------------
-	// 3. 墜落済みの森: 左翼喪失・機首から突っ込んだ残骸 + 炎の照り返し
+	// 3. 墜落済みの森: 車輪格納モデル使用 + 激しい破損・左翼喪失・尾翼破損・煤煙ダメージ（項目6）
 	// ------------------------------------------------------------
 	{
 		LocationData& loc = locations_[static_cast<int>(TitleLocation::CrashedForest)];
@@ -220,16 +245,18 @@ void TitleScene::Initialize() {
 		loc.name = "CrashedForest";
 		loc.origin = { 5000.0f, 0.0f, 5000.0f };
 		loc.envModelPath = "";
-		loc.aircraftOffset = { 0.0f, 0.4f, 0.0f };
-		loc.aircraftRotation = { 0.18f, -0.8f, 0.35f }; // 機首下げ + 左に傾く
+		loc.aircraftModelPath = "Resources/models/m21.gltf"; // 脚格納飛行モデル（無傷で脚展開されたままの不自然さを解消！）
+		loc.aircraftOffset = { 0.0f, 0.28f, 0.0f };         // 機体が地面に激突し食い込む
+		loc.aircraftRotation = { 0.22f, -0.85f, 0.38f };    // 機首突っ込み + 左に激しく傾斜
 		loc.hiddenParts = {
 			DamagePart::Wing_L, DamagePart::Wing1_L, DamagePart::Wing2_L,
 			DamagePart::Aileron_L, DamagePart::Tank1,
+			DamagePart::Elevator0, DamagePart::Rudder,      // 左水平尾翼・方向舵も千切れ飛ぶ激突ダメージ
 		};
-		loc.debrisOffset = { -7.0f, 0.3f, 4.0f };          // 千切れた左翼が後方に突き刺さる
-		loc.debrisRotation = { 0.9f, 0.6f, -0.4f };
+		loc.debrisOffset = { -6.5f, 0.38f, 4.2f };          // 千切れた左翼が激突痕に突き刺さる
+		loc.debrisRotation = { 0.95f, 0.70f, -0.45f };
 		loc.skyboxTexIndex = whiteSky;
-		loc.skyboxColor = { 0.07f, 0.08f, 0.11f, 1.0f };    // 項目4: 荒涼とした曇天の暗い空（不自然な紫色の丸い太陽フレアを根本解消）
+		loc.skyboxColor = { 0.07f, 0.08f, 0.11f, 1.0f };
 
 		// 墜落現場の地面パーツ（不時着滑走路・アスファルト敷地）
 		loc.extraEnvParts.clear();
@@ -255,7 +282,7 @@ void TitleScene::Initialize() {
 
 		// めり込み防止：十分な距離（15.5m）と俯瞰高さ（3.2m）で全景を見渡すシネマティックカメラ
 		loc.camera = { 15.5f, 0.0f, 3.2f, 0.0f, 0.8f, 0.05f, 0.0f, false };
-		loc.grade = { { 0.04f, 0.05f, 0.07f }, 0.04f, 0.5f }; // 冷徹なミリタリーダークトーン（紫色を排除）
+		loc.grade = { { 0.04f, 0.05f, 0.07f }, 0.04f, 0.5f };
 	}
 
 	for (auto& loc : locations_) {
@@ -398,19 +425,57 @@ void TitleScene::Initialize() {
 	InitializeMenuCard(spriteCommon);
 
 	// ============================
-	// PRESS SPACE テキスト（項目7: 画面上部Y=92に配置し、主役の機体シルエット被りを完全解消）
+	// 操作案内テキスト＆半透明ダーク帯（項目9: 主翼や車輪との被りを100%防止する安全バナー）
 	// ============================
-	pressSpaceText_.Initialize("Consolas", "[ PRESS SPACE OR CLICK TO START ]", 17.0f);
+	const float bannerW = 620.0f;
+	const float bannerH = 38.0f;
+	const float bannerX = (kScreenWidth - bannerW) * 0.5f;
+	const float bannerY = 660.0f; // 画面下部の安全エリア
+
+	pressSpaceBannerBg_ = std::make_unique<Sprite>();
+	pressSpaceBannerBg_->Initialize(spriteCommon, "assets/textures/white1x1.png");
+	pressSpaceBannerBg_->SetAnchorPoint({ 0.0f, 0.0f });
+	pressSpaceBannerBg_->SetPosition({ bannerX, bannerY });
+	pressSpaceBannerBg_->SetSize({ bannerW, bannerH });
+	pressSpaceBannerBg_->SetColor({ 0.02f, 0.05f, 0.03f, 0.82f }); // 深いダークミリタリー半透明
+	pressSpaceBannerBg_->Update();
+
+	pressSpaceBorders_.clear();
+	auto addBannerLine = [&](const Vector2& pos, const Vector2& size, const MyMath::Vector4& col) {
+		auto sp = std::make_unique<Sprite>();
+		sp->Initialize(spriteCommon, "assets/textures/white1x1.png");
+		sp->SetAnchorPoint({ 0.0f, 0.0f });
+		sp->SetPosition(pos);
+		sp->SetSize(size);
+		sp->SetColor(col);
+		sp->Update();
+		pressSpaceBorders_.push_back(std::move(sp));
+	};
+	const MyMath::Vector4 bannerLineCol = { 0.20f, 0.85f, 0.50f, 0.70f };
+	// 上下の境界線 (1px)
+	addBannerLine({ bannerX, bannerY }, { bannerW, 1.0f }, bannerLineCol);
+	addBannerLine({ bannerX, bannerY + bannerH - 1.0f }, { bannerW, 1.0f }, bannerLineCol);
+	// 左右のコーナーブラケット (2px)
+	addBannerLine({ bannerX, bannerY }, { 8.0f, 2.0f }, bannerLineCol);
+	addBannerLine({ bannerX, bannerY }, { 2.0f, 8.0f }, bannerLineCol);
+	addBannerLine({ bannerX + bannerW - 8.0f, bannerY }, { 8.0f, 2.0f }, bannerLineCol);
+	addBannerLine({ bannerX + bannerW - 2.0f, bannerY }, { 2.0f, 8.0f }, bannerLineCol);
+	addBannerLine({ bannerX, bannerY + bannerH - 2.0f }, { 8.0f, 2.0f }, bannerLineCol);
+	addBannerLine({ bannerX, bannerY + bannerH - 8.0f }, { 2.0f, 8.0f }, bannerLineCol);
+	addBannerLine({ bannerX + bannerW - 8.0f, bannerY + bannerH - 2.0f }, { 8.0f, 2.0f }, bannerLineCol);
+	addBannerLine({ bannerX + bannerW - 2.0f, bannerY + bannerH - 8.0f }, { 2.0f, 8.0f }, bannerLineCol);
+
+	pressSpaceText_.Initialize("Consolas", "[ PRESS SPACE OR CLICK TO START / SKIP ]", 15.0f);
 	pressSpaceText_.SetAnchorPoint({ 0.5f, 0.5f });
-	pressSpaceText_.SetPosition({ kScreenWidth * 0.5f, 76.0f }); // 機首・胴体と重ならない画面上部セーフゾーン
-	pressSpaceText_.SetColor({ 0.92f, 0.98f, 0.95f, 0.95f });
-	pressSpaceText_.SetDropShadow(true, { 2.0f, 2.0f }, { 0.0f, 0.0f, 0.0f, 0.95f });
-	pressSpaceText_.SetOutline(true, 1.5f, { 0.02f, 0.04f, 0.03f, 0.98f });
+	pressSpaceText_.SetPosition({ kScreenWidth * 0.5f, bannerY + bannerH * 0.5f });
+	pressSpaceText_.SetColor({ 0.35f, 1.0f, 0.65f, 0.95f });
+	pressSpaceText_.SetDropShadow(true, { 1.5f, 1.5f }, { 0.0f, 0.0f, 0.0f, 0.95f });
 	UIStateStyle pulseStyle;
-	pulseStyle.color = { 0.92f, 0.98f, 0.95f, 0.95f };
+	pulseStyle.color = { 0.35f, 1.0f, 0.65f, 0.95f };
 	pulseStyle.scale = 1.0f;
 	pulseStyle.loopMotion = UILoopMotion::Pulse;
-	pulseStyle.motionIntensity = 1.2f;
+	pulseStyle.motionIntensity = 1.15f;
+	pulseStyle.motionSpeed = 2.2f;
 	pressSpaceText_.SetStyle("Normal", pulseStyle);
 
 	
@@ -520,52 +585,52 @@ void TitleScene::Update() {
 			tunnelScrollZ = std::fmod(animTimer_ * kFlightSpeed, kTunnelLength);
 		}
 
-		// 墜落現場専用：折れた左翼付け根・破損エンジンから立ち上るリアルな濃煙と飛び散る火花
+		// 墜落現場専用：折れた左翼付け根・破損エンジンから立ち上るリアルな濃煙と微小火の粉（項目4）
 		if (loc.id == TitleLocation::CrashedForest) {
 			crashSmokeTimer_ += dt;
-			if (crashSmokeTimer_ >= 0.04f) {
+			if (crashSmokeTimer_ >= 0.035f) {
 				crashSmokeTimer_ = 0.0f;
 				MyMath::Vector3 smokePos = MyMath::Add(loc.origin, loc.aircraftOffset);
-				smokePos.x -= 1.8f;
-				smokePos.y += 0.8f;
+				smokePos.x -= 1.6f;
+				smokePos.y += 0.7f;
 				smokePos.z += 0.2f;
 
 				ParticleParameters smokeParams;
-				smokeParams.minVelocity = { -0.015f, 0.025f, -0.015f };
-				smokeParams.maxVelocity = {  0.015f, 0.055f,  0.015f };
-				// シリアスな軍用濃煙・黒煙（ポップなシャボン玉色を完全排除）
-				smokeParams.minColor = { 0.06f, 0.06f, 0.07f, 0.85f };
-				smokeParams.maxColor = { 0.14f, 0.14f, 0.16f, 0.92f };
-				smokeParams.minLifeTime = 3.2f;
-				smokeParams.maxLifeTime = 5.0f;
-				smokeParams.minScale = 1.0f;
-				smokeParams.maxScale = 4.2f;
-				smokeParams.scaleEasing = 0.45f;
-				smokeParams.randomPositionRange = 0.30f;
-				smokeParams.acceleration = { 0.0003f, 0.0001f, 0.0002f };
+				smokeParams.minVelocity = { -0.012f, 0.028f, -0.012f };
+				smokeParams.maxVelocity = {  0.012f, 0.065f,  0.012f };
+				// リアルな重厚黒煙・煤煙ダークグレー（ポップな球体・シャボン玉色を完全排除）
+				smokeParams.minColor = { 0.08f, 0.08f, 0.09f, 0.90f };
+				smokeParams.maxColor = { 0.20f, 0.20f, 0.22f, 0.95f };
+				smokeParams.minLifeTime = 3.5f;
+				smokeParams.maxLifeTime = 5.2f;
+				smokeParams.minScale = 1.2f;
+				smokeParams.maxScale = 4.8f;
+				smokeParams.scaleEasing = 0.40f;
+				smokeParams.randomPositionRange = 0.35f;
+				smokeParams.acceleration = { 0.0004f, 0.0001f, 0.0002f };
 				ParticleManager::GetInstance()->Emit("TitleSmoke", smokePos, smokeParams, 2);
 			}
 
 			crashSparkTimer_ += dt;
-			if (crashSparkTimer_ >= 0.08f) {
+			if (crashSparkTimer_ >= 0.12f) { // 火花は控えめに、極小の赤熱火の粉（ember）のみ
 				crashSparkTimer_ = 0.0f;
 				MyMath::Vector3 sparkPos = MyMath::Add(loc.origin, loc.aircraftOffset);
-				sparkPos.x -= 1.7f;
-				sparkPos.y += 0.6f;
+				sparkPos.x -= 1.5f;
+				sparkPos.y += 0.5f;
 				sparkPos.z += 0.1f;
 
 				ParticleParameters sparkParams;
-				sparkParams.minVelocity = { -0.035f, 0.025f, -0.035f };
-				sparkParams.maxVelocity = {  0.035f, 0.075f,  0.035f };
-				sparkParams.minColor = { 1.0f, 0.40f, 0.08f, 1.0f };
-				sparkParams.maxColor = { 1.0f, 0.95f, 0.35f, 1.0f };
+				sparkParams.minVelocity = { -0.025f, 0.020f, -0.025f };
+				sparkParams.maxVelocity = {  0.025f, 0.055f,  0.025f };
+				sparkParams.minColor = { 1.0f, 0.35f, 0.05f, 0.90f };
+				sparkParams.maxColor = { 1.0f, 0.80f, 0.20f, 0.95f };
 				sparkParams.minLifeTime = 0.4f;
-				sparkParams.maxLifeTime = 0.9f;
-				sparkParams.minScale = 0.08f;
-				sparkParams.maxScale = 0.22f;
-				sparkParams.randomPositionRange = 0.20f;
-				sparkParams.acceleration = { 0.0f, -0.0025f, 0.0f };
-				ParticleManager::GetInstance()->Emit("TitleSpark", sparkPos, sparkParams, 3);
+				sparkParams.maxLifeTime = 0.85f;
+				sparkParams.minScale = 0.03f;
+				sparkParams.maxScale = 0.07f; // 微小な火の粉
+				sparkParams.randomPositionRange = 0.15f;
+				sparkParams.acceleration = { 0.0f, -0.0020f, 0.0f };
+				ParticleManager::GetInstance()->Emit("TitleSpark", sparkPos, sparkParams, 1);
 			}
 		}
 
@@ -608,6 +673,7 @@ void TitleScene::Update() {
 	ApplyLocationLighting(loc);
 
 	if (state_ == TitleState::DroneView) {
+		SetCursorVisible(false); // ドローン画面中はマウスカーソル非表示（項目7）
 
 		// スペースキーまたはクリックでハッカー風コンソール演出（項目2）を経てメニューへ
 		Input* input = Input::GetInstance();
@@ -672,21 +738,34 @@ void TitleScene::Update() {
 			postEffect->AddActiveEffect(vignette);
 		}
 
+		if (pressSpaceBannerBg_) {
+			pressSpaceBannerBg_->Update();
+		}
+		for (auto& sp : pressSpaceBorders_) {
+			sp->Update();
+		}
 		pressSpaceText_.Update();
 
 	} else if (state_ == TitleState::ConsoleBoot) {
+		SetCursorVisible(false); // コンソール演出中もマウスカーソル完全非表示（項目7）
 		consoleBootTimer_ += dt;
 		Input* input = Input::GetInstance();
 		bool skipTriggered = (consoleBootTimer_ > 0.30f && (input->TriggerKey(DIK_SPACE) || input->TriggerKey(DIK_RETURN) || input->TriggerMouse(0)));
 
-		// 時間経過またはスキップで、スムーズなフェードアウト演出を開始
+		// 時間経過またはスキップで、スムーズなフェードアウト＆トランジション演出を開始（項目3）
 		if (consoleBootTimer_ >= kConsoleBootDuration || skipTriggered) {
 			consoleExitTimer_ += dt;
 			if (consoleExitTimer_ >= kConsoleExitDuration) {
 				state_ = TitleState::Menu;
 				stateTimer_ = 0.0f;
 				consoleExitTimer_ = 0.0f;
+				menuEnterTimer_ = kMenuEnterDuration; // メニュー起動トランジション開始！
+				SetCursorVisible(true);               // メニューに入って初めてカーソルを表示！
 			}
+		}
+
+		if (consoleBgSprite_) {
+			consoleBgSprite_->Update();
 		}
 
 		// 背景を完全な黒（アルファ1.0）にして格納庫の透けを完全排除
@@ -696,16 +775,25 @@ void TitleScene::Update() {
 		PostEffect* postEffect = PostEffect::GetInstance();
 		postEffect->ClearActiveEffects();
 
-		// 切り替えフェードアウト時の短いCRT走査線グリッチ演出
+		// 切り替えフェードアウト時の短いCRT走査線グリッチ演出（項目3）
 		if (consoleExitTimer_ > 0.0f) {
 			float exitRatio = consoleExitTimer_ / kConsoleExitDuration;
 			ActivePostEffect scanline;
 			scanline.type = PostEffectType::kScanLine;
-			scanline.intensity = 0.15f * exitRatio;
+			scanline.intensity = 0.22f * exitRatio;
 			postEffect->AddActiveEffect(scanline);
+
+			ActivePostEffect noise;
+			noise.type = PostEffectType::kRandom;
+			noise.intensity = 0.15f * exitRatio;
+			postEffect->AddActiveEffect(noise);
 		}
 
 	} else if (state_ == TitleState::Menu) {
+		SetCursorVisible(true); // メニュー中はマウス操作を有効化（項目7）
+		if (menuEnterTimer_ > 0.0f) {
+			menuEnterTimer_ -= dt;
+		}
 		selectionManager_.Update();
 		UpdateMenuConsoleVisuals();
 
@@ -892,16 +980,17 @@ void TitleScene::Draw() {
 		pm->DrawPlane({ 5.5f, 1.0f, 9.5f }, { 0.0f, 0.5f, 0.0f }, { origin.x, origin.y + 0.015f, origin.z }, { 0.0f, 0.0f, 0.0f, 0.20f }, shadowTex, titleCamera);
 	}
 
-	// 墜落現場の焦げ跡・激突痕デカール（項目5: 三角錐発光体は削除し、地面の焦げ跡とパーティクルのみでリアルに演出）
+	// 墜落現場の焦げ跡・激突滑走溝デカール（項目6: 胴体着陸の長大な滑走溝と左翼激突痕）
 	if (loc.id == TitleLocation::CrashedForest && titleCamera) {
 		PrimitiveModel* pm = PrimitiveModel::GetInstance();
 		MyMath::Vector3 origin = loc.origin;
 		uint32_t scorchTex = (crashScorchTexIndex_ != 0) ? crashScorchTexIndex_ : whiteTexIndex_;
-		// 胴体激突地点の大きな焦げ跡デカール
-		pm->DrawPlane({ 9.0f, 1.0f, 14.5f }, { 0.0f, -0.8f, 0.0f }, { origin.x, origin.y + 0.012f, origin.z }, { 0.02f, 0.02f, 0.02f, 0.88f }, scorchTex, titleCamera);
+		// 激突・胴体滑走の長大な溝デカール (Scorch Trench: 手前から激突点まで伸びる黒焦げブレーキ痕)
+		pm->DrawPlane({ 4.5f, 1.0f, 22.0f }, { 0.0f, -0.85f, 0.0f }, { origin.x + 4.0f, origin.y + 0.010f, origin.z - 7.0f }, { 0.01f, 0.01f, 0.01f, 0.92f }, scorchTex, titleCamera);
+		// 胴体激突地点の大きな焦げ跡クレーターデカール
+		pm->DrawPlane({ 10.5f, 1.0f, 16.0f }, { 0.0f, -0.8f, 0.0f }, { origin.x, origin.y + 0.012f, origin.z }, { 0.02f, 0.02f, 0.02f, 0.92f }, scorchTex, titleCamera);
 		// 千切れた左翼の激突痕デカール
-		pm->DrawPlane({ 6.0f, 1.0f, 8.5f }, { 0.0f, 0.6f, 0.0f }, { origin.x - 7.0f, origin.y + 0.012f, origin.z + 4.0f }, { 0.02f, 0.02f, 0.02f, 0.82f }, scorchTex, titleCamera);
-		// ※不自然な黄色い三角錐（DrawCone）は完全削除済み。煙と火花パーティクルで表現。
+		pm->DrawPlane({ 6.5f, 1.0f, 9.5f }, { 0.0f, 0.6f, 0.0f }, { origin.x - 6.5f, origin.y + 0.014f, origin.z + 4.2f }, { 0.02f, 0.02f, 0.02f, 0.88f }, scorchTex, titleCamera);
 	}
 
 	// 機体・残骸は現在のロケーションのみ描画
@@ -1005,6 +1094,25 @@ void TitleScene::SetupLocation(LocationData& loc, Camera* camera) {
 		}
 		for (DamagePart part : loc.hiddenParts) {
 			loc.debrisModel->SetPartVisible(part, true);
+		}
+	}
+
+	// ロケーション別マテリアルの質感設定（項目5: 格納庫のメタリック反射、項目6: 墜落現場の焦げ跡）
+	if (loc.id == TitleLocation::Hangar) {
+		// 格納庫: 軍用機らしい重厚なジュラルミン・メタリック質感と高輝度スペキュラ
+		loc.visualModel->SetMaterialProperties(72.0f, 2.6f, 0.60f);
+		loc.visualModel->SetMaterialColor({ 1.0f, 1.0f, 1.0f, 1.0f });
+	} else if (loc.id == TitleLocation::Tunnel) {
+		// トンネル: スラスター光を反射する金属肌
+		loc.visualModel->SetMaterialProperties(64.0f, 2.2f, 0.50f);
+		loc.visualModel->SetMaterialColor({ 1.0f, 1.0f, 1.0f, 1.0f });
+	} else if (loc.id == TitleLocation::CrashedForest) {
+		// 墜落現場: 激突・炎上による黒焦げ・煤煙ダークトーン、鈍い低光沢
+		loc.visualModel->SetMaterialProperties(16.0f, 0.35f, 0.08f);
+		loc.visualModel->SetMaterialColor({ 0.32f, 0.30f, 0.30f, 1.0f });
+		if (loc.debrisModel) {
+			loc.debrisModel->SetMaterialProperties(14.0f, 0.30f, 0.06f);
+			loc.debrisModel->SetMaterialColor({ 0.28f, 0.26f, 0.26f, 1.0f });
 		}
 	}
 }
@@ -1576,8 +1684,21 @@ void TitleScene::DrawOSD() {
 	snprintf(timeBuf, sizeof(timeBuf), "%02d:%02d:%02d:%02d", hours, mins, secs, frames);
 	tr->Print("Consolas", timeBuf, left + 64.0f, top + 9.0f, 15.0f, { 0.85f, 0.95f, 1.0f, 0.85f });
 
-	// --- 右上: バッテリー / シグナル / 解像度 (Consolas) ---
-	tr->Print("Consolas", "BAT 94%   SIG ||||   4K/60P", right - 220.0f, top + 9.0f, 14.0f, { 0.85f, 0.95f, 1.0f, 0.75f });
+	// ドローン姿勢・ジャイロテレメトリ（項目10: カメラの揺れと連動してリアルタイム変動）
+	float dronePitch = 2.4f * std::sin(animTimer_ * 0.6f);
+	float droneRoll = -1.2f * std::cos(animTimer_ * 0.8f);
+	float droneAlt = 12.0f + 0.4f * std::sin(animTimer_ * 0.4f);
+	char telemBuf[64];
+	snprintf(telemBuf, sizeof(telemBuf), "PITCH %+.1f deg  ROLL %+.1f deg  ALT %.1fm", dronePitch, droneRoll, droneAlt);
+	tr->Print("Consolas", telemBuf, left + 8.0f, top + 30.0f, 11.5f, { 0.25f, 0.88f, 0.55f, 0.70f });
+
+	// --- 右上: バッテリー / シグナル / データレート動的表示（項目10）---
+	int batPercent = 94 - ((static_cast<int>(animTimer_ * 0.04f)) % 2); // 94% ↔ 93% 微小放電シミュレーション
+	const char* sigBars = (static_cast<int>(animTimer_ * 1.5f) % 7 == 4) ? "|||." : "||||"; // 電波アイコンアニメーションゆらぎ
+	float dataRate = 48.2f + 0.35f * std::sin(animTimer_ * 2.2f);
+	char rightHudBuf[64];
+	snprintf(rightHudBuf, sizeof(rightHudBuf), "BAT %d%%  SIG [%s]  %.1fMb/s  4K/60P", batPercent, sigBars, dataRate);
+	tr->Print("Consolas", rightHudBuf, right - 280.0f, top + 9.0f, 13.5f, { 0.85f, 0.95f, 1.0f, 0.80f });
 
 	// --- 左下: カメラ番号 & ロケーション (Consolas) ---
 	std::string camName;
@@ -1614,7 +1735,10 @@ void TitleScene::DrawOSD() {
 }
 
 void TitleScene::DrawConsoleBoot() {
-	// 背景の漆黒コンソールパネル（完全暗転）
+	// 背景の完全漆黒コンソールスプライト（項目1: 格納庫の透けを100%遮蔽）
+	if (consoleBgSprite_) {
+		consoleBgSprite_->Draw();
+	}
 	backgroundPanel_.SetBackgroundColor({ 0.0f, 0.0f, 0.0f, 1.0f });
 	backgroundPanel_.Draw();
 
@@ -1625,45 +1749,59 @@ void TitleScene::DrawConsoleBoot() {
 
 	TextRenderer* tr = TextRenderer::GetInstance();
 	const float startX = 140.0f;
-	float currentY = 160.0f;
-	const float fontSize = 21.0f;
+	float currentY = 140.0f;
+	const float fontSize = 19.0f;
 	const MyMath::Vector4 greenCol = { 0.20f, 0.95f, 0.45f, 0.96f * textAlpha };
 	const MyMath::Vector4 cyanCol  = { 0.25f, 0.90f, 1.0f, 0.90f * textAlpha };
 
-	// ターミナルヘッダー
+	// ターミナルヘッダー（項目2: 等幅フォントConsolasによる本格的UNIX/コマンドプロンプト画面）
 	tr->Print("Consolas", "/// TACTICAL DEFENSE MAINFRAME // SECURE TERMINAL v4.12 ///", startX, currentY, 15.0f, cyanCol);
-	currentY += 40.0f;
+	currentY += 34.0f;
+	tr->Print("Consolas", "===================================================================", startX, currentY, 12.0f, { 0.18f, 0.70f, 0.40f, 0.45f * textAlpha });
+	currentY += 24.0f;
 
 	if (consoleBootTimer_ >= 0.05f) {
-		tr->Print("Consolas", ">> BOOT SEQUENCE INITIATED...", startX, currentY, fontSize, greenCol);
-		currentY += 34.0f;
+		tr->Print("Consolas", "[0x0040] BOOT_SEQ: INITIATING TACTICAL SUBSYSTEMS... OK", startX, currentY, fontSize, greenCol);
+		currentY += 32.0f;
 	}
 	if (consoleBootTimer_ >= 0.25f) {
-		tr->Print("Consolas", ">> SCANNING RECON DRONE TELEMETRY... [3 CHANNELS ONLINE]", startX, currentY, fontSize, greenCol);
-		currentY += 34.0f;
+		tr->Print("Consolas", "[0x008A] SCAN_FEED: ACQUIRING 3-AXIS DRONE TELEMETRY... [ONLINE]", startX, currentY, fontSize, greenCol);
+		currentY += 32.0f;
 	}
 	if (consoleBootTimer_ >= 0.50f) {
-		tr->Print("Consolas", ">> MOUNTING TACTICAL MISSION DATABASE... OK", startX, currentY, fontSize, greenCol);
-		currentY += 34.0f;
+		tr->Print("Consolas", "[0x012F] MOUNT_FS : OPERATION DIRECTIVE 'DAWN' DATABASE... OK", startX, currentY, fontSize, greenCol);
+		currentY += 32.0f;
 	}
 	if (consoleBootTimer_ >= 0.72f) {
 		bool blink = (std::fmod(consoleBootTimer_, 0.24f) < 0.12f);
-		std::string passLine = ">> booting...completed, password? *****";
+		std::string passLine = "root@dawn-core:~$ ./authenticate_sortie --key **********";
 		if (blink) { passLine += " _"; }
 		tr->Print("Consolas", passLine, startX, currentY, fontSize, { 0.35f, 1.0f, 0.55f, 1.0f * textAlpha });
-		currentY += 45.0f;
+		currentY += 38.0f;
 	}
 	if (consoleBootTimer_ >= 0.95f) {
-		tr->Print("Consolas", "[ ACCESS GRANTED: WELCOME TO THE COMBAT ZONE ]", startX, currentY, 19.0f, { 1.0f, 0.92f, 0.25f, 0.95f * textAlpha });
+		tr->Print("Consolas", ">> [ ACCESS GRANTED : WELCOME TO THE COMBAT ZONE ] <<", startX, currentY, 20.0f, { 1.0f, 0.92f, 0.25f, 0.95f * textAlpha });
 	}
 
 	// 画面下部にスキップ案内
-	tr->Print("Consolas", "[ PRESS SPACE OR CLICK TO SKIP ]", kScreenWidth * 0.5f, kScreenHeight - 45.0f, 14.0f, { 0.45f, 0.60f, 0.70f, 0.60f * textAlpha }, { 0.5f, 0.5f });
+	tr->Print("Consolas", "[ PRESS SPACE OR CLICK TO SKIP ]", kScreenWidth * 0.5f, kScreenHeight - 45.0f, 14.0f, { 0.45f, 0.75f, 0.55f, 0.75f * textAlpha }, { 0.5f, 0.5f });
+
+	// トランジション進行中のグリッチノイズ（項目3）
+	if (consoleExitTimer_ > 0.0f) {
+		DrawTransitionGlitch();
+	}
 }
 
 void TitleScene::DrawUI() {
 	if (state_ == TitleState::DroneView) {
 		DrawOSD();
+		// 操作案内テキストの半透明ダーク帯を描画（項目9: 主翼や車輪との被りを100%防止）
+		if (pressSpaceBannerBg_) {
+			pressSpaceBannerBg_->Draw();
+		}
+		for (auto& sp : pressSpaceBorders_) {
+			sp->Draw();
+		}
 		pressSpaceText_.Draw();
 		DrawTransitionGlitch();
 	} else if (state_ == TitleState::ConsoleBoot) {
@@ -1671,6 +1809,11 @@ void TitleScene::DrawUI() {
 	} else if (state_ == TitleState::Menu) {
 		// 背景オーバーレイ
 		backgroundPanel_.Draw();
+
+		// メニュー移行トランジション（0.35秒間の滑らかな起動フェードイン＆走査線展開：項目3）
+		if (menuEnterTimer_ > 0.0f) {
+			DrawTransitionGlitch();
+		}
 
 		// 中央のコンソール端末ウィンドウ
 		DrawMenuCard();
@@ -1737,6 +1880,7 @@ void TitleScene::DrawUI() {
 }
 
 void TitleScene::Finalize() {
+	SetCursorVisible(true); // シーン終了時にカーソルを復帰（項目7）
 	UITextRegistry::GetInstance()->Clear();
 }
 

@@ -38,7 +38,9 @@ void AircraftVisualModel::SetModelForPart(DamagePart part, Model* model, const s
 	node.object->SetModel(model);
 	node.object->SetTargetNodeNames(targetNodeNames);
 	if (node.object->GetModel()) {
-		node.object->GetModel()->SetEnvironmentCoefficient(0.0f); // 金属反射をOFF
+		node.object->GetModel()->SetShininess(64.0f);
+		node.object->GetModel()->SetSpecularIntensity(2.2f);
+		node.object->GetModel()->SetEnvironmentCoefficient(0.50f); // 重厚な金属・環境光反射
 	}
 }
 
@@ -190,4 +192,24 @@ Matrix4x4 AircraftVisualModel::GetPartWorldMatrix(DamagePart part) const {
 Vector3 AircraftVisualModel::GetPartWorldPosition(DamagePart part) const {
 	Matrix4x4 world = GetPartWorldMatrix(part);
 	return { world.m[3][0], world.m[3][1], world.m[3][2] };
+}
+
+void AircraftVisualModel::SetMaterialProperties(float shininess, float specularIntensity, float envCoefficient) {
+	for (auto& [part, node] : partNodes_) {
+		if (node.object && node.object->GetModel()) {
+			Model* model = node.object->GetModel();
+			model->SetShininess(shininess);
+			model->SetSpecularIntensity(specularIntensity);
+			model->SetEnvironmentCoefficient(envCoefficient);
+		}
+	}
+}
+
+void AircraftVisualModel::SetMaterialColor(const Vector4& color) {
+	for (auto& [part, node] : partNodes_) {
+		if (node.object && node.object->GetModel()) {
+			Model* model = node.object->GetModel();
+			model->SetColor(color);
+		}
+	}
 }

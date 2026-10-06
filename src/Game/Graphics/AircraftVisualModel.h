@@ -58,6 +58,12 @@ public:
 	/// @brief 指定パーツの最新ワールド座標を取得
 	Vector3 GetPartWorldPosition(DamagePart part) const;
 
+	/// @brief 全パーツのマテリアルパラメータ（光沢度、スペキュラ強度、環境反射係数）を設定
+	void SetMaterialProperties(float shininess, float specularIntensity, float envCoefficient);
+
+	/// @brief 全パーツのベースカラー乗算色を設定（焦げ跡・ダメージ変色用）
+	void SetMaterialColor(const Vector4& color);
+
 private:
 	struct PartNode {
 		std::unique_ptr<Object3d> object = nullptr;

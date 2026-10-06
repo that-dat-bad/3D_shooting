@@ -52,6 +52,8 @@ public:
 	void SetSpecularIntensity(float intensity) { for (auto* mat : materialDatas_) { if (mat) mat->specularIntensity = intensity; } }
 	float GetSpecularIntensity() const { return !materialDatas_.empty() && materialDatas_[0] ? materialDatas_[0]->specularIntensity : 0.0f; }
 
+	void SetColor(const Vector4& color) { for (auto* mat : materialDatas_) { if (mat) mat->color = color; } }
+
 	struct VertexData {
 		Vector4 position;
 		Vector2 texcoord;

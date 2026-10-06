@@ -52,12 +52,20 @@ private:
 	static constexpr float kConsoleBootDuration = 1.15f;
 	float consoleExitTimer_ = 0.0f;     ///< コンソールからメニューへのスムーズなフェード移行タイマー
 	static constexpr float kConsoleExitDuration = 0.28f;
+	float menuEnterTimer_ = 0.0f;       ///< メニュー展開トランジションタイマー
+	static constexpr float kMenuEnterDuration = 0.35f;
+	bool isCursorShown_ = false;
+	void SetCursorVisible(bool visible);
+
 	int currentLocationIndex_ = 0;
 	bool lockLocation_ = false;          ///< デバッグ用：カット切替を停止
 	static constexpr float kCutDuration = 6.0f; ///< 1カットの長さ(秒)
 
 	// --- UI追加要素 ---
 	UIText pressSpaceText_;
+	std::unique_ptr<Sprite> pressSpaceBannerBg_;               ///< 操作案内の半透明ダーク帯（機体との被り防止）
+	std::vector<std::unique_ptr<Sprite>> pressSpaceBorders_;   ///< 操作案内帯のサイバー枠線
+	std::unique_ptr<Sprite> consoleBgSprite_;                  ///< コンソールブート時の完全漆黒背景スプライト
 	UIPanel scanlineOverlay_;
 	UIPanel menuCardPanel_;                         ///< メニュー中央のコンソール端末ウィンドウ
 	UIPanel menuHeaderPanel_;                       ///< コンソール端末上部ヘッダーバー
