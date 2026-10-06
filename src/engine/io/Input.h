@@ -103,9 +103,14 @@ public:
 	/// <summary>
 	/// クライアント領域基準でのマウス位置取得
 	/// </summary>
-	/// <param name="hwnd">ウィンドウハンドル</param>
+	/// <param name="hwnd">ウィンドウハンドル（省略時は初期化時のHWNDを使用）</param>
 	/// <returns>座標構造体</returns>
-	MousePosition GetMouseScreenPosition(HWND hwnd);
+	MousePosition GetMouseScreenPosition(HWND hwnd = nullptr);
+
+	/// <summary>
+	/// ウィンドウハンドル取得
+	/// </summary>
+	HWND GetHwnd() const { return hwnd_; }
 
 	~Input() = default;
 

@@ -691,11 +691,18 @@ void TitleScene::Update() {
 	if (state_ == TitleState::DroneView) {
 		SetCursorVisible(false); // ドローン画面中はマウスカーソル非表示（項目7）
 
-		// スペースキーまたはクリックでOSウィンドウ最小化演出を経てコンソールへ（項目1）
+		// スペースキー、Enterキー、またはマウスクリック（左クリック）でOSウィンドウ最小化演出を経てコンソールへ（項目1）
 		Input* input = Input::GetInstance();
-		if (input->TriggerKey(DIK_SPACE) || input->TriggerMouse(0)) {
+		bool clickTriggered = input->TriggerMouse(0) || ((::GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0 && !wasLButtonDown_);
+		bool enterTriggered = input->TriggerKey(DIK_SPACE) || input->TriggerKey(DIK_RETURN);
+		wasLButtonDown_ = ((::GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0) || input->PushMouse(0);
+
+		if (enterTriggered || clickTriggered) {
 			state_ = TitleState::WindowClose;
 			windowCloseTimer_ = 0.0f;
+			if (CurrentLocation().id == TitleLocation::CrashedForest) {
+				ChangeLocation(0); // 通信途絶現場からメニュー移行時は基地メイン回線（格納庫）に接続復帰
+			}
 		}
 
 		// ポストエフェクト (ドローン風 + ブルーム発光)
@@ -823,7 +830,9 @@ void TitleScene::Update() {
 		SetCursorVisible(false); // コンソール演出中もマウスカーソル完全非表示（項目7）
 		consoleBootTimer_ += dt;
 		Input* input = Input::GetInstance();
-		bool skipTriggered = (consoleBootTimer_ > 0.30f && (input->TriggerKey(DIK_SPACE) || input->TriggerKey(DIK_RETURN) || input->TriggerMouse(0)));
+		bool clickTriggered = input->TriggerMouse(0) || ((::GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0 && !wasLButtonDown_);
+		wasLButtonDown_ = ((::GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0) || input->PushMouse(0);
+		bool skipTriggered = (consoleBootTimer_ > 0.30f && (input->TriggerKey(DIK_SPACE) || input->TriggerKey(DIK_RETURN) || clickTriggered));
 
 		// 時間経過またはスキップで、スムーズなフェードアウト＆トランジション演出を開始（項目3）
 		if (consoleBootTimer_ >= kConsoleBootDuration || skipTriggered) {
@@ -834,6 +843,9 @@ void TitleScene::Update() {
 				consoleExitTimer_ = 0.0f;
 				menuEnterTimer_ = kMenuEnterDuration; // メニュー起動トランジション開始！
 				SetCursorVisible(true);               // メニューに入って初めてカーソルを表示！
+				if (CurrentLocation().id == TitleLocation::CrashedForest) {
+					ChangeLocation(0); // メニュー突入時に通信途絶現場なら基地メイン回線（格納庫）に復帰
+				}
 			}
 		}
 
@@ -867,7 +879,65 @@ void TitleScene::Update() {
 		if (menuEnterTimer_ > 0.0f) {
 			menuEnterTimer_ -= dt;
 		}
-		selectionManager_.Update();
+
+		// --- 疑似ウィンドウ（DAWN_OS ターミナル）のマウスドラッグ＆UI操作 ---
+		Input* input = Input::GetInstance();
+		HWND hwnd = input->GetHwnd();
+		Input::MousePosition mousePos = input->GetMouseScreenPosition();
+		float mx = static_cast<float>(mousePos.x);
+		float my = static_cast<float>(mousePos.y);
+
+		// クライアント領域スケーリング（DPIやリサイズによるゲーム解像度との不一致を完全解消）
+		if (hwnd) {
+			RECT rc;
+			if (::GetClientRect(hwnd, &rc) && (rc.right - rc.left > 0) && (rc.bottom - rc.top > 0)) {
+				float actualW = static_cast<float>(rc.right - rc.left);
+				float actualH = static_cast<float>(rc.bottom - rc.top);
+				mx *= (kScreenWidth / actualW);
+				my *= (kScreenHeight / actualH);
+			}
+		}
+
+		const float cardW = 520.0f;
+		const float cardH = 616.0f;
+		const float tbH = 34.0f;
+
+		// マウスボタン押下判定（DirectInput ＋ Windows API の多重フォールバック）
+		bool isLButtonDown = input->PushMouse(0) || ((::GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0);
+		bool isLButtonTrigger = input->TriggerMouse(0) || (isLButtonDown && !wasLButtonDown_);
+
+		// タイトルバー右上の [×] 閉じるボタン (18x18px)
+		const float closeBtnX = menuWindowPos_.x + cardW - 34.0f;
+		const float closeBtnY = menuWindowPos_.y + 5.0f;
+		if (isLButtonTrigger && mx >= closeBtnX && mx <= closeBtnX + 22.0f && my >= closeBtnY && my <= closeBtnY + 22.0f) {
+			PostQuitMessage(0);
+		}
+
+		// タイトルバーのドラッグ判定（右端のボタン領域を除く上部バー全域）
+		if (!isWindowDragging_ && isLButtonTrigger) {
+			if (mx >= menuWindowPos_.x && mx <= menuWindowPos_.x + cardW - 36.0f &&
+				my >= menuWindowPos_.y && my <= menuWindowPos_.y + tbH) {
+				isWindowDragging_ = true;
+				windowDragOffset_ = { mx - menuWindowPos_.x, my - menuWindowPos_.y };
+			}
+		}
+
+		if (isWindowDragging_) {
+			if (!isLButtonDown) {
+				isWindowDragging_ = false;
+			} else {
+				Vector2 targetPos = { mx - windowDragOffset_.x, my - windowDragOffset_.y };
+				// 画面外への完全な消失を防止（タイトルバーが常に画面内に留まるようクランプ）
+				targetPos.x = std::clamp(targetPos.x, -cardW + 80.0f, kScreenWidth - 80.0f);
+				targetPos.y = std::clamp(targetPos.y, 0.0f, kScreenHeight - tbH);
+				UpdateMenuWindowPosition(targetPos);
+			}
+		}
+		wasLButtonDown_ = isLButtonDown;
+
+		if (!isWindowDragging_) {
+			selectionManager_.Update();
+		}
 		UpdateMenuConsoleVisuals();
 
 		// 現在のロケーションをゆっくりOrbitする
@@ -1017,8 +1087,8 @@ void TitleScene::Draw() {
 	Camera* titleCamera = CameraManager::GetInstance()->GetActiveCamera();
 
 	// 墜落現場専用：「何も映さずノイズだけがいいね」
-	// 機体・地面・セット・残骸・エフェクトなど3Dは一切映さず、フラットな背景のみ描画してポストエフェクトの全面砂嵐ノイズに委ねる！
-	if (loc.id == TitleLocation::CrashedForest) {
+	// ドローン視点時のみ3Dは一切映さず、フラットな背景のみ描画してポストエフェクトの全面砂嵐ノイズに委ねる！
+	if (loc.id == TitleLocation::CrashedForest && state_ == TitleState::DroneView) {
 		if (skybox_) {
 			skybox_->SetColor({ 0.18f, 0.18f, 0.20f, 1.0f });
 			SkyboxCommon::GetInstance()->SetupCommonState();
@@ -1374,14 +1444,18 @@ void TitleScene::ChangeLocation(int index) {
 
 void TitleScene::InitializeMenuCard(SpriteCommon* spriteCommon) {
 	menuBorderSprites_.clear();
+	menuBorderOffsets_.clear();
 	buttonBorders_.clear();
+	buttonBorderOutlineOffsets_.clear();
+	buttonBorderBracketOffsets_.clear();
+	buttonBorderIndicatorOffsets_.clear();
 
 	const float cardWidth = 520.0f;
 	const float cardHeight = 616.0f;
-	const float cardX = (kScreenWidth - cardWidth) * 0.5f; // 380.0f
-	const float cardY = 52.0f;
+	const float cardX = menuWindowPos_.x; // 380.0f
+	const float cardY = menuWindowPos_.y; // 52.0f
 
-	auto addBorderLine = [this, spriteCommon](const Vector2& pos, const Vector2& size, const MyMath::Vector4& color) {
+	auto addBorderLine = [this, spriteCommon, cardX, cardY](const Vector2& pos, const Vector2& size, const MyMath::Vector4& color) {
 		auto sp = std::make_unique<Sprite>();
 		sp->Initialize(spriteCommon, "assets/textures/white1x1.png");
 		sp->SetAnchorPoint({ 0.0f, 0.0f });
@@ -1389,6 +1463,7 @@ void TitleScene::InitializeMenuCard(SpriteCommon* spriteCommon) {
 		sp->SetSize(size);
 		sp->SetColor(color);
 		sp->Update();
+		menuBorderOffsets_.push_back({ pos.x - cardX, pos.y - cardY });
 		menuBorderSprites_.push_back(std::move(sp));
 	};
 
@@ -1474,11 +1549,11 @@ void TitleScene::InitializeMenuCard(SpriteCommon* spriteCommon) {
 	addBorderLine({ cardX, cardY + 32.0f }, { cardWidth, 2.0f }, { 0.20f, 0.85f, 0.50f, 0.80f });
 
 	// タイトル下（Y=232）の水平区切り線
-	addBorderLine({ cardX + 24.0f, 232.0f }, { cardWidth - 48.0f, 1.0f }, { 0.18f, 0.75f, 0.45f, 0.45f });
+	addBorderLine({ cardX + 24.0f, cardY + 180.0f }, { cardWidth - 48.0f, 1.0f }, { 0.18f, 0.75f, 0.45f, 0.45f });
 
 	// 操作案内枠（Y=482、高さ38px、幅 cardWidth - 50px）
 	const float gfX = cardX + 25.0f;
-	const float gfY = 482.0f;
+	const float gfY = cardY + 430.0f;
 	const float gfW = cardWidth - 50.0f;
 	const float gfH = 38.0f;
 	const MyMath::Vector4 gfCorner = { 0.22f, 0.85f, 0.50f, 0.65f };
@@ -1501,8 +1576,8 @@ void TitleScene::InitializeMenuCard(SpriteCommon* spriteCommon) {
 	// ------------------------------------------------------------
 	const float btnW = 390.0f;
 	const float btnH = 44.0f;
-	const float btnX = (kScreenWidth - btnW) * 0.5f;
-	const float btnStartY = 248.0f;
+	const float btnX = cardX + 65.0f;
+	const float btnStartY = cardY + 196.0f;
 	const float btnSpacing = 56.0f;
 	const float bcLen = 8.0f;
 	const float bcThick = 2.0f;
@@ -1521,27 +1596,102 @@ void TitleScene::InitializeMenuCard(SpriteCommon* spriteCommon) {
 	for (int i = 0; i < 4; ++i) {
 		float by = btnStartY + btnSpacing * static_cast<float>(i);
 		ButtonBorderGroup group;
+		std::vector<Vector2> outOffsets;
+		std::vector<Vector2> brkOffsets;
+
+		auto addOutline = [&](const Vector2& pos, const Vector2& size, const MyMath::Vector4& color) {
+			outOffsets.push_back({ pos.x - cardX, pos.y - cardY });
+			group.outlines.push_back(createLineSprite(pos, size, color));
+		};
+		auto addBracket = [&](const Vector2& pos, const Vector2& size, const MyMath::Vector4& color) {
+			brkOffsets.push_back({ pos.x - cardX, pos.y - cardY });
+			group.brackets.push_back(createLineSprite(pos, size, color));
+		};
 
 		// 外周枠線 (1px) 4本
-		group.outlines.push_back(createLineSprite({ btnX, by }, { btnW, 1.0f }, { 0.15f, 0.50f, 0.30f, 0.35f }));
-		group.outlines.push_back(createLineSprite({ btnX, by + btnH - 1.0f }, { btnW, 1.0f }, { 0.15f, 0.50f, 0.30f, 0.35f }));
-		group.outlines.push_back(createLineSprite({ btnX, by }, { 1.0f, btnH }, { 0.15f, 0.50f, 0.30f, 0.35f }));
-		group.outlines.push_back(createLineSprite({ btnX + btnW - 1.0f, by }, { 1.0f, btnH }, { 0.15f, 0.50f, 0.30f, 0.35f }));
+		addOutline({ btnX, by }, { btnW, 1.0f }, { 0.15f, 0.50f, 0.30f, 0.35f });
+		addOutline({ btnX, by + btnH - 1.0f }, { btnW, 1.0f }, { 0.15f, 0.50f, 0.30f, 0.35f });
+		addOutline({ btnX, by }, { 1.0f, btnH }, { 0.15f, 0.50f, 0.30f, 0.35f });
+		addOutline({ btnX + btnW - 1.0f, by }, { 1.0f, btnH }, { 0.15f, 0.50f, 0.30f, 0.35f });
 
 		// 四隅ブラケット (2px) 8本
-		group.brackets.push_back(createLineSprite({ btnX, by }, { bcLen, bcThick }, { 0.20f, 0.70f, 0.40f, 0.50f }));
-		group.brackets.push_back(createLineSprite({ btnX, by }, { bcThick, bcLen }, { 0.20f, 0.70f, 0.40f, 0.50f }));
-		group.brackets.push_back(createLineSprite({ btnX + btnW - bcLen, by }, { bcLen, bcThick }, { 0.20f, 0.70f, 0.40f, 0.50f }));
-		group.brackets.push_back(createLineSprite({ btnX + btnW - bcThick, by }, { bcThick, bcLen }, { 0.20f, 0.70f, 0.40f, 0.50f }));
-		group.brackets.push_back(createLineSprite({ btnX, by + btnH - bcThick }, { bcLen, bcThick }, { 0.20f, 0.70f, 0.40f, 0.50f }));
-		group.brackets.push_back(createLineSprite({ btnX, by + btnH - bcLen }, { bcThick, bcLen }, { 0.20f, 0.70f, 0.40f, 0.50f }));
-		group.brackets.push_back(createLineSprite({ btnX + btnW - bcLen, by + btnH - bcThick }, { bcLen, bcThick }, { 0.20f, 0.70f, 0.40f, 0.50f }));
-		group.brackets.push_back(createLineSprite({ btnX + btnW - bcThick, by + btnH - bcLen }, { bcThick, bcLen }, { 0.20f, 0.70f, 0.40f, 0.50f }));
+		addBracket({ btnX, by }, { bcLen, bcThick }, { 0.20f, 0.70f, 0.40f, 0.50f });
+		addBracket({ btnX, by }, { bcThick, bcLen }, { 0.20f, 0.70f, 0.40f, 0.50f });
+		addBracket({ btnX + btnW - bcLen, by }, { bcLen, bcThick }, { 0.20f, 0.70f, 0.40f, 0.50f });
+		addBracket({ btnX + btnW - bcThick, by }, { bcThick, bcLen }, { 0.20f, 0.70f, 0.40f, 0.50f });
+		addBracket({ btnX, by + btnH - bcThick }, { bcLen, bcThick }, { 0.20f, 0.70f, 0.40f, 0.50f });
+		addBracket({ btnX, by + btnH - bcLen }, { bcThick, bcLen }, { 0.20f, 0.70f, 0.40f, 0.50f });
+		addBracket({ btnX + btnW - bcLen, by + btnH - bcThick }, { bcLen, bcThick }, { 0.20f, 0.70f, 0.40f, 0.50f });
+		addBracket({ btnX + btnW - bcThick, by + btnH - bcLen }, { bcThick, bcLen }, { 0.20f, 0.70f, 0.40f, 0.50f });
 
 		// 左端のアクティブバー
+		buttonBorderIndicatorOffsets_.push_back({ (btnX - 8.0f) - cardX, (by + 12.0f) - cardY });
 		group.indicator = createLineSprite({ btnX - 8.0f, by + 12.0f }, { 3.0f, 20.0f }, { 0.08f, 0.25f, 0.15f, 0.25f });
 
+		buttonBorderOutlineOffsets_.push_back(std::move(outOffsets));
+		buttonBorderBracketOffsets_.push_back(std::move(brkOffsets));
 		buttonBorders_.push_back(std::move(group));
+	}
+}
+
+void TitleScene::UpdateMenuWindowPosition(const Vector2& newPos) {
+	menuWindowPos_ = newPos;
+
+	menuCardPanel_.SetPosition(menuWindowPos_);
+	menuCardPanel_.Update();
+
+	menuHeaderPanel_.SetPosition(menuWindowPos_);
+	menuHeaderPanel_.Update();
+
+	if (headerLampSprite_) {
+		headerLampSprite_->SetPosition({ menuWindowPos_.x + 14.0f, menuWindowPos_.y + 12.0f });
+		headerLampSprite_->Update();
+	}
+
+	for (size_t i = 0; i < menuBorderSprites_.size() && i < menuBorderOffsets_.size(); ++i) {
+		menuBorderSprites_[i]->SetPosition({ menuWindowPos_.x + menuBorderOffsets_[i].x, menuWindowPos_.y + menuBorderOffsets_[i].y });
+		menuBorderSprites_[i]->Update();
+	}
+
+	if (titleLogoSprite_) {
+		titleLogoSprite_->SetPosition({ menuWindowPos_.x + 260.0f, menuWindowPos_.y + 82.0f });
+		titleLogoSprite_->Update();
+	}
+
+	subtitleText_.SetPosition({ menuWindowPos_.x + 260.0f, menuWindowPos_.y + 144.0f });
+	subtitleText_.Update();
+
+	const float btnX = menuWindowPos_.x + 65.0f;
+	const float btnStartY = menuWindowPos_.y + 196.0f;
+	const float btnSpacing = 56.0f;
+
+	startButton_.SetPosition({ btnX, btnStartY });
+	startButton_.Update();
+	editorButton_.SetPosition({ btnX, btnStartY + btnSpacing });
+	editorButton_.Update();
+	settingsButton_.SetPosition({ btnX, btnStartY + btnSpacing * 2.0f });
+	settingsButton_.Update();
+	exitButton_.SetPosition({ btnX, btnStartY + btnSpacing * 3.0f });
+	exitButton_.Update();
+
+	for (size_t i = 0; i < buttonBorders_.size(); ++i) {
+		auto& group = buttonBorders_[i];
+		if (i < buttonBorderOutlineOffsets_.size()) {
+			for (size_t j = 0; j < group.outlines.size() && j < buttonBorderOutlineOffsets_[i].size(); ++j) {
+				group.outlines[j]->SetPosition({ menuWindowPos_.x + buttonBorderOutlineOffsets_[i][j].x, menuWindowPos_.y + buttonBorderOutlineOffsets_[i][j].y });
+				group.outlines[j]->Update();
+			}
+		}
+		if (i < buttonBorderBracketOffsets_.size()) {
+			for (size_t j = 0; j < group.brackets.size() && j < buttonBorderBracketOffsets_[i].size(); ++j) {
+				group.brackets[j]->SetPosition({ menuWindowPos_.x + buttonBorderBracketOffsets_[i][j].x, menuWindowPos_.y + buttonBorderBracketOffsets_[i][j].y });
+				group.brackets[j]->Update();
+			}
+		}
+		if (i < buttonBorderIndicatorOffsets_.size() && group.indicator) {
+			group.indicator->SetPosition({ menuWindowPos_.x + buttonBorderIndicatorOffsets_[i].x, menuWindowPos_.y + buttonBorderIndicatorOffsets_[i].y });
+			group.indicator->Update();
+		}
 	}
 }
 
@@ -1618,11 +1768,11 @@ void TitleScene::DrawMenuCard() {
 	if (menuEnterTimer_ > 0.0f) {
 		float enterRatio = 1.0f - (menuEnterTimer_ / kMenuEnterDuration);
 		enterRatio = (std::min)((std::max)(enterRatio, 0.0f), 1.0f);
-		float cardY = 52.0f;
+		float cardY = menuWindowPos_.y;
 		float laserY = cardY + 616.0f * enterRatio;
 
 		TextRenderer* tr = TextRenderer::GetInstance();
-		tr->Print("HackGen", ">> CONSTRUCTING TACTICAL UI FRAMEWORK... 100% <<", kScreenWidth * 0.5f, laserY - 14.0f, 12.0f, { 0.40f, 1.0f, 0.70f, 0.90f }, { 0.5f, 0.5f });
+		tr->Print("HackGen", ">> CONSTRUCTING TACTICAL UI FRAMEWORK... 100% <<", menuWindowPos_.x + 260.0f, laserY - 14.0f, 12.0f, { 0.40f, 1.0f, 0.70f, 0.90f }, { 0.5f, 0.5f });
 	}
 }
 
@@ -2170,14 +2320,14 @@ void TitleScene::DrawUI() {
 		TextRenderer* tr = TextRenderer::GetInstance();
 		const float cardWidth = 520.0f;
 		const float cardHeight = 616.0f;
-		const float cardX = (kScreenWidth - cardWidth) * 0.5f;
-		const float cardY = 52.0f;
+		const float cardX = menuWindowPos_.x;
+		const float cardY = menuWindowPos_.y;
 
 		// 端末ヘッダーテキスト (HackGen 13.0f) - タイトルバー左側
 		tr->Print("HackGen", "TERMINAL : DAWN_OS [v4.12]", cardX + 28.0f, cardY + 9.0f, 13.0f, { 0.35f, 1.0f, 0.60f, 0.95f });
 
 		// 作戦指令ヘッダーラベル - すべて緑文字に統一
-		tr->Print("HackGen", "/// CLASSIFIED OPERATION DIRECTIVE ///", kScreenWidth * 0.5f, 74.0f, 11.0f, { 0.22f, 0.78f, 0.45f, 0.80f }, { 0.5f, 0.0f });
+		tr->Print("HackGen", "/// CLASSIFIED OPERATION DIRECTIVE ///", cardX + cardWidth * 0.5f, cardY + 22.0f, 11.0f, { 0.22f, 0.78f, 0.45f, 0.80f }, { 0.5f, 0.0f });
 
 		// メインタイトル：DAWN ロゴスプライト（白文字 + MiG-21通過）
 		if (titleLogoSprite_) {
@@ -2188,7 +2338,7 @@ void TitleScene::DrawUI() {
 		subtitleText_.Draw();
 
 		// システム認証ステータス行 - すべて緑文字に統一
-		tr->Print("HackGen", "AUTH LEVEL 5 GRANTED // READY FOR MISSION INPUT", kScreenWidth * 0.5f, 214.0f, 10.5f, { 0.22f, 0.78f, 0.45f, 0.85f }, { 0.5f, 0.0f });
+		tr->Print("HackGen", "AUTH LEVEL 5 GRANTED // READY FOR MISSION INPUT", cardX + cardWidth * 0.5f, cardY + 162.0f, 10.5f, { 0.22f, 0.78f, 0.45f, 0.85f }, { 0.5f, 0.0f });
 
 		// メニューボタン（コマンド行）
 		startButton_.Draw();
@@ -2200,8 +2350,8 @@ void TitleScene::DrawUI() {
 		tr->Print(
 			"HackGen",
 			"[ UP / DOWN ] SELECT     [ ENTER / SPACE ] EXECUTE",
-			kScreenWidth * 0.5f,
-			501.0f,
+			cardX + cardWidth * 0.5f,
+			cardY + 449.0f,
 			14.0f,
 			{ 0.35f, 0.95f, 0.55f, 0.95f },
 			{ 0.5f, 0.5f }

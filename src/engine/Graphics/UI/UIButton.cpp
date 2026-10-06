@@ -111,13 +111,22 @@ void UIButton::Draw() {
 }
 
 bool UIButton::IsMouseInside() const {
-	HWND hwnd = FindWindowW(L"WindowClass", nullptr);
-	if (!hwnd) return false;
-
-	Input::MousePosition mousePos = Input::GetInstance()->GetMouseScreenPosition(hwnd);
+	Input* input = Input::GetInstance();
+	HWND hwnd = input->GetHwnd();
+	Input::MousePosition mousePos = input->GetMouseScreenPosition();
 
 	float mx = static_cast<float>(mousePos.x);
 	float my = static_cast<float>(mousePos.y);
+
+	if (hwnd) {
+		RECT rc;
+		if (::GetClientRect(hwnd, &rc) && (rc.right - rc.left > 0) && (rc.bottom - rc.top > 0)) {
+			float actualW = static_cast<float>(rc.right - rc.left);
+			float actualH = static_cast<float>(rc.bottom - rc.top);
+			mx *= (static_cast<float>(WinApp::kClientWidth) / actualW);
+			my *= (static_cast<float>(WinApp::kClientHeight) / actualH);
+		}
+	}
 
 	float left = position_.x - size_.x * anchorPoint_.x;
 	float right = left + size_.x;

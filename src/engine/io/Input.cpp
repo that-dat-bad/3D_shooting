@@ -63,10 +63,25 @@ void Input::Update()
 
 	// 入力取得
 	keyboard_->Acquire();
-	mouse_->Acquire();
 	keyboard_->GetDeviceState(sizeof(keys_), keys_);
 	
-	mouse_->GetDeviceState(sizeof(mouseState_), &mouseState_);
+	HRESULT hr = mouse_->Acquire();
+	hr = mouse_->GetDeviceState(sizeof(mouseState_), &mouseState_);
+	if (FAILED(hr)) {
+		mouse_->Acquire();
+		mouse_->GetDeviceState(sizeof(mouseState_), &mouseState_);
+	}
+
+	// Win32 API のマウスボタン状態も統合（フォーカス状態やDirectInput一時ロスト時にも確実に検出）
+	if ((::GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0) {
+		mouseState_.rgbButtons[0] = 0x80;
+	}
+	if ((::GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0) {
+		mouseState_.rgbButtons[1] = 0x80;
+	}
+	if ((::GetAsyncKeyState(VK_MBUTTON) & 0x8000) != 0) {
+		mouseState_.rgbButtons[2] = 0x80;
+	}
 
 	// カーソルロック中は毎フレーム、OSカーソルをウィンドウ中央に戻す
 	if (cursorLocked_ && hwnd_) {
@@ -111,7 +126,11 @@ Input::MousePosition Input::GetMouseScreenPosition(HWND hwnd)
 {
 	POINT pt;
 	::GetCursorPos(&pt);
-	::ScreenToClient(hwnd, &pt);
+	HWND targetHwnd = hwnd ? hwnd : hwnd_;
+	if (targetHwnd)
+	{
+		::ScreenToClient(targetHwnd, &pt);
+	}
 	return { pt.x, pt.y };
 }
 

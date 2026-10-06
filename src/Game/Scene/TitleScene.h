@@ -88,8 +88,19 @@ private:
 
 	void InitializeMenuCard(SpriteCommon* spriteCommon);
 	void UpdateMenuConsoleVisuals();
+	void UpdateMenuWindowPosition(const Vector2& newPos);
 	void DrawMenuCard();
 	void DrawTransitionGlitch();
+
+	// --- 疑似ウィンドウ（DAWN_OS ターミナル）のマウスドラッグ移動管理 ---
+	Vector2 menuWindowPos_ = { 380.0f, 52.0f }; ///< ウィンドウ左上座標
+	bool isWindowDragging_ = false;             ///< ドラッグ中フラグ
+	bool wasLButtonDown_ = false;               ///< 前フレームの左マウスボタン押下状態
+	Vector2 windowDragOffset_ = { 0.0f, 0.0f }; ///< ドラッグ開始時のマウス相対オフセット
+	std::vector<Vector2> menuBorderOffsets_;    ///< menuBorderSprites_ の相対オフセット
+	std::vector<std::vector<Vector2>> buttonBorderOutlineOffsets_;  ///< ボタン外周枠線相対オフセット
+	std::vector<std::vector<Vector2>> buttonBorderBracketOffsets_;  ///< ボタン四隅ブラケット相対オフセット
+	std::vector<Vector2> buttonBorderIndicatorOffsets_;            ///< ボタンインジケーター相対オフセット
 	void DrawConsoleBoot();
 	void InitializeWindowCloseVisuals(SpriteCommon* spriteCommon);
 	void DrawWindowClose();
