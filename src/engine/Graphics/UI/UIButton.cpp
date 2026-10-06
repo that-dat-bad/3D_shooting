@@ -89,11 +89,12 @@ void UIButton::Update() {
 	// 背景パネルの更新
 	backgroundPanel_.SetPosition(position_);
 	backgroundPanel_.SetSize(size_);
+	backgroundPanel_.SetAnchorPoint(anchorPoint_);
 	backgroundPanel_.Update();
 
 	// ラベルテキストの更新（ボタン中央に配置）
-	float textX = position_.x + size_.x * 0.5f;
-	float textY = position_.y + size_.y * 0.5f;
+	float textX = position_.x + size_.x * (0.5f - anchorPoint_.x);
+	float textY = position_.y + size_.y * (0.5f - anchorPoint_.y);
 	labelText_.SetPosition({ textX, textY });
 	labelText_.SetVisible(isVisible_);
 	labelText_.Update();
@@ -118,6 +119,10 @@ bool UIButton::IsMouseInside() const {
 	float mx = static_cast<float>(mousePos.x);
 	float my = static_cast<float>(mousePos.y);
 
-	return (mx >= position_.x && mx <= position_.x + size_.x &&
-			my >= position_.y && my <= position_.y + size_.y);
+	float left = position_.x - size_.x * anchorPoint_.x;
+	float right = left + size_.x;
+	float top = position_.y - size_.y * anchorPoint_.y;
+	float bottom = top + size_.y;
+
+	return (mx >= left && mx <= right && my >= top && my <= bottom);
 }

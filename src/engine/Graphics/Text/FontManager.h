@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -15,6 +15,9 @@ struct CharacterInfo {
     std::string textureName;
     uint32_t textureIndex = 0;
     float size = 0.0f;
+    float ascent = 0.0f;
+    float descent = 0.0f;
+    float lineGap = 0.0f;
 };
 
 /// <summary>

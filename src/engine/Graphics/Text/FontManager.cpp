@@ -1,4 +1,4 @@
-﻿#include "FontManager.h"
+#include "FontManager.h"
 
 #define STBRP_STATIC
 #define STB_RECT_PACK_IMPLEMENTATION
@@ -116,6 +116,22 @@ void FontManager::LoadFont(const std::string& fontName, const std::string& fileP
     info.size = pixelHeight;
     info.textureName = fontName + "_Tex";
     info.textureIndex = 0;
+
+    // フォントの垂直メトリクス（ベースライン、アセント、ディセント）の取得
+    stbtt_fontinfo fontInfo;
+    int fontOffset = stbtt_GetFontOffsetForIndex(ttfBuffer.data(), 0);
+    if (fontOffset >= 0 && stbtt_InitFont(&fontInfo, ttfBuffer.data(), fontOffset)) {
+        int ascent = 0, descent = 0, lineGap = 0;
+        stbtt_GetFontVMetrics(&fontInfo, &ascent, &descent, &lineGap);
+        float vScale = stbtt_ScaleForPixelHeight(&fontInfo, pixelHeight);
+        info.ascent = static_cast<float>(ascent) * vScale;
+        info.descent = static_cast<float>(descent) * vScale;
+        info.lineGap = static_cast<float>(lineGap) * vScale;
+    } else {
+        info.ascent = pixelHeight * 0.8f;
+        info.descent = -pixelHeight * 0.2f;
+        info.lineGap = 0.0f;
+    }
 
     // ハッシュマップに格納
     for (size_t i = 0; i < codepoints.size(); ++i) {

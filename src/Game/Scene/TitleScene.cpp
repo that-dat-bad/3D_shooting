@@ -468,10 +468,10 @@ void TitleScene::Initialize() {
 	addBannerLine({ bannerX + bannerW - 8.0f, bannerY + bannerH - 2.0f }, { 8.0f, 2.0f }, bannerLineCol);
 	addBannerLine({ bannerX + bannerW - 2.0f, bannerY + bannerH - 8.0f }, { 2.0f, 8.0f }, bannerLineCol);
 
-	// フォントベースラインの浮き上がりを相殺するため、Y中心に +4.5f を加えてバナー枠の中央にジャストフィット
+	// 正確なascent/descentアンカー計算により、バナー枠の中心にジャストフィット
 	pressSpaceText_.Initialize("HackGen", "[ PRESS SPACE OR CLICK TO START / SKIP ]", 14.0f);
 	pressSpaceText_.SetAnchorPoint({ 0.5f, 0.5f });
-	pressSpaceText_.SetPosition({ kScreenWidth * 0.5f, bannerY + bannerH * 0.5f + 4.5f });
+	pressSpaceText_.SetPosition({ kScreenWidth * 0.5f, bannerY + bannerH * 0.5f });
 	pressSpaceText_.SetColor({ 0.35f, 1.0f, 0.65f, 0.95f });
 	pressSpaceText_.SetDropShadow(true, { 1.5f, 1.5f }, { 0.0f, 0.0f, 0.0f, 0.95f });
 	UIStateStyle pulseStyle;
@@ -710,37 +710,70 @@ void TitleScene::Update() {
 		bloom.dirY = (loc.id == TitleLocation::Tunnel) ? 0.78f : 0.74f;    // 輝度閾値 (0.60fから0.78fに引き上げ、高輝度部のみ自然に光らせる)
 		postEffect->AddActiveEffect(bloom);
 
-		// カメラ切替時の砂嵐ノイズトランジション演出（項目10）
-		if (transitionTimer_ > 0.0f) {
-			float t = transitionTimer_ / kTransitionDuration;
+		// 墜落現場専用：適度で落ち着いた砂嵐モニター演出（過剰な激しさを抑制）
+		if (loc.id == TitleLocation::CrashedForest) {
+			// 控えめなグリッチスパイク
+			float glitchSpike = (rand() % 100 < 8) ? (0.08f + static_cast<float>(rand() % 100) / 100.0f * 0.12f) : 0.0f;
+
+			// 1. 落ち着いた砂嵐ノイズ（0.65fから0.22fへ大幅抑制）
 			ActivePostEffect noise;
 			noise.type = PostEffectType::kRandom;
-			noise.intensity = 0.35f * t;
+			noise.intensity = 0.22f + glitchSpike;
 			postEffect->AddActiveEffect(noise);
 
-			ActivePostEffect glitchScan;
-			glitchScan.type = PostEffectType::kScanLine;
-			glitchScan.intensity = 0.18f * t;
-			postEffect->AddActiveEffect(glitchScan);
-		} else {
-			// 通常時の繊細な走査線（項目9）
+			// 2. 繊細なCRT走査線（0.28fから0.12fへ抑制、ゆっくりスクロール）
 			ActivePostEffect scanline;
 			scanline.type = PostEffectType::kScanLine;
-			scanline.intensity = 0.045f;
+			scanline.intensity = 0.12f + glitchSpike * 0.2f;
+			scanline.dirX = 520.0f; // 走査線の細かさ
+			scanline.dirY = 6.0f;   // 穏やかなスクロール
 			postEffect->AddActiveEffect(scanline);
+
+			// 3. 控えめで上品な色収差（0.032fから0.012fへ抑制し、文字の可読性を確保）
+			ActivePostEffect chromatic;
+			chromatic.type = PostEffectType::kChromaticAberration;
+			chromatic.intensity = 0.012f + glitchSpike * 0.015f;
+			postEffect->AddActiveEffect(chromatic);
+
+			// 4. 控えめなレンズ歪み（0.036fから0.010fへ抑制し、過剰な歪曲を解消）
+			ActivePostEffect lens;
+			lens.type = PostEffectType::kLensDistortion;
+			lens.intensity = 0.010f;
+			postEffect->AddActiveEffect(lens);
+		} else {
+			// 通常ロケーション（Tunnel など）
+			// カメラ切替時の砂嵐ノイズトランジション演出（項目10）
+			if (transitionTimer_ > 0.0f) {
+				float t = transitionTimer_ / kTransitionDuration;
+				ActivePostEffect noise;
+				noise.type = PostEffectType::kRandom;
+				noise.intensity = 0.35f * t;
+				postEffect->AddActiveEffect(noise);
+
+				ActivePostEffect glitchScan;
+				glitchScan.type = PostEffectType::kScanLine;
+				glitchScan.intensity = 0.18f * t;
+				postEffect->AddActiveEffect(glitchScan);
+			} else {
+				// 通常時の繊細な走査線（項目9）
+				ActivePostEffect scanline;
+				scanline.type = PostEffectType::kScanLine;
+				scanline.intensity = 0.045f;
+				postEffect->AddActiveEffect(scanline);
+			}
+
+			// 控えめで上品な色収差（項目1, 9: 残像・過剰ボケを防止）
+			ActivePostEffect chromatic;
+			chromatic.type = PostEffectType::kChromaticAberration;
+			chromatic.intensity = 0.006f;
+			postEffect->AddActiveEffect(chromatic);
+
+			// 控えめなレンズ歪み
+			ActivePostEffect lens;
+			lens.type = PostEffectType::kLensDistortion;
+			lens.intensity = 0.008f;
+			postEffect->AddActiveEffect(lens);
 		}
-
-		// 控えめで上品な色収差（項目1, 9: 残像・過剰ボケを防止）
-		ActivePostEffect chromatic;
-		chromatic.type = PostEffectType::kChromaticAberration;
-		chromatic.intensity = 0.006f;
-		postEffect->AddActiveEffect(chromatic);
-
-		// 控えめなレンズ歪み
-		ActivePostEffect lens;
-		lens.type = PostEffectType::kLensDistortion;
-		lens.intensity = 0.008f;
-		postEffect->AddActiveEffect(lens);
 
 		// ロケーション固有の色味（ビネット + カラーオーバーレイ）
 		if (loc.grade.vignette > 0.0f || loc.grade.tintIntensity > 0.0f) {
@@ -982,6 +1015,17 @@ void TitleScene::Draw() {
 
 	LocationData& loc = CurrentLocation();
 	Camera* titleCamera = CameraManager::GetInstance()->GetActiveCamera();
+
+	// 墜落現場専用：「何も映さずノイズだけがいいね」
+	// 機体・地面・セット・残骸・エフェクトなど3Dは一切映さず、フラットな背景のみ描画してポストエフェクトの全面砂嵐ノイズに委ねる！
+	if (loc.id == TitleLocation::CrashedForest) {
+		if (skybox_) {
+			skybox_->SetColor({ 0.18f, 0.18f, 0.20f, 1.0f });
+			SkyboxCommon::GetInstance()->SetupCommonState();
+			skybox_->Draw();
+		}
+		return;
+	}
 
 	if (skybox_) {
 		if (loc.id == TitleLocation::Tunnel) {
@@ -1293,6 +1337,18 @@ void TitleScene::UpdateLocationCamera(const LocationData& loc, float dt, bool me
 	// ドローン挙動：旋回移動による向心バンク傾き（手ぶれ・振動はゼロ、滑らかな旋回傾き）
 	float baseRoll = -orbitSpeed * bankTilt * 1.2f;
 	float dynamicRoll = baseRoll + std::cos(cameraTheta_) * 0.015f * bankTilt;
+
+	// 墜落現場専用：衝撃で故障しかけた監視カメラの電気的スタッター・微小ブレ
+	if (loc.id == TitleLocation::CrashedForest) {
+		if (rand() % 100 < 8) { // 8%の確率でカクッとノイズブレ
+			float shakeAmt = (static_cast<float>(rand() % 100) - 50.0f) * 0.003f;
+			camPos.x += shakeAmt;
+			camPos.y += shakeAmt * 0.7f;
+			dynamicRoll += shakeAmt * 2.2f;
+		}
+		float subtleVibe = std::sin(animTimer_ * 28.0f) * 0.006f;
+		camPos.y += subtleVibe;
+	}
 
 	Camera* titleCamera = CameraManager::GetInstance()->GetActiveCamera();
 	if (titleCamera) {
@@ -1609,8 +1665,10 @@ void TitleScene::DrawTransitionGlitch() {
 	// 画面中央の警告テキスト（ミリタリー通信同期アラート）
 	TextRenderer* tr = TextRenderer::GetInstance();
 	if (std::fmod(transitionTimer_, 0.09f) < 0.06f) {
-		tr->Print("HackGen", ">> OPTICAL FEED DISRUPTED - CHANNEL SYNCHRONIZING <<", kScreenWidth * 0.5f - 240.0f, kScreenHeight * 0.5f - 40.0f, 17.0f, { 1.0f, 0.82f, 0.15f, 0.95f });
-		tr->Print("HackGen", "/// SENSOR RE-ACQUISITION IN PROGRESS - STAND BY ///", kScreenWidth * 0.5f - 230.0f, kScreenHeight * 0.5f - 16.0f, 13.0f, { 0.2f, 0.92f, 1.0f, 0.85f });
+		const float cx = kScreenWidth * 0.5f;
+		const float cy = kScreenHeight * 0.5f;
+		tr->Print("HackGen", ">> OPTICAL FEED DISRUPTED - CHANNEL SYNCHRONIZING <<", cx, cy - 40.0f, 17.0f, { 1.0f, 0.82f, 0.15f, 0.95f }, { 0.5f, 0.5f });
+		tr->Print("HackGen", "/// SENSOR RE-ACQUISITION IN PROGRESS - STAND BY ///", cx, cy - 16.0f, 13.0f, { 0.2f, 0.92f, 1.0f, 0.85f }, { 0.5f, 0.5f });
 	}
 }
 
@@ -1722,16 +1780,45 @@ void TitleScene::DrawOSD() {
 	const float right = kScreenWidth - 48.0f;
 	const float top = 36.0f;
 	const float bottom = kScreenHeight - 36.0f;
+	const bool isDisconnected = (CurrentLocation().id == TitleLocation::CrashedForest);
 
 	// RECランプの点滅更新
 	if (recDotSprite_) {
-		bool recBlink = (std::fmod(animTimer_, 1.0f) < 0.6f);
-		recDotSprite_->SetColor(recBlink ? MyMath::Vector4{ 1.0f, 0.15f, 0.15f, 0.95f } : MyMath::Vector4{ 0.3f, 0.05f, 0.05f, 0.20f });
+		if (isDisconnected) {
+			// 切断時：高速な警告レッド点滅
+			bool errBlink = (std::fmod(animTimer_, 0.4f) < 0.2f);
+			recDotSprite_->SetColor(errBlink ? MyMath::Vector4{ 1.0f, 0.15f, 0.15f, 0.95f } : MyMath::Vector4{ 0.3f, 0.05f, 0.05f, 0.20f });
+		} else {
+			bool recBlink = (std::fmod(animTimer_, 1.0f) < 0.6f);
+			recDotSprite_->SetColor(recBlink ? MyMath::Vector4{ 1.0f, 0.15f, 0.15f, 0.95f } : MyMath::Vector4{ 0.3f, 0.05f, 0.05f, 0.20f });
+		}
 		recDotSprite_->Update();
 	}
 
-	// 枠・レティクル描画
-	for (auto& sp : osdSprites_) {
+	// 枠線・レティクルの動的カラー設定（墜落現場 CrashedForest では全て警告赤に！）
+	float blinkAlpha = isDisconnected ? (0.70f + 0.30f * std::sin(animTimer_ * 10.0f)) : 1.0f;
+	const MyMath::Vector4 redBorderCol = { 1.0f, 0.20f, 0.20f, 0.88f * blinkAlpha };
+	const MyMath::Vector4 redReticleCol = { 0.98f, 0.25f, 0.25f, 0.78f * blinkAlpha };
+
+	for (size_t i = 0; i < osdSprites_.size(); ++i) {
+		auto& sp = osdSprites_[i];
+		if (i % 2 == 1) { // 奇数インデックスが表面のバー（偶数は黒ドロップシャドウ）
+			if (isDisconnected) {
+				sp->SetColor(redBorderCol);
+			} else {
+				if (i <= 15) {
+					// 四隅ブラケット
+					sp->SetColor({ 0.90f, 0.96f, 1.0f, 0.85f });
+				} else if (i <= 19) {
+					// 水平ピッチマーカー
+					sp->SetColor({ 0.90f, 0.96f, 1.0f, 0.60f });
+				} else {
+					// センターレティクル
+					sp->SetColor({ 0.22f, 0.88f, 0.48f, 0.65f });
+				}
+			}
+			sp->Update();
+		}
 		sp->Draw();
 	}
 	if (recDotSprite_) {
@@ -1739,67 +1826,119 @@ void TitleScene::DrawOSD() {
 	}
 
 	TextRenderer* tr = TextRenderer::GetInstance();
+	const float cx = kScreenWidth * 0.5f;
+	const float cy = kScreenHeight * 0.5f;
 
-	// --- 左上: REC & タイムコード (HackGen) ---
-	tr->Print("HackGen", "REC", left + 24.0f, top + 9.0f, 15.0f, { 1.0f, 0.95f, 0.95f, 0.95f });
+	if (isDisconnected) {
+		// ============================================================
+		// 墜落現場専用：DISCONNECTED / 信号途絶HUD表示
+		// ============================================================
 
-	char timeBuf[32];
-	int totalSec = static_cast<int>(animTimer_);
-	int hours = (totalSec / 3600) % 24;
-	int mins = (totalSec / 60) % 60;
-	int secs = totalSec % 60;
-	int frames = static_cast<int>((animTimer_ - totalSec) * 60.0f);
-	snprintf(timeBuf, sizeof(timeBuf), "%02d:%02d:%02d:%02d", hours, mins, secs, frames);
-	tr->Print("HackGen", timeBuf, left + 64.0f, top + 9.0f, 15.0f, { 0.85f, 0.95f, 1.0f, 0.85f });
-
-	// ドローン姿勢・ジャイロテレメトリ（項目10: カメラの揺れと連動してリアルタイム変動）
-	float dronePitch = 2.4f * std::sin(animTimer_ * 0.6f);
-	float droneRoll = -1.2f * std::cos(animTimer_ * 0.8f);
-	float droneAlt = 12.0f + 0.4f * std::sin(animTimer_ * 0.4f);
-	char telemBuf[64];
-	snprintf(telemBuf, sizeof(telemBuf), "PITCH %+.1f deg  ROLL %+.1f deg  ALT %.1fm", dronePitch, droneRoll, droneAlt);
-	tr->Print("HackGen", telemBuf, left + 8.0f, top + 30.0f, 11.5f, { 0.25f, 0.88f, 0.55f, 0.70f });
-
-	// --- 右上: バッテリー / シグナル / データレート動的表示（項目10）---
-	int batPercent = 94 - ((static_cast<int>(animTimer_ * 0.04f)) % 2); // 94% ↔ 93% 微小放電シミュレーション
-	const char* sigBars = (static_cast<int>(animTimer_ * 1.5f) % 7 == 4) ? "|||." : "||||"; // 電波アイコンアニメーションゆらぎ
-	float dataRate = 48.2f + 0.35f * std::sin(animTimer_ * 2.2f);
-	char rightHudBuf[64];
-	snprintf(rightHudBuf, sizeof(rightHudBuf), "BAT %d%%  SIG [%s]  %.1fMb/s  4K/60P", batPercent, sigBars, dataRate);
-	tr->Print("HackGen", rightHudBuf, right - 280.0f, top + 9.0f, 13.5f, { 0.85f, 0.95f, 1.0f, 0.80f });
-
-	// --- 左下: カメラ番号 & ロケーション (HackGen) ---
-	std::string camName;
-	std::string camCoord;
-	if (transitionTimer_ > 0.0f) {
-		camName = "CONNECTING... // ACQUIRING OPTICAL FEED";
-		camCoord = "FEED SWITCH IN PROGRESS - PLEASE STAND BY";
-	} else {
-		switch (CurrentLocation().id) {
-		case TitleLocation::Hangar:
-			camName = "CAM 01 // HANGAR - BAY 4";
-			camCoord = "LAT 35.6895 N  LON 139.6917 E  ALT +12m";
-			break;
-		case TitleLocation::Tunnel:
-			camName = "CAM 02 // PURSUIT DRONE - TUNNEL 04";
-			camCoord = "SPEED: MACH 1.15 // AFTERBURNER: MAXIMUM";
-			break;
-		case TitleLocation::CrashedForest:
-			camName = "CAM 03 // CRASH SITE - SECTOR 7";
-			camCoord = "LAT 35.6780 N  LON 139.7102 E  ALT +340m";
-			break;
-		default:
-			camName = "CAM 01 // RECON DRONE";
-			camCoord = "LAT --.-- N  LON ---.-- E";
-			break;
+		// 水平グリッチノイズバーの描画（控えめに時々走る程度に調整）
+		for (size_t i = 0; i < glitchSprites_.size(); ++i) {
+			if (rand() % 100 < 10) { // 10%の控えめな確率で出現
+				float gy = static_cast<float>(rand() % static_cast<int>(kScreenHeight));
+				float gh = static_cast<float>(1 + rand() % 12);
+				float gw = kScreenWidth;
+				float gAlpha = 0.12f + static_cast<float>(rand() % 100) / 100.0f * 0.18f;
+				MyMath::Vector4 gCol = (rand() % 3 == 0)
+					? MyMath::Vector4{ 0.0f, 0.0f, 0.0f, gAlpha * 1.2f }
+					: ((rand() % 2 == 0) ? MyMath::Vector4{ 0.95f, 0.95f, 0.98f, gAlpha } : MyMath::Vector4{ 0.9f, 0.15f, 0.15f, gAlpha * 0.5f });
+				glitchSprites_[i]->SetPosition({ 0.0f, gy });
+				glitchSprites_[i]->SetSize({ gw, gh });
+				glitchSprites_[i]->SetColor(gCol);
+				glitchSprites_[i]->Update();
+				glitchSprites_[i]->Draw();
+			}
 		}
-	}
-	tr->Print("HackGen", camName, left + 8.0f, bottom - 38.0f, 17.0f, { 0.85f, 0.95f, 1.0f, 0.90f });
-	tr->Print("HackGen", camCoord, left + 8.0f, bottom - 18.0f, 12.0f, { 0.65f, 0.75f, 0.85f, 0.60f });
 
-	// --- 右下: 光学系 & リンク情報 (HackGen) ---
-	tr->Print("HackGen", "ZOOM 1.0x   F/2.8   ISO 400", right - 210.0f, bottom - 38.0f, 14.0f, { 0.85f, 0.95f, 1.0f, 0.75f });
-	tr->Print("HackGen", "LINK: SECURE LIVE FEED", right - 210.0f, bottom - 18.0f, 12.0f, { 0.45f, 0.85f, 0.55f, 0.70f });
+		// --- 左上: NO SIGNAL & フリーズタイムコード ---
+		tr->Print("HackGen", "NO SIGNAL", left + 24.0f, top + 9.0f, 15.0f, { 1.0f, 0.25f, 0.25f, 0.95f });
+		tr->Print("HackGen", "--:--:--:-- [FROZEN]", left + 120.0f, top + 9.0f, 15.0f, { 0.85f, 0.30f, 0.30f, 0.85f });
+		tr->Print("HackGen", "CARRIER LINK: SEVERED // SENSOR FAULT DETECTED", left + 8.0f, top + 30.0f, 11.5f, { 1.0f, 0.45f, 0.45f, 0.80f });
+
+		// --- 右上: DISCONNECTED 警告テキスト（点滅）---
+		bool blinkRight = (std::fmod(animTimer_, 0.6f) < 0.4f);
+		MyMath::Vector4 rightCol = blinkRight ? MyMath::Vector4{ 1.0f, 0.20f, 0.20f, 0.98f } : MyMath::Vector4{ 0.65f, 0.12f, 0.12f, 0.45f };
+		tr->Print("HackGen", "BAT --%  SIG [NO CARRIER]  0.0Mb/s  DISCONNECTED", right - 365.0f, top + 9.0f, 13.5f, rightCol);
+
+		// --- 画面中央: 点滅する緊急アラート ---
+		bool centerBlink = (std::fmod(animTimer_, 0.8f) < 0.55f);
+		if (centerBlink) {
+			tr->Print("HackGen", ">> [ DISCONNECTED : SIGNAL LOST ] <<", cx, cy - 42.0f, 17.0f, { 1.0f, 0.15f, 0.15f, 0.95f }, { 0.5f, 0.5f });
+			tr->Print("HackGen", "/// CRASH PROTOCOL ENGAGED - RECONNECT PENDING ///", cx, cy - 18.0f, 12.0f, { 1.0f, 0.45f, 0.45f, 0.80f }, { 0.5f, 0.5f });
+		}
+
+		// --- 左下: 途絶ロケーション ---
+		tr->Print("HackGen", "CAM 03 // CRASH SITE - SECTOR 7 [DISCONNECTED]", left + 8.0f, bottom - 38.0f, 17.0f, { 1.0f, 0.30f, 0.30f, 0.95f });
+		tr->Print("HackGen", "TERMINATED OPTICAL LINK // SENSOR OFFLINE", left + 8.0f, bottom - 18.0f, 12.0f, { 0.85f, 0.30f, 0.30f, 0.70f });
+
+		// --- 右下: 切断ステータス ---
+		tr->Print("HackGen", "OPTICS: CORRUPTED", right - 210.0f, bottom - 38.0f, 14.0f, { 1.0f, 0.35f, 0.35f, 0.80f });
+		tr->Print("HackGen", "LINK: DISCONNECTED", right - 210.0f, bottom - 18.0f, 12.0f, { 1.0f, 0.20f, 0.20f, 0.95f });
+
+	} else {
+		// ============================================================
+		// 通常ロケーション（Tunnel, Hangar）HUD表示
+		// ============================================================
+
+		// --- 左上: REC & タイムコード (HackGen) ---
+		tr->Print("HackGen", "REC", left + 24.0f, top + 9.0f, 15.0f, { 1.0f, 0.95f, 0.95f, 0.95f });
+
+		char timeBuf[32];
+		int totalSec = static_cast<int>(animTimer_);
+		int hours = (totalSec / 3600) % 24;
+		int mins = (totalSec / 60) % 60;
+		int secs = totalSec % 60;
+		int frames = static_cast<int>((animTimer_ - totalSec) * 60.0f);
+		snprintf(timeBuf, sizeof(timeBuf), "%02d:%02d:%02d:%02d", hours, mins, secs, frames);
+		tr->Print("HackGen", timeBuf, left + 64.0f, top + 9.0f, 15.0f, { 0.85f, 0.95f, 1.0f, 0.85f });
+
+		// ドローン姿勢・ジャイロテレメトリ
+		float dronePitch = 2.4f * std::sin(animTimer_ * 0.6f);
+		float droneRoll = -1.2f * std::cos(animTimer_ * 0.8f);
+		float droneAlt = 12.0f + 0.4f * std::sin(animTimer_ * 0.4f);
+		char telemBuf[64];
+		snprintf(telemBuf, sizeof(telemBuf), "PITCH %+.1f deg  ROLL %+.1f deg  ALT %.1fm", dronePitch, droneRoll, droneAlt);
+		tr->Print("HackGen", telemBuf, left + 8.0f, top + 30.0f, 11.5f, { 0.25f, 0.88f, 0.55f, 0.70f });
+
+		// --- 右上: バッテリー / シグナル / データレート動的表示 ---
+		int batPercent = 94 - ((static_cast<int>(animTimer_ * 0.04f)) % 2);
+		const char* sigBars = (static_cast<int>(animTimer_ * 1.5f) % 7 == 4) ? "|||." : "||||";
+		float dataRate = 48.2f + 0.35f * std::sin(animTimer_ * 2.2f);
+		char rightHudBuf[64];
+		snprintf(rightHudBuf, sizeof(rightHudBuf), "BAT %d%%  SIG [%s]  %.1fMb/s  4K/60P", batPercent, sigBars, dataRate);
+		tr->Print("HackGen", rightHudBuf, right - 280.0f, top + 9.0f, 13.5f, { 0.85f, 0.95f, 1.0f, 0.80f });
+
+		// --- 左下: カメラ番号 & ロケーション (HackGen) ---
+		std::string camName;
+		std::string camCoord;
+		if (transitionTimer_ > 0.0f) {
+			camName = "CONNECTING... // ACQUIRING OPTICAL FEED";
+			camCoord = "FEED SWITCH IN PROGRESS - PLEASE STAND BY";
+		} else {
+			switch (CurrentLocation().id) {
+			case TitleLocation::Hangar:
+				camName = "CAM 01 // HANGAR - BAY 4";
+				camCoord = "LAT 35.6895 N  LON 139.6917 E  ALT +12m";
+				break;
+			case TitleLocation::Tunnel:
+				camName = "CAM 02 // PURSUIT DRONE - TUNNEL 04";
+				camCoord = "SPEED: MACH 1.15 // AFTERBURNER: MAXIMUM";
+				break;
+			default:
+				camName = "CAM 01 // RECON DRONE";
+				camCoord = "LAT --.-- N  LON ---.-- E";
+				break;
+			}
+		}
+		tr->Print("HackGen", camName, left + 8.0f, bottom - 38.0f, 17.0f, { 0.85f, 0.95f, 1.0f, 0.90f });
+		tr->Print("HackGen", camCoord, left + 8.0f, bottom - 18.0f, 12.0f, { 0.65f, 0.75f, 0.85f, 0.60f });
+
+		// --- 右下: 光学系 & リンク情報 (HackGen) ---
+		tr->Print("HackGen", "ZOOM 1.0x   F/2.8   ISO 400", right - 210.0f, bottom - 38.0f, 14.0f, { 0.85f, 0.95f, 1.0f, 0.75f });
+		tr->Print("HackGen", "LINK: SECURE LIVE FEED", right - 210.0f, bottom - 18.0f, 12.0f, { 0.45f, 0.85f, 0.55f, 0.70f });
+	}
 }
 
 void TitleScene::InitializeWindowCloseVisuals(SpriteCommon* spriteCommon) {

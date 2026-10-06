@@ -33,6 +33,9 @@ public:
 	void SetSize(const Vector2& size) { size_ = size; }
 	Vector2 GetSize() const { return size_; }
 
+	void SetAnchorPoint(const Vector2& anchor) { anchorPoint_ = anchor; }
+	Vector2 GetAnchorPoint() const { return anchorPoint_; }
+
 	void SetVisible(bool visible) { isVisible_ = visible; }
 	bool IsVisible() const { return isVisible_; }
 
@@ -207,6 +210,7 @@ protected:
 protected:
 	Vector2 position_ = { 0.0f, 0.0f };
 	Vector2 size_ = { 100.0f, 50.0f };
+	Vector2 anchorPoint_ = { 0.0f, 0.0f };
 	bool isVisible_ = true;
 	bool isActive_ = true;
 	Vector4 color_ = { 1.0f, 1.0f, 1.0f, 1.0f };

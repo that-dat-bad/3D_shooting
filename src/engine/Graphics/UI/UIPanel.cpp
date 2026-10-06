@@ -18,7 +18,7 @@ void UIPanel::Update() {
 	backgroundSprite_->SetPosition(GetRenderPosition());
 	backgroundSprite_->SetSize(GetRenderSize());
 	backgroundSprite_->SetColor(GetRenderColor());
-	backgroundSprite_->SetAnchorPoint({ 0.0f, 0.0f });
+	backgroundSprite_->SetAnchorPoint(anchorPoint_);
 	backgroundSprite_->Update();
 }
 

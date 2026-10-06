@@ -27,9 +27,6 @@ public:
 	void SetFontName(const std::string& name) { fontName_ = name; }
 	const std::string& GetFontName() const { return fontName_; }
 
-	void SetAnchorPoint(const Vector2& anchor) { anchorPoint_ = anchor; }
-	const Vector2& GetAnchorPoint() const { return anchorPoint_; }
-
 	// --- 装飾（ドロップシャドウ） ---
 	void SetDropShadow(bool enable, const Vector2& offset = {2.0f, 2.0f}, const Vector4& color = {0.0f, 0.0f, 0.0f, 1.0f}) {
 		hasDropShadow_ = enable;
@@ -54,7 +51,6 @@ private:
 	std::string fontName_ = "HackGen";
 	std::string text_;
 	float fontSize_ = 32.0f;
-	Vector2 anchorPoint_ = {0.0f, 0.0f};
 
 	bool hasDropShadow_ = false;
 	Vector2 shadowOffset_ = {2.0f, 2.0f};

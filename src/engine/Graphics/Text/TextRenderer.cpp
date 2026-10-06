@@ -54,7 +54,9 @@ Vector2 TextRenderer::CalculateTextSize(const std::string& fontName, const std::
             totalWidth += it->second.xadvance * scale;
         }
     }
-    return {totalWidth, size};
+    float fontHeight = (info->ascent - info->descent) * scale;
+    if (fontHeight <= 0.0f) { fontHeight = size; }
+    return {totalWidth, fontHeight};
 }
 
 void TextRenderer::Print(const std::string& fontName, const std::string& text, float x, float y, float size, const Vector4& color, const Vector2& anchorPoint) {
@@ -65,8 +67,14 @@ void TextRenderer::Print(const std::string& fontName, const std::string& text, f
     
     Vector2 textSize = CalculateTextSize(fontName, text, size);
     float startX = x - textSize.x * anchorPoint.x;
-    // テキスト全体の高さをsizeとし、ベースラインはその80%の位置にあると仮定する
-    float startY = y + size * 0.8f - size * anchorPoint.y;
+    
+    // フォントのascentとdescentに基づき、アンカーに応じたベースライン位置を正確に決定
+    // anchorPoint.y = 0.0f: 上揃え (行上端が y) -> startY = y + ascent * scale
+    // anchorPoint.y = 0.5f: 上下中央揃え (上下中心が y) -> startY = y + (ascent + descent) * 0.5f * scale
+    // anchorPoint.y = 1.0f: 下揃え (行下端が y) -> startY = y + descent * scale
+    float scaledAscent = info->ascent * scale;
+    float scaledDescent = info->descent * scale;
+    float startY = y + scaledAscent * (1.0f - anchorPoint.y) + scaledDescent * anchorPoint.y;
 
     for (size_t i = 0; i < text.length(); ) {
         char32_t codepoint = 0;
