@@ -2173,8 +2173,8 @@ void TitleScene::DrawWindowClose() {
 		const std::string line2 = "/// BOOTING DAWN TERMINAL ///";
 		const float baseFontSize = 13.5f;
 
-		Vector2 size1 = tr->CalculateTextSize("HackGen", line1, baseFontSize);
-		Vector2 size2 = tr->CalculateTextSize("HackGen", line2, baseFontSize);
+		Vector2 size1 = tr->CalculateTextSize("HackGenRegular", line1, baseFontSize);
+		Vector2 size2 = tr->CalculateTextSize("HackGenRegular", line2, baseFontSize);
 		float maxTextW = (std::max)(size1.x, size2.x);
 		float lineGap = 6.0f;
 		float totalTextH = baseFontSize * 2.0f + lineGap;
@@ -2247,7 +2247,7 @@ void TitleScene::DrawWindowClose() {
 			float line2Y = centerY + (actualFontSize * 0.65f + actualLineGap * 0.5f);
 
 			tr->Print(
-				"HackGen",
+				"HackGenRegular",
 				line1,
 				centerX,
 				line1Y,
@@ -2256,7 +2256,7 @@ void TitleScene::DrawWindowClose() {
 				{ 0.5f, 0.5f }
 			);
 			tr->Print(
-				"HackGen",
+				"HackGenRegular",
 				line2,
 				centerX,
 				line2Y,
@@ -2444,7 +2444,7 @@ void TitleScene::DrawUI() {
 		tr->Print("HackGen", "TERMINAL : DAWN_OS [v4.12]", cardX + 28.0f, cardY + 9.0f, 13.0f, { 0.35f, 1.0f, 0.60f, 0.95f });
 
 		// 作戦指令ヘッダーラベル - すべて緑文字に統一
-		tr->Print("HackGen", "/// CLASSIFIED OPERATION DIRECTIVE ///", cardX + cardWidth * 0.5f, cardY + 22.0f, 11.0f, { 0.22f, 0.78f, 0.45f, 0.80f }, { 0.5f, 0.0f });
+		tr->Print("HackGenRegular", "/// CLASSIFIED OPERATION DIRECTIVE ///", cardX + cardWidth * 0.5f, cardY + 22.0f, 12.0f, { 0.28f, 0.88f, 0.52f, 0.85f }, { 0.5f, 0.0f });
 
 		// メインタイトル：DAWN ロゴスプライト（白文字 + MiG-21通過）
 		if (titleLogoSprite_) {
@@ -2455,7 +2455,7 @@ void TitleScene::DrawUI() {
 		subtitleText_.Draw();
 
 		// システム認証ステータス行 - すべて緑文字に統一
-		tr->Print("HackGen", "AUTH LEVEL 5 GRANTED // READY FOR MISSION INPUT", cardX + cardWidth * 0.5f, cardY + 162.0f, 10.5f, { 0.22f, 0.78f, 0.45f, 0.85f }, { 0.5f, 0.0f });
+		tr->Print("HackGenRegular", "AUTH LEVEL 5 GRANTED // READY FOR MISSION INPUT", cardX + cardWidth * 0.5f, cardY + 162.0f, 12.0f, { 0.28f, 0.88f, 0.52f, 0.90f }, { 0.5f, 0.0f });
 
 		// メニューボタン（コマンド行）
 		startButton_.Draw();
@@ -2474,23 +2474,26 @@ void TitleScene::DrawUI() {
 			{ 0.5f, 0.5f }
 		);
 
-		// ウィンドウ最下部ステータスバー (HackGen 10.5f) - 緑文字に統一
+		// ウィンドウ最下部ステータスバー (高さ26pxのバーの中央にジャスト配置・文字つぶれ防止)
+		const float sbCenterY = cardY + cardHeight - 13.0f;
+		const float sbFontSize = 13.0f;
 		tr->Print(
-			"HackGen",
+			"HackGenRegular",
 			"ROOT@TACTICAL_OS: ONLINE",
 			cardX + 16.0f,
-			cardY + cardHeight - 18.0f,
-			10.5f,
-			{ 0.25f, 0.82f, 0.45f, 0.85f }
+			sbCenterY,
+			sbFontSize,
+			{ 0.35f, 0.95f, 0.60f, 0.95f },
+			{ 0.0f, 0.5f }
 		);
 		tr->Print(
-			"HackGen",
+			"HackGenRegular",
 			"PORT: 115200 BAUD // UTF-8",
 			cardX + cardWidth - 16.0f,
-			cardY + cardHeight - 18.0f,
-			10.5f,
-			{ 0.22f, 0.75f, 0.40f, 0.80f },
-			{ 1.0f, 0.0f }
+			sbCenterY,
+			sbFontSize,
+			{ 0.30f, 0.90f, 0.55f, 0.90f },
+			{ 1.0f, 0.5f }
 		);
 	}
 }

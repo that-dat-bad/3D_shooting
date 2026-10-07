@@ -38,8 +38,9 @@ void Game::Initialize() {
 	FontManager::GetInstance()->LoadFont("Roboto", "C:/Windows/Fonts/msgothic.ttc", 96.0f);
 	FontManager::GetInstance()->LoadFont("Consolas", "C:/Windows/Fonts/consolab.ttf", 64.0f);
 	FontManager::GetInstance()->LoadFont("TitleJp", "C:/Windows/Fonts/meiryob.ttc", 96.0f);
-	FontManager::GetInstance()->LoadFont("HackGen", "assets/fonts/HackGen-Bold.ttf", 64.0f);
-	FontManager::GetInstance()->LoadFont("HackGenConsole", "assets/fonts/HackGenConsole-Bold.ttf", 64.0f);
+	FontManager::GetInstance()->LoadFont("HackGen", "assets/fonts/HackGen-Bold.ttf", 48.0f);
+	FontManager::GetInstance()->LoadFont("HackGenRegular", "assets/fonts/HackGen-Regular.ttf", 36.0f);
+	FontManager::GetInstance()->LoadFont("HackGenConsole", "assets/fonts/HackGenConsole-Bold.ttf", 48.0f);
 
 	imguiManager = std::make_unique<ImGuiManager>();
 	imguiManager->Initialize(winApp.get(), DirectXCommon::GetInstance(), srvManager.get());
