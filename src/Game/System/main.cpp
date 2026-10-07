@@ -6,8 +6,15 @@
 #include "../engine/Debug/dump.h"
 #include "Game.h"
 #include <dxgidebug.h>
+#include <filesystem>
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int) {
+	// 実行ファイルが存在するディレクトリを作業ディレクトリ（カレントディレクトリ）に固定
+	wchar_t exePath[MAX_PATH];
+	if (GetModuleFileNameW(nullptr, exePath, MAX_PATH) > 0) {
+		std::filesystem::current_path(std::filesystem::path(exePath).parent_path());
+	}
+
 	Dump::Install();
 
 	HRESULT hr = MFStartup(MF_VERSION, MFSTARTUP_NOSOCKET);

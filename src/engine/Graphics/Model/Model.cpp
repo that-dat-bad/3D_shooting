@@ -403,15 +403,13 @@ Model::ModelData Model::LoadModelFile(const std::string& directoryPath, const st
 	ModelData modelData;
 	Assimp::Importer importer;
 	std::string filePath = filename;
-	//テクスチャのためにディレクトリを抽出
-	std::string baseDirectory = std::filesystem::path(filePath).parent_path().string();
 	if (!directoryPath.empty()) {
 		filePath = directoryPath + "/" + filename;
 	}
+	//テクスチャのためにディレクトリを抽出
+	std::string baseDirectory = std::filesystem::path(filePath).parent_path().string();
 
-	std::string absolutePath = std::filesystem::absolute(filePath).string();
-
-	const aiScene* scene = importer.ReadFile(absolutePath.c_str(),
+	const aiScene* scene = importer.ReadFile(filePath.c_str(),
 		aiProcess_FlipWindingOrder | aiProcess_FlipUVs | aiProcess_Triangulate | aiProcess_GenSmoothNormals | aiProcess_JoinIdenticalVertices);
 	if (!scene || !scene->HasMeshes()) {
 		return modelData;
@@ -568,7 +566,7 @@ Model::ModelData Model::LoadModelFile(const std::string& directoryPath, const st
 		}
 		char buf[256];
 		sprintf_s(buf, "[Model.cpp] Bound Box for %s: X[%.3f, %.3f], Y[%.3f, %.3f], Z[%.3f, %.3f], Verts:%zu\n",
-			absolutePath.c_str(), minX, maxX, minY, maxY, minZ, maxZ, modelData.vertices.size());
+			filePath.c_str(), minX, maxX, minY, maxY, minZ, maxZ, modelData.vertices.size());
 		OutputDebugStringA(buf);
 	}
 
@@ -592,7 +590,7 @@ Model::ModelData Model::LoadModelFile(const std::string& directoryPath, const st
 
 					if (textureIndex < scene->mNumTextures) {
 						aiTexture* embeddedTexture = scene->mTextures[textureIndex];
-						std::string embeddedTexName = absolutePath + "_tex" + std::to_string(textureIndex);
+						std::string embeddedTexName = filePath + "_tex" + std::to_string(textureIndex);
 
 						if (embeddedTexture->mHeight == 0) {
 							TextureManager::GetInstance()->LoadTextureFromMemory(
@@ -674,13 +672,11 @@ Model::Animation Model::LoadAnimationFile(const std::string& directoryPath, cons
 		filePath = directoryPath + "/" + filename;
 	}
 
-	std::string absolutePath = std::filesystem::absolute(filePath).string();
-
-	const aiScene* scene = importer.ReadFile(absolutePath.c_str(), 0);
+	const aiScene* scene = importer.ReadFile(filePath.c_str(), 0);
 	if (!scene || scene->mNumAnimations == 0) {
 		std::string errorOut = "Assimp Error: No animation found\n";
 		errorOut += importer.GetErrorString();
-		errorOut += "\nFailed to load: " + absolutePath;
+		errorOut += "\nFailed to load: " + filePath;
 		MessageBoxA(nullptr, errorOut.c_str(), "Animation Load Error", MB_OK | MB_ICONERROR);
 		return animation;
 	}
@@ -746,9 +742,7 @@ std::vector<std::string> Model::LoadAnimationNames(const std::string& directoryP
 		filePath = directoryPath + "/" + filename;
 	}
 
-	std::string absolutePath = std::filesystem::absolute(filePath).string();
-
-	const aiScene* scene = importer.ReadFile(absolutePath.c_str(), 0);
+	const aiScene* scene = importer.ReadFile(filePath.c_str(), 0);
 	if (!scene || scene->mNumAnimations == 0) {
 		return names;
 	}
