@@ -2104,8 +2104,8 @@ void TitleScene::InitializeWindowCloseVisuals(SpriteCommon* spriteCommon) {
 	}
 
 	windowCloseBorderSprites_.clear();
-	// ウィンドウタイトルバーと枠線（計6本）
-	for (int i = 0; i < 6; ++i) {
+	// ウィンドウタイトルバーと外枠線、クライアント内部背景、BOOTINGステータス枠（計11本）
+	for (int i = 0; i < 11; ++i) {
 		auto sp = std::make_unique<Sprite>();
 		sp->Initialize(spriteCommon, "assets/textures/white1x1.png");
 		sp->SetAnchorPoint({ 0.0f, 0.0f });
@@ -2153,8 +2153,120 @@ void TitleScene::DrawWindowClose() {
 		windowCloseMaskSprites_[3]->Draw();
 	}
 
-	if (curW > 16.0f && curH > 16.0f && windowCloseBorderSprites_.size() >= 5) {
-		// OSウィンドウタイトルバー
+	if (curW > 16.0f && curH > 16.0f && windowCloseBorderSprites_.size() >= 11) {
+		// 1. ウィンドウ内部クライアント領域の暗転背景（映像リンク切断に伴い画面がダークターミナルへ移行）
+		float innerDarken = (std::min)(0.92f, 0.40f + 0.52f * t);
+		windowCloseBorderSprites_[5]->SetPosition({ curX, curY });
+		windowCloseBorderSprites_[5]->SetSize({ curW, curH });
+		windowCloseBorderSprites_[5]->SetColor({ 0.01f, 0.04f, 0.02f, innerDarken });
+		windowCloseBorderSprites_[5]->Update();
+		windowCloseBorderSprites_[5]->Draw();
+
+		// 2. ウィンドウ中央のステータス情報枠（BOOTINGメッセージを綺麗に囲むサイバーフレーム）
+		// アニメーション中のアルファ曲線: 開始時に素早くフェードインし、終盤ウィンドウ消滅に合わせてフェードアウト
+		float fadeIn = (std::min)(1.0f, t / 0.12f);
+		float fadeOut = (std::clamp)((0.88f - t) / 0.18f, 0.0f, 1.0f);
+		float textAlpha = fadeIn * fadeOut;
+
+		TextRenderer* tr = TextRenderer::GetInstance();
+		const std::string line1 = "/// VIDEO LINK DISENGAGED ///";
+		const std::string line2 = "/// BOOTING DAWN TERMINAL ///";
+		const float baseFontSize = 13.5f;
+
+		Vector2 size1 = tr->CalculateTextSize("HackGen", line1, baseFontSize);
+		Vector2 size2 = tr->CalculateTextSize("HackGen", line2, baseFontSize);
+		float maxTextW = (std::max)(size1.x, size2.x);
+		float lineGap = 6.0f;
+		float totalTextH = baseFontSize * 2.0f + lineGap;
+
+		// ウィンドウ枠（グリーンボーダー）の内側に完全に収めるためのマージン
+		const float marginX = 20.0f;
+		const float marginY = 14.0f;
+		float maxBoxW = (std::max)(0.0f, curW - marginX * 2.0f);
+		float maxBoxH = (std::max)(0.0f, curH - marginY * 2.0f);
+
+		const float padX = 20.0f;
+		const float padY = 12.0f;
+		float desiredBoxW = maxTextW + padX * 2.0f;
+		float desiredBoxH = totalTextH + padY * 2.0f;
+
+		// ウィンドウ縮小に伴い、ステータス枠と文字サイズを滑らかに同期縮小
+		float scaleX = (maxBoxW < desiredBoxW && desiredBoxW > 0.0f) ? (maxBoxW / desiredBoxW) : 1.0f;
+		float scaleY = (maxBoxH < desiredBoxH && desiredBoxH > 0.0f) ? (maxBoxH / desiredBoxH) : 1.0f;
+		float boxScale = (std::min)(scaleX, scaleY);
+
+		float actualBoxW = desiredBoxW * boxScale;
+		float actualBoxH = desiredBoxH * boxScale;
+		float actualFontSize = baseFontSize * boxScale;
+		float actualLineGap = lineGap * boxScale;
+
+		float centerX = kScreenWidth * 0.5f;
+		float centerY = kScreenHeight * 0.5f;
+		float boxX = centerX - actualBoxW * 0.5f;
+		float boxY = centerY - actualBoxH * 0.5f;
+
+		// ウィンドウ内に十分なスペースがあり、文字が判読できるサイズの間だけ描画
+		if (textAlpha > 0.01f && actualFontSize >= 6.5f && actualBoxW >= 40.0f && actualBoxH >= 20.0f) {
+			// ステータス枠背景プレート
+			windowCloseBorderSprites_[6]->SetPosition({ boxX, boxY });
+			windowCloseBorderSprites_[6]->SetSize({ actualBoxW, actualBoxH });
+			windowCloseBorderSprites_[6]->SetColor({ 0.02f, 0.09f, 0.04f, 0.85f * textAlpha });
+			windowCloseBorderSprites_[6]->Update();
+			windowCloseBorderSprites_[6]->Draw();
+
+			// ステータス枠のサイバーボーダー（上・下・左・右）
+			MyMath::Vector4 innerBorderCol = { 0.25f, 0.95f, 0.55f, 0.70f * textAlpha };
+			float borderThick = (std::max)(1.0f, 1.5f * boxScale);
+
+			windowCloseBorderSprites_[7]->SetPosition({ boxX, boxY });
+			windowCloseBorderSprites_[7]->SetSize({ actualBoxW, borderThick }); // 上
+			windowCloseBorderSprites_[7]->SetColor(innerBorderCol);
+			windowCloseBorderSprites_[7]->Update();
+			windowCloseBorderSprites_[7]->Draw();
+
+			windowCloseBorderSprites_[8]->SetPosition({ boxX, boxY + actualBoxH - borderThick });
+			windowCloseBorderSprites_[8]->SetSize({ actualBoxW, borderThick }); // 下
+			windowCloseBorderSprites_[8]->SetColor(innerBorderCol);
+			windowCloseBorderSprites_[8]->Update();
+			windowCloseBorderSprites_[8]->Draw();
+
+			windowCloseBorderSprites_[9]->SetPosition({ boxX, boxY });
+			windowCloseBorderSprites_[9]->SetSize({ borderThick, actualBoxH }); // 左
+			windowCloseBorderSprites_[9]->SetColor(innerBorderCol);
+			windowCloseBorderSprites_[9]->Update();
+			windowCloseBorderSprites_[9]->Draw();
+
+			windowCloseBorderSprites_[10]->SetPosition({ boxX + actualBoxW - borderThick, boxY });
+			windowCloseBorderSprites_[10]->SetSize({ borderThick, actualBoxH }); // 右
+			windowCloseBorderSprites_[10]->SetColor(innerBorderCol);
+			windowCloseBorderSprites_[10]->Update();
+			windowCloseBorderSprites_[10]->Draw();
+
+			// 枠内に綺麗にセンタリングしてBOOTINGテキストを描画
+			float line1Y = centerY - (actualFontSize * 0.65f + actualLineGap * 0.5f);
+			float line2Y = centerY + (actualFontSize * 0.65f + actualLineGap * 0.5f);
+
+			tr->Print(
+				"HackGen",
+				line1,
+				centerX,
+				line1Y,
+				actualFontSize,
+				{ 0.35f, 0.85f, 0.65f, 0.90f * textAlpha },
+				{ 0.5f, 0.5f }
+			);
+			tr->Print(
+				"HackGen",
+				line2,
+				centerX,
+				line2Y,
+				actualFontSize,
+				{ 0.30f, 1.00f, 0.58f, 1.00f * textAlpha },
+				{ 0.5f, 0.5f }
+			);
+		}
+
+		// 3. OSウィンドウタイトルバー
 		float titleBarH = 24.0f;
 		windowCloseBorderSprites_[0]->SetPosition({ curX, curY - titleBarH });
 		windowCloseBorderSprites_[0]->SetSize({ curW, titleBarH });
@@ -2162,7 +2274,7 @@ void TitleScene::DrawWindowClose() {
 		windowCloseBorderSprites_[0]->Update();
 		windowCloseBorderSprites_[0]->Draw();
 
-		// 枠線4辺 (鮮烈なエレクトリックネオングリーン)
+		// 4. 外枠線4辺 (鮮烈なエレクトリックネオングリーン)
 		MyMath::Vector4 borderCol = { 0.25f, 0.98f, 0.58f, 0.95f };
 		windowCloseBorderSprites_[1]->SetPosition({ curX, curY });
 		windowCloseBorderSprites_[1]->SetSize({ curW, 2.0f }); // 上
@@ -2188,17 +2300,22 @@ void TitleScene::DrawWindowClose() {
 		windowCloseBorderSprites_[4]->Update();
 		windowCloseBorderSprites_[4]->Draw();
 
-		// タイトルバーテキスト（最小化アニメーション中：項目7）
-		if (curW > 220.0f) {
-			TextRenderer* tr = TextRenderer::GetInstance();
-			tr->Print("HackGen", "[CAM-01 : OPTICAL FEED - MINIMIZING TO SYSTEM CONSOLE...]", curX + 10.0f, curY - 19.0f, 11.5f, { 0.35f, 1.0f, 0.65f, 0.95f });
-			tr->Print("HackGen", "[ _ ] [口] [X]", curX + curW - 86.0f, curY - 19.0f, 11.5f, { 0.85f, 0.85f, 0.85f, 0.95f });
+		// 5. タイトルバーテキスト（最小化アニメーション中：幅に応じて動的短縮して枠内維持）
+		if (curW > 80.0f) {
+			float titleAlpha = (std::min)(1.0f, (curW - 80.0f) / 100.0f);
+			if (curW >= 460.0f) {
+				tr->Print("HackGen", "[CAM-01 : OPTICAL FEED - MINIMIZING TO SYSTEM CONSOLE...]", curX + 10.0f, curY - 19.0f, 11.5f, { 0.35f, 1.0f, 0.65f, 0.95f * titleAlpha });
+			} else if (curW >= 260.0f) {
+				tr->Print("HackGen", "[CAM-01 : MINIMIZING...]", curX + 10.0f, curY - 19.0f, 11.5f, { 0.35f, 1.0f, 0.65f, 0.95f * titleAlpha });
+			} else if (curW >= 120.0f) {
+				tr->Print("HackGen", "[CAM-01]", curX + 8.0f, curY - 19.0f, 11.0f, { 0.35f, 1.0f, 0.65f, 0.95f * titleAlpha });
+			}
+
+			if (curW >= 180.0f) {
+				tr->Print("HackGen", "[ _ ] [口] [X]", curX + curW - 86.0f, curY - 19.0f, 11.5f, { 0.85f, 0.85f, 0.85f, 0.95f * titleAlpha });
+			}
 		}
 	}
-
-	// 画面奥のデスクトップ・ターミナル開始メッセージ
-	TextRenderer* tr = TextRenderer::GetInstance();
-	tr->Print("HackGen", "/// VIDEO LINK DISENGAGED // BOOTING DAWN TERMINAL ///", kScreenWidth * 0.5f, kScreenHeight * 0.5f - 8.0f, 14.5f, { 0.20f, 0.90f, 0.48f, 0.75f * t }, { 0.5f, 0.5f });
 }
 
 void TitleScene::DrawConsoleBoot() {
