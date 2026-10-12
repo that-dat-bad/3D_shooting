@@ -42,7 +42,8 @@ private:
 		DroneView,
 		WindowClose,
 		ConsoleBoot,
-		Menu
+		Menu,
+		SortieSequence
 	};
 	TitleState state_ = TitleState::DroneView;
 	float stateTimer_ = 0.0f;
@@ -50,15 +51,18 @@ private:
 	float transitionTimer_ = 0.0f;      ///< カメラ切替時のノイズトランジションタイマー
 	static constexpr float kTransitionDuration = 0.15f; ///< 0.15秒の一瞬の切り替え（テンポ向上）
 	float windowCloseTimer_ = 0.0f;     ///< カメラ映像ウィンドウ最小化・閉じる演出タイマー
-	static constexpr float kWindowCloseDuration = 0.42f; ///< カメラ映像ウィンドウ最小化・閉じる演出タイマー（視認可能なアニメーション時間）
+	static constexpr float kWindowCloseDuration = 0.35f; ///< スタイリッシュなウィンドウ最小化
 	std::vector<std::unique_ptr<Sprite>> windowCloseMaskSprites_;   ///< 最小化時の外側4黒マスク
 	std::vector<std::unique_ptr<Sprite>> windowCloseBorderSprites_; ///< 最小化ウィンドウのOSタイトルバー＆サイバー枠線
 	float consoleBootTimer_ = 0.0f;     ///< クリック後のハッカー風コンソール演出タイマー
-	static constexpr float kConsoleBootDuration = 2.20f; ///< テキストタイピング完了後に十分読める余韻を持たせる
+	static constexpr float kConsoleBootDuration = 1.45f; ///< 味わい深く読めるタイピング速度
 	float consoleExitTimer_ = 0.0f;     ///< コンソールからメニューへのスムーズな接続アニメーションタイマー
-	static constexpr float kConsoleExitDuration = 0.50f; ///< 文字グリッチ＆UI枠形成の接続アニメーション時間
+	static constexpr float kConsoleExitDuration = 0.32f; ///< サイバーグリッチ遷移
 	float menuEnterTimer_ = 0.0f;       ///< メニュー展開トランジションタイマー
-	static constexpr float kMenuEnterDuration = 0.35f;
+	static constexpr float kMenuEnterDuration = 0.30f;   ///< UI形成レーザースキャン
+	float sortieTimer_ = 0.0f;          ///< 出撃シーケンスタイマー（項目1, 2, 3）
+	static constexpr float kSortieDuration = 1.9f;       ///< 出撃シーケンスの総時間
+	std::unique_ptr<Sprite> sortieFlashSprite_;          ///< 出撃トランジション用ホワイトアウト
 	bool isCursorShown_ = false;
 	void SetCursorVisible(bool visible);
 
@@ -104,6 +108,63 @@ private:
 	void DrawConsoleBoot();
 	void InitializeWindowCloseVisuals(SpriteCommon* spriteCommon);
 	void DrawWindowClose();
+	void DrawSortieSequence();
+
+	// --- フルOSデスクトップ環境 ---
+	struct OSWindow {
+		int id = 0;
+		std::string title;
+		Vector2 pos = { 0.0f, 0.0f };
+		Vector2 size = { 0.0f, 0.0f };
+		Vector2 normalPos = { 0.0f, 0.0f };   ///< 復元時の通常位置
+		Vector2 normalSize = { 0.0f, 0.0f };  ///< 復元時の通常サイズ
+		float titleBarHeight = 26.0f;
+		bool isOpen = true;
+		bool isMinimized = false;
+		bool isDragging = false;
+		Vector2 dragOffset = { 0.0f, 0.0f };
+		float animScale = 1.0f;               ///< 最小化・復元アニメーションスケール (0.0:タスクバー格納, 1.0:通常展開)
+	};
+
+	struct DesktopIcon {
+		int id = 0;
+		std::string label;
+		std::string subLabel;
+		Vector2 pos = { 0.0f, 0.0f };
+		Vector2 size = { 76.0f, 68.0f };
+	};
+
+	std::vector<OSWindow> osWindows_;
+	std::vector<DesktopIcon> desktopIcons_;
+	int activeWindowId_ = 0;
+	bool isStartMenuOpen_ = false;
+
+	// スタートメニュー選択時の暗転・ノイズクッション演出
+	float startMenuTransitionTimer_ = 0.0f;
+	static constexpr float kStartMenuTransitionDuration = 0.14f;
+	int pendingStartMenuAction_ = -1;
+
+	// カスタムサイバーマウスカーソル
+	Vector2 customCursorPos_ = { 640.0f, 360.0f };
+	float cursorRippleTimer_ = 0.0f;
+	Vector2 cursorRipplePos_ = { 0.0f, 0.0f };
+	std::vector<std::unique_ptr<Sprite>> cursorSprites_; ///< 独立した専用カーソルスプライト（枯渇防止）
+
+	// OS UI描画用スプライトプール
+	std::vector<std::unique_ptr<Sprite>> osSpritePool_;
+	size_t osSpritePoolIdx_ = 0;
+	void DrawOSRect(const Vector2& pos, const Vector2& size, const MyMath::Vector4& color);
+	void DrawOSBorder(const Vector2& pos, const Vector2& size, const MyMath::Vector4& color, float thick = 1.5f);
+	void DrawOSPanel(const Vector2& pos, const Vector2& size, const MyMath::Vector4& bgCol, const MyMath::Vector4& borderCol, float thick = 1.5f);
+
+	void InitializeOSDesktop(SpriteCommon* spriteCommon);
+	void UpdateOSDesktop(float dt, const Vector2& mousePos, bool isLDown, bool isLTrig);
+	void DrawOSDesktop();
+	void DrawOSTaskbar();
+	void DrawOSWindowCam(const OSWindow& win);
+	void DrawOSWindowTelemetry(const OSWindow& win);
+	void DrawDesktopIcons();
+	void DrawCustomCursor();
 
 	// --- OSD (ドローンカメラビュー枠) ---
 	std::vector<std::unique_ptr<Sprite>> osdSprites_;

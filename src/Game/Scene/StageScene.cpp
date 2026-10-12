@@ -13,6 +13,7 @@
 #include "../../engine/Physics/Collision3DManager.h"
 #include "../Environment/TerrainSyncManager.h"
 #include "../../engine/Graphics/UI/UITextRegistry.h"
+#include "../../engine/Graphics/Text/TextRenderer.h"
 #include <cmath>
 #include <algorithm>
 #include <filesystem>
@@ -29,6 +30,14 @@ static constexpr float kDeltaTime = 1.0f / 60.0f;
 
 void StageScene::Initialize() {
 	sceneID = SCENE::STAGE;
+
+	// マウスポインターを非表示（項目9: マウスポインターの残留を完全解消）
+	while (::ShowCursor(FALSE) >= 0) {}
+	::SetCursor(nullptr);
+	HWND hwnd = Input::GetInstance() ? Input::GetInstance()->GetHwnd() : nullptr;
+	if (hwnd) {
+		::SetClassLongPtr(hwnd, GCLP_HCURSOR, 0);
+	}
 
 	// ============================
 	// 機体設定（CFG）のロード
@@ -87,6 +96,9 @@ void StageScene::Initialize() {
 
 	// 1つのモデルファイルからノード名に基づいて自動セットアップ
 	aircraftVisualModel_.SetupFromSingleModel(generalConfig.modelPath);
+	// キャノピーの半透明マテリアルと反射・ハイライト設定（項目8: 自機モデルの質感のギャップを解消）
+	aircraftVisualModel_.SetupCanopyMaterial();
+	aircraftVisualModel_.SetMaterialProperties(48.0f, 1.35f, 0.45f);
 	
 	// フォールバックとして、もし何も読み込まれなかった場合（ノードが見つからなかった場合）のために
 	if (!aircraftVisualModel_.IsPartVisible(DamagePart::Fuse)) {
@@ -99,6 +111,17 @@ void StageScene::Initialize() {
 			aircraftVisualModel_.SetModelForPart(p, "Resources/models/m21.gltf");
 		}
 	}
+
+	// 出撃イントロ用ホワイトアウト復帰フェードスプライト（項目1）
+	SpriteCommon* spriteCommon = SpriteCommon::GetInstance();
+	introFadeSprite_ = std::make_unique<Sprite>();
+	introFadeSprite_->Initialize(spriteCommon, "assets/textures/white1x1.png");
+	introFadeSprite_->SetAnchorPoint({ 0.0f, 0.0f });
+	introFadeSprite_->SetPosition({ 0.0f, 0.0f });
+	introFadeSprite_->SetSize({ static_cast<float>(WinApp::kClientWidth), static_cast<float>(WinApp::kClientHeight) });
+	introFadeSprite_->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
+	introFadeSprite_->Update();
+	sortieIntroTimer_ = 0.0f;
 
 	// 地面テクスチャ
 	TextureManager::GetInstance()->LoadTexture("assets/textures/white1x1.png");
@@ -773,9 +796,46 @@ void StageScene::Update() {
 	}
 
 	// ============================
-	// 追従カメラ
+	// 追従カメラ ＆ 出撃イントロカメラワーク（項目6）
 	// ============================
-	playerCamera_.Update(gameDeltaTime, &flightModel_, &mouseAimController_, mouseAimEnabled_);
+	if (sortieIntroTimer_ < kSortieIntroDuration) {
+		sortieIntroTimer_ += gameDeltaTime;
+		float introProg = std::clamp(sortieIntroTimer_ / kSortieIntroDuration, 0.0f, 1.0f);
+
+		// 出撃カタパルトブースト加速（時速約450km/hへロケット急加速）
+		float boostSpeed = 80.0f + 60.0f * (1.0f - std::exp(-introProg * 3.5f));
+		flightModel_.SetVelocity(Multiply(boostSpeed, flightModel_.GetForwardDirection()));
+
+		// カメラワーク（Smoothstep）: 機体の斜め前方〜右横ローアングルから、急加速する機体を追って後方へ回り込む！
+		float easeT = introProg * introProg * (3.0f - 2.0f * introProg);
+
+		Vector3 forward = flightModel_.GetForwardDirection();
+		Vector3 right = flightModel_.GetRightDirection();
+		Vector3 up = flightModel_.GetUpDirection();
+
+		// 開始カメラ位置: 前方6m, 右横14m, 下1.5m (迫力のローアングル前方パス)
+		Vector3 startCamOffset = Add(Add(Multiply(6.0f, forward), Multiply(14.0f, right)), Multiply(-1.5f, up));
+		// 終了カメラ位置: 後方22m, 上8m (通常の追従位置)
+		Vector3 endCamOffset = Add(Multiply(-22.0f, forward), Multiply(8.0f, up));
+
+		Vector3 curCamOffset = Add(Multiply(1.0f - easeT, startCamOffset), Multiply(easeT, endCamOffset));
+		Vector3 camPos = Add(pos, curCamOffset);
+		Vector3 lookTarget = Add(pos, Multiply(4.0f * (1.0f - easeT), forward)); // 機体中心〜少し前を注視
+
+		Camera* camera = CameraManager::GetInstance()->GetActiveCamera();
+		if (camera) {
+			camera->SetTranslate(camPos);
+			// LookAt 回転計算
+			Vector3 toTarget = Normalize(Subtract(lookTarget, camPos));
+			float pitch = std::asin(std::clamp(-toTarget.y, -1.0f, 1.0f));
+			float yaw = std::atan2(toTarget.x, toTarget.z);
+			camera->SetRotate({ pitch, yaw, 0.0f });
+			camera->Update();
+		}
+	} else {
+		// 通常追従カメラ
+		playerCamera_.Update(gameDeltaTime, &flightModel_, &mouseAimController_, mouseAimEnabled_);
+	}
 
 	// ============================
 	// ============================
@@ -1150,6 +1210,36 @@ void StageScene::Update() {
 		dist.type = PostEffectType::kLensDistortion;
 		dist.intensity = 0.18f;
 		postEffect->AddActiveEffect(dist);
+	} else if (!isGameOver_) {
+		// レトロモニター/HUD風のアートスタイル維持（世界観統一：項目4）
+		// ブルーム (Bloom)
+		ActivePostEffect bloom;
+		bloom.type = PostEffectType::kBloom;
+		bloom.intensity = 2.2f;
+		bloom.dirX = 1.15f;
+		bloom.dirY = 0.70f;
+		postEffect->AddActiveEffect(bloom);
+
+		// 上品な走査線 (ScanLine)
+		ActivePostEffect scan;
+		scan.type = PostEffectType::kScanLine;
+		scan.kernelSize = 0;
+		scan.intensity = 0.035f;
+		scan.dirX = 640.0f;
+		scan.dirY = 3.0f;
+		postEffect->AddActiveEffect(scan);
+
+		// 微小色収差 (Chromatic Aberration)
+		ActivePostEffect ab;
+		ab.type = PostEffectType::kChromaticAberration;
+		ab.intensity = 0.005f;
+		postEffect->AddActiveEffect(ab);
+
+		// 周辺減光 (Vignette)
+		ActivePostEffect vig;
+		vig.type = PostEffectType::kVignette;
+		vig.intensity = 0.40f;
+		postEffect->AddActiveEffect(vig);
 	}
 
 	// 2. 環境の更新（太陽の回転、ライティング、太陽ブルーム処理の委譲）
@@ -1429,6 +1519,31 @@ void StageScene::Draw() {
 void StageScene::DrawUI() {
 	// HUD（タイマー・残弾数・照準）描画
 	hud_.Draw();
+
+	// 出撃イントロ中のサイバーHUD案内 ＆ ホワイトアウト復帰フェード（項目1, 6, 7）
+	if (sortieIntroTimer_ < kSortieIntroDuration) {
+		TextRenderer* tr = TextRenderer::GetInstance();
+
+		// 上部のサイバー出撃テレメトリ表示
+		bool blink = (static_cast<int>(sortieIntroTimer_ * 10.0f) % 2) == 0;
+		Vector4 alertCol = blink ? Vector4{ 1.0f, 0.90f, 0.25f, 0.95f } : Vector4{ 0.35f, 1.0f, 0.65f, 0.85f };
+
+		tr->Print("HackGen", "[ SIMULATED COMBAT SPACE: REZ COMPLETE ]", WinApp::kClientWidth * 0.5f, 75.0f, 14.0f, alertCol, { 0.5f, 0.0f });
+
+		if (sortieIntroTimer_ < 1.3f) {
+			tr->Print("HackGen", ">>> CATAPULT BOOST: 100% /// ENGAGING AIRSPACE >>>", WinApp::kClientWidth * 0.5f, 98.0f, 13.0f, { 0.30f, 0.95f, 0.60f, 0.90f }, { 0.5f, 0.0f });
+		} else {
+			tr->Print("HackGen", ">>> FLIGHT CONTROL ASSIGNED TO PILOT >>>", WinApp::kClientWidth * 0.5f, 98.0f, 13.0f, { 0.40f, 1.0f, 0.70f, 0.95f }, { 0.5f, 0.0f });
+		}
+
+		// ホワイトアウトからの復帰フェード（項目1）
+		if (introFadeSprite_ && sortieIntroTimer_ < 0.45f) {
+			float whiteAlpha = std::clamp(1.0f - (sortieIntroTimer_ / 0.45f), 0.0f, 1.0f);
+			introFadeSprite_->SetColor({ 1.0f, 1.0f, 1.0f, whiteAlpha });
+			introFadeSprite_->Update();
+			introFadeSprite_->Draw();
+		}
+	}
 }
 
 
@@ -1449,7 +1564,7 @@ void StageScene::Finalize() {
 
 
 // ===========================================================
-// 地面描画（タイル式グリッド）
+// 地面描画（タイル式グリッド ＆ シミュレータ空間Rez構築演出：項目7）
 // ===========================================================
 
 void StageScene::DrawGround() {
@@ -1468,6 +1583,12 @@ void StageScene::DrawGround() {
 	float snapX = std::floor(aircraftPos.x / tileSize) * tileSize;
 	float snapZ = std::floor(aircraftPos.z / tileSize) * tileSize;
 
+	// 出撃イントロ中のRez構築進行度（奥から手前へ光りながら構築：項目7）
+	bool isRezActive = (sortieIntroTimer_ < kSortieIntroDuration);
+	float rezProg = isRezActive ? std::clamp(sortieIntroTimer_ / (kSortieIntroDuration * 0.70f), 0.0f, 1.0f) : 1.0f;
+	const float lineExtent = tileRange * tileSize;
+	float rezWaveZ = snapZ + lineExtent * (1.0f - rezProg * 2.0f); // 奥から手前へ走るRez波面
+
 	// タイルを敷き詰めて描画
 	for (int ix = -tileRange; ix <= tileRange; ix++) {
 		for (int iz = -tileRange; iz <= tileRange; iz++) {
@@ -1483,6 +1604,23 @@ void StageScene::DrawGround() {
 				? Vector4{ 0.25f, 0.35f, 0.20f, 1.0f }   // 暗い草色
 				: Vector4{ 0.35f, 0.50f, 0.28f, 1.0f };   // 明るい草色
 
+			// Rez演出中：波面近傍のタイルが発光し、未構築部はダークサイバー調
+			if (isRezActive) {
+				float distToWave = std::abs(cz - rezWaveZ);
+				if (cz > rezWaveZ) {
+					// 波面より奥（すでにRez構築完了）：徐々に通常色へ
+					float settle = std::clamp((cz - rezWaveZ) / (lineExtent * 0.6f), 0.0f, 1.0f);
+					color = { 0.15f + 0.15f * settle, 0.35f + 0.10f * settle, 0.22f + 0.08f * settle, 1.0f };
+				} else if (distToWave < tileSize * 1.5f) {
+					// 波面通過中：強烈なネオングリーンのRezフラッシュ
+					float flash = 1.0f - (distToWave / (tileSize * 1.5f));
+					color = { 0.35f + 0.40f * flash, 0.85f + 0.15f * flash, 0.50f + 0.35f * flash, 1.0f };
+				} else {
+					// 波面より手前（未構築）：漆黒の仮想空間
+					color = { 0.02f, 0.05f, 0.03f, 1.0f };
+				}
+			}
+
 			Vector3 scale = { tileSize, 1.0f, tileSize };
 			Vector3 rotate = { 0.0f, 0.0f, 0.0f };
 			Vector3 translate = { cx + tileSize * 0.5f, 0.0f, cz + tileSize * 0.5f };
@@ -1495,25 +1633,41 @@ void StageScene::DrawGround() {
 	}
 
 	// --- グリッドライン（100m間隔） ---
-	// 機体の周囲に十字のグリッド線を描画して距離感を出す
-	const float lineExtent = tileRange * tileSize;
-	const Vector4 lineColor = { 0.15f, 0.15f, 0.15f, 0.8f };
-
+	// 仮想戦闘空間のタクティカルネオングリッド（項目7）
 	for (int i = -tileRange; i <= tileRange; i++) {
 		float x = snapX + i * tileSize;
+		Vector4 lineCol = { 0.12f, 0.40f, 0.22f, 0.70f };
+		if (isRezActive) {
+			float lineAlpha = std::clamp((x - snapX + lineExtent) / (lineExtent * 2.0f), 0.3f, 1.0f);
+			lineCol = { 0.25f, 0.95f, 0.55f, 0.85f * lineAlpha };
+		}
+
 		PrimitiveModel::GetInstance()->DrawLine3D(
 			{ x, 0.1f, snapZ - lineExtent },
 			{ x, 0.1f, snapZ + lineExtent },
-			lineColor, camera
+			lineCol, camera
 		);
 	}
 
 	for (int i = -tileRange; i <= tileRange; i++) {
 		float z = snapZ + i * tileSize;
+		Vector4 lineCol = { 0.12f, 0.40f, 0.22f, 0.70f };
+		if (isRezActive) {
+			float dist = std::abs(z - rezWaveZ);
+			if (dist < tileSize * 1.2f) {
+				// 波面上のグリッド線が最も明るく発光
+				lineCol = { 0.65f, 1.0f, 0.80f, 1.0f };
+			} else if (z > rezWaveZ) {
+				lineCol = { 0.25f, 0.85f, 0.50f, 0.75f };
+			} else {
+				lineCol = { 0.05f, 0.20f, 0.10f, 0.35f };
+			}
+		}
+
 		PrimitiveModel::GetInstance()->DrawLine3D(
 			{ snapX - lineExtent, 0.1f, z },
 			{ snapX + lineExtent, 0.1f, z },
-			lineColor, camera
+			lineCol, camera
 		);
 	}
 }

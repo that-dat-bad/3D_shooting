@@ -55,6 +55,11 @@ private:
 	// 地面グリッド描画
 	void DrawGround();
 
+	// --- 出撃イントロカメラワーク ＆ Rez構築演出（項目6, 7）---
+	float sortieIntroTimer_ = 0.0f;
+	static constexpr float kSortieIntroDuration = 2.2f;
+	std::unique_ptr<Sprite> introFadeSprite_;
+
 	std::unique_ptr<Skybox> skybox_ = nullptr;
 
 	// ============================

@@ -150,17 +150,17 @@ bool StageHUD::ProjectToScreen(const Vector3& worldPos, const Matrix4x4& vpMat, 
 // ================================================================
 
 void StageHUD::DrawTimer() {
-	float panelW = 200.0f;
+	float panelW = 210.0f;
 	float panelH = 46.0f;
 	float panelX = (hudData_.screenWidth - panelW) * 0.5f;
 	float panelY = 16.0f;
 
-	// 背景と枠線
-	Vector4 bgColor = { 0.03f, 0.06f, 0.10f, 0.75f };
-	Vector4 borderColor = { 0.20f, 0.45f, 0.65f, 0.85f };
+	// 背景と枠線（タクティカルネオングリーン統一：項目5）
+	Vector4 bgColor = { 0.01f, 0.05f, 0.03f, 0.88f };
+	Vector4 borderColor = { 0.22f, 0.85f, 0.50f, 0.85f };
 
 	// タイムに応じたステータスカラー
-	Vector4 textColor = { 0.90f, 0.95f, 1.0f, 1.0f }; // 通常（シアン白）
+	Vector4 textColor = { 0.35f, 1.0f, 0.65f, 0.98f }; // 通常（タクティカルネオングリーン）
 	if (hudData_.remainingTime <= 30.0f) {
 		// 30秒以下: 赤色点滅警告
 		float pulse = 0.55f + 0.45f * std::sin(animTimer_ * 10.0f);
@@ -178,11 +178,11 @@ void StageHUD::DrawTimer() {
 	// 上部アクセントバー
 	DrawRect({ panelX + panelW * 0.5f - 30.0f, panelY }, { 60.0f, 2.0f }, borderColor);
 
-	// 時間文字列の生成
+	// 時間文字列の生成（タクティカルブラケット付きフォーマット）
 	int minutes = static_cast<int>(hudData_.remainingTime) / 60;
 	int seconds = static_cast<int>(hudData_.remainingTime) % 60;
 	char timeStr[32];
-	snprintf(timeStr, sizeof(timeStr), "TIME %02d:%02d", minutes, seconds);
+	snprintf(timeStr, sizeof(timeStr), "[ TIME %02d:%02d ]", minutes, seconds);
 
 	// テキスト描画 (TextRenderer)
 	TextRenderer::GetInstance()->Print(
@@ -190,7 +190,7 @@ void StageHUD::DrawTimer() {
 		timeStr,
 		hudData_.screenWidth * 0.5f,
 		panelY + 10.0f,
-		26.0f,
+		24.0f,
 		textColor,
 		{ 0.5f, 0.0f }
 	);
@@ -202,16 +202,16 @@ void StageHUD::DrawAmmo() {
 	float panelX = hudData_.screenWidth - panelW - 24.0f;
 	float panelY = hudData_.screenHeight - panelH - 24.0f;
 
-	Vector4 bgColor = { 0.03f, 0.06f, 0.10f, 0.75f };
-	Vector4 borderColor = { 0.20f, 0.45f, 0.65f, 0.85f };
+	Vector4 bgColor = { 0.01f, 0.05f, 0.03f, 0.88f };
+	Vector4 borderColor = { 0.22f, 0.85f, 0.50f, 0.85f };
 
 	float ammoRatio = (hudData_.maxAmmo > 0)
 		? static_cast<float>(hudData_.currentAmmo) / static_cast<float>(hudData_.maxAmmo)
 		: 0.0f;
 
-	// 残弾数に応じたステータスカラー
-	Vector4 ammoTextColor = { 0.90f, 0.95f, 1.0f, 1.0f };
-	Vector4 gaugeFillColor = { 0.20f, 0.85f, 0.45f, 0.95f }; // 通常: 緑
+	// 残弾数に応じたステータスカラー（タクティカルグリーン統一：項目5）
+	Vector4 ammoTextColor = { 0.85f, 1.0f, 0.90f, 0.98f };
+	Vector4 gaugeFillColor = { 0.25f, 0.95f, 0.55f, 0.95f }; // 通常: タクティカルグリーン
 
 	if (hudData_.currentAmmo == 0) {
 		// 弾切れ
@@ -231,7 +231,7 @@ void StageHUD::DrawAmmo() {
 
 	// 射撃時のパンチ演出
 	if (firePunchTimer_ > 0.0f) {
-		borderColor = { 0.40f, 0.85f, 1.0f, 1.0f };
+		borderColor = { 0.40f, 1.0f, 0.70f, 1.0f };
 	}
 
 	DrawBorderedPanel({ panelX, panelY }, { panelW, panelH }, bgColor, borderColor, 1.5f);
@@ -243,7 +243,7 @@ void StageHUD::DrawAmmo() {
 		panelX + 16.0f,
 		panelY + 8.0f,
 		14.0f,
-		{ 0.55f, 0.75f, 0.95f, 0.90f }
+		{ 0.35f, 0.95f, 0.60f, 0.90f }
 	);
 
 	// 残弾数数値
