@@ -23,6 +23,9 @@ public:
 	/// @brief 初期化
 	void Initialize(Object3dCommon* object3dCommon, Camera* camera);
 
+	/// @brief カメラの再設定
+	void SetCamera(Camera* camera);
+
 	/// @brief パーツモデルの設定
 	void SetModelForPart(DamagePart part, const std::string& modelFilePath, const std::string& targetNodeName = "");
 	void SetModelForPart(DamagePart part, Model* model, const std::string& targetNodeName = "");

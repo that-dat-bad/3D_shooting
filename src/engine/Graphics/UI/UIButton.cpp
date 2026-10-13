@@ -93,9 +93,19 @@ void UIButton::Update() {
 	backgroundPanel_.SetAnchorPoint(anchorPoint_);
 	backgroundPanel_.Update();
 
-	// ラベルテキストの更新（ボタン中央に配置 + オフセット微調整）
-	float textX = position_.x + size_.x * (0.5f - anchorPoint_.x) + textOffset_.x;
+	// ラベルテキストの更新（アライメントに応じた配置 + オフセット微調整）
+	float btnLeft = position_.x - size_.x * anchorPoint_.x;
+	float textX = 0.0f;
 	float textY = position_.y + size_.y * (0.5f - anchorPoint_.y) + textOffset_.y;
+
+	if (textAlignment_ == TextAlignment::Left) {
+		textX = btnLeft + leftPadding_ + textOffset_.x;
+		labelText_.SetAnchorPoint({ 0.0f, 0.5f });
+	} else {
+		textX = position_.x + size_.x * (0.5f - anchorPoint_.x) + textOffset_.x;
+		labelText_.SetAnchorPoint({ 0.5f, 0.5f });
+	}
+
 	labelText_.SetPosition({ textX, textY });
 	labelText_.SetVisible(isVisible_);
 	labelText_.Update();
@@ -107,7 +117,7 @@ void UIButton::Draw() {
 	// 背景描画
 	backgroundPanel_.Draw();
 
-	// テキスト描画（本体テキストはボタン中央に完全固定・ガタつきなし）
+	// テキスト描画（本体テキストは固定ライン配置・ガタつきなし）
 	labelText_.Draw();
 
 	// 選択時のプロンプト装飾（左側余白の >> と末尾の点滅カーソル _）
@@ -117,17 +127,23 @@ void UIButton::Draw() {
 			const std::string& fontName = labelText_.GetFontName();
 			Vector2 textSize = tr->CalculateTextSize(fontName, label_, fontSize_);
 
-			float textCenterX = position_.x + size_.x * (0.5f - anchorPoint_.x) + textOffset_.x;
+			float btnLeft = position_.x - size_.x * anchorPoint_.x;
 			float textCenterY = position_.y + size_.y * (0.5f - anchorPoint_.y) + textOffset_.y;
 
 			// 1. 左側余白の ">>"（ボタン左端から28pxの位置に端正に配置）
-			float promptX = position_.x - size_.x * anchorPoint_.x + 28.0f;
+			float promptX = btnLeft + 28.0f;
 			tr->Print(fontName, ">>", promptX, textCenterY, fontSize_, selectedTextColor_, { 0.0f, 0.5f });
 
 			// 2. テキスト末尾の点滅カーソル "_"（0.36秒周期で点滅）
 			bool blink = (std::fmod(promptBlinkTimer_, 0.36f) < 0.18f);
 			if (blink) {
-				float cursorX = textCenterX + textSize.x * 0.5f + 6.0f;
+				float cursorX = 0.0f;
+				if (textAlignment_ == TextAlignment::Left) {
+					cursorX = btnLeft + leftPadding_ + textOffset_.x + textSize.x + 6.0f;
+				} else {
+					float textCenterX = position_.x + size_.x * (0.5f - anchorPoint_.x) + textOffset_.x;
+					cursorX = textCenterX + textSize.x * 0.5f + 6.0f;
+				}
 				tr->Print(fontName, "_", cursorX, textCenterY, fontSize_, selectedTextColor_, { 0.0f, 0.5f });
 			}
 		}

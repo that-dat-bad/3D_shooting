@@ -1,5 +1,6 @@
 #include "StageScene.h"
 #include "../System/GameResult.h"
+#include "../System/AsyncPreloadManager.h"
 #include "../../engine/Graphics/Camera/CameraManager.h"
 #include "../../engine/Graphics/Model/Object3dCommon.h"
 #include "../../engine/Graphics/Model/SkyboxCommon.h"
@@ -41,13 +42,15 @@ void StageScene::Initialize() {
 	}
 
 	// ============================
-	// 機体設定（CFG）のロード
+	// 機体設定（CFG）のロード（非同期プリロードキャッシュを活用）
 	// ============================
 	std::string aircraftCfgPath = aircraftConfig_.GetCurrentFilePath();
 	if (aircraftCfgPath.empty()) {
 		aircraftCfgPath = "Resources/aircraft/mig21.cfg";
 	}
-	aircraftConfig_.LoadFromCfg(aircraftCfgPath);
+	if (!AsyncPreloadManager::GetInstance()->ApplyPreloadedAircraftConfig(aircraftConfig_)) {
+		aircraftConfig_.LoadFromCfg(aircraftCfgPath);
+	}
 
 	const auto& airframeData = aircraftConfig_.GetAirframe();
 	const auto& engineData = aircraftConfig_.GetEngine();
@@ -177,13 +180,15 @@ void StageScene::Initialize() {
 	// 弾丸マネージャー初期化
 	bulletManager_.Initialize(512);
 
-	// ミッションデータのロード
+	// ミッションデータのロード（非同期プリロードキャッシュを活用）
 	auto& missionManager = MissionManager::GetInstance();
 	std::string loadPath = missionManager.GetCurrentFilePath();
 	if (loadPath.empty()) {
 		loadPath = "Resources/missions/mission01.json";
 	}
-	missionManager.Load(loadPath);
+	if (!AsyncPreloadManager::GetInstance()->ApplyPreloadedMission(missionManager)) {
+		missionManager.Load(loadPath);
+	}
 
 	const auto& mission = missionManager.GetCurrentMission();
 
@@ -285,6 +290,9 @@ void StageScene::TriggerGameOver() {
 	timeScale_ = 0.35f; // 被弾スローモーション
 	endSequence_ = StageEndSequence::GameOver_Critical;
 	endSeqTimer_ = 0.0f;
+
+	// 非同期処理による軽量化：ゲームオーバー演出中にバックグラウンドで次ステージデータを非同期プリロード！
+	AsyncPreloadManager::GetInstance()->StartStagePreloadAsync();
 
 	// 項目4: テーマカラー赤反転
 	hud_.SetWarningColorMode(true);
@@ -762,11 +770,13 @@ void StageScene::Update() {
 	}
 
 	// ============================
-	// 戦闘システム更新
+	// 戦闘システム更新（ゲームオーバー等の時間停止中はCPU負荷を完全バイパス）
 	// ============================
-	gunpod_.Update(gameDeltaTime);
-	bulletManager_.Update(gameDeltaTime);
-	enemyManager_.Update(gameDeltaTime);
+	if (gameDeltaTime > 0.0001f) {
+		gunpod_.Update(gameDeltaTime);
+		bulletManager_.Update(gameDeltaTime);
+		enemyManager_.Update(gameDeltaTime);
+	}
 	EffectManager::GetInstance()->Update();
 
 	// ============================

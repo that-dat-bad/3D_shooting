@@ -5,6 +5,7 @@
 #include "../../engine/Graphics/Text/TextRenderer.h"
 #include "../../engine/Graphics/System/TextureManager.h"
 #include "../System/GameResult.h"
+#include "../System/AsyncPreloadManager.h"
 #include "../../engine/Graphics/UI/UITextRegistry.h"
 #include "WinApp.h"
 #include <cmath>
@@ -146,6 +147,8 @@ void ClearScene::Initialize() {
 		clickedButtonIdx_ = 0;
 		isRewinding_ = true;
 		rewindTimer_ = 0.0f;
+		// 非同期処理による軽量化：VHS巻き戻し演出の裏でバックグラウンドスレッドでステージリソースを非同期プリロード！
+		AsyncPreloadManager::GetInstance()->StartStagePreloadAsync();
 	});
 
 	titleButton_.Initialize(spriteCommon, "[ RETURN TO BASE ]", 20.0f);

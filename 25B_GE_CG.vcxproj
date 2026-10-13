@@ -364,6 +364,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="src\Game\Environment\TerrainSyncManager.h" />
     <ClInclude Include="src\engine\Graphics\UI\UISelectionManager.h" />
     <ClInclude Include="src\engine\Graphics\UI\UITextRegistry.h" />
+    <ClInclude Include="src\Game\System\AsyncPreloadManager.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\Game\Graphics\AircraftVisualModel.cpp" />
@@ -484,6 +485,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="src\Game\Environment\TerrainSyncManager.cpp" />
     <ClCompile Include="src\engine\Graphics\UI\UISelectionManager.cpp" />
     <ClCompile Include="src\engine\Graphics\UI\UITextRegistry.cpp" />
+    <ClCompile Include="src\Game\System\AsyncPreloadManager.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="external\imgui\LICENSE.txt" />

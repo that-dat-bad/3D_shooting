@@ -24,38 +24,62 @@ void FontManager::Initialize() {
 }
 
 void FontManager::Finalize() {
+    WaitForAllPendingFonts();
+    std::lock_guard<std::mutex> lock(fontsMutex_);
     fonts_.clear();
 }
 
-void FontManager::LoadFont(const std::string& fontName, const std::string& filePath, float pixelHeight) {
-    if (fonts_.contains(fontName)) { return; }
+void FontManager::Update() {
+    // 完了した非同期タスクを取り出して GPU にテクスチャ転送
+    if (pendingFontFutures_.empty()) { return; }
+
+    for (auto it = pendingFontFutures_.begin(); it != pendingFontFutures_.end(); ) {
+        if (it->wait_for(std::chrono::milliseconds(0)) == std::future_status::ready) {
+            FontRasterResult res = it->get();
+            if (res.success) {
+                TextureManager::GetInstance()->LoadTextureFromRawPixels(
+                    res.info.textureName, res.texWidth, res.texHeight, DXGI_FORMAT_R8G8B8A8_UNORM, res.rgbaBitmap.data()
+                );
+                res.info.textureIndex = TextureManager::GetInstance()->GetTextureIndexByFilePath(res.info.textureName);
+
+                std::lock_guard<std::mutex> lock(fontsMutex_);
+                fonts_[res.fontName] = res.info;
+            }
+            it = pendingFontFutures_.erase(it);
+        } else {
+            ++it;
+        }
+    }
+}
+
+FontRasterResult FontManager::RasterizeFontInternal(const std::string& fontName, const std::string& filePath, float pixelHeight) {
+    FontRasterResult result;
+    result.fontName = fontName;
+    result.pixelHeight = pixelHeight;
+    result.success = false;
 
     std::ifstream file(filePath, std::ios::binary | std::ios::ate);
     if (!file.is_open()) {
-        assert(false && "Failed to open font file.");
-        return;
+        return result;
     }
     std::streamsize size = file.tellg();
     if (size <= 0) {
-        assert(false && "Invalid font file size.");
-        return;
+        return result;
     }
     file.seekg(0, std::ios::beg);
     std::vector<unsigned char> ttfBuffer(size);
     if (!file.read((char*)ttfBuffer.data(), size)) {
-        assert(false && "Failed to read font file.");
-        return;
+        return result;
     }
 
-    // 高解像度パッキング（4096 x 4096テクスチャで大文字サイズも極めてシャープに描画）
+    // 高解像度パッキング（4096 x 4096テクスチャ）
     stbtt_pack_context spc;
-    int texWidth = 4096;
-    int texHeight = 4096;
-    std::vector<unsigned char> tempBitmap(texWidth * texHeight);
+    result.texWidth = 4096;
+    result.texHeight = 4096;
+    std::vector<unsigned char> tempBitmap(result.texWidth * result.texHeight);
 
-    if (!stbtt_PackBegin(&spc, tempBitmap.data(), texWidth, texHeight, 0, 1, nullptr)) {
-        assert(false && "Failed to begin packing.");
-        return;
+    if (!stbtt_PackBegin(&spc, tempBitmap.data(), result.texWidth, result.texHeight, 0, 1, nullptr)) {
+        return result;
     }
     stbtt_PackSetOversampling(&spc, 1, 1);
 
@@ -70,7 +94,7 @@ void FontManager::LoadFont(const std::string& fontName, const std::string& fileP
         U"第章節段級位界宇宙星空陸海川山森都市街建物道路橋"
         U"自機僚機標的目標迎撃索敵追尾離脱接近交戦戦果作戦指令司令部防衛制圧";
 
-    // 必要な全コードポイントを1つの配列に集約（レンジ分割による stb_truetype の missing_glyph インデックス不整合バグを回避）
+    // 必要な全コードポイントを1つの配列に集約
     std::vector<int> codepoints;
     codepoints.reserve(1024);
 
@@ -108,60 +132,141 @@ void FontManager::LoadFont(const std::string& fontName, const std::string& fileP
     range.num_chars = static_cast<int>(codepoints.size());
     range.chardata_for_range = packedChars.data();
 
-    // 単一レンジでパッキング（stb_truetype の複数レンジ時 missing_glyph バッファオーバーランを完全に防止）
     stbtt_PackFontRanges(&spc, ttfBuffer.data(), 0, &range, 1);
     stbtt_PackEnd(&spc);
 
-    CharacterInfo info;
-    info.size = pixelHeight;
-    info.textureName = fontName + "_Tex";
-    info.textureIndex = 0;
+    result.info.size = pixelHeight;
+    result.info.textureName = fontName + "_Tex";
+    result.info.textureIndex = 0;
 
-    // フォントの垂直メトリクス（ベースライン、アセント、ディセント）の取得
+    // フォントの垂直メトリクス取得
     stbtt_fontinfo fontInfo;
     int fontOffset = stbtt_GetFontOffsetForIndex(ttfBuffer.data(), 0);
     if (fontOffset >= 0 && stbtt_InitFont(&fontInfo, ttfBuffer.data(), fontOffset)) {
         int ascent = 0, descent = 0, lineGap = 0;
         stbtt_GetFontVMetrics(&fontInfo, &ascent, &descent, &lineGap);
         float vScale = stbtt_ScaleForPixelHeight(&fontInfo, pixelHeight);
-        info.ascent = static_cast<float>(ascent) * vScale;
-        info.descent = static_cast<float>(descent) * vScale;
-        info.lineGap = static_cast<float>(lineGap) * vScale;
+        result.info.ascent = static_cast<float>(ascent) * vScale;
+        result.info.descent = static_cast<float>(descent) * vScale;
+        result.info.lineGap = static_cast<float>(lineGap) * vScale;
     } else {
-        info.ascent = pixelHeight * 0.8f;
-        info.descent = -pixelHeight * 0.2f;
-        info.lineGap = 0.0f;
+        result.info.ascent = pixelHeight * 0.8f;
+        result.info.descent = -pixelHeight * 0.2f;
+        result.info.lineGap = 0.0f;
     }
 
-    // ハッシュマップに格納
     for (size_t i = 0; i < codepoints.size(); ++i) {
-        info.glyphs[codepoints[i]] = packedChars[i];
+        result.info.glyphs[codepoints[i]] = packedChars[i];
     }
 
-    std::vector<uint32_t> rgbaBitmap(texWidth * texHeight);
-    for (int i = 0; i < texWidth * texHeight; ++i) {
+    result.rgbaBitmap.resize(result.texWidth * result.texHeight);
+    for (int i = 0; i < result.texWidth * result.texHeight; ++i) {
         uint8_t alpha = tempBitmap[i];
-        rgbaBitmap[i] = (alpha << 24) | (255 << 16) | (255 << 8) | 255;
+        result.rgbaBitmap[i] = (alpha << 24) | (255 << 16) | (255 << 8) | 255;
     }
 
-    TextureManager::GetInstance()->LoadTextureFromRawPixels(
-        info.textureName, texWidth, texHeight, DXGI_FORMAT_R8G8B8A8_UNORM, rgbaBitmap.data()
+    result.success = true;
+    return result;
+}
+
+void FontManager::LoadFont(const std::string& fontName, const std::string& filePath, float pixelHeight) {
+    {
+        std::lock_guard<std::mutex> lock(fontsMutex_);
+        if (fonts_.contains(fontName)) { return; }
+    }
+
+    FontRasterResult res = RasterizeFontInternal(fontName, filePath, pixelHeight);
+    if (res.success) {
+        TextureManager::GetInstance()->LoadTextureFromRawPixels(
+            res.info.textureName, res.texWidth, res.texHeight, DXGI_FORMAT_R8G8B8A8_UNORM, res.rgbaBitmap.data()
+        );
+        res.info.textureIndex = TextureManager::GetInstance()->GetTextureIndexByFilePath(res.info.textureName);
+
+        std::lock_guard<std::mutex> lock(fontsMutex_);
+        fonts_[fontName] = res.info;
+    }
+}
+
+void FontManager::LoadFontAsync(const std::string& fontName, const std::string& filePath, float pixelHeight) {
+    {
+        std::lock_guard<std::mutex> lock(fontsMutex_);
+        if (fonts_.contains(fontName)) { return; }
+    }
+
+    // バックグラウンドスレッドで非同期にラスタライズを実行
+    pendingFontFutures_.push_back(
+        std::async(std::launch::async, &FontManager::RasterizeFontInternal, fontName, filePath, pixelHeight)
     );
+}
 
-    info.textureIndex = TextureManager::GetInstance()->GetTextureIndexByFilePath(info.textureName);
+void FontManager::LoadFontsParallel(const std::vector<FontLoadRequest>& requests) {
+    std::vector<std::future<FontRasterResult>> futures;
+    futures.reserve(requests.size());
 
-    fonts_[fontName] = info;
+    // CPU全コアを使って一斉に非同期ラスタライズ開始
+    for (const auto& req : requests) {
+        {
+            std::lock_guard<std::mutex> lock(fontsMutex_);
+            if (fonts_.contains(req.fontName)) continue;
+        }
+        futures.push_back(
+            std::async(std::launch::async, &FontManager::RasterizeFontInternal, req.fontName, req.filePath, req.pixelHeight)
+        );
+    }
+
+    // 全タスクの完了を待機し、メインスレッドで一括GPUテクスチャ化
+    for (auto& fut : futures) {
+        FontRasterResult res = fut.get();
+        if (res.success) {
+            TextureManager::GetInstance()->LoadTextureFromRawPixels(
+                res.info.textureName, res.texWidth, res.texHeight, DXGI_FORMAT_R8G8B8A8_UNORM, res.rgbaBitmap.data()
+            );
+            res.info.textureIndex = TextureManager::GetInstance()->GetTextureIndexByFilePath(res.info.textureName);
+
+            std::lock_guard<std::mutex> lock(fontsMutex_);
+            fonts_[res.fontName] = res.info;
+        }
+    }
+}
+
+bool FontManager::IsFontLoaded(const std::string& fontName) const {
+    std::lock_guard<std::mutex> lock(fontsMutex_);
+    return fonts_.contains(fontName);
+}
+
+void FontManager::WaitForAllPendingFonts() {
+    for (auto& fut : pendingFontFutures_) {
+        if (fut.valid()) {
+            FontRasterResult res = fut.get();
+            if (res.success) {
+                TextureManager::GetInstance()->LoadTextureFromRawPixels(
+                    res.info.textureName, res.texWidth, res.texHeight, DXGI_FORMAT_R8G8B8A8_UNORM, res.rgbaBitmap.data()
+                );
+                res.info.textureIndex = TextureManager::GetInstance()->GetTextureIndexByFilePath(res.info.textureName);
+
+                std::lock_guard<std::mutex> lock(fontsMutex_);
+                fonts_[res.fontName] = res.info;
+            }
+        }
+    }
+    pendingFontFutures_.clear();
 }
 
 const CharacterInfo* FontManager::GetCharacterInfo(const std::string& fontName) const {
+    std::lock_guard<std::mutex> lock(fontsMutex_);
     auto it = fonts_.find(fontName);
     if (it != fonts_.end()) {
         return &it->second;
+    }
+    // ロード未完了時の安全なフォールバック（クラッシュ防止）
+    if (!fonts_.empty()) {
+        return &fonts_.begin()->second;
     }
     return nullptr;
 }
 
 std::vector<std::string> FontManager::GetFontNames() const {
+    std::lock_guard<std::mutex> lock(fontsMutex_);
     std::vector<std::string> names;
     names.reserve(fonts_.size());
     for (const auto& [name, _] : fonts_) {

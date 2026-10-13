@@ -5,6 +5,7 @@
 #include "../../engine/Graphics/Text/TextRenderer.h"
 #include "../../engine/Graphics/System/TextureManager.h"
 #include "../System/GameResult.h"
+#include "../System/AsyncPreloadManager.h"
 #include "../../engine/Graphics/UI/UITextRegistry.h"
 #include "WinApp.h"
 #include <cmath>
@@ -110,6 +111,8 @@ void GameOverScene::Initialize() {
 			isRetrying_ = true;
 			retryGlitchTimer_ = 0.0f;
 			GameResult::GetInstance().isRetry = true;
+			// 非同期処理による軽量化：リトライ演出の裏でバックグラウンドスレッドでステージリソースを非同期プリロード！
+			AsyncPreloadManager::GetInstance()->StartStagePreloadAsync();
 		}
 	});
 

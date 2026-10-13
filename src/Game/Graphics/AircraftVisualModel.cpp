@@ -9,6 +9,15 @@ void AircraftVisualModel::Initialize(Object3dCommon* object3dCommon, Camera* cam
 	camera_ = camera;
 }
 
+void AircraftVisualModel::SetCamera(Camera* camera) {
+	camera_ = camera;
+	for (auto& [part, node] : partNodes_) {
+		if (node.object) {
+			node.object->SetCamera(camera);
+		}
+	}
+}
+
 void AircraftVisualModel::SetModelForPart(DamagePart part, const std::string& modelFilePath, const std::string& targetNodeName) {
 	Model* model = ModelManager::GetInstance()->FindModel(modelFilePath);
 	if (!model) {

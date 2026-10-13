@@ -2,6 +2,7 @@
 #include <dinput.h>
 #include "TitleScene.h"
 #include "../System/GameResult.h"
+#include "../System/AsyncPreloadManager.h"
 #include "../../engine/Graphics/Sprite/SpriteCommon.h"
 #include "../../engine/Graphics/Text/TextRenderer.h"
 #include "../../engine/Graphics/System/TextureManager.h"
@@ -26,6 +27,13 @@
 // 画面サイズ定数
 static constexpr float kScreenWidth = static_cast<float>(WinApp::kClientWidth);   // 1280
 static constexpr float kScreenHeight = static_cast<float>(WinApp::kClientHeight); // 720
+
+// 静的リソースキャッシュの実体定義
+TitleScene::TitleResourceCache TitleScene::s_cache_;
+
+void TitleScene::ClearStaticCache() {
+	s_cache_ = TitleResourceCache{};
+}
 
 void TitleScene::SetCursorVisible(bool visible) {
 	isCursorShown_ = visible;
@@ -57,30 +65,9 @@ void TitleScene::Initialize() {
 	defconLevel_ = 2;
 
 	SpriteCommon* spriteCommon = SpriteCommon::GetInstance();
-
-	// コンソールブート時の完全漆黒背景スプライト（項目1: 格納庫の透けを100%遮蔽）
-	consoleBgSprite_ = std::make_unique<Sprite>();
-	consoleBgSprite_->Initialize(spriteCommon, "assets/textures/white1x1.png");
-	consoleBgSprite_->SetAnchorPoint({ 0.0f, 0.0f });
-	consoleBgSprite_->SetPosition({ 0.0f, 0.0f });
-	consoleBgSprite_->SetSize({ kScreenWidth, kScreenHeight });
-	consoleBgSprite_->SetColor({ 0.0f, 0.0f, 0.0f, 1.0f });
-	consoleBgSprite_->Update();
-
-	// 出撃シーケンス用ブラックアウトスプライト（黒フェード）
-	sortieFlashSprite_ = std::make_unique<Sprite>();
-	sortieFlashSprite_->Initialize(spriteCommon, "assets/textures/white1x1.png");
-	sortieFlashSprite_->SetAnchorPoint({ 0.0f, 0.0f });
-	sortieFlashSprite_->SetPosition({ 0.0f, 0.0f });
-	sortieFlashSprite_->SetSize({ kScreenWidth, kScreenHeight });
-	sortieFlashSprite_->SetColor({ 0.0f, 0.0f, 0.0f, 0.0f });
-	sortieFlashSprite_->Update();
-
-	// フルOSデスクトップ環境の初期化
-	InitializeOSDesktop(spriteCommon);
+	TextureManager* tm = TextureManager::GetInstance();
 
 	// 必須テクスチャのロード
-	TextureManager* tm = TextureManager::GetInstance();
 	tm->LoadTexture("assets/textures/white1x1.png");
 	whiteTexIndex_ = tm->GetTextureIndexByFilePath("assets/textures/white1x1.png");
 
@@ -114,13 +101,98 @@ void TitleScene::Initialize() {
 		titleCamera->Update();
 	}
 
-	TextureManager::GetInstance()->LoadTexture("assets/textures/cedar_bridge_sunset_1_2k.dds");
-	skybox_ = std::make_unique<Skybox>();
-	skybox_->Initialize(SkyboxCommon::GetInstance());
-	skybox_->SetCamera(titleCamera);
-	uint32_t skyboxTexIndex = TextureManager::GetInstance()->GetTextureIndexByFilePath("assets/textures/cedar_bridge_sunset_1_2k.dds");
-	skybox_->SetTextureIndex(skyboxTexIndex);
+	tm->LoadTexture("assets/textures/cedar_bridge_sunset_1_2k.dds");
+	uint32_t skyboxTexIndex = tm->GetTextureIndexByFilePath("assets/textures/cedar_bridge_sunset_1_2k.dds");
 	Object3dCommon::GetInstance()->SetDefaultEnvTextureIndex(skyboxTexIndex);
+
+	const bool fromCache = s_cache_.isCached;
+	if (fromCache) {
+		// ============================================================
+		// キャッシュからの0ms高速復元（D3D12リソース生成2,000バッファ完全スキップ）
+		// ============================================================
+		skybox_ = std::move(s_cache_.skybox);
+		locations_ = std::move(s_cache_.locations);
+		afterburner_ = std::move(s_cache_.afterburner);
+		consoleBgSprite_ = std::move(s_cache_.consoleBgSprite);
+		sortieFlashSprite_ = std::move(s_cache_.sortieFlashSprite);
+		recDotSprite_ = std::move(s_cache_.recDotSprite);
+		titleLogoSprite_ = std::move(s_cache_.titleLogoSprite);
+		headerLampSprite_ = std::move(s_cache_.headerLampSprite);
+		pressSpaceBannerBg_ = std::move(s_cache_.pressSpaceBannerBg);
+		osSpritePool_ = std::move(s_cache_.osSpritePool);
+		cursorSprites_ = std::move(s_cache_.cursorSprites);
+		windowCloseMaskSprites_ = std::move(s_cache_.windowCloseMaskSprites);
+		windowCloseBorderSprites_ = std::move(s_cache_.windowCloseBorderSprites);
+		menuBorderSprites_ = std::move(s_cache_.menuBorderSprites);
+		buttonBorders_ = std::move(s_cache_.buttonBorders);
+		glitchSprites_ = std::move(s_cache_.glitchSprites);
+		osdSprites_ = std::move(s_cache_.osdSprites);
+		pressSpaceBorders_ = std::move(s_cache_.pressSpaceBorders);
+		menuBorderOffsets_ = s_cache_.menuBorderOffsets;
+		buttonBorderOutlineOffsets_ = s_cache_.buttonBorderOutlineOffsets;
+		buttonBorderBracketOffsets_ = s_cache_.buttonBorderBracketOffsets;
+		buttonBorderIndicatorOffsets_ = s_cache_.buttonBorderIndicatorOffsets;
+		s_cache_.isCached = false; // 所有権を this に移行
+
+		// カメラを全オブジェクトに再接続
+		if (skybox_) {
+			skybox_->SetCamera(titleCamera);
+		}
+		for (auto& loc : locations_) {
+			if (loc.envObject) loc.envObject->SetCamera(titleCamera);
+			for (auto& extra : loc.extraEnvParts) {
+				if (extra.object) extra.object->SetCamera(titleCamera);
+			}
+			if (loc.visualModel) loc.visualModel->SetCamera(titleCamera);
+			if (loc.debrisModel) loc.debrisModel->SetCamera(titleCamera);
+		}
+
+		// スプライトステートとウィンドウ位置のリセット
+		osSpritePoolIdx_ = 0;
+		if (consoleBgSprite_) {
+			consoleBgSprite_->SetColor({ 0.0f, 0.0f, 0.0f, 1.0f });
+			consoleBgSprite_->Update();
+		}
+		if (sortieFlashSprite_) {
+			sortieFlashSprite_->SetColor({ 0.0f, 0.0f, 0.0f, 0.0f });
+			sortieFlashSprite_->Update();
+		}
+
+		menuWindowPos_ = { 392.0f, 44.0f };
+		UpdateMenuWindowPosition(menuWindowPos_);
+		isWindowDragging_ = false;
+		wasLButtonDown_ = false;
+		isStartMenuOpen_ = false;
+		ResetOSDesktopWindows();
+	} else {
+		// ============================================================
+		// 初回生成（パーツ・セグメント・モデルの削減は一切行わず100%保持）
+		// ============================================================
+		// コンソールブート時の完全漆黒背景スプライト（項目1: 格納庫の透けを100%遮蔽）
+		consoleBgSprite_ = std::make_unique<Sprite>();
+		consoleBgSprite_->Initialize(spriteCommon, "assets/textures/white1x1.png");
+		consoleBgSprite_->SetAnchorPoint({ 0.0f, 0.0f });
+		consoleBgSprite_->SetPosition({ 0.0f, 0.0f });
+		consoleBgSprite_->SetSize({ kScreenWidth, kScreenHeight });
+		consoleBgSprite_->SetColor({ 0.0f, 0.0f, 0.0f, 1.0f });
+		consoleBgSprite_->Update();
+
+		// 出撃シーケンス用ブラックアウトスプライト（黒フェード）
+		sortieFlashSprite_ = std::make_unique<Sprite>();
+		sortieFlashSprite_->Initialize(spriteCommon, "assets/textures/white1x1.png");
+		sortieFlashSprite_->SetAnchorPoint({ 0.0f, 0.0f });
+		sortieFlashSprite_->SetPosition({ 0.0f, 0.0f });
+		sortieFlashSprite_->SetSize({ kScreenWidth, kScreenHeight });
+		sortieFlashSprite_->SetColor({ 0.0f, 0.0f, 0.0f, 0.0f });
+		sortieFlashSprite_->Update();
+
+		// フルOSデスクトップ環境の初期化（512枚プール＆24枚カーソル）
+		InitializeOSDesktop(spriteCommon);
+
+		skybox_ = std::make_unique<Skybox>();
+		skybox_->Initialize(SkyboxCommon::GetInstance());
+		skybox_->SetCamera(titleCamera);
+		skybox_->SetTextureIndex(skyboxTexIndex);
 
 	ModelManager::GetInstance()->LoadModel("Resources/models/m21_wg.gltf");
 	ModelManager::GetInstance()->LoadModel("Resources/models/m21.gltf");
@@ -311,6 +383,7 @@ void TitleScene::Initialize() {
 	for (auto& loc : locations_) {
 		SetupLocation(loc, titleCamera);
 	}
+	} // end of else (!fromCache) for 3D setup
 
 	// 誘導灯・回転灯の自発光（エミッシブ）設定
 	Model* guideModel = ModelManager::GetInstance()->FindModel("Resources/models/title/Tunnel_guide.obj");
@@ -363,11 +436,6 @@ void TitleScene::Initialize() {
 	backgroundPanel_.SetBackgroundColor({ 0.0f, 0.0f, 0.0f, 0.3f }); // 少し透明度を上げて後ろの3Dが見えるように
 
 	// ============================
-	// メニューカード（中央の半透明ダークガラスパネル）
-	// ============================
-	InitializeMenuCard(spriteCommon);
-
-	// ============================
 	// タイトルテキスト（コンソールプロジェクト識別バナー: 鮮烈なターミナルグリーン）
 	// ============================
 	titleText_.Initialize("HackGen", "DAWN", 48.0f);
@@ -403,6 +471,7 @@ void TitleScene::Initialize() {
 
 	// START ボタン
 	startButton_.Initialize(spriteCommon, "[01] EXECUTE SORTIE", 21.0f);
+	startButton_.SetLeftAligned(true, 100.0f);
 	startButton_.SetTextOffset({ 0.0f, 3.0f });
 	startButton_.GetLabelText()->SetFontName("HackGen");
 	startButton_.SetPosition({ buttonX, buttonStartY });
@@ -418,10 +487,13 @@ void TitleScene::Initialize() {
 		isEngineTesting_ = true;
 		engineTestTimer_ = kSortieDuration;
 		SetCursorVisible(false); // 出撃開始と同時にOSカーソルを消去（項目9）
+		// 非同期処理による軽量化：出撃演出ムービーの裏でバックグラウンドスレッドでステージリソースを非同期プリロード！
+		AsyncPreloadManager::GetInstance()->StartStagePreloadAsync();
 	});
 
 	// EDITOR ボタン
 	editorButton_.Initialize(spriteCommon, "[02] MISSION EDITOR", 21.0f);
+	editorButton_.SetLeftAligned(true, 100.0f);
 	editorButton_.SetTextOffset({ 0.0f, 3.0f });
 	editorButton_.GetLabelText()->SetFontName("HackGen");
 	editorButton_.SetPosition({ buttonX, buttonStartY + buttonSpacing });
@@ -437,6 +509,7 @@ void TitleScene::Initialize() {
 
 	// SETTINGS ボタン
 	settingsButton_.Initialize(spriteCommon, "[03] SYSTEM CONFIG", 21.0f);
+	settingsButton_.SetLeftAligned(true, 100.0f);
 	settingsButton_.SetTextOffset({ 0.0f, 3.0f });
 	settingsButton_.GetLabelText()->SetFontName("HackGen");
 	settingsButton_.SetPosition({ buttonX, buttonStartY + buttonSpacing * 2.0f });
@@ -452,6 +525,7 @@ void TitleScene::Initialize() {
 
 	// EXIT ボタン
 	exitButton_.Initialize(spriteCommon, "[04] ABORT / EXIT", 21.0f);
+	exitButton_.SetLeftAligned(true, 100.0f);
 	exitButton_.SetTextOffset({ 0.0f, 3.0f });
 	exitButton_.GetLabelText()->SetFontName("HackGen");
 	exitButton_.SetPosition({ buttonX, buttonStartY + buttonSpacing * 3.0f });
@@ -470,52 +544,90 @@ void TitleScene::Initialize() {
 	selectionManager_.AddButton(&settingsButton_);
 	selectionManager_.AddButton(&exitButton_);
 
-	// コンソールメニューカードの初期化
-	InitializeMenuCard(spriteCommon);
+	// ============================================================
+	// 初回のみ実行するスプライト・エフェクト初期化（キャッシュ復元時は0msスキップ）
+	// ============================================================
+	if (!fromCache) {
+		// コンソールメニューカードの初期化
+		InitializeMenuCard(spriteCommon);
 
-	// ============================
-	// ============================
-	// 操作案内テキスト＆ミリタリー黒帯（枠線中央にジャストフィット配置：UIずれ解消）
-	// ============================
-	const float bannerW = 600.0f;
-	const float bannerH = 34.0f; // 高さを34pxに設定し、テキストが上下枠線に重ならない余裕を確保
-	const float bannerX = (kScreenWidth - bannerW) * 0.5f;
-	const float bannerY = 672.0f; // 画面最下部（672～706px）の安全領域
+		// 操作案内テキスト＆ミリタリー黒帯（枠線中央にジャストフィット配置：UIずれ解消）
+		const float bannerW = 600.0f;
+		const float bannerH = 34.0f; // 高さを34pxに設定し、テキストが上下枠線に重ならない余裕を確保
+		const float bannerX = (kScreenWidth - bannerW) * 0.5f;
+		const float bannerY = 672.0f; // 画面最下部（672～706px）の安全領域
 
-	pressSpaceBannerBg_ = std::make_unique<Sprite>();
-	pressSpaceBannerBg_->Initialize(spriteCommon, "assets/textures/white1x1.png");
-	pressSpaceBannerBg_->SetAnchorPoint({ 0.0f, 0.0f });
-	pressSpaceBannerBg_->SetPosition({ bannerX, bannerY });
-	pressSpaceBannerBg_->SetSize({ bannerW, bannerH });
-	pressSpaceBannerBg_->SetColor({ 0.01f, 0.02f, 0.01f, 0.98f }); // 完全不透明に近い漆黒ミリタリー帯
-	pressSpaceBannerBg_->Update();
+		pressSpaceBannerBg_ = std::make_unique<Sprite>();
+		pressSpaceBannerBg_->Initialize(spriteCommon, "assets/textures/white1x1.png");
+		pressSpaceBannerBg_->SetAnchorPoint({ 0.0f, 0.0f });
+		pressSpaceBannerBg_->SetPosition({ bannerX, bannerY });
+		pressSpaceBannerBg_->SetSize({ bannerW, bannerH });
+		pressSpaceBannerBg_->SetColor({ 0.01f, 0.02f, 0.01f, 0.98f }); // 完全不透明に近い漆黒ミリタリー帯
+		pressSpaceBannerBg_->Update();
 
-	pressSpaceBorders_.clear();
-	auto addBannerLine = [&](const Vector2& pos, const Vector2& size, const MyMath::Vector4& col) {
-		auto sp = std::make_unique<Sprite>();
-		sp->Initialize(spriteCommon, "assets/textures/white1x1.png");
-		sp->SetAnchorPoint({ 0.0f, 0.0f });
-		sp->SetPosition(pos);
-		sp->SetSize(size);
-		sp->SetColor(col);
-		sp->Update();
-		pressSpaceBorders_.push_back(std::move(sp));
-	};
-	const MyMath::Vector4 bannerLineCol = { 0.20f, 0.85f, 0.50f, 0.70f };
-	// 上下の境界線 (1px)
-	addBannerLine({ bannerX, bannerY }, { bannerW, 1.0f }, bannerLineCol);
-	addBannerLine({ bannerX, bannerY + bannerH - 1.0f }, { bannerW, 1.0f }, bannerLineCol);
-	// 左右のコーナーブラケット (2px)
-	addBannerLine({ bannerX, bannerY }, { 8.0f, 2.0f }, bannerLineCol);
-	addBannerLine({ bannerX, bannerY }, { 2.0f, 8.0f }, bannerLineCol);
-	addBannerLine({ bannerX + bannerW - 8.0f, bannerY }, { 8.0f, 2.0f }, bannerLineCol);
-	addBannerLine({ bannerX + bannerW - 2.0f, bannerY }, { 2.0f, 8.0f }, bannerLineCol);
-	addBannerLine({ bannerX, bannerY + bannerH - 2.0f }, { 8.0f, 2.0f }, bannerLineCol);
-	addBannerLine({ bannerX, bannerY + bannerH - 8.0f }, { 2.0f, 8.0f }, bannerLineCol);
-	addBannerLine({ bannerX + bannerW - 8.0f, bannerY + bannerH - 2.0f }, { 8.0f, 2.0f }, bannerLineCol);
-	addBannerLine({ bannerX + bannerW - 2.0f, bannerY + bannerH - 8.0f }, { 2.0f, 8.0f }, bannerLineCol);
+		pressSpaceBorders_.clear();
+		auto addBannerLine = [&](const Vector2& pos, const Vector2& size, const MyMath::Vector4& col) {
+			auto sp = std::make_unique<Sprite>();
+			sp->Initialize(spriteCommon, "assets/textures/white1x1.png");
+			sp->SetAnchorPoint({ 0.0f, 0.0f });
+			sp->SetPosition(pos);
+			sp->SetSize(size);
+			sp->SetColor(col);
+			sp->Update();
+			pressSpaceBorders_.push_back(std::move(sp));
+		};
+		const MyMath::Vector4 bannerLineCol = { 0.20f, 0.85f, 0.50f, 0.70f };
+		// 上下の境界線 (1px)
+		addBannerLine({ bannerX, bannerY }, { bannerW, 1.0f }, bannerLineCol);
+		addBannerLine({ bannerX, bannerY + bannerH - 1.0f }, { bannerW, 1.0f }, bannerLineCol);
+		// 左右のコーナーブラケット (2px)
+		addBannerLine({ bannerX, bannerY }, { 8.0f, 2.0f }, bannerLineCol);
+		addBannerLine({ bannerX, bannerY }, { 2.0f, 8.0f }, bannerLineCol);
+		addBannerLine({ bannerX + bannerW - 8.0f, bannerY }, { 8.0f, 2.0f }, bannerLineCol);
+		addBannerLine({ bannerX + bannerW - 2.0f, bannerY }, { 2.0f, 8.0f }, bannerLineCol);
+		addBannerLine({ bannerX, bannerY + bannerH - 2.0f }, { 8.0f, 2.0f }, bannerLineCol);
+		addBannerLine({ bannerX, bannerY + bannerH - 8.0f }, { 2.0f, 8.0f }, bannerLineCol);
+		addBannerLine({ bannerX + bannerW - 8.0f, bannerY + bannerH - 2.0f }, { 8.0f, 2.0f }, bannerLineCol);
+		addBannerLine({ bannerX + bannerW - 2.0f, bannerY + bannerH - 8.0f }, { 2.0f, 8.0f }, bannerLineCol);
+
+		// DAWN タイトルロゴスプライト初期化（白文字 + MiG-21通過）
+		titleLogoSprite_ = std::make_unique<Sprite>();
+		titleLogoSprite_->Initialize(spriteCommon, "assets/textures/title_logo_dawn_cropped.png");
+		titleLogoSprite_->SetAnchorPoint({ 0.5f, 0.5f });
+		titleLogoSprite_->SetPosition({ kScreenWidth * 0.5f, 158.0f });
+		titleLogoSprite_->SetSize({ 410.0f, 91.8f });
+		titleLogoSprite_->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f }); // 鮮烈な白文字＆機体
+		titleLogoSprite_->SetBlendMode(BlendMode::kNormal);
+		titleLogoSprite_->Update();
+
+		// ドローンカメラOSD初期化
+		InitializeOSD(spriteCommon);
+
+		// カメラ映像ウィンドウ閉じる演出の初期化（項目1）
+		InitializeWindowCloseVisuals(spriteCommon);
+
+		// 高品位アフターバーナーの初期化（Mig-21 単発エンジン・ショックダイヤモンド）
+		afterburner_ = std::make_unique<Afterburner>();
+		afterburner_->Initialize();
+		afterburner_->SetTwinEngine(false);
+		afterburner_->SetSingleNozzleOffset({ 0.0f, 0.011f, 14.95f });
+		afterburner_->SetFlameRadius(0.38f);
+		afterburner_->SetFlameLength(6.2f);
+		afterburner_->SetShockDiamondCount(5);
+		afterburner_->SetFlameColor({ 0.28f, 0.65f, 1.0f });
+		afterburner_->SetCoreColor({ 0.88f, 0.95f, 1.0f });
+		afterburner_->SetIntensity(1.35f);
+
+#ifdef USE_IMGUI
+		if (!afterburnerConfigPath_.empty()) {
+			afterburner_->LoadConfig(afterburnerConfigPath_);
+		}
+#endif
+	}
 
 	// 正確なascent/descentアンカー計算により、バナー枠の中心にジャストフィット
+	const float bannerH = 34.0f;
+	const float bannerY = 672.0f;
 	pressSpaceText_.Initialize("HackGen", "[ PRESS SPACE OR CLICK TO START / SKIP ]", 14.0f);
 	pressSpaceText_.SetAnchorPoint({ 0.5f, 0.5f });
 	pressSpaceText_.SetPosition({ kScreenWidth * 0.5f, bannerY + bannerH * 0.5f });
@@ -529,7 +641,6 @@ void TitleScene::Initialize() {
 	pulseStyle.motionSpeed = 2.2f;
 	pressSpaceText_.SetStyle("Normal", pulseStyle);
 
-	
 	// UITextRegistryに登録（エディタから編集可能にする）
 	UITextRegistry::GetInstance()->Register("Title_Main", &titleText_);
 	UITextRegistry::GetInstance()->Register("Title_Sub", &subtitleText_);
@@ -537,52 +648,6 @@ void TitleScene::Initialize() {
 	UITextRegistry::GetInstance()->Register("Title_BtnSettings", settingsButton_.GetLabelText());
 	UITextRegistry::GetInstance()->Register("Title_BtnExit", exitButton_.GetLabelText());
 	UITextRegistry::GetInstance()->Register("Title_PressSpace", &pressSpaceText_);
-
-	// DAWN タイトルロゴスプライト初期化（白文字 + MiG-21通過）
-	titleLogoSprite_ = std::make_unique<Sprite>();
-	titleLogoSprite_->Initialize(spriteCommon, "assets/textures/title_logo_dawn_cropped.png");
-	titleLogoSprite_->SetAnchorPoint({ 0.5f, 0.5f });
-	titleLogoSprite_->SetPosition({ kScreenWidth * 0.5f, 158.0f });
-	titleLogoSprite_->SetSize({ 410.0f, 91.8f });
-	titleLogoSprite_->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f }); // 鮮烈な白文字＆機体
-	titleLogoSprite_->SetBlendMode(BlendMode::kNormal);
-	titleLogoSprite_->Update();
-
-	// ドローンカメラOSD初期化
-	InitializeOSD(spriteCommon);
-
-	// カメラ映像ウィンドウ閉じる演出の初期化（項目1）
-	InitializeWindowCloseVisuals(spriteCommon);
-
-	// フルOSデスクトップ環境の初期化
-	InitializeOSDesktop(spriteCommon);
-
-	// 出撃トランジション用ブラックアウトスプライトの初期化（黒フェード）
-	sortieFlashSprite_ = std::make_unique<Sprite>();
-	sortieFlashSprite_->Initialize(spriteCommon, "assets/textures/white1x1.png");
-	sortieFlashSprite_->SetAnchorPoint({ 0.0f, 0.0f });
-	sortieFlashSprite_->SetPosition({ 0.0f, 0.0f });
-	sortieFlashSprite_->SetSize({ kScreenWidth, kScreenHeight });
-	sortieFlashSprite_->SetColor({ 0.0f, 0.0f, 0.0f, 0.0f });
-	sortieFlashSprite_->Update();
-
-	// 高品位アフターバーナーの初期化（Mig-21 単発エンジン・ショックダイヤモンド）
-	afterburner_ = std::make_unique<Afterburner>();
-	afterburner_->Initialize();
-	afterburner_->SetTwinEngine(false);
-	afterburner_->SetSingleNozzleOffset({ 0.0f, 0.011f, 14.95f });
-	afterburner_->SetFlameRadius(0.38f);
-	afterburner_->SetFlameLength(6.2f);
-	afterburner_->SetShockDiamondCount(5);
-	afterburner_->SetFlameColor({ 0.28f, 0.65f, 1.0f });
-	afterburner_->SetCoreColor({ 0.88f, 0.95f, 1.0f });
-	afterburner_->SetIntensity(1.35f);
-
-#ifdef USE_IMGUI
-	if (!afterburnerConfigPath_.empty()) {
-		afterburner_->LoadConfig(afterburnerConfigPath_);
-	}
-#endif
 }
 
 void TitleScene::Update() {
@@ -1379,9 +1444,16 @@ void TitleScene::Draw() {
 // ロケーション関連ヘルパー
 // ============================================================
 namespace {
-	/// ModelManager と同じ規則（そのまま or assets/ 付加）でファイル存在を確認
+	static std::unordered_map<std::string, bool> s_assetExistsCache;
+	/// ModelManager と同じ規則（そのまま or assets/ 付加）でファイル存在を確認（結果を静的キャッシュ）
 	bool TitleAssetExists(const std::string& path) {
-		return std::filesystem::exists(path) || std::filesystem::exists("assets/" + path);
+		auto it = s_assetExistsCache.find(path);
+		if (it != s_assetExistsCache.end()) {
+			return it->second;
+		}
+		bool exists = std::filesystem::exists(path) || std::filesystem::exists("assets/" + path);
+		s_assetExistsCache[path] = exists;
+		return exists;
 	}
 	constexpr float kDegToRad = 3.14159265f / 180.0f;
 }
@@ -1883,7 +1955,7 @@ void TitleScene::UpdateMenuConsoleVisuals() {
 	exitButton_.SetTextColor(normalGreen);
 	exitButton_.SetSelectedTextColor(selectedGreen);
 
-	// 各ボタンのラベル文字列は中央固定（>> と 点滅カーソル _ はUIButton内部で描画し、本体テキストは一切ガタつかない）
+	// 各ボタンのラベル文字列は左揃え固定インデント配置（[01]〜[04]の頭出し位置を垂直に完全整列）
 	startButton_.SetLabel("[01] EXECUTE SORTIE");
 	editorButton_.SetLabel("[02] MISSION EDITOR");
 	settingsButton_.SetLabel("[03] SYSTEM CONFIG");
@@ -2105,14 +2177,6 @@ void TitleScene::DrawMenuCard() {
 		{ 1.0f, 0.5f }
 	);
 
-	// メニュー初期展開時のレーザー走査線＆枠形成エフェクト（項目2）
-	if (menuEnterTimer_ > 0.0f) {
-		float enterRatio = 1.0f - (menuEnterTimer_ / kMenuEnterDuration);
-		enterRatio = (std::min)((std::max)(enterRatio, 0.0f), 1.0f);
-		float laserY = cardY + 616.0f * enterRatio;
-
-		tr->Print("HackGen", ">> CONSTRUCTING TACTICAL UI FRAMEWORK... 100% <<", cardX + 260.0f, laserY - 14.0f, 12.0f, { 0.40f, 1.0f, 0.70f, 0.90f }, { 0.5f, 0.5f });
-	}
 
 	if (isActive) {
 		// アクティブウィンドウ強調: 外周ネオン発光ボーダー ＆ 四隅コーナーブラケット輝度ブースト
@@ -2982,6 +3046,35 @@ void TitleScene::DrawUI() {
 void TitleScene::Finalize() {
 	SetCursorVisible(false); // ゲーム画面へ遷移するためOSカーソルを確実に非表示（項目9）
 	UITextRegistry::GetInstance()->Clear();
+
+	// ------------------------------------------------------------
+	// 静的リソースキャッシュへの退避（リファクタリング最適化）
+	// 次回タイトル訪問時のD3D12リソース生成（2,000バッファ以上）と
+	// 3D背景109個のObject3d再初期化をスキップして0ms高速遷移を実現
+	// ------------------------------------------------------------
+	s_cache_.skybox = std::move(skybox_);
+	s_cache_.locations = std::move(locations_);
+	s_cache_.afterburner = std::move(afterburner_);
+	s_cache_.consoleBgSprite = std::move(consoleBgSprite_);
+	s_cache_.sortieFlashSprite = std::move(sortieFlashSprite_);
+	s_cache_.recDotSprite = std::move(recDotSprite_);
+	s_cache_.titleLogoSprite = std::move(titleLogoSprite_);
+	s_cache_.headerLampSprite = std::move(headerLampSprite_);
+	s_cache_.pressSpaceBannerBg = std::move(pressSpaceBannerBg_);
+	s_cache_.osSpritePool = std::move(osSpritePool_);
+	s_cache_.cursorSprites = std::move(cursorSprites_);
+	s_cache_.windowCloseMaskSprites = std::move(windowCloseMaskSprites_);
+	s_cache_.windowCloseBorderSprites = std::move(windowCloseBorderSprites_);
+	s_cache_.menuBorderSprites = std::move(menuBorderSprites_);
+	s_cache_.buttonBorders = std::move(buttonBorders_);
+	s_cache_.glitchSprites = std::move(glitchSprites_);
+	s_cache_.osdSprites = std::move(osdSprites_);
+	s_cache_.pressSpaceBorders = std::move(pressSpaceBorders_);
+	s_cache_.menuBorderOffsets = menuBorderOffsets_;
+	s_cache_.buttonBorderOutlineOffsets = buttonBorderOutlineOffsets_;
+	s_cache_.buttonBorderBracketOffsets = buttonBorderBracketOffsets_;
+	s_cache_.buttonBorderIndicatorOffsets = buttonBorderIndicatorOffsets_;
+	s_cache_.isCached = true;
 }
 
 #ifdef USE_IMGUI
@@ -3206,6 +3299,10 @@ void TitleScene::InitializeOSDesktop(SpriteCommon* spriteCommon) {
 		cursorSprites_.push_back(std::move(sp));
 	}
 
+	ResetOSDesktopWindows();
+}
+
+void TitleScene::ResetOSDesktopWindows() {
 	osWindows_.clear();
 
 	// Window 0: メインターミナル (DAWN_OS)
@@ -4514,46 +4611,38 @@ void TitleScene::DrawOSDesktop() {
 	TextRenderer* tr = TextRenderer::GetInstance();
 	osSpritePoolIdx_ = 0;
 
-	// 項目9: OSデスクトップ順次立ち上がり（Staggered Launch）進行度
-	// 0.0: ブート直後, 1.0: 立ち上がり完了
+	// OSデスクトップ同期立ち上がりアニメーション進行度（0.0: ブート直後, 1.0: 立ち上がり完了）
 	float enterProg = 1.0f;
 	if (menuEnterTimer_ > 0.0f) {
 		enterProg = std::clamp(1.0f - (menuEnterTimer_ / kMenuEnterDuration), 0.0f, 1.0f);
 	}
+	// 滑らかなイーズアウト進行度 (Ease-Out Sine: 最初素早く、最後しっとり定着)
+	float smoothProg = (enterProg >= 1.0f) ? 1.0f : std::sin(enterProg * 1.5707963f);
 
-	// 1. デスクトップ上部ヘッダー（OSウォーターマーク: enterProg 0.05f〜 でフェードイン）
-	if (enterProg >= 0.05f) {
-		float hAlpha = std::clamp((enterProg - 0.05f) / 0.25f, 0.0f, 1.0f);
+	// 1. デスクトップ上部ヘッダー（OSウォーターマーク: 全体と同時にスムーズフェードイン）
+	{
+		float hAlpha = smoothProg;
 		tr->Print("HackGen", "DAWN_OS TACTICAL DEFENSE MAINFRAME [v4.12.0]", 24.0f, 18.0f, 12.0f, { 0.30f, 0.85f, 0.50f, 0.70f * hAlpha });
 		tr->Print("HackGen", "CLEARANCE: LEVEL 5 // SECURE DESKTOP ENVIRONMENT", kScreenWidth - 380.0f, 18.0f, 11.5f, { 0.25f, 0.70f, 0.40f, 0.60f * hAlpha });
 	}
-
 	tr->Flush(); // ヘッダーテキストを先に描画
 
-	// 2. ウィンドウ描画（最後にアクティブになったものを一番上に：windowZOrder_ 順に奥から手前へ描画）
-	// サブウィンドウは enterProg 0.20f〜、メインウィンドウは enterProg 0.32f〜 で立ち上がり
+	// 2. ウィンドウ描画（全ウィンドウが時間差なく完全に同時にアニメーション展開！）
 	for (int winId : windowZOrder_) {
 		if (winId >= 0 && winId < static_cast<int>(osWindows_.size())) {
 			auto& win = osWindows_[winId];
 			if (winId == 0) {
-				if (win.isOpen && !win.isMinimized && win.animScale >= 0.01f && enterProg >= 0.30f) {
+				if (win.isOpen && !win.isMinimized && win.animScale >= 0.01f) {
 					DrawMenuCard();
 					tr->Flush(); // メインターミナルのテキストを描画
-
-					// 立ち上がり中のレーザースキャン枠アクセント
-					if (enterProg < 1.0f) {
-						float scanRatio = std::clamp((enterProg - 0.30f) / 0.70f, 0.0f, 1.0f);
-						float curH = 468.0f * scanRatio;
-						DrawOSBorder(menuWindowPos_, { 460.0f, curH }, { 0.45f, 1.0f, 0.70f, (1.0f - scanRatio) * 0.95f }, 2.0f);
-					}
 				}
 			} else if (winId == 1) {
-				if (enterProg >= 0.18f) {
+				if (win.isOpen && !win.isMinimized && win.animScale >= 0.01f) {
 					DrawOSWindowCam(win);
 					tr->Flush(); // サブウィンドウ1のテキストを描画
 				}
 			} else if (winId == 2) {
-				if (enterProg >= 0.24f) {
+				if (win.isOpen && !win.isMinimized && win.animScale >= 0.01f) {
 					DrawOSWindowTelemetry(win);
 					tr->Flush(); // サブウィンドウ2のテキストを描画
 				}
@@ -4561,28 +4650,22 @@ void TitleScene::DrawOSDesktop() {
 		}
 	}
 
-	// 3. デスクトップアイコン
-	if (enterProg >= 0.25f) {
-		DrawDesktopIcons();
-		tr->Flush();
-	}
+	// 3. デスクトップアイコン（同時にフェードイン）
+	DrawDesktopIcons();
+	tr->Flush();
 
-	// 4. タスクバー & スタートメニュー（enterProg 0.10f〜 で立ち上がり）
-	if (enterProg >= 0.10f) {
-		DrawOSTaskbar();
-		tr->Flush();
-	}
+	// 4. タスクバー & スタートメニュー（同時にフェードイン）
+	DrawOSTaskbar();
+	tr->Flush();
 
-	// 5. ターミナルの色に合わせた緑色のカスタムカーソル（最前面: enterProg 0.15f〜）
-	if (enterProg >= 0.15f) {
-		DrawCustomCursor();
-		tr->Flush();
-	}
+	// 5. ターミナルの色に合わせた緑色のカスタムカーソル（最前面: 同時に表示）
+	DrawCustomCursor();
+	tr->Flush();
 
 	// 起動時の短い立ち上がりHUDインジケーター（画面中央下に一瞬表示してフェード）
 	if (menuEnterTimer_ > 0.0f) {
 		float hudAlpha = (1.0f - enterProg);
-		tr->Print("HackGen", "[ DAWN-OS SUBSYSTEMS ONLINE ]", kScreenWidth * 0.5f, kScreenHeight - 65.0f, 13.0f, { 0.35f, 1.0f, 0.65f, 0.85f * hudAlpha }, { 0.5f, 0.5f });
+		tr->Print("HackGen", "[ DAWN-OS ALL SYSTEMS ONLINE ]", kScreenWidth * 0.5f, kScreenHeight - 65.0f, 13.0f, { 0.35f, 1.0f, 0.65f, 0.85f * hudAlpha }, { 0.5f, 0.5f });
 		tr->Flush();
 	}
 }

@@ -7,6 +7,7 @@
 #include "../../engine/Graphics/Text/FontManager.h"
 #include "../../engine/Graphics/Text/TextRenderer.h"
 #include "../Scene/SceneFactory.h"
+#include "../Scene/TitleScene.h"
 
 
 
@@ -35,12 +36,17 @@ void Game::Initialize() {
 
 	FontManager::GetInstance()->Initialize();
 	TextRenderer::GetInstance()->Initialize(SpriteCommon::GetInstance());
-	FontManager::GetInstance()->LoadFont("Roboto", "C:/Windows/Fonts/msgothic.ttc", 96.0f);
-	FontManager::GetInstance()->LoadFont("Consolas", "C:/Windows/Fonts/consolab.ttf", 64.0f);
-	FontManager::GetInstance()->LoadFont("TitleJp", "C:/Windows/Fonts/meiryob.ttc", 96.0f);
-	FontManager::GetInstance()->LoadFont("HackGen", "assets/fonts/HackGen-Bold.ttf", 48.0f);
-	FontManager::GetInstance()->LoadFont("HackGenRegular", "assets/fonts/HackGen-Regular.ttf", 36.0f);
-	FontManager::GetInstance()->LoadFont("HackGenConsole", "assets/fonts/HackGenConsole-Bold.ttf", 48.0f);
+
+	// 非同期処理による軽量化：全コアを使ったマルチスレッド並列フォントラスタライズ
+	std::vector<FontLoadRequest> fontRequests = {
+		{ "Roboto", "C:/Windows/Fonts/msgothic.ttc", 96.0f },
+		{ "Consolas", "C:/Windows/Fonts/consolab.ttf", 64.0f },
+		{ "TitleJp", "C:/Windows/Fonts/meiryob.ttc", 96.0f },
+		{ "HackGen", "assets/fonts/HackGen-Bold.ttf", 48.0f },
+		{ "HackGenRegular", "assets/fonts/HackGen-Regular.ttf", 36.0f },
+		{ "HackGenConsole", "assets/fonts/HackGenConsole-Bold.ttf", 48.0f }
+	};
+	FontManager::GetInstance()->LoadFontsParallel(fontRequests);
 
 	imguiManager = std::make_unique<ImGuiManager>();
 	imguiManager->Initialize(winApp.get(), DirectXCommon::GetInstance(), srvManager.get());
@@ -60,6 +66,7 @@ void Game::Initialize() {
 void Game::Update() {
 	// システムの更新
 	Input::GetInstance()->Update();
+	FontManager::GetInstance()->Update();
 	imguiManager->Begin();
 
 	sceneManager->Update();
@@ -158,8 +165,9 @@ void Game::Finalize() {
 	DirectXCommon::GetInstance()->FlushTextureUploads();
 	DirectXCommon::GetInstance()->WaitForGPU();
 
-	// 2. シーンを先に解放
+	// 2. シーンを先に解放し、タイトル静的リソースキャッシュもグラフィックス基盤破棄前にクリーンアップ
 	sceneManager.reset();
+	TitleScene::ClearStaticCache();
 
 	// 3. ImGuiの終了処理と解放
 	if (imguiManager) {

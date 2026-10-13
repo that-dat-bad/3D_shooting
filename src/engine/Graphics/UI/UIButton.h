@@ -68,6 +68,27 @@ public:
 	void SetPromptDecoratorsEnabled(bool enabled) { enablePromptDecorators_ = enabled; }
 	bool IsPromptDecoratorsEnabled() const { return enablePromptDecorators_; }
 
+	/// @brief テキスト配置方式
+	enum class TextAlignment {
+		Center,		///< 中央揃え
+		Left,		///< 左揃え（leftPadding_ による固定インデント配置）
+	};
+
+	/// @brief テキストのアライメントを設定
+	void SetTextAlignment(TextAlignment alignment, float leftPadding = 100.0f) {
+		textAlignment_ = alignment;
+		leftPadding_ = leftPadding;
+	}
+
+	/// @brief 左揃え（固定インデント）を有効化
+	void SetLeftAligned(bool leftAligned, float leftPadding = 100.0f) {
+		textAlignment_ = leftAligned ? TextAlignment::Left : TextAlignment::Center;
+		leftPadding_ = leftPadding;
+	}
+
+	TextAlignment GetTextAlignment() const { return textAlignment_; }
+	float GetLeftPadding() const { return leftPadding_; }
+
 	/// @brief マウスが矩形の範囲内にいるかチェック
 	bool IsMouseInside() const;
 
@@ -99,6 +120,10 @@ private:
 
 	// テキストオフセット微調整
 	Vector2 textOffset_ = { 0.0f, 0.0f };
+
+	// テキスト配置アライメント
+	TextAlignment textAlignment_ = TextAlignment::Center;
+	float leftPadding_ = 100.0f;
 
 	// プロンプト装飾（>> と _）
 	bool enablePromptDecorators_ = true;

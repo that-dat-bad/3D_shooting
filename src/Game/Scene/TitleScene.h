@@ -22,6 +22,9 @@ public:
 	void DrawUI() override;
 	void Finalize() override;
 
+	/// @brief アプリケーション終了時に静的リソースキャッシュを完全解放する
+	static void ClearStaticCache();
+
 private:
 	// --- UI要素 ---
 	UIPanel backgroundPanel_;		///< 背景オーバーレイ
@@ -102,7 +105,7 @@ private:
 	void DrawTransitionGlitch();
 
 	// --- 疑似ウィンドウ（DAWN_OS ターミナル）のマウスドラッグ移動管理 ---
-	Vector2 menuWindowPos_ = { 380.0f, 52.0f }; ///< ウィンドウ左上座標
+	Vector2 menuWindowPos_ = { 392.0f, 44.0f }; ///< ウィンドウ左上座標
 	bool isWindowDragging_ = false;             ///< ドラッグ中フラグ
 	bool wasLButtonDown_ = false;               ///< 前フレームの左マウスボタン押下状態
 	Vector2 windowDragOffset_ = { 0.0f, 0.0f }; ///< ドラッグ開始時のマウス相対オフセット
@@ -165,6 +168,7 @@ private:
 	void DrawOSPanel(const Vector2& pos, const Vector2& size, const MyMath::Vector4& bgCol, const MyMath::Vector4& borderCol, float thick = 1.5f);
 
 	void InitializeOSDesktop(SpriteCommon* spriteCommon);
+	void ResetOSDesktopWindows();
 	void UpdateOSDesktop(float dt, const Vector2& mousePos, bool isLDown, bool isLTrig);
 	void DrawOSDesktop();
 	void DrawOSTaskbar();
@@ -329,4 +333,44 @@ private:
 	float abEditorStatusTimer_ = 0.0f;
 	void DrawAfterburnerEditor();
 #endif
+
+	// ============================================================
+	// タイトルシーン静的リソースキャッシュ（リファクタリング最適化）
+	// タイトル再訪問時のD3D12リソース生成（2,000バッファ以上）と
+	// 3D背景109個のObject3d再初期化を完全スキップして0ms遷移を達成する
+	// ============================================================
+	struct TitleResourceCache {
+		bool isCached = false;
+
+		// 3D環境
+		std::unique_ptr<Skybox> skybox;
+		std::vector<LocationData> locations;
+		std::unique_ptr<Afterburner> afterburner;
+
+		// 2Dスプライト
+		std::unique_ptr<Sprite> consoleBgSprite;
+		std::unique_ptr<Sprite> sortieFlashSprite;
+		std::unique_ptr<Sprite> recDotSprite;
+		std::unique_ptr<Sprite> titleLogoSprite;
+		std::unique_ptr<Sprite> headerLampSprite;
+		std::unique_ptr<Sprite> pressSpaceBannerBg;
+
+		std::vector<std::unique_ptr<Sprite>> osSpritePool;
+		std::vector<std::unique_ptr<Sprite>> cursorSprites;
+		std::vector<std::unique_ptr<Sprite>> windowCloseMaskSprites;
+		std::vector<std::unique_ptr<Sprite>> windowCloseBorderSprites;
+		std::vector<std::unique_ptr<Sprite>> menuBorderSprites;
+		std::vector<ButtonBorderGroup> buttonBorders;
+		std::vector<std::unique_ptr<Sprite>> glitchSprites;
+		std::vector<std::unique_ptr<Sprite>> osdSprites;
+		std::vector<std::unique_ptr<Sprite>> pressSpaceBorders;
+
+		// 相対オフセット
+		std::vector<Vector2> menuBorderOffsets;
+		std::vector<std::vector<Vector2>> buttonBorderOutlineOffsets;
+		std::vector<std::vector<Vector2>> buttonBorderBracketOffsets;
+		std::vector<Vector2> buttonBorderIndicatorOffsets;
+	};
+
+	static TitleResourceCache s_cache_;
 };
