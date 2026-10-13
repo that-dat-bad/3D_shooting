@@ -35,8 +35,8 @@ void SceneManager::Update() {
 			if (ImGui::MenuItem("Stage")) {
 				IScene::SetSceneID(SCENE::STAGE);
 			}
-			if (ImGui::MenuItem("Result")) {
-				IScene::SetSceneID(SCENE::RESULT);
+			if (ImGui::MenuItem("GameOver")) {
+				IScene::SetSceneID(SCENE::GAMEOVER);
 			}
 			if (ImGui::MenuItem("Clear")) {
 				IScene::SetSceneID(SCENE::CLEAR);

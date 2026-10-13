@@ -39,4 +39,9 @@ private:
     // アニメーション
     float animTimer_ = 0.0f;
     float fadeInAlpha_ = 0.0f;         ///< フェードインの進行度
+
+    // 項目9: データアップロードとウィンドウ閉鎖シーケンス
+    bool isUploading_ = false;
+    float uploadTimer_ = 0.0f;
+    std::unique_ptr<Sprite> uploadSprite_;
 };

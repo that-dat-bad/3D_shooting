@@ -16,6 +16,9 @@ public:
     /// <summary>カメラの位置・姿勢の更新処理</summary>
     void Update(float dt, FlightModel* flightModel, MouseAimController* mouseAimController, bool mouseAimEnabled);
 
+    /// <summary>カメラの現在位置と注視点を直接指定して同期（イントロからのシームレス接続用）</summary>
+    void SnapTo(const MyMath::Vector3& pos, const MyMath::Vector3& lookTarget);
+
     bool& GetFreeViewActive() { return freeViewActive_; }
     float* GetCameraDistancePtr() { return &cameraDistance_; }
     float* GetCameraHeightPtr() { return &cameraHeight_; }

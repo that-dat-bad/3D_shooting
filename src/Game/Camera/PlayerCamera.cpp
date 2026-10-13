@@ -20,6 +20,21 @@ void PlayerCamera::Initialize(const MyMath::Vector3& initialPos, const MyMath::V
     cachedCameraYaw_ = camRot.y;
 }
 
+void PlayerCamera::SnapTo(const MyMath::Vector3& pos, const MyMath::Vector3& lookTarget) {
+    cameraCurrentPos_ = pos;
+    cameraLookTarget_ = lookTarget;
+    Vector3 camRot = LookAtRotation(cameraCurrentPos_, cameraLookTarget_);
+    cachedCameraPitch_ = camRot.x;
+    cachedCameraYaw_ = camRot.y;
+
+    Camera* camera = CameraManager::GetInstance()->GetActiveCamera();
+    if (camera) {
+        camera->SetTranslate(cameraCurrentPos_);
+        camera->SetRotate(camRot);
+        Object3dCommon::GetInstance()->SetCameraPosition(cameraCurrentPos_);
+    }
+}
+
 void PlayerCamera::Update(float dt, FlightModel* flightModel, MouseAimController* mouseAimController, bool mouseAimEnabled) {
     Vector3 aircraftPos = flightModel->GetPosition();
     Vector3 forward = flightModel->GetForwardDirection();

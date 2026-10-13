@@ -182,7 +182,7 @@
     <ClInclude Include="src\engine\Debug\UIEditorWindow.h">
       <Filter>驛｢譎渉・･郢晢ｽ｣驛｢謨鳴驛｢譎｢・ｽ・ｼ 驛｢譎・ｽｼ譁撰ｼ憺Δ・ｧ繝ｻ・､驛｢譎｢・ｽ・ｫ</Filter>
     </ClInclude>
-    <ClInclude Include="src\Game\Scene\ResultScene.h">
+    <ClInclude Include="src\Game\Scene\GameOverScene.h">
       <Filter>驛｢譎鞘ぎ・･郢晢ｽ｣驛｢謨問ぎ驛｢譎｢・ｽ・ｼ 驛｢譎・ｽｼ譁撰ｼ憺Δ・ｧ繝ｻ・､驛｢譎｢・ｽ・ｫ</Filter>
     </ClInclude>
     <ClInclude Include="src\Game\Scene\Iscene.h">
@@ -201,6 +201,9 @@
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="src\Game\Scene\StageHUD.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Game\Scene\CombatBootSequence.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="src\Game\Scene\TitleScene.h">
@@ -498,7 +501,7 @@
     <ClCompile Include="src\Game\Scene\ClearScene.cpp">
       <Filter>驛｢・ｧ繝ｻ・ｽ驛｢譎｢・ｽ・ｼ驛｢・ｧ繝ｻ・ｹ 驛｢譎・ｽｼ譁撰ｼ憺Δ・ｧ繝ｻ・､驛｢譎｢・ｽ・ｫ</Filter>
     </ClCompile>
-    <ClCompile Include="src\Game\Scene\ResultScene.cpp">
+    <ClCompile Include="src\Game\Scene\GameOverScene.cpp">
       <Filter>驛｢・ｧ繝ｻ・ｽ驛｢譎｢・ｽ・ｼ驛｢・ｧ繝ｻ・ｹ 驛｢譎・ｽｼ譁撰ｼ憺Δ・ｧ繝ｻ・､驛｢譎｢・ｽ・ｫ</Filter>
     </ClCompile>
     <ClCompile Include="src\Game\Scene\IScene.cpp">
@@ -514,6 +517,9 @@
       <Filter>ソース ファイル</Filter>
     </ClCompile>
     <ClCompile Include="src\Game\Scene\StageHUD.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Game\Scene\CombatBootSequence.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
     <ClCompile Include="src\Game\Graphics\AircraftVisualModel.cpp">

@@ -8,10 +8,10 @@
 /// @brief 機体の全体・ビジュアル設定
 struct AircraftGeneralConfig {
 	std::string name = "MiG-21 Fishbed";
-	std::string modelPath = "Resources/models/m21.gltf";
-	float environmentCoefficient = 0.0f;
-	float specularIntensity = 1.0f;
-	float shininess = 50.0f;
+	std::string modelPath = "Resources/models/m21_wg.gltf";
+	float environmentCoefficient = 0.45f;
+	float specularIntensity = 1.35f;
+	float shininess = 48.0f;
 };
 
 /// @brief 機体設定ファイル（.cfg）の読み込み・保存・管理クラス

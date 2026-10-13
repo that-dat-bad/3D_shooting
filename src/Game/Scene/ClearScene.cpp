@@ -151,12 +151,20 @@ void ClearScene::Initialize() {
 	titleButton_.SetNormalColor({ 0.10f, 0.15f, 0.22f, 0.85f });
 	titleButton_.SetHoverColor({ 0.12f, 0.30f, 0.50f, 0.95f });
 	titleButton_.SetSelectedColor({ 0.15f, 0.40f, 0.65f, 0.95f });
+	// 項目9: TITLE 押下時にデータアップロード演出を開始
 	titleButton_.SetOnClick([this]() {
-		sceneID = SCENE::TITLE;
+		isUploading_ = true;
+		uploadTimer_ = 0.0f;
 	});
 
 	selectionManager_.AddButton(&replayButton_);
 	selectionManager_.AddButton(&titleButton_);
+
+	// アップロード用スプライト
+	uploadSprite_ = std::make_unique<Sprite>();
+	uploadSprite_->Initialize(spriteCommon, "assets/textures/white1x1.png");
+	isUploading_ = false;
+	uploadTimer_ = 0.0f;
 
 	// UITextRegistryに登録
 	UITextRegistry::GetInstance()->Register("Clear_MissionComplete", &missionCompleteText_);
@@ -179,7 +187,18 @@ void ClearScene::Update() {
 		if (fadeInAlpha_ > 1.0f) fadeInAlpha_ = 1.0f;
 	}
 
-	selectionManager_.Update();
+	// 項目9: アップロード＆ウィンドウ閉鎖シーケンス更新
+	if (isUploading_) {
+		uploadTimer_ += 1.0f / 60.0f;
+		if (uploadTimer_ >= 1.50f) {
+			// タイトルへ「ReturnFromClear」で遷移！
+			GameResult::GetInstance().titleEntryReason = TitleEntryReason::ReturnFromClear;
+			sceneID = SCENE::TITLE;
+			return;
+		}
+	} else {
+		selectionManager_.Update();
+	}
 
 	// 各UI要素の更新
 	backgroundPanel_.Update();
@@ -195,6 +214,7 @@ void ClearScene::Update() {
 #ifdef USE_IMGUI
 	ImGui::Begin("CLEAR SCENE DEBUG");
 	ImGui::Text("FadeIn: %.2f", fadeInAlpha_);
+	ImGui::Text("Uploading: %s (%.2f)", isUploading_ ? "YES" : "NO", uploadTimer_);
 	const GameResult& result = GameResult::GetInstance();
 	ImGui::Text("Enemies: %d", result.enemiesDestroyed);
 	ImGui::Text("Time: %.1fs", result.clearTimeSeconds);
@@ -208,11 +228,10 @@ void ClearScene::Draw() {
 }
 
 void ClearScene::DrawUI() {
-
 	// 背景
 	backgroundPanel_.Draw();
 
-	// MISSION COMPLETE（フェードインの影響を受ける）
+	// MISSION COMPLETE
 	missionCompleteText_.Draw();
 
 	// リザルトパネル
@@ -239,6 +258,99 @@ void ClearScene::DrawUI() {
 		16.0f,
 		{ 0.5f, 0.5f, 0.55f, 0.6f }
 	);
+
+	// ------------------------------------------------------------
+	// 項目9: 「UPLOADING COMBAT DATA... 100% [OK]」& ウィンドウ縮小演出
+	// ------------------------------------------------------------
+	if (isUploading_ && uploadSprite_) {
+		auto DrawRectHelper = [this](const Vector2& pos, const Vector2& size, const Vector4& col) {
+			uploadSprite_->SetPosition(pos);
+			uploadSprite_->SetAnchorPoint({ 0.0f, 0.0f });
+			uploadSprite_->SetSize(size);
+			uploadSprite_->SetColor(col);
+			uploadSprite_->Update();
+			uploadSprite_->Draw();
+		};
+
+		// 0.0s〜1.1s: データアップロードダイアログ
+		if (uploadTimer_ < 1.15f) {
+			float dlgW = 620.0f;
+			float dlgH = 120.0f;
+			float dlgX = (kScreenWidth - dlgW) * 0.5f;
+			float dlgY = (kScreenHeight - dlgH) * 0.5f + 160.0f;
+
+			// 半透明ダーク背景
+			DrawRectHelper({ dlgX, dlgY }, { dlgW, dlgH }, { 0.02f, 0.06f, 0.12f, 0.95f });
+			// シアン枠線
+			DrawRectHelper({ dlgX, dlgY }, { dlgW, 2.0f }, { 0.25f, 0.85f, 1.0f, 0.95f });
+			DrawRectHelper({ dlgX, dlgY + dlgH - 2.0f }, { dlgW, 2.0f }, { 0.25f, 0.85f, 1.0f, 0.95f });
+			DrawRectHelper({ dlgX, dlgY }, { 2.0f, dlgH }, { 0.25f, 0.85f, 1.0f, 0.95f });
+			DrawRectHelper({ dlgX + dlgW - 2.0f, dlgY }, { 2.0f, dlgH }, { 0.25f, 0.85f, 1.0f, 0.95f });
+
+			// アップロード進行度（0.0s〜0.9sで100%へ到達）
+			float prog = std::clamp(uploadTimer_ / 0.85f, 0.0f, 1.0f);
+			int pct = static_cast<int>(prog * 100.0f);
+
+			char headerText[64];
+			if (pct >= 100) {
+				snprintf(headerText, sizeof(headerText), "UPLOADING COMBAT DATA... 100%% [OK]");
+			} else {
+				snprintf(headerText, sizeof(headerText), "UPLOADING COMBAT DATA... %d%%", pct);
+			}
+
+			TextRenderer::GetInstance()->Print(
+				"HackGen",
+				headerText,
+				dlgX + 24.0f,
+				dlgY + 16.0f,
+				20.0f,
+				(pct >= 100) ? Vector4{ 0.35f, 1.0f, 0.60f, 1.0f } : Vector4{ 0.30f, 0.85f, 1.0f, 0.95f }
+			);
+
+			// プログレスバー背景
+			float barX = dlgX + 24.0f;
+			float barY = dlgY + 54.0f;
+			float barW = dlgW - 48.0f;
+			float barH = 14.0f;
+			DrawRectHelper({ barX, barY }, { barW, barH }, { 0.05f, 0.12f, 0.20f, 0.80f });
+
+			// プログレスバー本体
+			DrawRectHelper({ barX, barY }, { barW * prog, barH }, (pct >= 100) ? Vector4{ 0.20f, 0.95f, 0.50f, 0.95f } : Vector4{ 0.20f, 0.75f, 1.0f, 0.90f });
+
+			TextRenderer::GetInstance()->Print(
+				"HackGen",
+				(pct >= 100) ? "STATUS: SYNCHRONIZATION COMPLETE // CLOSING CLIENT" : "ENCRYPTING TELEMETRY STREAM VIA SECURE LINK...",
+				dlgX + 24.0f,
+				dlgY + 82.0f,
+				14.0f,
+				{ 0.70f, 0.80f, 0.90f, 0.80f }
+			);
+		} else {
+			// 1.15s〜1.50s: 戦闘画面自体が「OSウィンドウ」として中央へ縮小されカチッと閉じる演出！
+			float closeT = std::clamp((uploadTimer_ - 1.15f) / 0.35f, 0.0f, 1.0f);
+			float winScale = 1.0f - closeT * closeT;
+			float halfW = (kScreenWidth * 0.5f) * winScale;
+			float halfH = (kScreenHeight * 0.5f) * winScale;
+			float centerX = kScreenWidth * 0.5f;
+			float centerY = kScreenHeight * 0.5f;
+
+			// 外側4つの黒マスクでウィンドウ縮小を表現
+			// 上
+			DrawRectHelper({ 0.0f, 0.0f }, { kScreenWidth, centerY - halfH }, { 0.0f, 0.0f, 0.0f, 1.0f });
+			// 下
+			DrawRectHelper({ 0.0f, centerY + halfH }, { kScreenWidth, kScreenHeight - (centerY + halfH) }, { 0.0f, 0.0f, 0.0f, 1.0f });
+			// 左
+			DrawRectHelper({ 0.0f, centerY - halfH }, { centerX - halfW, halfH * 2.0f }, { 0.0f, 0.0f, 0.0f, 1.0f });
+			// 右
+			DrawRectHelper({ centerX + halfW, centerY - halfH }, { kScreenWidth - (centerX + halfW), halfH * 2.0f }, { 0.0f, 0.0f, 0.0f, 1.0f });
+
+			// 縮小ウィンドウのOS枠線
+			DrawRectHelper({ centerX - halfW, centerY - halfH }, { halfW * 2.0f, 2.0f }, { 0.30f, 0.70f, 1.0f, 0.90f });
+			DrawRectHelper({ centerX - halfW, centerY + halfH - 2.0f }, { halfW * 2.0f, 2.0f }, { 0.30f, 0.70f, 1.0f, 0.90f });
+			DrawRectHelper({ centerX - halfW, centerY - halfH }, { 2.0f, halfH * 2.0f }, { 0.30f, 0.70f, 1.0f, 0.90f });
+			DrawRectHelper({ centerX + halfW - 2.0f, centerY - halfH }, { 2.0f, halfH * 2.0f }, { 0.30f, 0.70f, 1.0f, 0.90f });
+		}
+	}
 }
 
 void ClearScene::Finalize() {

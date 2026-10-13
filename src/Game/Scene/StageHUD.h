@@ -42,7 +42,23 @@ public:
 	/// @brief 2D UIパスでの描画処理
 	void Draw();
 
+	/// @brief HUD展開アニメーションのリセット（戦闘モード起動時に呼び出し）
+	void ResetDeploy() { deployTimer_ = 0.0f; }
+
+	/// @brief 被弾・撃墜時のテーマカラー反転（緑→赤/オレンジ）設定（項目4）
+	void SetWarningColorMode(bool warn) { isWarningMode_ = warn; }
+	bool IsWarningColorMode() const { return isWarningMode_; }
+
+	/// @brief ステージクリア時のHUD順次シャットダウン開始（項目5）
+	void StartShutdown() { isShuttingDown_ = true; shutdownTimer_ = 0.0f; }
+	void ResetShutdown() { isShuttingDown_ = false; shutdownTimer_ = 0.0f; }
+	bool IsShutdownComplete() const { return isShuttingDown_ && shutdownTimer_ >= 1.2f; }
+
 private:
+	float deployTimer_ = 0.0f;    ///< HUD順次展開タイマー
+	bool isWarningMode_ = false;  ///< テーマカラー赤反転モード
+	bool isShuttingDown_ = false; ///< クリア時のOFFLINE順次消去モード
+	float shutdownTimer_ = 0.0f;  ///< シャットダウンタイマー
 	// --- 2D描画ヘルパー ---
 	void DrawLine(const Vector2& p1, const Vector2& p2, float thickness, const Vector4& color, BlendMode blendMode = BlendMode::kNormal);
 	void DrawRect(const Vector2& pos, const Vector2& size, const Vector4& color, const Vector2& anchor = { 0.0f, 0.0f }, BlendMode blendMode = BlendMode::kNormal);

@@ -2,7 +2,7 @@
 #include "TitleScene.h"
 #include "StageScene.h"
 #include "ClearScene.h"
-#include "ResultScene.h"
+#include "GameOverScene.h"
 #include "DebugScene.h"
 #include "MissionEditorScene.h"
 
@@ -19,8 +19,8 @@ std::unique_ptr<IScene> SceneFactory::CreateScene(int sceneID) {
 	case SCENE::CLEAR:
 		newScene = std::make_unique<ClearScene>();
 		break;
-	case SCENE::RESULT:
-		newScene = std::make_unique<ResultScene>();
+	case SCENE::GAMEOVER:
+		newScene = std::make_unique<GameOverScene>();
 		break;
 	case SCENE::DEBUG:
 		newScene = std::make_unique<DebugScene>();

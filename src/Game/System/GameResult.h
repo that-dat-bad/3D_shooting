@@ -1,6 +1,12 @@
 #pragma once
 #include <cstdint>
 
+enum class TitleEntryReason {
+	InitialBoot,          ///< 通常の初回起動（ドローン視点）
+	RebootFromGameOver,   ///< ゲームオーバーからの復旧（SYSTEM REBOOTING... → ConsoleBoot）
+	ReturnFromClear       ///< クリアからの復帰（WindowClose → 再認証セキュリティ演出）
+};
+
 /// @brief ゲームのクリア結果データ。シーン間でstatic共有する。
 struct GameResult {
 	int enemiesDestroyed = 0;		///< 撃破した敵の数
@@ -8,6 +14,7 @@ struct GameResult {
 	float playerHPRemaining = 0.0f;	///< 残りHP
 	float playerMaxHP = 100.0f;		///< 最大HP
 	bool missionCleared = false;	///< ミッションクリアしたか
+	TitleEntryReason titleEntryReason = TitleEntryReason::InitialBoot; ///< タイトル画面への突入理由
 
 	/// @brief 結果をリセットする
 	void Reset() {
@@ -16,6 +23,7 @@ struct GameResult {
 		playerHPRemaining = 0.0f;
 		playerMaxHP = 100.0f;
 		missionCleared = false;
+		titleEntryReason = TitleEntryReason::InitialBoot;
 	}
 
 	/// @brief シーン間の受け渡し用グローバルインスタンス

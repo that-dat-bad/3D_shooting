@@ -8,7 +8,8 @@ enum SCENE {
 	TITLE,
 	STAGE,
 	CLEAR,
-	RESULT,
+	GAMEOVER,
+	RESULT = GAMEOVER, // 互換性エイリアス
 	DEBUG,
 	MISSION_EDITOR,
 };

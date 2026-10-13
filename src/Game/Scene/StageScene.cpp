@@ -1,4 +1,5 @@
 #include "StageScene.h"
+#include "../System/GameResult.h"
 #include "../../engine/Graphics/Camera/CameraManager.h"
 #include "../../engine/Graphics/Model/Object3dCommon.h"
 #include "../../engine/Graphics/Model/SkyboxCommon.h"
@@ -108,33 +109,29 @@ void StageScene::Initialize() {
 			DamagePart::Tail, DamagePart::Rudder, DamagePart::Elevator0, DamagePart::Elevator1
 		};
 		for (auto p : parts) {
-			aircraftVisualModel_.SetModelForPart(p, "Resources/models/m21.gltf");
+			aircraftVisualModel_.SetModelForPart(p, "Resources/models/m21_wg.gltf");
 		}
 	}
 
-	// 出撃イントロ用ブラックアウト復帰フェードスプライト（黒フェードイン）
+	// 出撃イントロ（AC6メインシステム戦闘モード起動シーケンス & 黒フェード）初期化
 	SpriteCommon* spriteCommon = SpriteCommon::GetInstance();
-	introFadeSprite_ = std::make_unique<Sprite>();
-	introFadeSprite_->Initialize(spriteCommon, "assets/textures/white1x1.png");
-	introFadeSprite_->SetAnchorPoint({ 0.0f, 0.0f });
-	introFadeSprite_->SetPosition({ 0.0f, 0.0f });
-	introFadeSprite_->SetSize({ static_cast<float>(WinApp::kClientWidth), static_cast<float>(WinApp::kClientHeight) });
-	introFadeSprite_->SetColor({ 0.0f, 0.0f, 0.0f, 1.0f });
-	introFadeSprite_->Update();
+	combatBootSequence_.Initialize(spriteCommon);
+	combatBootSequence_.Start();
 	sortieIntroTimer_ = 0.0f;
+	hud_.ResetDeploy();
 
 	// 地面テクスチャ
 	TextureManager::GetInstance()->LoadTexture("assets/textures/white1x1.png");
 	groundTextureIndex_ = TextureManager::GetInstance()->GetTextureIndexByFilePath("assets/textures/white1x1.png");
 
-
-
-	TextureManager::GetInstance()->LoadTexture("assets/textures/cedar_bridge_sunset_1_2k.dds");
+	// 項目7: 大空・夕暮れの雲・山脈が広がるピュアスカイボックス（黒背景を解消）
+	TextureManager::GetInstance()->LoadTexture("assets/textures/qwantani_dusk_2_puresky_2k.dds");
 	skybox_ = std::make_unique<Skybox>();
 	skybox_->Initialize(SkyboxCommon::GetInstance());
 	skybox_->SetCamera(CameraManager::GetInstance()->GetActiveCamera());
-	uint32_t skyboxTexIndex = TextureManager::GetInstance()->GetTextureIndexByFilePath("assets/textures/cedar_bridge_sunset_1_2k.dds");
+	uint32_t skyboxTexIndex = TextureManager::GetInstance()->GetTextureIndexByFilePath("assets/textures/qwantani_dusk_2_puresky_2k.dds");
 	skybox_->SetTextureIndex(skyboxTexIndex);
+	skybox_->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
 	Object3dCommon::GetInstance()->SetDefaultEnvTextureIndex(skyboxTexIndex);
 
 	// ============================
@@ -190,14 +187,18 @@ void StageScene::Initialize() {
 	playerHP_ = mission.playerHP;
 	flightModel_.SetPosition(mission.playerPosition);
 
+	// 敵の出現制御（enableEnemies_ が false の場合は敵をスポーンさせない）
+	static const std::vector<EnemySpawnData> kEmptyAirEnemies = {};
+	static const std::vector<GroundEnemySpawnData> kEmptyGroundEnemies = {};
+
 	enemyManager_.Initialize(
-		mission.enemies,
+		enableEnemies_ ? mission.enemies : kEmptyAirEnemies,
 		airframeData,
 		engineData,
 		gunpodData,
 		&flightModel_,
 		&bulletManager_,
-		mission.groundEnemies
+		enableEnemies_ ? mission.groundEnemies : kEmptyGroundEnemies
 	);
 
 	// エフェクトマネージャー初期化
@@ -250,7 +251,17 @@ void StageScene::Initialize() {
 
 	// 戦闘HUD初期化
 	hud_.Initialize(SpriteCommon::GetInstance());
+	hud_.SetWarningColorMode(false);
+	hud_.ResetShutdown();
 	isFiringThisFrame_ = false;
+
+	// 演出用スプライトの初期化
+	seqOverlaySprite_ = std::make_unique<Sprite>();
+	seqOverlaySprite_->Initialize(SpriteCommon::GetInstance(), "assets/textures/white1x1.png");
+	seqNoiseSprite_ = std::make_unique<Sprite>();
+	seqNoiseSprite_->Initialize(SpriteCommon::GetInstance(), "assets/textures/white1x1.png");
+	endSequence_ = StageEndSequence::None;
+	endSeqTimer_ = 0.0f;
 
 	// Phase 1: 目標・トリガーのランタイム状態リセット
 	missionManager.ResetRuntimeState();
@@ -261,13 +272,29 @@ void StageScene::Initialize() {
 }
 
 void StageScene::TriggerGameOver() {
-	if (isGameOver_) { return; }
+	if (isGameOver_ || isMissionCleared_) { return; }
 	isGameOver_ = true;
 	isMissionFailed_ = true;
 	gameOverTimer_ = 0.0f;
 	playerHP_ = 0.0f;
-	timeScale_ = 1.0f;
+	timeScale_ = 0.35f; // 被弾スローモーション
+	endSequence_ = StageEndSequence::GameOver_Critical;
+	endSeqTimer_ = 0.0f;
+
+	// 項目4: テーマカラー赤反転
+	hud_.SetWarningColorMode(true);
+
 	EffectManager::GetInstance()->EmitDestroyEffect(flightModel_.GetPosition());
+}
+
+void StageScene::TriggerGameClear() {
+	if (isMissionCleared_ || isGameOver_) { return; }
+	isMissionCleared_ = true;
+	endSequence_ = StageEndSequence::Clear_HudShutdown;
+	endSeqTimer_ = 0.0f;
+
+	// 項目5: HUDの順次シャットダウン開始
+	hud_.StartShutdown();
 }
 
 
@@ -336,19 +363,19 @@ void StageScene::Update() {
 	}
 	timeText_.Update();
 
-	// ゲームオーバー演出の更新（スローモーション & 画面遷移）
-	if (isGameOver_) {
-		gameOverTimer_ += kDeltaTime;
-		float progress = std::clamp(gameOverTimer_ / kGameOverDuration, 0.0f, 1.0f);
-		// 1.0 -> 0.15 にスローダウン
-		timeScale_ = 1.0f - progress * 0.85f;
-
-		if (progress >= 1.0f) {
-			sceneID = SCENE::RESULT;
+	// デバッグ用キー（VキーでGameOver演出、BキーでGameClear演出を即時テスト可能）
+	Input* inputDebug = Input::GetInstance();
+	if (inputDebug) {
+		if (inputDebug->TriggerKey(DIK_V)) {
+			TriggerGameOver();
 		}
-	} else {
-		timeScale_ = 1.0f;
+		if (inputDebug->TriggerKey(DIK_B)) {
+			TriggerGameClear();
+		}
 	}
+
+	// ゲームオーバー / クリア演出シーケンスの更新
+	UpdateEndSequence(kDeltaTime);
 
 	float gameDeltaTime = kDeltaTime * timeScale_;
 
@@ -356,20 +383,33 @@ void StageScene::Update() {
 	totalTime_ += gameDeltaTime;
 
 	// ============================
-	// プレイヤー入力 → FlightModel
+	// 項目8: マウスポインター非表示の徹底（ImGuiやOSメッセージによる再表示を防止）
+	// ============================
+#ifdef USE_IMGUI
+	ImGui::SetMouseCursor(ImGuiMouseCursor_None);
+#endif
+	while (::ShowCursor(FALSE) >= 0) {}
+	::SetCursor(nullptr);
+
+	// ============================
+	// プレイヤー入力 → FlightModel（ゲームオーバー中は操作遮断）
 	// ============================
 	Input* input = Input::GetInstance();
+	float finalPitch = 0.0f;
+	float finalRoll = 0.0f;
+	float finalYaw = 0.0f;
 
-	// --- スロットル ---
-	if (input->PushKey(DIK_W)) {
-		throttle_ += 0.8f * gameDeltaTime;
-	}
-	if (input->PushKey(DIK_S)) {
-		throttle_ -= 0.8f * gameDeltaTime;
-	}
-	if (throttle_ < 0.0f) { throttle_ = 0.0f; }
-	if (throttle_ > 1.0f) { throttle_ = 1.0f; }
-	flightModel_.SetThrottleInput(throttle_);
+	if (!isGameOver_) {
+		// --- スロットル ---
+		if (input->PushKey(DIK_W)) {
+			throttle_ += 0.8f * gameDeltaTime;
+		}
+		if (input->PushKey(DIK_S)) {
+			throttle_ -= 0.8f * gameDeltaTime;
+		}
+		if (throttle_ < 0.0f) { throttle_ = 0.0f; }
+		if (throttle_ > 1.0f) { throttle_ = 1.0f; }
+		flightModel_.SetThrottleInput(throttle_);
 
 	// --- マウスエイム ON/OFF トグル (M キー) ---
 	if (input->TriggerKey(DIK_M)) {
@@ -431,9 +471,9 @@ void StageScene::Update() {
 	}
 
 	// --- 操舵入力の決定 ---
-	float finalPitch = 0.0f;
-	float finalRoll = 0.0f;
-	float finalYaw = 0.0f;
+	finalPitch = 0.0f;
+	finalRoll = 0.0f;
+	finalYaw = 0.0f;
 
 	// --- マウス入力による目標方向の更新 ---
 	// カーソルロック中かつ自由視点カメラ(Cキー)でない場合のみ、マウスで目標方向を更新する
@@ -490,17 +530,17 @@ void StageScene::Update() {
 
 	flightModel_.SetControlInput(finalPitch, finalRoll, finalYaw);
 
-	// --- フラップ / エアブレーキ ---
-	flightModel_.SetFlapInput(input->PushKey(DIK_F));
-	flightModel_.SetAirBrakeInput(input->PushKey(DIK_B));
-
-	if (input->TriggerKey(DIK_V)) {
-		sceneID = SCENE::RESULT;
+		// --- フラップ / エアブレーキ ---
+		flightModel_.SetFlapInput(input->PushKey(DIK_F));
+		flightModel_.SetAirBrakeInput(input->PushKey(DIK_B));
+	} else {
+		flightModel_.SetControlInput(0.0f, 0.0f, 0.0f);
+		flightModel_.SetThrottleInput(0.0f);
 	}
 
 	// --- 射撃入力（マウス左クリック） ---
 	isFiringThisFrame_ = false;
-	if (input->PushMouse(0) && !isMissionCleared_ && !isMissionFailed_) {
+	if (input->PushMouse(0) && !isMissionCleared_ && !isMissionFailed_ && sortieIntroTimer_ >= kSortieIntroDuration) {
 		int ammoBefore = gunpod_.GetCurrentAmmo();
 		gunpod_.Fire();
 		if (gunpod_.GetCurrentAmmo() < ammoBefore) {
@@ -645,7 +685,7 @@ void StageScene::Update() {
 	Vector3 leftWingTip = Add(Add(aircraftPos, Multiply(-6.0f, right)), Multiply(-2.0f, forward));
 	Vector3 rightWingTip = Add(Add(aircraftPos, Multiply(6.0f, right)), Multiply(-2.0f, forward));
 
-	if (currentG > 3.0f && flightModel_.GetSpeed() > 50.0f) {
+	if (!isGameOver_ && currentG > 3.0f && flightModel_.GetSpeed() > 50.0f) {
 		float gFactor = (currentG - 3.0f) / 3.0f; // 0.0 ~ 1.0
 		if (gFactor < 0.0f) { gFactor = 0.0f; }
 		if (gFactor > 1.0f) { gFactor = 1.0f; }
@@ -746,9 +786,9 @@ void StageScene::Update() {
 
 
 	// ============================
-	// 衝突判定（新システム）
+	// 衝突判定（ゲームオーバー中は不要な当たり判定処理をスキップ）
 	// ============================
-	{
+	if (!isGameOver_) {
 		// 毎フレーム登録をクリアして再登録
 		collisionSystem_.ClearAll();
 
@@ -775,9 +815,8 @@ void StageScene::Update() {
 	}
 
 	// --- クリア判定 ---
-	if (!isMissionCleared_ && enemyManager_.IsAllDestroyed()) {
-		isMissionCleared_ = true;
-		sceneID = SCENE::CLEAR;
+	if (!isMissionCleared_ && !isMissionFailed_ && enemyManager_.IsAllDestroyed()) {
+		TriggerGameClear();
 	}
 
 	// --- 機体全般の壊滅判定 (パーツ破壊・パイロット死亡等) ---
@@ -795,50 +834,76 @@ void StageScene::Update() {
 	aircraftObject_->SetRotate(euler);
 	aircraftObject_->Update();
 
-	if (skybox_) {
-		skybox_->Update();
-	}
-
 	// ============================
-	// 追従カメラ ＆ 出撃イントロカメラワーク（項目6）
+	// 追従カメラ ＆ 出撃イントロカメラワーク（項目4: シームレス円弧旋回移行）
 	// ============================
 	if (sortieIntroTimer_ < kSortieIntroDuration) {
 		sortieIntroTimer_ += gameDeltaTime;
+		combatBootSequence_.Update(gameDeltaTime);
 		float introProg = std::clamp(sortieIntroTimer_ / kSortieIntroDuration, 0.0f, 1.0f);
 
-		// 出撃カタパルトブースト加速（時速約450km/hへロケット急加速）
-		float boostSpeed = 80.0f + 60.0f * (1.0f - std::exp(-introProg * 3.5f));
+		// 重厚なカタパルト射出加速（初速約80km/hから徐々に180km/hへ滑走）
+		float boostSpeed = 22.0f + 28.0f * (1.0f - std::exp(-introProg * 2.2f));
 		flightModel_.SetVelocity(Multiply(boostSpeed, flightModel_.GetForwardDirection()));
-
-		// カメラワーク（Smoothstep）: 機体の斜め前方〜右横ローアングルから、急加速する機体を追って後方へ回り込む！
-		float easeT = introProg * introProg * (3.0f - 2.0f * introProg);
 
 		Vector3 forward = flightModel_.GetForwardDirection();
 		Vector3 right = flightModel_.GetRightDirection();
 		Vector3 up = flightModel_.GetUpDirection();
 
-		// 開始カメラ位置: 前方6m, 右横14m, 下1.5m (迫力のローアングル前方パス)
-		Vector3 startCamOffset = Add(Add(Multiply(6.0f, forward), Multiply(14.0f, right)), Multiply(-1.5f, up));
-		// 終了カメラ位置: 後方22m, 上8m (通常の追従位置)
-		Vector3 endCamOffset = Add(Multiply(-22.0f, forward), Multiply(8.0f, up));
+		Vector3 camPos{};
+		Vector3 lookTarget{};
 
-		Vector3 curCamOffset = Add(Multiply(1.0f - easeT, startCamOffset), Multiply(easeT, endCamOffset));
-		Vector3 camPos = Add(pos, curCamOffset);
-		Vector3 lookTarget = Add(pos, Multiply(4.0f * (1.0f - easeT), forward)); // 機体中心〜少し前を注視
+		if (sortieIntroTimer_ < 2.30f) {
+			// Phase 1〜2: 機体の斜め前方〜右横ローアングルパス（重厚な滑走カット）
+			float sideT = sortieIntroTimer_ / 2.30f;
+			float forwardOffset = 6.0f - 2.0f * sideT;
+			Vector3 camOffset = Add(Add(Multiply(forwardOffset, forward), Multiply(13.0f, right)), Multiply(-0.6f, up));
+			camPos = Add(pos, camOffset);
+			lookTarget = Add(pos, Multiply(2.0f, forward));
+		} else {
+			// Phase 3〜4: 機体の右側面から後方へのシネマティック円弧旋回（項目4）
+			// 2.30s〜4.80s（2.5秒間）をかけて、機体の横から真後ろへ回り込み、通常の追従視線へシームレス接続！
+			float orbitProg = std::clamp((sortieIntroTimer_ - 2.30f) / 2.50f, 0.0f, 1.0f);
+			float smoothOrbit = orbitProg * orbitProg * (3.0f - 2.0f * orbitProg);
 
-		Camera* camera = CameraManager::GetInstance()->GetActiveCamera();
-		if (camera) {
-			camera->SetTranslate(camPos);
-			// LookAt 回転計算
-			Vector3 toTarget = Normalize(Subtract(lookTarget, camPos));
-			float pitch = std::asin(std::clamp(-toTarget.y, -1.0f, 1.0f));
-			float yaw = std::atan2(toTarget.x, toTarget.z);
-			camera->SetRotate({ pitch, yaw, 0.0f });
-			camera->Update();
+			// 旋回角: 右横（pi/2 = 90度） -> 真後ろ（pi = 180度）
+			float angle = (3.14159265f * 0.50f) + smoothOrbit * (3.14159265f * 0.50f);
+			float dist = 14.0f + 8.0f * smoothOrbit; // 14m -> 22m (通常追従距離)
+			float height = -0.6f + 8.6f * smoothOrbit; // -0.6m -> +8.0m (通常追従高さ)
+
+			// 機体のローカル水平面での円弧位置計算
+			// angle = 90度 -> right=1.0, forward=0.0
+			// angle = 180度 -> right=0.0, forward=-1.0
+			float localX = dist * std::sin(angle);
+			float localZ = -dist * std::cos(angle);
+			Vector3 camOffset = Add(Add(Multiply(localZ, forward), Multiply(localX, right)), Multiply(height, up));
+			camPos = Add(pos, camOffset);
+
+			// 注視点も機体中心から、前方の追従注視点（前方40m + 上方4.8m）へ滑らかに補間
+			Vector3 endLookTarget = Add(pos, Add(Multiply(40.0f, forward), Multiply(4.8f, up)));
+			Vector3 startLookTarget = Add(pos, Multiply(2.0f, forward));
+			lookTarget = Lerp(startLookTarget, endLookTarget, smoothOrbit);
 		}
+
+		// 毎フレーム PlayerCamera の内部状態と同期（ハードカットの完全根絶：項目4）
+		playerCamera_.SnapTo(camPos, lookTarget);
+
+	} else if (endSequence_ == StageEndSequence::Clear_TacticalMapZoom) {
+		// 項目7: 戦闘空間（緑のグリッド）のカメラが急激にズームアウトし、ワイヤーフレームの戦術マップ画面に切り替わる
+		float zoomProg = std::clamp((endSeqTimer_ - 2.8f) / 1.5f, 0.0f, 1.0f);
+		float easeZoom = zoomProg * zoomProg;
+		// 高度 100m -> 1800m へ真上から見下ろす垂直急ズームアウト！
+		Vector3 mapCamPos = { pos.x, pos.y + 25.0f + 1600.0f * easeZoom, pos.z };
+		Vector3 mapLookTarget = { pos.x, pos.y, pos.z + 0.1f };
+		playerCamera_.SnapTo(mapCamPos, mapLookTarget);
 	} else {
-		// 通常追従カメラ
+		// 通常追従カメラ（イントロの終了地点と注視点から100%シームレスに継続）
 		playerCamera_.Update(gameDeltaTime, &flightModel_, &mouseAimController_, mouseAimEnabled_);
+	}
+
+	// カメラ更新直後にスカイボックスの位置を同期（項目7）
+	if (skybox_) {
+		skybox_->Update();
 	}
 
 	// ============================
@@ -1111,6 +1176,10 @@ void StageScene::Update() {
 	ImGui::TextColored(hpColor, "PLAYER HP: %.1f / %.1f", playerHP_, playerMaxHP_);
 	ImGui::Separator();
 
+	if (ImGui::Checkbox("Enable Enemies (敵出現 ON/OFF)", &enableEnemies_)) {
+		Restart();
+	}
+
 	ImGui::Text("Total Enemies: %d / %d (Air: %d, Ground: %d)", 
 		enemyManager_.GetDestroyedCount(), enemyManager_.GetTotalCount(),
 		enemyManager_.GetAliveAirCount(), enemyManager_.GetAliveGroundCount());
@@ -1215,11 +1284,44 @@ void StageScene::Update() {
 		dist.intensity = 0.18f;
 		postEffect->AddActiveEffect(dist);
 	} else if (!isGameOver_) {
-		// レトロモニター/HUD風のアートスタイル維持（世界観統一：項目4）
+		// 出撃イントロ（AC6メインシステム戦闘モード起動）演出連動ポストエフェクト
+		float bootBloom = 2.0f;
+		float bootScan = 0.030f;
+		float bootAberration = 0.004f;
+		float bootVignette = 0.40f;
+
+		if (sortieIntroTimer_ < kSortieIntroDuration) {
+			bootVignette = 0.55f; // 演出中は外周を少し暗くして中央バナーを強調
+
+			if (sortieIntroTimer_ < 0.85f) {
+				// 項目1: 完全暗転（ノイズ・ブルームも抑えて静寂のタメ）
+				bootBloom = 0.0f;
+				bootScan = 0.0f;
+				bootAberration = 0.0f;
+			} else if (sortieIntroTimer_ < 1.35f) {
+				// 走査レーザー時のサイバースキャンライン
+				float t = (sortieIntroTimer_ - 0.85f) / 0.50f;
+				bootScan = 0.08f * (1.0f - t * 0.4f);
+				bootAberration = 0.012f * (1.0f - t * 0.5f);
+				bootBloom = 2.4f;
+			} else if (sortieIntroTimer_ < 3.40f) {
+				// タイピング〜戦闘モード確立（適正ブルーム：過剰発光による横引き残像を防止：項目5）
+				bootBloom = 2.2f;
+				bootScan = 0.040f;
+				bootAberration = 0.006f;
+			} else if (sortieIntroTimer_ >= 4.55f && sortieIntroTimer_ <= 4.80f) {
+				// 項目4: プレイ視点移行瞬間の微小ホワイトロックオングリッチ
+				float flashT = (sortieIntroTimer_ - 4.55f) / 0.25f;
+				float pulse = std::sin(flashT * 3.14159f);
+				bootBloom = 2.2f + 1.2f * pulse;
+				bootAberration = 0.015f * pulse;
+			}
+		}
+
 		// ブルーム (Bloom)
 		ActivePostEffect bloom;
 		bloom.type = PostEffectType::kBloom;
-		bloom.intensity = 2.2f;
+		bloom.intensity = bootBloom;
 		bloom.dirX = 1.15f;
 		bloom.dirY = 0.70f;
 		postEffect->AddActiveEffect(bloom);
@@ -1228,7 +1330,7 @@ void StageScene::Update() {
 		ActivePostEffect scan;
 		scan.type = PostEffectType::kScanLine;
 		scan.kernelSize = 0;
-		scan.intensity = 0.035f;
+		scan.intensity = bootScan;
 		scan.dirX = 640.0f;
 		scan.dirY = 3.0f;
 		postEffect->AddActiveEffect(scan);
@@ -1236,14 +1338,29 @@ void StageScene::Update() {
 		// 微小色収差 (Chromatic Aberration)
 		ActivePostEffect ab;
 		ab.type = PostEffectType::kChromaticAberration;
-		ab.intensity = 0.005f;
+		ab.intensity = bootAberration;
 		postEffect->AddActiveEffect(ab);
 
 		// 周辺減光 (Vignette)
 		ActivePostEffect vig;
 		vig.type = PostEffectType::kVignette;
-		vig.intensity = 0.40f;
+		vig.intensity = bootVignette;
 		postEffect->AddActiveEffect(vig);
+	} else if (isGameOver_) {
+		// 項目1, 4: ゲームオーバー時のポストエフェクト（マルチパスピンポンを廃止し、超軽量な1パスに最適化）
+		if (endSequence_ == StageEndSequence::GameOver_Critical) {
+			ActivePostEffect ab;
+			ab.type = PostEffectType::kChromaticAberration;
+			ab.intensity = 0.025f;
+			postEffect->AddActiveEffect(ab);
+		} else if (endSequence_ == StageEndSequence::GameOver_SignalLost) {
+			ActivePostEffect scan;
+			scan.type = PostEffectType::kScanLine;
+			scan.intensity = 0.25f;
+			scan.dirX = 640.0f;
+			scan.dirY = 4.0f;
+			postEffect->AddActiveEffect(scan);
+		}
 	}
 
 	// 2. 環境の更新（太陽の回転、ライティング、太陽ブルーム処理の委譲）
@@ -1269,24 +1386,6 @@ void StageScene::Update() {
 		postEffect->AddActiveEffect(vig);
 	}
 
-	// 4. ゲームオーバー演出 (スローモー + 色収差 + ディゾルブ)
-	if (isGameOver_) {
-		float progress = std::clamp(gameOverTimer_ / kGameOverDuration, 0.0f, 1.0f);
-
-		// 色収差 (Chromatic Aberration)
-		ActivePostEffect ab;
-		ab.type = PostEffectType::kChromaticAberration;
-		ab.intensity = progress * 0.05f;
-		postEffect->AddActiveEffect(ab);
-
-		// ディゾルブ (Dissolve)
-		ActivePostEffect dissolve;
-		dissolve.type = PostEffectType::kDissolve;
-		dissolve.dissolveThreshold = progress;
-		dissolve.dissolveEdgeWidth = 0.08f;
-		dissolve.dissolveMaskIndex = 0; // assets/masks/noise0.png
-		postEffect->AddActiveEffect(dissolve);
-	}
 
 	// ============================
 	// 戦闘HUDの更新
@@ -1521,48 +1620,27 @@ void StageScene::Draw() {
 
 
 void StageScene::DrawUI() {
-	// HUD（タイマー・残弾数・照準）描画
-	hud_.Draw();
+	// 1. 出撃イントロ用黒フェード背景描画（3Dシーンの上、最前面UIの下）
+	combatBootSequence_.DrawBackgroundFade();
 
-	// 出撃イントロ中のサイバーHUD案内 ＆ ホワイトアウト復帰フェード（項目1, 6, 7）
-	if (sortieIntroTimer_ < kSortieIntroDuration) {
-		TextRenderer* tr = TextRenderer::GetInstance();
-
-		// 上部のサイバー出撃テレメトリ表示
-		bool blink = (static_cast<int>(sortieIntroTimer_ * 10.0f) % 2) == 0;
-		Vector4 alertCol = blink ? Vector4{ 1.0f, 0.90f, 0.25f, 0.95f } : Vector4{ 0.35f, 1.0f, 0.65f, 0.85f };
-
-		tr->Print("HackGen", "[ SIMULATED COMBAT SPACE: REZ COMPLETE ]", WinApp::kClientWidth * 0.5f, 75.0f, 14.0f, alertCol, { 0.5f, 0.0f });
-
-		if (sortieIntroTimer_ < 1.3f) {
-			tr->Print("HackGen", ">>> CATAPULT BOOST: 100% /// ENGAGING AIRSPACE >>>", WinApp::kClientWidth * 0.5f, 98.0f, 13.0f, { 0.30f, 0.95f, 0.60f, 0.90f }, { 0.5f, 0.0f });
-		} else {
-			tr->Print("HackGen", ">>> FLIGHT CONTROL ASSIGNED TO PILOT >>>", WinApp::kClientWidth * 0.5f, 98.0f, 13.0f, { 0.40f, 1.0f, 0.70f, 0.95f }, { 0.5f, 0.0f });
-		}
-
-		// ブラックアウトからの復帰フェード（黒フェードイン）
-		// 最初の0.25秒間は暗転（完全ブラック）を維持し、全データの描画とGPUパイプラインが確実に安定してから滑らかに明転
-		constexpr float kFadeHoldDuration = 0.25f;
-		constexpr float kFadeInDuration = 0.65f;
-		constexpr float kTotalFadeDuration = kFadeHoldDuration + kFadeInDuration; // 0.90秒
-
-		if (introFadeSprite_ && sortieIntroTimer_ < kTotalFadeDuration) {
-			TextRenderer::GetInstance()->Flush();
-			float blackAlpha = 1.0f;
-			if (sortieIntroTimer_ > kFadeHoldDuration) {
-				float p = (sortieIntroTimer_ - kFadeHoldDuration) / kFadeInDuration;
-				p = std::clamp(p, 0.0f, 1.0f);
-				blackAlpha = 1.0f - p * (3.0f - 2.0f * p); // スムーズなイージングで明転
-			}
-			introFadeSprite_->SetColor({ 0.0f, 0.0f, 0.0f, blackAlpha });
-			introFadeSprite_->Update();
-			introFadeSprite_->Draw();
-		}
+	// 2. 戦闘HUD（残弾数・照準・タイマー）描画
+	// 出撃演出の起動バナー展開中は非表示にし、戦闘モード確立完了後（3.60s以降）にスムーズ順次展開（項目9）
+	if (sortieIntroTimer_ >= 3.60f) {
+		hud_.Draw();
 	}
+
+	// 3. AC6スタイル「メインシステム、戦闘モード起動...」ブートUI描画（最前面）
+	if (sortieIntroTimer_ < kSortieIntroDuration) {
+		combatBootSequence_.DrawBootUI();
+	}
+
+	// 4. ゲームオーバー / ステージクリア演出UI描画（最前面）
+	DrawEndSequenceUI();
 }
 
 
 void StageScene::Finalize() {
+	combatBootSequence_.Finalize();
 	TerrainSyncManager::GetInstance()->Finalize();
 	
 	// シーン終了時にカーソルを復帰
@@ -1588,17 +1666,15 @@ void StageScene::DrawGround() {
 
 	Vector3 aircraftPos = flightModel_.GetPosition();
 
-	// --- 地面タイル ---
-	// 1タイルのサイズ（メートル）
-	const float tileSize = 100.0f;
-	// 機体を中心にタイルをいくつ並べるか（片方向）
-	const int tileRange = 10;
+	// --- 地面タイル（項目7: 4.5km四方の広大な大地） ---
+	const float tileSize = 160.0f;
+	const int tileRange = 14;
 
 	// 機体位置をタイルサイズでスナップ（タイルの中心座標に丸める）
 	float snapX = std::floor(aircraftPos.x / tileSize) * tileSize;
 	float snapZ = std::floor(aircraftPos.z / tileSize) * tileSize;
 
-	// タイルを敷き詰めて描画（画面が黒いうちに100%ロード完了した完全な地形として安定描画）
+	// タイルを敷き詰めて描画
 	for (int ix = -tileRange; ix <= tileRange; ix++) {
 		for (int iz = -tileRange; iz <= tileRange; iz++) {
 			float cx = snapX + ix * tileSize;
@@ -1610,8 +1686,8 @@ void StageScene::DrawGround() {
 			bool isDark = ((gridX + gridZ) % 2 != 0);
 
 			Vector4 color = isDark
-				? Vector4{ 0.25f, 0.35f, 0.20f, 1.0f }   // 暗い草色
-				: Vector4{ 0.35f, 0.50f, 0.28f, 1.0f };   // 明るい草色
+				? Vector4{ 0.18f, 0.26f, 0.18f, 1.0f }   // 落ち着いた軍用ダークオリーブグリーン
+				: Vector4{ 0.24f, 0.35f, 0.22f, 1.0f };   // 自然なミリタリーグリーン
 
 			Vector3 scale = { tileSize, 1.0f, tileSize };
 			Vector3 rotate = { 0.0f, 0.0f, 0.0f };
@@ -1624,16 +1700,16 @@ void StageScene::DrawGround() {
 		}
 	}
 
-	// --- グリッドライン（100m間隔） ---
+	// --- グリッドライン（160m間隔） ---
 	// 仮想戦闘空間のタクティカルネオングリッド
 	const float lineExtent = tileRange * tileSize;
-	const Vector4 lineCol = { 0.15f, 0.50f, 0.28f, 0.75f };
+	const Vector4 lineCol = { 0.18f, 0.55f, 0.32f, 0.70f };
 
 	for (int i = -tileRange; i <= tileRange; i++) {
 		float x = snapX + i * tileSize;
 		PrimitiveModel::GetInstance()->DrawLine3D(
-			{ x, 0.1f, snapZ - lineExtent },
-			{ x, 0.1f, snapZ + lineExtent },
+			{ x, 0.15f, snapZ - lineExtent },
+			{ x, 0.15f, snapZ + lineExtent },
 			lineCol, camera
 		);
 	}
@@ -1641,8 +1717,8 @@ void StageScene::DrawGround() {
 	for (int i = -tileRange; i <= tileRange; i++) {
 		float z = snapZ + i * tileSize;
 		PrimitiveModel::GetInstance()->DrawLine3D(
-			{ snapX - lineExtent, 0.1f, z },
-			{ snapX + lineExtent, 0.1f, z },
+			{ snapX - lineExtent, 0.15f, z },
+			{ snapX + lineExtent, 0.15f, z },
 			lineCol, camera
 		);
 	}
@@ -1667,7 +1743,10 @@ void StageScene::CheckPartDestructionEvents() {
 					ejectForce = Multiply(-6.0f, flightModel_.GetRightDirection());
 				}
 
-				Model* mainModel = ModelManager::GetInstance()->FindModel("Resources/models/m21.gltf");
+				Model* mainModel = ModelManager::GetInstance()->FindModel("Resources/models/m21_wg.gltf");
+				if (!mainModel) {
+					mainModel = ModelManager::GetInstance()->FindModel("Resources/models/m21.gltf");
+				}
 				static const std::unordered_map<DamagePart, std::string> kPartNodeNameMap = {
 					{ DamagePart::Fuse, "Fuse" },
 					{ DamagePart::Wing_L, "Wing_L" },
@@ -1961,6 +2040,395 @@ void StageScene::DrawMissionMessages() {
 void StageScene::Restart() {
 	Finalize();
 	Initialize();
+}
+
+// ============================================================
+// ゲームオーバー / クリア演出シーケンス更新（項目1〜7）
+// ============================================================
+void StageScene::UpdateEndSequence(float dt) {
+	if (endSequence_ == StageEndSequence::None) {
+		timeScale_ = 1.0f;
+		return;
+	}
+
+	endSeqTimer_ += dt;
+
+	// --- ゲームオーバー系（キビキビとした緊迫感のある高速テンポへ最適化: 計1.10秒）---
+	if (endSequence_ == StageEndSequence::GameOver_Critical) {
+		// 項目4: 0.0s - 0.30s: 撃墜瞬間の被弾スローモーション & 赤反転点滅
+		timeScale_ = 0.20f;
+		if (endSeqTimer_ >= 0.30f) {
+			endSequence_ = StageEndSequence::GameOver_SignalLost;
+		}
+	} else if (endSequence_ == StageEndSequence::GameOver_SignalLost) {
+		// 項目1: 0.30s - 0.75s: 一瞬の通信途絶・フリーズ & SIGNAL LOST表示
+		timeScale_ = 0.0f;
+		if (endSeqTimer_ >= 0.75f) {
+			endSequence_ = StageEndSequence::GameOver_CrtShutdown;
+		}
+	} else if (endSequence_ == StageEndSequence::GameOver_CrtShutdown) {
+		// 項目2: 0.75s - 1.10s: ブラウン管テレビの電源遮断演出（水平収束・プツッ暗転）
+		timeScale_ = 0.0f;
+		if (endSeqTimer_ >= 1.10f) {
+			// ゲームオーバー画面へ即座に遷移
+			sceneID = SCENE::GAMEOVER;
+		}
+	}
+	// --- ステージクリア系 ---
+	else if (endSequence_ == StageEndSequence::Clear_HudShutdown) {
+		// 項目5: 0.0s - 1.4s: HUD各パーツが「OFFLINE」となり順次消滅、MISSION ACCOMPLISHED タイピング
+		timeScale_ = 1.0f;
+		if (endSeqTimer_ >= 1.4f) {
+			endSequence_ = StageEndSequence::Clear_AutopilotReturn;
+		}
+	} else if (endSequence_ == StageEndSequence::Clear_AutopilotReturn) {
+		// 項目6: 1.4s - 2.8s: ENTERING AUTOPILOT MODE... RETURNING TO BASE、自機急加速・急上昇
+		timeScale_ = 1.0f;
+		// オートパイロットによる自機急上昇加速制御
+		float climbT = std::clamp((endSeqTimer_ - 1.4f) / 1.4f, 0.0f, 1.0f);
+		float speed = 120.0f + climbT * 420.0f;
+		Vector3 curFwd = flightModel_.GetForwardDirection();
+		Vector3 climbDir = Normalize(Add(curFwd, { 0.0f, 0.60f * climbT, 0.0f }));
+		flightModel_.SetVelocity(Multiply(speed, climbDir));
+
+		if (endSeqTimer_ >= 2.8f) {
+			endSequence_ = StageEndSequence::Clear_TacticalMapZoom;
+		}
+	} else if (endSequence_ == StageEndSequence::Clear_TacticalMapZoom) {
+		// 項目7: 2.8s - 4.5s: 垂直急ズームアウト、戦術マップ化、3.5sでSECTOR CLEAREDスタンプ押下
+		timeScale_ = 1.0f;
+		if (endSeqTimer_ >= 4.5f) {
+			// クリアリザルトへ記録を保存して遷移
+			auto& res = GameResult::GetInstance();
+			res.missionCleared = true;
+			res.clearTimeSeconds = missionElapsedTime_;
+			res.playerHPRemaining = playerHP_;
+			res.playerMaxHP = playerMaxHP_;
+			sceneID = SCENE::CLEAR;
+		}
+	}
+}
+
+// ============================================================
+// ゲームオーバー / クリア演出UI描画（項目1〜7）
+// ============================================================
+void StageScene::DrawEndSequenceUI() {
+	if (endSequence_ == StageEndSequence::None) {
+		return;
+	}
+
+	float screenW = static_cast<float>(WinApp::kClientWidth);
+	float screenH = static_cast<float>(WinApp::kClientHeight);
+
+	// 軽量描画ヘルパーラムダ
+	auto DrawSolidRect = [this](const Vector2& pos, const Vector2& size, const Vector4& color, BlendMode blend = BlendMode::kNormal) {
+		if (!seqOverlaySprite_) return;
+		seqOverlaySprite_->SetBlendMode(blend);
+		seqOverlaySprite_->SetPosition(pos);
+		seqOverlaySprite_->SetAnchorPoint({ 0.0f, 0.0f });
+		seqOverlaySprite_->SetSize(size);
+		seqOverlaySprite_->SetRotation(0.0f);
+		seqOverlaySprite_->SetColor(color);
+		seqOverlaySprite_->Update();
+		seqOverlaySprite_->Draw();
+	};
+
+	auto DrawHollowBorder = [&DrawSolidRect](const Vector2& pos, const Vector2& size, const Vector4& color, float thickness) {
+		DrawSolidRect(pos, { size.x, thickness }, color);
+		DrawSolidRect({ pos.x, pos.y + size.y - thickness }, { size.x, thickness }, color);
+		DrawSolidRect(pos, { thickness, size.y }, color);
+		DrawSolidRect({ pos.x + size.x - thickness, pos.y }, { thickness, size.y }, color);
+	};
+
+	// ------------------------------------------------------------
+	// 項目4: 被弾・撃墜時のテーマカラー反転 & CRITICAL DAMAGE 激しい点滅
+	// ------------------------------------------------------------
+	if (endSequence_ == StageEndSequence::GameOver_Critical) {
+		// 0.08s 周期の激しい赤色警告フラッシュ
+		float blinkPhase = std::fmod(endSeqTimer_, 0.10f);
+		bool isBlinkOn = (blinkPhase < 0.06f);
+
+		if (isBlinkOn) {
+			float bannerW = 680.0f;
+			float bannerH = 70.0f;
+			float bannerX = (screenW - bannerW) * 0.5f;
+			float bannerY = 120.0f;
+
+			// 赤色半透明バナー背景
+			DrawSolidRect({ bannerX, bannerY }, { bannerW, bannerH }, { 0.50f, 0.02f, 0.02f, 0.85f });
+			DrawSolidRect({ bannerX, bannerY }, { bannerW, 2.0f }, { 1.0f, 0.25f, 0.20f, 0.95f });
+			DrawSolidRect({ bannerX, bannerY + bannerH - 2.0f }, { bannerW, 2.0f }, { 1.0f, 0.25f, 0.20f, 0.95f });
+
+			TextRenderer::GetInstance()->Print(
+				"HackGen",
+				"! CRITICAL DAMAGE !",
+				screenW * 0.5f,
+				bannerY + 10.0f,
+				34.0f,
+				{ 1.0f, 0.35f, 0.30f, 1.0f },
+				{ 0.5f, 0.0f }
+			);
+
+			TextRenderer::GetInstance()->Print(
+				"HackGen",
+				"HULL INTEGRITY COMPROMISED // EJECTION RECOMMENDED",
+				screenW * 0.5f,
+				bannerY + 44.0f,
+				14.0f,
+				{ 1.0f, 0.85f, 0.85f, 0.90f },
+				{ 0.5f, 0.0f }
+			);
+		}
+	}
+
+	// ------------------------------------------------------------
+	// 項目1: 通信途絶（シグナルロスト）フリーズ & 軽量グリッチ帯 & テキスト
+	// （※GPUストールを引き起こしていた30回スプライト描画ループを完全撤廃し軽量化）
+	// ------------------------------------------------------------
+	else if (endSequence_ == StageEndSequence::GameOver_SignalLost) {
+		// 薄暗い赤黒ノイズベール（1枚のみ）
+		DrawSolidRect({ 0.0f, 0.0f }, { screenW, screenH }, { 0.15f, 0.01f, 0.01f, 0.35f });
+
+		// 画面を横切る大きなグリッチ走査バー（数本のみ描画で超軽量かつスタイリッシュ）
+		float glitchOffset = std::fmod(endSeqTimer_ * 800.0f, screenH);
+		DrawSolidRect({ 0.0f, glitchOffset }, { screenW, 16.0f }, { 0.9f, 0.9f, 0.9f, 0.15f });
+		float glitchOffset2 = std::fmod(endSeqTimer_ * 1300.0f + 200.0f, screenH);
+		DrawSolidRect({ 0.0f, glitchOffset2 }, { screenW, 32.0f }, { 0.8f, 0.1f, 0.1f, 0.20f });
+
+		// 中央警告カード
+		float cardW = 740.0f;
+		float cardH = 150.0f;
+		float cardX = (screenW - cardW) * 0.5f;
+		float cardY = (screenH - cardH) * 0.5f;
+
+		// カード背景と赤枠（DrawHollowBorderに集約して超軽量化）
+		DrawSolidRect({ cardX, cardY }, { cardW, cardH }, { 0.06f, 0.01f, 0.01f, 0.92f });
+		DrawHollowBorder({ cardX, cardY }, { cardW, cardH }, { 0.95f, 0.20f, 0.20f, 0.95f }, 2.5f);
+		DrawSolidRect({ cardX, cardY }, { cardW, 4.0f }, { 1.0f, 0.30f, 0.30f, 1.0f });
+
+		// 点滅する「SIGNAL LOST」
+		float signalPulse = 0.6f + 0.4f * std::sin(endSeqTimer_ * 20.0f);
+		TextRenderer::GetInstance()->Print(
+			"HackGen",
+			"SIGNAL LOST",
+			screenW * 0.5f,
+			cardY + 20.0f,
+			46.0f,
+			{ 1.0f, 0.20f, 0.20f, signalPulse },
+			{ 0.5f, 0.0f }
+		);
+
+		// 「TELEMETRY DISCONNECTED (遠隔測定切断)」
+		TextRenderer::GetInstance()->Print(
+			"HackGen",
+			"TELEMETRY DISCONNECTED (遠隔測定切断)",
+			screenW * 0.5f,
+			cardY + 76.0f,
+			22.0f,
+			{ 0.95f, 0.85f, 0.85f, 0.95f },
+			{ 0.5f, 0.0f }
+		);
+
+		TextRenderer::GetInstance()->Print(
+			"HackGen",
+			"CARRIER FREQUENCY TERMINATED // SYSTEM FAULT 0x000000FA",
+			screenW * 0.5f,
+			cardY + 110.0f,
+			14.0f,
+			{ 0.80f, 0.35f, 0.35f, 0.80f },
+			{ 0.5f, 0.0f }
+		);
+	}
+
+	// ------------------------------------------------------------
+	// 項目2: システム強制シャットダウン（ブラウン管テレビのプツッ暗転: 0.35秒でキビキビと閉鎖）
+	// ------------------------------------------------------------
+	else if (endSequence_ == StageEndSequence::GameOver_CrtShutdown) {
+		float crtT = std::clamp((endSeqTimer_ - 0.75f) / 0.35f, 0.0f, 1.0f);
+		float centerY = screenH * 0.5f;
+		float centerX = screenW * 0.5f;
+
+		if (crtT < 0.60f) {
+			// Phase 1 (0.00〜0.60): 上下から黒マスクが中央水平線に向かって急激に収束！
+			float p = crtT / 0.60f;
+			float collapse = 1.0f - std::pow(1.0f - p, 3.0f);
+			float halfH = (screenH * 0.5f) * (1.0f - collapse);
+			if (halfH < 2.0f) halfH = 2.0f;
+
+			DrawSolidRect({ 0.0f, 0.0f }, { screenW, centerY - halfH }, { 0.0f, 0.0f, 0.0f, 1.0f });
+			DrawSolidRect({ 0.0f, centerY + halfH }, { screenW, screenH - (centerY + halfH) }, { 0.0f, 0.0f, 0.0f, 1.0f });
+
+			// 中央水平発光線
+			float lineAlpha = 0.8f + 0.2f * std::sin(endSeqTimer_ * 50.0f);
+			DrawSolidRect({ 0.0f, centerY - 2.0f }, { screenW, 4.0f }, { 0.85f, 0.95f, 1.0f, lineAlpha }, BlendMode::kAdd);
+		} else if (crtT < 0.85f) {
+			// Phase 2 (0.60〜0.85): 水平線が左右から急速に収縮！
+			float p = (crtT - 0.60f) / 0.25f;
+			float shrink = 1.0f - p;
+			float halfW = (screenW * 0.5f) * shrink;
+
+			DrawSolidRect({ 0.0f, 0.0f }, { screenW, screenH }, { 0.0f, 0.0f, 0.0f, 1.0f });
+			DrawSolidRect({ centerX - halfW, centerY - 2.5f }, { halfW * 2.0f, 5.0f }, { 1.0f, 1.0f, 1.0f, 1.0f }, BlendMode::kAdd);
+		} else {
+			// Phase 3 (0.85〜1.00): 「プツッ」と極小の光点が光って完全暗転！
+			float p = (crtT - 0.85f) / 0.15f;
+			DrawSolidRect({ 0.0f, 0.0f }, { screenW, screenH }, { 0.0f, 0.0f, 0.0f, 1.0f });
+
+			if (p < 0.40f) {
+				float popAlpha = 1.0f - (p / 0.40f);
+				DrawSolidRect({ centerX - 4.0f, centerY - 4.0f }, { 8.0f, 8.0f }, { 1.0f, 1.0f, 1.0f, popAlpha }, BlendMode::kAdd);
+			}
+		}
+	}
+
+	// ------------------------------------------------------------
+	// 項目5: ステージクリア時のMISSION ACCOMPLISHEDタイピング
+	// ------------------------------------------------------------
+	else if (endSequence_ == StageEndSequence::Clear_HudShutdown) {
+		if (endSeqTimer_ >= 0.40f) {
+			const std::string fullTitle = "MISSION ACCOMPLISHED";
+			float typeTime = endSeqTimer_ - 0.40f;
+			int charCount = static_cast<int>(typeTime / 0.045f);
+			if (charCount > static_cast<int>(fullTitle.size())) {
+				charCount = static_cast<int>(fullTitle.size());
+			}
+			std::string displayTitle = fullTitle.substr(0, charCount);
+
+			// カーソル点滅
+			bool showCursor = (static_cast<int>(typeTime * 10.0f) % 2 == 0);
+			if (charCount < static_cast<int>(fullTitle.size()) && showCursor) {
+				displayTitle += "_";
+			}
+
+			float centerY = screenH * 0.5f - 40.0f;
+
+			// タイピングテキスト
+			TextRenderer::GetInstance()->Print(
+				"HackGen",
+				displayTitle.c_str(),
+				screenW * 0.5f,
+				centerY,
+				42.0f,
+				{ 0.35f, 1.0f, 0.60f, 0.95f },
+				{ 0.5f, 0.0f }
+			);
+
+			// 日本語補足「(作戦完了)」
+			if (charCount >= static_cast<int>(fullTitle.size())) {
+				TextRenderer::GetInstance()->Print(
+					"HackGen",
+					"(作戦完了)",
+					screenW * 0.5f,
+					centerY + 50.0f,
+					22.0f,
+					{ 0.70f, 0.95f, 0.80f, 0.85f },
+					{ 0.5f, 0.0f }
+				);
+			}
+		}
+	}
+
+	// ------------------------------------------------------------
+	// 項目6: 帰還シーケンス（オートパイロット）
+	// ------------------------------------------------------------
+	else if (endSequence_ == StageEndSequence::Clear_AutopilotReturn) {
+		float bannerW = 760.0f;
+		float bannerH = 80.0f;
+		float bannerX = (screenW - bannerW) * 0.5f;
+		float bannerY = screenH * 0.5f + 80.0f;
+
+		DrawSolidRect({ bannerX, bannerY }, { bannerW, bannerH }, { 0.02f, 0.08f, 0.04f, 0.85f });
+		DrawHollowBorder({ bannerX, bannerY }, { bannerW, bannerH }, { 0.25f, 0.95f, 0.55f, 0.90f }, 1.5f);
+
+		TextRenderer::GetInstance()->Print(
+			"HackGen",
+			"ENTERING AUTOPILOT MODE... RETURNING TO BASE",
+			screenW * 0.5f,
+			bannerY + 14.0f,
+			24.0f,
+			{ 0.40f, 1.0f, 0.70f, 1.0f },
+			{ 0.5f, 0.0f }
+		);
+
+		TextRenderer::GetInstance()->Print(
+			"HackGen",
+			"(自動操縦移行... 帰還中)",
+			screenW * 0.5f,
+			bannerY + 46.0f,
+			18.0f,
+			{ 0.80f, 0.95f, 0.85f, 0.90f },
+			{ 0.5f, 0.0f }
+		);
+	}
+
+	// ------------------------------------------------------------
+	// 項目7: タクティカルマップ移行 & SECTOR CLEARED スタンプ押下
+	// ------------------------------------------------------------
+	else if (endSequence_ == StageEndSequence::Clear_TacticalMapZoom) {
+		// 戦術マップ走査ライングリッド風オーバーレイ
+		float scanPulse = 0.15f + 0.05f * std::sin(endSeqTimer_ * 10.0f);
+		DrawSolidRect({ 0.0f, 0.0f }, { screenW, screenH }, { 0.02f, 0.15f, 0.08f, scanPulse });
+
+		// 四隅の戦術座標ブラケット
+		float bracketLen = 50.0f;
+		float margin = 40.0f;
+		Vector4 tactCol = { 0.25f, 0.90f, 0.55f, 0.85f };
+		DrawSolidRect({ margin, margin }, { bracketLen, 2.0f }, tactCol);
+		DrawSolidRect({ margin, margin }, { 2.0f, bracketLen }, tactCol);
+		DrawSolidRect({ screenW - margin - bracketLen, margin }, { bracketLen, 2.0f }, tactCol);
+		DrawSolidRect({ screenW - margin, margin }, { 2.0f, bracketLen }, tactCol);
+		DrawSolidRect({ margin, screenH - margin }, { bracketLen, 2.0f }, tactCol);
+		DrawSolidRect({ margin, screenH - margin - bracketLen }, { 2.0f, bracketLen }, tactCol);
+		DrawSolidRect({ screenW - margin - bracketLen, screenH - margin }, { bracketLen, 2.0f }, tactCol);
+		DrawSolidRect({ screenW - margin, screenH - margin - bracketLen }, { 2.0f, bracketLen }, tactCol);
+
+		TextRenderer::GetInstance()->Print(
+			"HackGen",
+			"TACTICAL MAP // SATELLITE ORBIT VIEW [GRID: 44-ALPHA]",
+			margin + 10.0f,
+			margin + 10.0f,
+			16.0f,
+			tactCol
+		);
+
+		// 3.5s に達した瞬間、SECTOR CLEARED のスタンプがドンッと押される！
+		if (endSeqTimer_ >= 3.5f) {
+			float stampT = std::clamp((endSeqTimer_ - 3.5f) / 0.14f, 0.0f, 1.0f);
+			// スケール 2.2 -> 1.0 への急激な衝撃落下
+			float stampScale = 1.0f + 1.2f * (1.0f - stampT) * (1.0f - stampT);
+
+			float boxW = 540.0f * stampScale;
+			float boxH = 130.0f * stampScale;
+			float boxX = (screenW - boxW) * 0.5f;
+			float boxY = (screenH - boxH) * 0.5f;
+
+			// スタンプ外枠（重厚な2重四角枠）
+			Vector4 stampCol = { 0.95f, 0.25f, 0.18f, 0.95f };
+			DrawHollowBorder({ boxX, boxY }, { boxW, boxH }, stampCol, 4.0f * stampScale);
+			DrawHollowBorder({ boxX + 6.0f * stampScale, boxY + 6.0f * stampScale }, { boxW - 12.0f * stampScale, boxH - 12.0f * stampScale }, stampCol, 1.5f * stampScale);
+
+			// スタンプ文字
+			TextRenderer::GetInstance()->Print(
+				"HackGen",
+				"SECTOR CLEARED",
+				screenW * 0.5f,
+				boxY + 22.0f * stampScale,
+				44.0f * stampScale,
+				stampCol,
+				{ 0.5f, 0.0f }
+			);
+
+			TextRenderer::GetInstance()->Print(
+				"HackGen",
+				"(セクター制圧)",
+				screenW * 0.5f,
+				boxY + 74.0f * stampScale,
+				22.0f * stampScale,
+				{ 1.0f, 0.85f, 0.80f, 0.95f },
+				{ 0.5f, 0.0f }
+			);
+		}
+	}
 }
 
 

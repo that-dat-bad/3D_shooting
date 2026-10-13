@@ -91,7 +91,8 @@
       <AdditionalDependencies>winhttp.lib;assimp-vc143-mtd.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
-      <Command>copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxcompiler.dll" "$(TargetDir)dxcompiler.dll"</Command>
+      <Command>copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxcompiler.dll" "$(TargetDir)dxcompiler.dll"
+xcopy /y /d /s /e "$(ProjectDir)assets" "$(TargetDir)assets\"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -320,7 +321,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="src\engine\Graphics\Text\TextRenderer.h" />
     <ClInclude Include="src\engine\Graphics\System\SrvManager.h" />
     <ClInclude Include="src\Game\Scene\ClearScene.h" />
-    <ClInclude Include="src\Game\Scene\ResultScene.h" />
+    <ClInclude Include="src\Game\Scene\GameOverScene.h" />
     <ClInclude Include="src\Game\Scene\DebugScene.h" />
     <ClInclude Include="src\Game\Scene\Iscene.h" />
     <ClInclude Include="src\Game\Scene\SceneManager.h" />
@@ -329,6 +330,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="src\Game\Scene\MissionEditorScene.h" />
     <ClInclude Include="src\Game\Scene\StageScene.h" />
     <ClInclude Include="src\Game\Scene\StageHUD.h" />
+    <ClInclude Include="src\Game\Scene\CombatBootSequence.h" />
     <ClInclude Include="src\Game\Camera\PlayerCamera.h" />
     <ClInclude Include="src\Game\Scene\TitleScene.h" />
     <ClInclude Include="src\engine\base\Math\Quaternion.h" />
@@ -452,7 +454,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="src\engine\Graphics\System\SrvManager.cpp" />
     <ClCompile Include="src\engine\Graphics\PostProcess\PostEffect.cpp" />
     <ClCompile Include="src\Game\Scene\ClearScene.cpp" />
-    <ClCompile Include="src\Game\Scene\ResultScene.cpp" />
+    <ClCompile Include="src\Game\Scene\GameOverScene.cpp" />
     <ClCompile Include="src\Game\Scene\DebugScene.cpp" />
     <ClCompile Include="src\Game\Scene\IScene.cpp" />
     <ClCompile Include="src\Game\Scene\SceneManager.cpp" />
@@ -460,6 +462,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="src\Game\Scene\MissionEditorScene.cpp" />
     <ClCompile Include="src\Game\Scene\StageScene.cpp" />
     <ClCompile Include="src\Game\Scene\StageHUD.cpp" />
+    <ClCompile Include="src\Game\Scene\CombatBootSequence.cpp" />
     <ClCompile Include="src\Game\Camera\PlayerCamera.cpp" />
     <ClCompile Include="src\Game\Scene\TitleScene.cpp" />
     <ClCompile Include="src\engine\base\Math\Quaternion.cpp" />

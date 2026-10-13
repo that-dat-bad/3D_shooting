@@ -30,6 +30,10 @@ void StageHUD::Initialize(SpriteCommon* spriteCommon) {
 void StageHUD::Update(float dt, const StageHUDData& data) {
 	hudData_ = data;
 	animTimer_ += dt;
+	deployTimer_ += dt;
+	if (isShuttingDown_) {
+		shutdownTimer_ += dt;
+	}
 
 	if (hudData_.isFiring) {
 		firePunchTimer_ = 0.08f;
@@ -146,31 +150,61 @@ bool StageHUD::ProjectToScreen(const Vector3& worldPos, const Matrix4x4& vpMat, 
 }
 
 // ================================================================
+// ================================================================
 // 各HUD要素の描画
 // ================================================================
 
 void StageHUD::DrawTimer() {
+	// 項目9: HUD順次展開（0.25s〜0.65s で上からスライドイン＋フェードイン）
+	if (deployTimer_ < 0.25f) return;
+
+	// 項目5: ステージクリア時のHUD順次シャットダウン（タイマーは0.60s〜1.00sでOFFLINE化＆消去）
+	float shutdownAlpha = 1.0f;
+	bool isTimerOffline = false;
+	if (isShuttingDown_) {
+		if (shutdownTimer_ >= 1.0f) {
+			return; // 完全に消滅
+		} else if (shutdownTimer_ >= 0.60f) {
+			isTimerOffline = true;
+			shutdownAlpha = 1.0f - (shutdownTimer_ - 0.60f) / 0.40f;
+		}
+	}
+
+	float deployT = std::clamp((deployTimer_ - 0.25f) / 0.40f, 0.0f, 1.0f);
+	float alpha = deployT * shutdownAlpha;
+	float slideY = -24.0f * (1.0f - deployT);
+
 	float panelW = 210.0f;
 	float panelH = 46.0f;
 	float panelX = (hudData_.screenWidth - panelW) * 0.5f;
-	float panelY = 16.0f;
+	float panelY = 16.0f + slideY;
 
-	// 背景と枠線（タクティカルネオングリーン統一：項目5）
-	Vector4 bgColor = { 0.01f, 0.05f, 0.03f, 0.88f };
-	Vector4 borderColor = { 0.22f, 0.85f, 0.50f, 0.85f };
+	// 背景と枠線
+	Vector4 bgColor = { 0.01f, 0.05f, 0.03f, 0.88f * alpha };
+	Vector4 borderColor = { 0.22f, 0.85f, 0.50f, 0.85f * alpha };
+	Vector4 textColor = { 0.35f, 1.0f, 0.65f, 0.98f * alpha }; // 通常: タクティカルネオングリーン
 
-	// タイムに応じたステータスカラー
-	Vector4 textColor = { 0.35f, 1.0f, 0.65f, 0.98f }; // 通常（タクティカルネオングリーン）
-	if (hudData_.remainingTime <= 30.0f) {
+	if (isWarningMode_) {
+		// 項目4: 被弾・撃墜時のテーマカラー赤色/オレンジ反転
+		float pulse = 0.6f + 0.4f * std::sin(animTimer_ * 18.0f);
+		textColor = { 1.0f, 0.20f, 0.20f, pulse * alpha };
+		borderColor = { 1.0f, 0.35f, 0.10f, pulse * alpha };
+		bgColor = { 0.22f, 0.02f, 0.02f, 0.90f * alpha };
+	} else if (isTimerOffline) {
+		// 項目5: OFFLINE状態
+		textColor = { 1.0f, 0.30f, 0.30f, 0.90f * alpha };
+		borderColor = { 0.60f, 0.20f, 0.20f, 0.70f * alpha };
+		bgColor = { 0.15f, 0.02f, 0.02f, 0.80f * alpha };
+	} else if (hudData_.remainingTime <= 30.0f) {
 		// 30秒以下: 赤色点滅警告
 		float pulse = 0.55f + 0.45f * std::sin(animTimer_ * 10.0f);
-		textColor = { 1.0f, 0.25f, 0.25f, pulse };
-		borderColor = { 1.0f, 0.3f, 0.3f, pulse * 0.9f };
-		bgColor = { 0.18f, 0.03f, 0.03f, 0.80f };
+		textColor = { 1.0f, 0.25f, 0.25f, pulse * alpha };
+		borderColor = { 1.0f, 0.3f, 0.3f, pulse * 0.9f * alpha };
+		bgColor = { 0.18f, 0.03f, 0.03f, 0.80f * alpha };
 	} else if (hudData_.remainingTime <= 60.0f) {
 		// 1分以下: 黄色注意
-		textColor = { 1.0f, 0.85f, 0.25f, 1.0f };
-		borderColor = { 0.85f, 0.70f, 0.20f, 0.85f };
+		textColor = { 1.0f, 0.85f, 0.25f, 1.0f * alpha };
+		borderColor = { 0.85f, 0.70f, 0.20f, 0.85f * alpha };
 	}
 
 	DrawBorderedPanel({ panelX, panelY }, { panelW, panelH }, bgColor, borderColor, 1.5f);
@@ -178,11 +212,15 @@ void StageHUD::DrawTimer() {
 	// 上部アクセントバー
 	DrawRect({ panelX + panelW * 0.5f - 30.0f, panelY }, { 60.0f, 2.0f }, borderColor);
 
-	// 時間文字列の生成（タクティカルブラケット付きフォーマット）
-	int minutes = static_cast<int>(hudData_.remainingTime) / 60;
-	int seconds = static_cast<int>(hudData_.remainingTime) % 60;
+	// 時間文字列の生成
 	char timeStr[32];
-	snprintf(timeStr, sizeof(timeStr), "[ TIME %02d:%02d ]", minutes, seconds);
+	if (isTimerOffline) {
+		snprintf(timeStr, sizeof(timeStr), "[ TIMER : OFFLINE ]");
+	} else {
+		int minutes = static_cast<int>(hudData_.remainingTime) / 60;
+		int seconds = static_cast<int>(hudData_.remainingTime) % 60;
+		snprintf(timeStr, sizeof(timeStr), "[ TIME %02d:%02d ]", minutes, seconds);
+	}
 
 	// テキスト描画 (TextRenderer)
 	TextRenderer::GetInstance()->Print(
@@ -197,41 +235,73 @@ void StageHUD::DrawTimer() {
 }
 
 void StageHUD::DrawAmmo() {
+	// 項目9: HUD順次展開（0.50s〜0.90s で右からスライドイン＋フェードイン）
+	if (deployTimer_ < 0.50f) return;
+
+	// 項目5: ステージクリア時のHUD順次シャットダウン（弾薬は0.30s〜0.70sでOFFLINE化＆消去）
+	float shutdownAlpha = 1.0f;
+	bool isAmmoOffline = false;
+	if (isShuttingDown_) {
+		if (shutdownTimer_ >= 0.70f) {
+			return; // 完全に消滅
+		} else if (shutdownTimer_ >= 0.30f) {
+			isAmmoOffline = true;
+			shutdownAlpha = 1.0f - (shutdownTimer_ - 0.30f) / 0.40f;
+		}
+	}
+
+	float deployT = std::clamp((deployTimer_ - 0.50f) / 0.40f, 0.0f, 1.0f);
+	float alpha = deployT * shutdownAlpha;
+	float slideX = 35.0f * (1.0f - deployT);
+
 	float panelW = 230.0f;
 	float panelH = 76.0f;
-	float panelX = hudData_.screenWidth - panelW - 24.0f;
+	float panelX = hudData_.screenWidth - panelW - 24.0f + slideX;
 	float panelY = hudData_.screenHeight - panelH - 24.0f;
 
-	Vector4 bgColor = { 0.01f, 0.05f, 0.03f, 0.88f };
-	Vector4 borderColor = { 0.22f, 0.85f, 0.50f, 0.85f };
+	Vector4 bgColor = { 0.01f, 0.05f, 0.03f, 0.88f * alpha };
+	Vector4 borderColor = { 0.22f, 0.85f, 0.50f, 0.85f * alpha };
 
 	float ammoRatio = (hudData_.maxAmmo > 0)
 		? static_cast<float>(hudData_.currentAmmo) / static_cast<float>(hudData_.maxAmmo)
 		: 0.0f;
 
-	// 残弾数に応じたステータスカラー（タクティカルグリーン統一：項目5）
-	Vector4 ammoTextColor = { 0.85f, 1.0f, 0.90f, 0.98f };
-	Vector4 gaugeFillColor = { 0.25f, 0.95f, 0.55f, 0.95f }; // 通常: タクティカルグリーン
+	// 残弾数に応じたステータスカラー
+	Vector4 ammoTextColor = { 0.85f, 1.0f, 0.90f, 0.98f * alpha };
+	Vector4 gaugeFillColor = { 0.25f, 0.95f, 0.55f, 0.95f * alpha }; // 通常: タクティカルグリーン
 
-	if (hudData_.currentAmmo == 0) {
+	if (isWarningMode_) {
+		// 項目4: 被弾・撃墜時のテーマカラー赤色/オレンジ反転
+		float pulse = 0.6f + 0.4f * std::sin(animTimer_ * 18.0f);
+		ammoTextColor = { 1.0f, 0.20f, 0.20f, pulse * alpha };
+		gaugeFillColor = { 1.0f, 0.35f, 0.10f, pulse * alpha };
+		borderColor = { 1.0f, 0.30f, 0.10f, pulse * alpha };
+		bgColor = { 0.22f, 0.02f, 0.02f, 0.90f * alpha };
+	} else if (isAmmoOffline) {
+		// 項目5: OFFLINE状態
+		ammoTextColor = { 1.0f, 0.30f, 0.30f, 0.90f * alpha };
+		gaugeFillColor = { 0.60f, 0.20f, 0.20f, 0.50f * alpha };
+		borderColor = { 0.60f, 0.20f, 0.20f, 0.70f * alpha };
+		bgColor = { 0.15f, 0.02f, 0.02f, 0.80f * alpha };
+	} else if (hudData_.currentAmmo == 0) {
 		// 弾切れ
 		float pulse = 0.5f + 0.5f * std::sin(animTimer_ * 12.0f);
-		ammoTextColor = { 1.0f, 0.20f, 0.20f, pulse };
-		gaugeFillColor = { 1.0f, 0.20f, 0.20f, pulse };
-		borderColor = { 1.0f, 0.30f, 0.30f, 0.80f };
+		ammoTextColor = { 1.0f, 0.20f, 0.20f, pulse * alpha };
+		gaugeFillColor = { 1.0f, 0.20f, 0.20f, pulse * alpha };
+		borderColor = { 1.0f, 0.30f, 0.30f, 0.80f * alpha };
 	} else if (ammoRatio <= 0.15f) {
 		// 15%以下: 赤色警告
-		ammoTextColor = { 1.0f, 0.30f, 0.30f, 1.0f };
-		gaugeFillColor = { 1.0f, 0.30f, 0.30f, 0.95f };
+		ammoTextColor = { 1.0f, 0.30f, 0.30f, 1.0f * alpha };
+		gaugeFillColor = { 1.0f, 0.30f, 0.30f, 0.95f * alpha };
 	} else if (ammoRatio <= 0.35f) {
 		// 35%以下: 黄色注意
-		ammoTextColor = { 1.0f, 0.85f, 0.25f, 1.0f };
-		gaugeFillColor = { 1.0f, 0.80f, 0.20f, 0.95f };
+		ammoTextColor = { 1.0f, 0.85f, 0.25f, 1.0f * alpha };
+		gaugeFillColor = { 1.0f, 0.80f, 0.20f, 0.95f * alpha };
 	}
 
 	// 射撃時のパンチ演出
-	if (firePunchTimer_ > 0.0f) {
-		borderColor = { 0.40f, 1.0f, 0.70f, 1.0f };
+	if (firePunchTimer_ > 0.0f && !isWarningMode_ && !isAmmoOffline) {
+		borderColor = { 0.40f, 1.0f, 0.70f, 1.0f * alpha };
 	}
 
 	DrawBorderedPanel({ panelX, panelY }, { panelW, panelH }, bgColor, borderColor, 1.5f);
@@ -239,16 +309,18 @@ void StageHUD::DrawAmmo() {
 	// ヘッダーラベル
 	TextRenderer::GetInstance()->Print(
 		"HackGen",
-		"GUN 20MM",
+		isAmmoOffline ? "WEAPON STATUS" : "GUN 20MM",
 		panelX + 16.0f,
 		panelY + 8.0f,
 		14.0f,
-		{ 0.35f, 0.95f, 0.60f, 0.90f }
+		isAmmoOffline ? Vector4{ 1.0f, 0.4f, 0.4f, 0.90f * alpha } : (isWarningMode_ ? Vector4{ 1.0f, 0.5f, 0.2f, 0.90f * alpha } : Vector4{ 0.35f, 0.95f, 0.60f, 0.90f * alpha })
 	);
 
 	// 残弾数数値
 	char ammoStr[32];
-	if (hudData_.currentAmmo == 0) {
+	if (isAmmoOffline) {
+		snprintf(ammoStr, sizeof(ammoStr), "OFFLINE");
+	} else if (hudData_.currentAmmo == 0) {
 		snprintf(ammoStr, sizeof(ammoStr), "EMPTY");
 	} else {
 		snprintf(ammoStr, sizeof(ammoStr), "%d / %d", hudData_.currentAmmo, hudData_.maxAmmo);
@@ -271,13 +343,13 @@ void StageHUD::DrawAmmo() {
 	float gaugeH = 8.0f;
 
 	// スロット背景
-	DrawRect({ gaugeX, gaugeY }, { gaugeW, gaugeH }, { 0.08f, 0.12f, 0.16f, 0.85f });
+	DrawRect({ gaugeX, gaugeY }, { gaugeW, gaugeH }, { 0.08f, 0.12f, 0.16f, 0.85f * alpha });
 	// スロット枠線
-	DrawRect({ gaugeX, gaugeY }, { gaugeW, 1.0f }, { 0.25f, 0.35f, 0.45f, 0.60f });
-	DrawRect({ gaugeX, gaugeY + gaugeH - 1.0f }, { gaugeW, 1.0f }, { 0.25f, 0.35f, 0.45f, 0.60f });
+	DrawRect({ gaugeX, gaugeY }, { gaugeW, 1.0f }, { 0.25f, 0.35f, 0.45f, 0.60f * alpha });
+	DrawRect({ gaugeX, gaugeY + gaugeH - 1.0f }, { gaugeW, 1.0f }, { 0.25f, 0.35f, 0.45f, 0.60f * alpha });
 
 	// アクティブゲージ
-	float fillW = gaugeW * (std::clamp)(ammoRatio, 0.0f, 1.0f);
+	float fillW = isAmmoOffline ? 0.0f : gaugeW * (std::clamp)(ammoRatio, 0.0f, 1.0f);
 	if (fillW > 0.0f) {
 		DrawRect({ gaugeX, gaugeY }, { fillW, gaugeH }, gaugeFillColor);
 	}
@@ -285,11 +357,16 @@ void StageHUD::DrawAmmo() {
 	// ゲージのセグメント区切り線（4等分）
 	for (int i = 1; i < 4; ++i) {
 		float divX = gaugeX + (gaugeW * 0.25f * i);
-		DrawLine({ divX, gaugeY }, { divX, gaugeY + gaugeH }, 1.0f, { 0.03f, 0.06f, 0.10f, 0.90f });
+		DrawLine({ divX, gaugeY }, { divX, gaugeY + gaugeH }, 1.0f, { 0.03f, 0.06f, 0.10f, 0.90f * alpha });
 	}
 }
 
 void StageHUD::DrawReticles() {
+	// 項目5: ステージクリア時のHUD順次シャットダウン（照準は真っ先に0.00s〜0.35sで消滅）
+	if (isShuttingDown_ && shutdownTimer_ >= 0.35f) {
+		return;
+	}
+
 	Vector2 noseScreen{};
 	Vector2 aimScreen{};
 
@@ -304,6 +381,20 @@ void StageHUD::DrawReticles() {
 		aimVisible = ProjectToScreen(aimTargetWorld, hudData_.viewProjectionMatrix, hudData_.screenWidth, hudData_.screenHeight, aimScreen);
 	}
 
+	// 項目9: HUD順次展開（0.00s〜0.40s でレティクルが拡大から収束しながら点灯展開）
+	float deployT = std::clamp(deployTimer_ / 0.40f, 0.0f, 1.0f);
+	float shutdownAlpha = isShuttingDown_ ? (1.0f - shutdownTimer_ / 0.35f) : 1.0f;
+	float alpha = deployT * (std::clamp)(shutdownAlpha, 0.0f, 1.0f);
+	float reticleScale = 1.0f + 0.45f * (1.0f - deployT);
+
+	// テーマカラー反転時（項目4）
+	Vector4 baseAimCol = isWarningMode_
+		? Vector4{ 1.0f, 0.25f, 0.15f, 0.95f * alpha }
+		: Vector4{ 0.0f, 0.95f, 0.45f, 0.85f * alpha };
+	Vector4 baseTickCol = isWarningMode_
+		? Vector4{ 1.0f, 0.45f, 0.10f, 1.0f * alpha }
+		: Vector4{ 0.0f, 1.0f, 0.55f, 0.95f * alpha };
+
 	// -----------------------------------------------------------------
 	// リードガイダンスライン（機首照準とマウス目標照準を結ぶHUDライン）
 	// -----------------------------------------------------------------
@@ -314,16 +405,16 @@ void StageHUD::DrawReticles() {
 		);
 
 		if (dist > 12.0f) {
-			// 半透明のHUDコネクトライン
-			Vector4 lineCol = { 0.0f, 0.95f, 0.50f, 0.40f };
+			Vector4 lineCol = isWarningMode_
+				? Vector4{ 1.0f, 0.30f, 0.20f, 0.50f * alpha }
+				: Vector4{ 0.0f, 0.95f, 0.50f, 0.40f * alpha };
 			DrawLine(noseScreen, aimScreen, 1.5f, lineCol);
 
-			// 中間地点に小さなガイドドット
 			Vector2 midPos = {
 				(noseScreen.x + aimScreen.x) * 0.5f,
 				(noseScreen.y + aimScreen.y) * 0.5f
 			};
-			DrawDot(midPos, 2.0f, { 0.0f, 0.95f, 0.50f, 0.60f });
+			DrawDot(midPos, 2.0f, isWarningMode_ ? Vector4{ 1.0f, 0.40f, 0.20f, 0.70f * alpha } : Vector4{ 0.0f, 0.95f, 0.50f, 0.60f * alpha });
 		}
 	}
 
@@ -331,28 +422,26 @@ void StageHUD::DrawReticles() {
 	// マウス目標照準（サークル＋十字目盛＋中心ドット）
 	// -----------------------------------------------------------------
 	if (aimVisible) {
-		float reticleRadius = 18.0f;
-		Vector4 reticleColor = { 0.0f, 0.95f, 0.45f, 0.85f };
-		Vector4 tickColor = { 0.0f, 1.0f, 0.55f, 0.95f };
+		float reticleRadius = 18.0f * reticleScale;
 
 		// 外周リング
-		DrawRing(aimScreen, reticleRadius, reticleColor);
+		DrawRing(aimScreen, reticleRadius, baseAimCol);
 
 		// 中心ドット
-		DrawDot(aimScreen, 2.5f, tickColor);
+		DrawDot(aimScreen, 2.5f, baseTickCol);
 
 		// 外周4箇所の十字目盛（上下左右）
 		float tickInner = reticleRadius + 3.0f;
 		float tickOuter = reticleRadius + 10.0f;
 
 		// 上
-		DrawLine({ aimScreen.x, aimScreen.y - tickOuter }, { aimScreen.x, aimScreen.y - tickInner }, 1.5f, tickColor);
+		DrawLine({ aimScreen.x, aimScreen.y - tickOuter }, { aimScreen.x, aimScreen.y - tickInner }, 1.5f, baseTickCol);
 		// 下
-		DrawLine({ aimScreen.x, aimScreen.y + tickInner }, { aimScreen.x, aimScreen.y + tickOuter }, 1.5f, tickColor);
+		DrawLine({ aimScreen.x, aimScreen.y + tickInner }, { aimScreen.x, aimScreen.y + tickOuter }, 1.5f, baseTickCol);
 		// 左
-		DrawLine({ aimScreen.x - tickOuter, aimScreen.y }, { aimScreen.x - tickInner, aimScreen.y }, 1.5f, tickColor);
+		DrawLine({ aimScreen.x - tickOuter, aimScreen.y }, { aimScreen.x - tickInner, aimScreen.y }, 1.5f, baseTickCol);
 		// 右
-		DrawLine({ aimScreen.x + tickInner, aimScreen.y }, { aimScreen.x + tickOuter, aimScreen.y }, 1.5f, tickColor);
+		DrawLine({ aimScreen.x + tickInner, aimScreen.y }, { aimScreen.x + tickOuter, aimScreen.y }, 1.5f, baseTickCol);
 	}
 
 	// -----------------------------------------------------------------
@@ -360,9 +449,15 @@ void StageHUD::DrawReticles() {
 	// -----------------------------------------------------------------
 	if (noseVisible) {
 		float pulseScale = (firePunchTimer_ > 0.0f) ? 1.25f : 1.0f;
-		Vector4 crossColor = (firePunchTimer_ > 0.0f)
-			? Vector4{ 1.0f, 0.85f, 0.40f, 1.0f }  // 射撃時フラッシュ
-			: Vector4{ 0.95f, 0.98f, 1.0f, 0.90f }; // 通常: クリアホワイト
+		pulseScale *= reticleScale;
+		Vector4 crossColor;
+		if (isWarningMode_) {
+			crossColor = { 1.0f, 0.3f, 0.2f, 0.95f * alpha };
+		} else if (firePunchTimer_ > 0.0f) {
+			crossColor = { 1.0f, 0.85f, 0.40f, 1.0f * alpha };
+		} else {
+			crossColor = { 0.95f, 0.98f, 1.0f, 0.90f * alpha };
+		}
 
 		// 中心小リング
 		DrawRing(noseScreen, 5.0f * pulseScale, crossColor);

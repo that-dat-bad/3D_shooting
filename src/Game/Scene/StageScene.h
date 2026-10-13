@@ -20,6 +20,7 @@
 #include "../../engine/Graphics/PostProcess/PostEffect.h"
 #include "../../engine/Graphics/UI/UIText.h"
 
+#include "CombatBootSequence.h"
 #include "../System/MissionManager.h"
 #include "../System/MissionMapView.h"
 
@@ -55,10 +56,10 @@ private:
 	// 地面グリッド描画
 	void DrawGround();
 
-	// --- 出撃イントロカメラワーク ＆ Rez構築演出（項目6, 7）---
+	// --- 出撃イントロ（AC6メインシステム戦闘モード起動シーケンス & カメラワーク）---
 	float sortieIntroTimer_ = 0.0f;
-	static constexpr float kSortieIntroDuration = 2.2f;
-	std::unique_ptr<Sprite> introFadeSprite_;
+	static constexpr float kSortieIntroDuration = CombatBootSequence::GetDuration();
+	CombatBootSequence combatBootSequence_;
 
 	std::unique_ptr<Skybox> skybox_ = nullptr;
 
@@ -79,6 +80,7 @@ private:
 	GunPod gunpod_;
 	EnemyManager enemyManager_;
 	BulletManager bulletManager_;
+	bool enableEnemies_ = false; ///< 敵出現フラグ（falseで敵スポーン無効）
 
 	// --- 統合当たり判定 ---
 	CollisionSystem collisionSystem_;
@@ -108,20 +110,44 @@ private:
 	float muzzleFlashRandomRoll_ = 0.0f;
 	float muzzleFlashRandomAlpha_ = 1.0f;
 
+	// ============================
+	// ゲームオーバー / クリア演出シーケンス（項目1〜7）
+	// ============================
+	enum class StageEndSequence {
+		None,
+		// ゲームオーバー演出
+		GameOver_Critical,      ///< 項目4: HUD赤反転、CRITICAL DAMAGE 点滅
+		GameOver_SignalLost,    ///< 項目1: 3Dフリーズ、強烈ノイズ/砂嵐、SIGNAL LOST 表示
+		GameOver_CrtShutdown,   ///< 項目2: ブラウン管電源切断演出（中央水平線収束・プツッ消滅）
+		// ステージクリア演出
+		Clear_HudShutdown,      ///< 項目5: HUD順次OFFLINE消去、MISSION ACCOMPLISHED タイピング
+		Clear_AutopilotReturn,  ///< 項目6: オートパイロット移行、自機急上昇・急加速離脱
+		Clear_TacticalMapZoom   ///< 項目7: 垂直急ズームアウト、戦術マップ、SECTOR CLEARED スタンプ
+	};
+	StageEndSequence endSequence_ = StageEndSequence::None;
+	float endSeqTimer_ = 0.0f;
+
 	void TriggerGameOver();
+	void TriggerGameClear();
+	void UpdateEndSequence(float dt);
+	void DrawEndSequenceUI();
 
 	// ゲーム状態
 	bool isMissionCleared_ = false;
 	bool isMissionFailed_ = false;
 	bool isGameOver_ = false;
 	float gameOverTimer_ = 0.0f;
-	static constexpr float kGameOverDuration = 2.0f;
+	static constexpr float kGameOverDuration = 1.10f;
 	float timeScale_ = 1.0f;
 
 	// ミッション制限時間（MissionData.timeLimitから設定）
 	float remainingTime_ = 300.0f;
 	float missionElapsedTime_ = 0.0f;  ///< ミッション経過時間（トリガー評価用）
 	UIText timeText_;
+
+	// 演出用スプライト
+	std::unique_ptr<Sprite> seqOverlaySprite_;
+	std::unique_ptr<Sprite> seqNoiseSprite_;
 
 	// 戦闘HUD（残弾数・照準・タイマー）
 	StageHUD hud_;

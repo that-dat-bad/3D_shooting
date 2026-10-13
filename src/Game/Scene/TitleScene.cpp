@@ -1,6 +1,7 @@
 #define DIRECTINPUT_VERSION     0x0800
 #include <dinput.h>
 #include "TitleScene.h"
+#include "../System/GameResult.h"
 #include "../../engine/Graphics/Sprite/SpriteCommon.h"
 #include "../../engine/Graphics/Text/TextRenderer.h"
 #include "../../engine/Graphics/System/TextureManager.h"
@@ -325,7 +326,25 @@ void TitleScene::Initialize() {
 		rotateModel->SetMaterialEmissive(0, { 2.5f, 0.8f, 0.1f }, 3.5f);
 	}
 
-	state_ = TitleState::DroneView;
+	TitleEntryReason entryReason = GameResult::GetInstance().titleEntryReason;
+	if (entryReason == TitleEntryReason::RebootFromGameOver) {
+		// 項目8: ゲームオーバーからの復帰時、起動コンソール画面に繋がり、再びOSが立ち上がってタイトルメニューに戻る
+		state_ = TitleState::ConsoleBoot;
+		consoleBootTimer_ = 0.0f;
+		consoleExitTimer_ = 0.0f;
+		isRebootLog_ = true;
+	} else if (entryReason == TitleEntryReason::ReturnFromClear) {
+		// 項目10: クリアからの復帰時、セッション終了・再認証セキュリティ演出
+		state_ = TitleState::ReAuthentication;
+		reauthTimer_ = 0.0f;
+		isRebootLog_ = false;
+	} else {
+		state_ = TitleState::DroneView;
+		isRebootLog_ = false;
+	}
+	// エントリ理由をリセット
+	GameResult::GetInstance().titleEntryReason = TitleEntryReason::InitialBoot;
+
 	stateTimer_ = 0.0f;
 	cutTimer_ = 0.0f;
 	cameraTheta_ = 0.0f;
@@ -924,6 +943,32 @@ void TitleScene::Update() {
 			postEffect->AddActiveEffect(noise);
 		}
 
+	} else if (state_ == TitleState::ReAuthentication) {
+		// 項目10: セッション終了・再認証セキュリティ演出の更新
+		SetCursorVisible(false);
+		reauthTimer_ += dt;
+
+		Input* input = Input::GetInstance();
+		bool clickTriggered = input->TriggerMouse(0) || ((::GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0 && !wasLButtonDown_);
+		wasLButtonDown_ = ((::GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0) || input->PushMouse(0);
+		bool skipTriggered = (input->TriggerKey(DIK_SPACE) || input->TriggerKey(DIK_RETURN) || clickTriggered);
+
+		if (skipTriggered || reauthTimer_ >= kReauthDuration) {
+			state_ = TitleState::Menu;
+			stateTimer_ = 0.0f;
+			menuEnterTimer_ = kMenuEnterDuration;
+			SetCursorVisible(true);
+			if (CurrentLocation().id == TitleLocation::CrashedForest) {
+				ChangeLocation(0);
+			}
+		}
+
+		if (consoleBgSprite_) {
+			consoleBgSprite_->Update();
+		}
+		backgroundPanel_.SetBackgroundColor({ 0.0f, 0.0f, 0.0f, 1.0f });
+		backgroundPanel_.Update();
+
 	} else if (state_ == TitleState::Menu) {
 		SetCursorVisible(false); // OS標準白カーソルを非表示にし、サイバーグリーンの専用タクティカルポインターを表示（項目5）
 		if (menuEnterTimer_ > 0.0f) {
@@ -1101,8 +1146,8 @@ void TitleScene::Update() {
 		} else {
 			// 黒フェードアウト進行に伴う減光処理
 			float fadeProgress = 0.0f;
-			if (sortieTimer_ > 1.25f) {
-				fadeProgress = std::clamp((sortieTimer_ - 1.25f) / (kSortieDuration - 1.25f), 0.0f, 1.0f);
+			if (sortieTimer_ > 1.65f) {
+				fadeProgress = std::clamp((sortieTimer_ - 1.65f) / (kSortieDuration - 1.65f), 0.0f, 1.0f);
 			}
 			float fadeMult = 1.0f - fadeProgress * 0.75f;
 
@@ -1947,8 +1992,33 @@ void TitleScene::DrawMenuCard() {
 		DrawOSRect({ consoleX + 2.0f, consoleY + 2.0f }, { consoleW - 4.0f, 28.0f }, { 0.04f, 0.18f, 0.09f, 0.95f });
 		tr->Print("HackGen", "[ ! ] COMBAT SORTIE INITIATED [ ! ]", consoleX + consoleW * 0.5f, consoleY + 7.0f, 13.0f, panelBorder, { 0.5f, 0.0f });
 
-		// 3. カタパルトチャージプログレスバー
-		float catProgress = (std::min)(1.0f, sortieTimer_ / 1.10f);
+		// 3. カタパルトチャージプログレスバー（項目3: 負荷タメ・認証停滞の緩急カーブ）
+		float catProgress = 0.0f;
+		if (sortieTimer_ < 0.40f) {
+			// 急速初期チャージ (0% -> 38%)
+			float t = sortieTimer_ / 0.40f;
+			catProgress = (1.0f - std::pow(1.0f - t, 2.0f)) * 0.38f;
+		} else if (sortieTimer_ < 0.75f) {
+			// 負荷タメ・蒸気圧充填停滞 (38% -> 42% で一瞬停滞！)
+			float t = (sortieTimer_ - 0.40f) / 0.35f;
+			catProgress = 0.38f + t * 0.04f;
+		} else if (sortieTimer_ < 1.30f) {
+			// 一気にチャージ上昇 (42% -> 89%)
+			float t = (sortieTimer_ - 0.75f) / 0.55f;
+			catProgress = 0.42f + (t * t * (3.0f - 2.0f * t)) * 0.47f;
+		} else if (sortieTimer_ < 1.60f) {
+			// インターロック解除待ちのタメ (89% -> 91% で一瞬停滞！)
+			float t = (sortieTimer_ - 1.30f) / 0.30f;
+			catProgress = 0.89f + t * 0.02f;
+		} else if (sortieTimer_ < 1.75f) {
+			// 100%突破！ (91% -> 100% 一気に完了！)
+			float t = (sortieTimer_ - 1.60f) / 0.15f;
+			catProgress = 0.91f + (1.0f - std::pow(1.0f - t, 3.0f)) * 0.09f;
+		} else {
+			catProgress = 1.0f;
+		}
+		catProgress = std::clamp(catProgress, 0.0f, 1.0f);
+
 		float barY = consoleY + 40.0f;
 		tr->Print("HackGen", "CATAPULT CHARGE :", consoleX + 16.0f, barY, 11.0f, { 0.35f, 0.85f, 0.55f, 0.90f });
 		char catBuf[32];
@@ -1974,19 +2044,19 @@ void TitleScene::DrawMenuCard() {
 			tr->Print("HackGen", "[0x0400] UPLINK TO MiG-21 AVIONICS... [ONLINE]", consoleX + 18.0f, logY, 11.0f, greenLog);
 			logY += lineGap;
 		}
-		if (sortieTimer_ >= 0.35f) {
+		if (sortieTimer_ >= 0.40f) {
 			tr->Print("HackGen", "[0x0420] STEAM PRESSURE: 24.8 MPa [NOMINAL]", consoleX + 18.0f, logY, 11.0f, greenLog);
 			logY += lineGap;
 		}
-		if (sortieTimer_ >= 0.65f) {
+		if (sortieTimer_ >= 0.80f) {
 			tr->Print("HackGen", "[0x0450] WEAPONS ARMED: 20MM CANNON + R-60M", consoleX + 18.0f, logY, 11.0f, greenLog);
 			logY += lineGap;
 		}
-		if (sortieTimer_ >= 0.90f) {
+		if (sortieTimer_ >= 1.30f) {
 			tr->Print("HackGen", "[0x0480] CANOPY LOCKED // CLEAR FOR TAKEOFF", consoleX + 18.0f, logY, 11.0f, greenLog);
 			logY += lineGap;
 		}
-		if (sortieTimer_ >= 1.15f) {
+		if (sortieTimer_ >= 1.70f) {
 			tr->Print("HackGen", ">>> AFTERBURNER IGNITION // LAUNCH >>>", consoleX + consoleW * 0.5f, logY + 4.0f, 12.5f, goldLog, { 0.5f, 0.0f });
 		}
 
@@ -2640,33 +2710,64 @@ void TitleScene::DrawConsoleBoot() {
 	const MyMath::Vector4 greenCol = { 0.20f, 0.95f, 0.45f, 0.96f * textAlpha };
 	const MyMath::Vector4 cyanCol  = { 0.25f, 0.90f, 1.0f, 0.90f * textAlpha };
 
-	// ターミナルヘッダー
-	tr->Print("HackGen", glitchText("/// TACTICAL DEFENSE MAINFRAME // SECURE TERMINAL v4.12 ///"), startX, currentY, 15.0f, cyanCol);
-	currentY += 34.0f;
-	tr->Print("HackGen", glitchText("==================================================================="), startX, currentY, 12.0f, { 0.18f, 0.70f, 0.40f, 0.45f * textAlpha });
-	currentY += 24.0f;
+	if (isRebootLog_) {
+		// 項目8: ゲームオーバーからの復旧ログ（敗北からの復旧プロセス）
+		tr->Print("HackGen", glitchText("/// DAWN-OS KERNEL REBOOT SEQUENCE // EMERGENCY RECOVERY ///"), startX, currentY, 15.0f, { 1.0f, 0.40f, 0.35f, 0.95f * textAlpha });
+		currentY += 34.0f;
+		tr->Print("HackGen", glitchText("==================================================================="), startX, currentY, 12.0f, { 0.8f, 0.3f, 0.2f, 0.45f * textAlpha });
+		currentY += 24.0f;
 
-	if (consoleBootTimer_ >= 0.06f) {
-		tr->Print("HackGen", glitchText("[0x0040] BOOT_SEQ: INITIATING TACTICAL SUBSYSTEMS... OK"), startX, currentY, fontSize, greenCol);
-		currentY += 32.0f;
-	}
-	if (consoleBootTimer_ >= 0.28f) {
-		tr->Print("HackGen", glitchText("[0x008A] SCAN_FEED: ACQUIRING 3-AXIS DRONE TELEMETRY... [ONLINE]"), startX, currentY, fontSize, greenCol);
-		currentY += 32.0f;
-	}
-	if (consoleBootTimer_ >= 0.58f) {
-		tr->Print("HackGen", glitchText("[0x012F] MOUNT_FS : OPERATION DIRECTIVE 'DAWN' DATABASE... OK"), startX, currentY, fontSize, greenCol);
-		currentY += 32.0f;
-	}
-	if (consoleBootTimer_ >= 0.90f) {
-		bool blink = (std::fmod(consoleBootTimer_, 0.20f) < 0.10f);
-		std::string passLine = "root@dawn-core:~$ ./authenticate_sortie --key **********";
-		if (blink) { passLine += " _"; }
-		tr->Print("HackGen", glitchText(passLine), startX, currentY, fontSize, { 0.35f, 1.0f, 0.55f, 1.0f * textAlpha });
-		currentY += 38.0f;
-	}
-	if (consoleBootTimer_ >= 1.20f) {
-		tr->Print("HackGen", glitchText(">> [ ACCESS GRANTED : WELCOME TO THE COMBAT ZONE ] <<"), startX, currentY, 20.0f, { 1.0f, 0.92f, 0.25f, 0.95f * textAlpha });
+		if (consoleBootTimer_ >= 0.06f) {
+			tr->Print("HackGen", glitchText("[0x0010] KERNEL_REBOOT : CLEARING CRASH EXCEPTION STACK... [OK]"), startX, currentY, fontSize, greenCol);
+			currentY += 32.0f;
+		}
+		if (consoleBootTimer_ >= 0.28f) {
+			tr->Print("HackGen", glitchText("[0x005A] SYSTEM_RESTORE: RESTORING FLIGHT AVIONICS SUBSYSTEMS... [OK]"), startX, currentY, fontSize, greenCol);
+			currentY += 32.0f;
+		}
+		if (consoleBootTimer_ >= 0.58f) {
+			tr->Print("HackGen", glitchText("[0x011B] RECOVERY_DAEMON: RELOADING SECURE OPERATING CONSOLE... [OK]"), startX, currentY, fontSize, greenCol);
+			currentY += 32.0f;
+		}
+		if (consoleBootTimer_ >= 0.90f) {
+			bool blink = (std::fmod(consoleBootTimer_, 0.20f) < 0.10f);
+			std::string passLine = "root@dawn-core:~$ ./restore_session --mode reboot_complete";
+			if (blink) { passLine += " _"; }
+			tr->Print("HackGen", glitchText(passLine), startX, currentY, fontSize, { 0.35f, 1.0f, 0.55f, 1.0f * textAlpha });
+			currentY += 38.0f;
+		}
+		if (consoleBootTimer_ >= 1.20f) {
+			tr->Print("HackGen", glitchText(">> [ SYSTEM REBOOT COMPLETE : RETURNING TO MAIN MENU ] <<"), startX, currentY, 20.0f, { 0.40f, 1.0f, 0.65f, 0.95f * textAlpha });
+		}
+	} else {
+		// 通常の初回起動ログ
+		tr->Print("HackGen", glitchText("/// TACTICAL DEFENSE MAINFRAME // SECURE TERMINAL v4.12 ///"), startX, currentY, 15.0f, cyanCol);
+		currentY += 34.0f;
+		tr->Print("HackGen", glitchText("==================================================================="), startX, currentY, 12.0f, { 0.18f, 0.70f, 0.40f, 0.45f * textAlpha });
+		currentY += 24.0f;
+
+		if (consoleBootTimer_ >= 0.06f) {
+			tr->Print("HackGen", glitchText("[0x0040] BOOT_SEQ: INITIATING TACTICAL SUBSYSTEMS... OK"), startX, currentY, fontSize, greenCol);
+			currentY += 32.0f;
+		}
+		if (consoleBootTimer_ >= 0.28f) {
+			tr->Print("HackGen", glitchText("[0x008A] SCAN_FEED: ACQUIRING 3-AXIS DRONE TELEMETRY... [ONLINE]"), startX, currentY, fontSize, greenCol);
+			currentY += 32.0f;
+		}
+		if (consoleBootTimer_ >= 0.58f) {
+			tr->Print("HackGen", glitchText("[0x012F] MOUNT_FS : OPERATION DIRECTIVE 'DAWN' DATABASE... OK"), startX, currentY, fontSize, greenCol);
+			currentY += 32.0f;
+		}
+		if (consoleBootTimer_ >= 0.90f) {
+			bool blink = (std::fmod(consoleBootTimer_, 0.20f) < 0.10f);
+			std::string passLine = "root@dawn-core:~$ ./authenticate_sortie --key **********";
+			if (blink) { passLine += " _"; }
+			tr->Print("HackGen", glitchText(passLine), startX, currentY, fontSize, { 0.35f, 1.0f, 0.55f, 1.0f * textAlpha });
+			currentY += 38.0f;
+		}
+		if (consoleBootTimer_ >= 1.20f) {
+			tr->Print("HackGen", glitchText(">> [ ACCESS GRANTED : WELCOME TO THE COMBAT ZONE ] <<"), startX, currentY, 20.0f, { 1.0f, 0.92f, 0.25f, 0.95f * textAlpha });
+		}
 	}
 
 	// 画面下部にスキップ案内
@@ -2718,6 +2819,103 @@ void TitleScene::DrawSortieSequence() {
 	}
 }
 
+// ------------------------------------------------------------
+// 項目10: セッション終了・再認証セキュリティ演出描画
+// ------------------------------------------------------------
+void TitleScene::DrawReAuthentication() {
+	if (consoleBgSprite_) {
+		consoleBgSprite_->Draw();
+	}
+	backgroundPanel_.SetBackgroundColor({ 0.0f, 0.0f, 0.0f, 1.0f });
+	backgroundPanel_.Draw();
+
+	TextRenderer* tr = TextRenderer::GetInstance();
+	float centerX = kScreenWidth * 0.5f;
+	float centerY = kScreenHeight * 0.5f;
+
+	// タイトル
+	tr->Print(
+		"HackGen",
+		"[ SESSION CLOSED. RE-AUTHENTICATION REQUIRED ]",
+		centerX,
+		centerY - 100.0f,
+		28.0f,
+		{ 1.0f, 0.35f, 0.35f, 0.95f },
+		{ 0.5f, 0.0f }
+	);
+
+	tr->Print(
+		"HackGen",
+		"(セッション終了。再認証が必要です)",
+		centerX,
+		centerY - 60.0f,
+		18.0f,
+		{ 0.85f, 0.85f, 0.85f, 0.85f },
+		{ 0.5f, 0.0f }
+	);
+
+	// ユーザー名
+	if (reauthTimer_ >= 0.35f) {
+		tr->Print(
+			"HackGen",
+			"USER IDENTITY: PILOT_01 // LEVEL-4 SECURITY CLEARANCE",
+			centerX,
+			centerY - 10.0f,
+			18.0f,
+			{ 0.30f, 0.90f, 0.60f, 0.90f },
+			{ 0.5f, 0.0f }
+		);
+	}
+
+	// 自動パスワード入力 (0.7s〜1.4s で ***** が1文字ずつ打たれる)
+	if (reauthTimer_ >= 0.70f) {
+		float pwTime = reauthTimer_ - 0.70f;
+		int starCount = std::clamp(static_cast<int>(pwTime / 0.12f), 0, 5);
+		std::string stars(starCount, '*');
+
+		bool blink = (std::fmod(reauthTimer_, 0.20f) < 0.10f);
+		std::string passDisplay = "PASSWORD: [ " + stars;
+		if (starCount < 5 && blink) {
+			passDisplay += "_";
+		}
+		passDisplay += " ]";
+
+		tr->Print(
+			"HackGen",
+			passDisplay.c_str(),
+			centerX,
+			centerY + 30.0f,
+			22.0f,
+			{ 0.25f, 1.0f, 0.55f, 1.0f },
+			{ 0.5f, 0.0f }
+		);
+	}
+
+	// 認証成功表示 (1.5s以降)
+	if (reauthTimer_ >= 1.50f) {
+		tr->Print(
+			"HackGen",
+			">> [ AUTHENTICATION SUCCESSFUL. WELCOME BACK ] <<",
+			centerX,
+			centerY + 75.0f,
+			20.0f,
+			{ 1.0f, 0.90f, 0.30f, 1.0f },
+			{ 0.5f, 0.0f }
+		);
+	}
+
+	// スキップ案内
+	tr->Print(
+		"HackGen",
+		"[ PRESS SPACE OR CLICK TO SKIP ]",
+		centerX,
+		kScreenHeight - 50.0f,
+		14.0f,
+		{ 0.5f, 0.7f, 0.6f, 0.6f },
+		{ 0.5f, 0.5f }
+	);
+}
+
 void TitleScene::DrawUI() {
 	if (state_ == TitleState::DroneView) {
 		DrawOSD();
@@ -2734,6 +2932,8 @@ void TitleScene::DrawUI() {
 		DrawWindowClose();
 	} else if (state_ == TitleState::ConsoleBoot) {
 		DrawConsoleBoot();
+	} else if (state_ == TitleState::ReAuthentication) {
+		DrawReAuthentication();
 	} else if (state_ == TitleState::Menu) {
 		// 背景オーバーレイ
 		backgroundPanel_.Draw();
