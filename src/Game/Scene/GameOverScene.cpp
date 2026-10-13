@@ -417,7 +417,11 @@ void GameOverScene::Update() {
 		titleButton_.SetPosition({ b2X, btnY });
 		titleButton_.Update();
 
-		gameOverText_.SetPosition({ w0->pos.x + w0->size.x * 0.5f, w0->pos.y + 48.0f });
+		// 完成形の文字列幅を基準に左端を決定（タイピング中も文字位置がずれないよう左上アンカーで固定）
+		Vector2 fullHeaderSize = TextRenderer::GetInstance()->CalculateTextSize(
+			gameOverText_.GetFontName(), fullHeader, gameOverText_.GetFontSize());
+		gameOverText_.SetAnchorPoint({ 0.0f, 0.0f });
+		gameOverText_.SetPosition({ w0->pos.x + (w0->size.x - fullHeaderSize.x) * 0.5f, w0->pos.y + 48.0f });
 		gameOverText_.Update();
 	}
 
