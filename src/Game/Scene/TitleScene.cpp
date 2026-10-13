@@ -2711,32 +2711,61 @@ void TitleScene::DrawConsoleBoot() {
 	const MyMath::Vector4 cyanCol  = { 0.25f, 0.90f, 1.0f, 0.90f * textAlpha };
 
 	if (isRebootLog_) {
-		// 項目8: ゲームオーバーからの復旧ログ（敗北からの復旧プロセス）
+		// 項目8: ゲームオーバーからの復旧ログ（各項目の[OK]が順に点灯するタメの演出）
 		tr->Print("HackGen", glitchText("/// DAWN-OS KERNEL REBOOT SEQUENCE // EMERGENCY RECOVERY ///"), startX, currentY, 15.0f, { 1.0f, 0.40f, 0.35f, 0.95f * textAlpha });
 		currentY += 34.0f;
 		tr->Print("HackGen", glitchText("==================================================================="), startX, currentY, 12.0f, { 0.8f, 0.3f, 0.2f, 0.45f * textAlpha });
 		currentY += 24.0f;
 
-		if (consoleBootTimer_ >= 0.06f) {
-			tr->Print("HackGen", glitchText("[0x0010] KERNEL_REBOOT : CLEARING CRASH EXCEPTION STACK... [OK]"), startX, currentY, fontSize, greenCol);
+		// 項目1: 0.10s〜 開始、0.48s で [OK] 点灯
+		if (consoleBootTimer_ >= 0.10f) {
+			bool ok1 = (consoleBootTimer_ >= 0.48f);
+			if (ok1) {
+				tr->Print("HackGen", glitchText("[0x0010] KERNEL_REBOOT : CLEARING CRASH EXCEPTION STACK... [OK]"), startX, currentY, fontSize, greenCol);
+			} else {
+				bool blink = (std::fmod(consoleBootTimer_, 0.16f) < 0.08f);
+				std::string line = "[0x0010] KERNEL_REBOOT : CLEARING CRASH EXCEPTION STACK...";
+				if (blink) line += " _";
+				tr->Print("HackGen", glitchText(line), startX, currentY, fontSize, { 1.0f, 0.85f, 0.30f, 0.92f * textAlpha });
+			}
 			currentY += 32.0f;
 		}
-		if (consoleBootTimer_ >= 0.28f) {
-			tr->Print("HackGen", glitchText("[0x005A] SYSTEM_RESTORE: RESTORING FLIGHT AVIONICS SUBSYSTEMS... [OK]"), startX, currentY, fontSize, greenCol);
-			currentY += 32.0f;
-		}
+		// 項目2: 0.58s〜 開始、0.98s で [OK] 点灯
 		if (consoleBootTimer_ >= 0.58f) {
-			tr->Print("HackGen", glitchText("[0x011B] RECOVERY_DAEMON: RELOADING SECURE OPERATING CONSOLE... [OK]"), startX, currentY, fontSize, greenCol);
+			bool ok2 = (consoleBootTimer_ >= 0.98f);
+			if (ok2) {
+				tr->Print("HackGen", glitchText("[0x005A] SYSTEM_RESTORE: RESTORING FLIGHT AVIONICS SUBSYSTEMS... [OK]"), startX, currentY, fontSize, greenCol);
+			} else {
+				bool blink = (std::fmod(consoleBootTimer_, 0.16f) < 0.08f);
+				std::string line = "[0x005A] SYSTEM_RESTORE: RESTORING FLIGHT AVIONICS SUBSYSTEMS...";
+				if (blink) line += " _";
+				tr->Print("HackGen", glitchText(line), startX, currentY, fontSize, { 1.0f, 0.85f, 0.30f, 0.92f * textAlpha });
+			}
 			currentY += 32.0f;
 		}
-		if (consoleBootTimer_ >= 0.90f) {
+		// 項目3: 1.08s〜 開始、1.48s で [OK] 点灯
+		if (consoleBootTimer_ >= 1.08f) {
+			bool ok3 = (consoleBootTimer_ >= 1.48f);
+			if (ok3) {
+				tr->Print("HackGen", glitchText("[0x011B] RECOVERY_DAEMON: RELOADING SECURE OPERATING CONSOLE... [OK]"), startX, currentY, fontSize, greenCol);
+			} else {
+				bool blink = (std::fmod(consoleBootTimer_, 0.16f) < 0.08f);
+				std::string line = "[0x011B] RECOVERY_DAEMON: RELOADING SECURE OPERATING CONSOLE...";
+				if (blink) line += " _";
+				tr->Print("HackGen", glitchText(line), startX, currentY, fontSize, { 1.0f, 0.85f, 0.30f, 0.92f * textAlpha });
+			}
+			currentY += 32.0f;
+		}
+		// 項目4: 1.58s〜 コマンド印字
+		if (consoleBootTimer_ >= 1.58f) {
 			bool blink = (std::fmod(consoleBootTimer_, 0.20f) < 0.10f);
 			std::string passLine = "root@dawn-core:~$ ./restore_session --mode reboot_complete";
 			if (blink) { passLine += " _"; }
 			tr->Print("HackGen", glitchText(passLine), startX, currentY, fontSize, { 0.35f, 1.0f, 0.55f, 1.0f * textAlpha });
 			currentY += 38.0f;
 		}
-		if (consoleBootTimer_ >= 1.20f) {
+		// 項目5: 1.98s〜 完了アナウンス発光
+		if (consoleBootTimer_ >= 1.98f) {
 			tr->Print("HackGen", glitchText(">> [ SYSTEM REBOOT COMPLETE : RETURNING TO MAIN MENU ] <<"), startX, currentY, 20.0f, { 0.40f, 1.0f, 0.65f, 0.95f * textAlpha });
 		}
 	} else {
@@ -4485,43 +4514,76 @@ void TitleScene::DrawOSDesktop() {
 	TextRenderer* tr = TextRenderer::GetInstance();
 	osSpritePoolIdx_ = 0;
 
-	// 1. デスクトップ上部ヘッダー（OSウォーターマーク）
-	tr->Print("HackGen", "DAWN_OS TACTICAL DEFENSE MAINFRAME [v4.12.0]", 24.0f, 18.0f, 12.0f, { 0.30f, 0.85f, 0.50f, 0.70f });
-	tr->Print("HackGen", "CLEARANCE: LEVEL 5 // SECURE DESKTOP ENVIRONMENT", kScreenWidth - 380.0f, 18.0f, 11.5f, { 0.25f, 0.70f, 0.40f, 0.60f });
+	// 項目9: OSデスクトップ順次立ち上がり（Staggered Launch）進行度
+	// 0.0: ブート直後, 1.0: 立ち上がり完了
+	float enterProg = 1.0f;
+	if (menuEnterTimer_ > 0.0f) {
+		enterProg = std::clamp(1.0f - (menuEnterTimer_ / kMenuEnterDuration), 0.0f, 1.0f);
+	}
+
+	// 1. デスクトップ上部ヘッダー（OSウォーターマーク: enterProg 0.05f〜 でフェードイン）
+	if (enterProg >= 0.05f) {
+		float hAlpha = std::clamp((enterProg - 0.05f) / 0.25f, 0.0f, 1.0f);
+		tr->Print("HackGen", "DAWN_OS TACTICAL DEFENSE MAINFRAME [v4.12.0]", 24.0f, 18.0f, 12.0f, { 0.30f, 0.85f, 0.50f, 0.70f * hAlpha });
+		tr->Print("HackGen", "CLEARANCE: LEVEL 5 // SECURE DESKTOP ENVIRONMENT", kScreenWidth - 380.0f, 18.0f, 11.5f, { 0.25f, 0.70f, 0.40f, 0.60f * hAlpha });
+	}
 
 	tr->Flush(); // ヘッダーテキストを先に描画
 
 	// 2. ウィンドウ描画（最後にアクティブになったものを一番上に：windowZOrder_ 順に奥から手前へ描画）
-	// 各ウィンドウ直後に tr->Flush() を呼ぶことで、背後ウィンドウのテキストが手前のウィンドウの背景に透けるのを防止
-	// ※ Draw() はプールをリセットしてスプライト（定数バッファ）を使い回すため、フレーム途中では使用しないこと
+	// サブウィンドウは enterProg 0.20f〜、メインウィンドウは enterProg 0.32f〜 で立ち上がり
 	for (int winId : windowZOrder_) {
 		if (winId >= 0 && winId < static_cast<int>(osWindows_.size())) {
 			auto& win = osWindows_[winId];
 			if (winId == 0) {
-				if (win.isOpen && !win.isMinimized && win.animScale >= 0.01f) {
+				if (win.isOpen && !win.isMinimized && win.animScale >= 0.01f && enterProg >= 0.30f) {
 					DrawMenuCard();
 					tr->Flush(); // メインターミナルのテキストを描画
+
+					// 立ち上がり中のレーザースキャン枠アクセント
+					if (enterProg < 1.0f) {
+						float scanRatio = std::clamp((enterProg - 0.30f) / 0.70f, 0.0f, 1.0f);
+						float curH = 468.0f * scanRatio;
+						DrawOSBorder(menuWindowPos_, { 460.0f, curH }, { 0.45f, 1.0f, 0.70f, (1.0f - scanRatio) * 0.95f }, 2.0f);
+					}
 				}
 			} else if (winId == 1) {
-				DrawOSWindowCam(win);
-				tr->Flush(); // サブウィンドウ1のテキストを描画
+				if (enterProg >= 0.18f) {
+					DrawOSWindowCam(win);
+					tr->Flush(); // サブウィンドウ1のテキストを描画
+				}
 			} else if (winId == 2) {
-				DrawOSWindowTelemetry(win);
-				tr->Flush(); // サブウィンドウ2のテキストを描画
+				if (enterProg >= 0.24f) {
+					DrawOSWindowTelemetry(win);
+					tr->Flush(); // サブウィンドウ2のテキストを描画
+				}
 			}
 		}
 	}
 
 	// 3. デスクトップアイコン
-	DrawDesktopIcons();
-	tr->Flush();
+	if (enterProg >= 0.25f) {
+		DrawDesktopIcons();
+		tr->Flush();
+	}
 
-	// 4. タスクバー & スタートメニュー（ウィンドウの上に必ず重なる）
-	DrawOSTaskbar();
-	tr->Flush();
+	// 4. タスクバー & スタートメニュー（enterProg 0.10f〜 で立ち上がり）
+	if (enterProg >= 0.10f) {
+		DrawOSTaskbar();
+		tr->Flush();
+	}
 
-	// 5. ターミナルの色に合わせた緑色のカスタムカーソル（最前面）
-	DrawCustomCursor();
-	tr->Flush();
+	// 5. ターミナルの色に合わせた緑色のカスタムカーソル（最前面: enterProg 0.15f〜）
+	if (enterProg >= 0.15f) {
+		DrawCustomCursor();
+		tr->Flush();
+	}
+
+	// 起動時の短い立ち上がりHUDインジケーター（画面中央下に一瞬表示してフェード）
+	if (menuEnterTimer_ > 0.0f) {
+		float hudAlpha = (1.0f - enterProg);
+		tr->Print("HackGen", "[ DAWN-OS SUBSYSTEMS ONLINE ]", kScreenWidth * 0.5f, kScreenHeight - 65.0f, 13.0f, { 0.35f, 1.0f, 0.65f, 0.85f * hudAlpha }, { 0.5f, 0.5f });
+		tr->Flush();
+	}
 }
 

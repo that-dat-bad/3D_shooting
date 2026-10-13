@@ -40,7 +40,16 @@ private:
     float animTimer_ = 0.0f;
     float fadeInAlpha_ = 0.0f;         ///< フェードインの進行度
 
-    // 項目9: データアップロードとウィンドウ閉鎖シーケンス
+    // 項目14: 選択時のフィードバック演出（白反転フラッシュ＆波紋）
+    float btnClickFlashTimer_ = 0.0f;
+    int clickedButtonIdx_ = -1;        ///< 0: Replay, 1: Title
+
+    // 項目15: VHSテープのリワインド（巻き戻し）演出
+    bool isRewinding_ = false;
+    float rewindTimer_ = 0.0f;
+    static constexpr float kRewindDuration = 0.45f;
+
+    // 項目16, 17, 18: データアップロードとウィンドウ閉鎖シーケンス
     bool isUploading_ = false;
     float uploadTimer_ = 0.0f;
     std::unique_ptr<Sprite> uploadSprite_;

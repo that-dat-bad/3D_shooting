@@ -58,7 +58,7 @@ private:
 
 	// --- 出撃イントロ（AC6メインシステム戦闘モード起動シーケンス & カメラワーク）---
 	float sortieIntroTimer_ = 0.0f;
-	static constexpr float kSortieIntroDuration = CombatBootSequence::GetDuration();
+	float sortieIntroDuration_ = CombatBootSequence::GetDuration();
 	CombatBootSequence combatBootSequence_;
 
 	std::unique_ptr<Skybox> skybox_ = nullptr;

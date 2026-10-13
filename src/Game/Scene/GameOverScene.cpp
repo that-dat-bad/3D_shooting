@@ -30,18 +30,22 @@ void GameOverScene::Initialize() {
 	Input::GetInstance()->UnlockCursor();
 	selectionManager_.Clear();
 	animTimer_ = 0.0f;
-	fadeInAlpha_ = 0.0f;
+	fadeInAlpha_ = 0.75f; // 暗転の空白時間を完全排除し、瞬時に画面を展開
 	isRebooting_ = false;
 	rebootTimer_ = 0.0f;
 	dumpScrollIndex_ = 0;
 	dumpScrollTimer_ = 0.0f;
+	logDeployTimer_ = 0.0f;
+	visibleLogCount_ = 0;
+	isRetrying_ = false;
+	retryGlitchTimer_ = 0.0f;
 
 	SpriteCommon* spriteCommon = SpriteCommon::GetInstance();
 
 	// 必須テクスチャのロード
 	TextureManager::GetInstance()->LoadTexture("assets/textures/white1x1.png");
 
-	// 黒フェード用スプライト
+	// 黒フェード・CRT収束用スプライト
 	rebootBlackoutSprite_ = std::make_unique<Sprite>();
 	rebootBlackoutSprite_->Initialize(spriteCommon, "assets/textures/white1x1.png");
 	
@@ -85,9 +89,9 @@ void GameOverScene::Initialize() {
 	gameOverText_.SetColor({ 1.0f, 0.25f, 0.25f, 1.0f });
 
 	// ============================
-	// ボタン配置
+	// ボタン配置（ブラケット [ ] 付きハッカー風デザイン）
 	// ============================
-	float buttonWidth = 260.0f;
+	float buttonWidth = 270.0f;
 	float buttonHeight = 52.0f;
 	float buttonSpacing = 35.0f;
 	float buttonsStartY = kScreenHeight - 110.0f;
@@ -95,26 +99,32 @@ void GameOverScene::Initialize() {
 	float totalButtonsWidth = buttonWidth * 2.0f + buttonSpacing;
 	float leftButtonX = (kScreenWidth - totalButtonsWidth) * 0.5f;
 
-	retryButton_.Initialize(spriteCommon, "RETRY MISSION", 22.0f);
+	retryButton_.Initialize(spriteCommon, "[ RETRY MISSION ]", 22.0f);
 	retryButton_.SetPosition({ leftButtonX, buttonsStartY });
 	retryButton_.SetSize({ buttonWidth, buttonHeight });
 	retryButton_.SetNormalColor({ 0.28f, 0.05f, 0.05f, 0.90f });
-	retryButton_.SetHoverColor({ 0.55f, 0.12f, 0.12f, 0.98f });
-	retryButton_.SetSelectedColor({ 0.70f, 0.18f, 0.18f, 1.0f });
+	retryButton_.SetHoverColor({ 0.60f, 0.12f, 0.12f, 0.98f });
+	retryButton_.SetSelectedColor({ 0.75f, 0.18f, 0.18f, 1.0f });
 	retryButton_.SetOnClick([this]() {
-		sceneID = SCENE::STAGE;
+		if (!isRetrying_ && !isRebooting_) {
+			isRetrying_ = true;
+			retryGlitchTimer_ = 0.0f;
+			GameResult::GetInstance().isRetry = true;
+		}
 	});
 
 	// 項目8: TITLE ボタン押下時にリブートシーケンス開始
-	titleButton_.Initialize(spriteCommon, "REBOOT OS (TITLE)", 22.0f);
+	titleButton_.Initialize(spriteCommon, "[ REBOOT OS (TITLE) ]", 22.0f);
 	titleButton_.SetPosition({ leftButtonX + buttonWidth + buttonSpacing, buttonsStartY });
 	titleButton_.SetSize({ buttonWidth, buttonHeight });
 	titleButton_.SetNormalColor({ 0.28f, 0.05f, 0.05f, 0.90f });
-	titleButton_.SetHoverColor({ 0.55f, 0.12f, 0.12f, 0.98f });
-	titleButton_.SetSelectedColor({ 0.70f, 0.18f, 0.18f, 1.0f });
+	titleButton_.SetHoverColor({ 0.60f, 0.12f, 0.12f, 0.98f });
+	titleButton_.SetSelectedColor({ 0.75f, 0.18f, 0.18f, 1.0f });
 	titleButton_.SetOnClick([this]() {
-		isRebooting_ = true;
-		rebootTimer_ = 0.0f;
+		if (!isRebooting_ && !isRetrying_) {
+			isRebooting_ = true;
+			rebootTimer_ = 0.0f;
+		}
 	});
 
 	selectionManager_.AddButton(&retryButton_);
@@ -128,24 +138,40 @@ void GameOverScene::Initialize() {
 void GameOverScene::Update() {
 	animTimer_ += 1.0f / 60.0f;
 	
-	// フェードイン
+	// フェードイン（開始0.75から即座に1.0へ到達し空白を完全排除）
 	if (fadeInAlpha_ < 1.0f) {
-		fadeInAlpha_ += 0.04f;
+		fadeInAlpha_ += 0.15f;
 		if (fadeInAlpha_ > 1.0f) fadeInAlpha_ = 1.0f;
 	}
 
-	// 項目3: 16進数メモリダンプのリアルタイム高速スクロール
-	dumpScrollTimer_ += 1.0f / 60.0f;
-	if (dumpScrollTimer_ >= 0.035f) {
-		dumpScrollTimer_ = 0.0f;
-		dumpScrollIndex_ = (dumpScrollIndex_ + 1) % (std::max)(1, static_cast<int>(memoryDumpPool_.size()));
+	// 項目3: コンソール風ログ展開アニメーション（1行あたり0.055sで上から順にカタカタ印字）
+	if (visibleLogCount_ < 6) {
+		logDeployTimer_ += 1.0f / 60.0f;
+		if (logDeployTimer_ >= 0.055f) {
+			logDeployTimer_ = 0.0f;
+			visibleLogCount_++;
+		}
+	} else {
+		// 全6行展開完了後はリアルタイム高速スクロールへ移行
+		dumpScrollTimer_ += 1.0f / 60.0f;
+		if (dumpScrollTimer_ >= 0.040f) {
+			dumpScrollTimer_ = 0.0f;
+			dumpScrollIndex_ = (dumpScrollIndex_ + 1) % (std::max)(1, static_cast<int>(memoryDumpPool_.size()));
+		}
 	}
 
-	// 項目8: リブート演出進行（0.50秒でキビキビとタイトルへ復帰）
-	if (isRebooting_) {
+	// 項目2-1: リトライ時のホワイトノイズ＆グリッチトランジション（0.22sで単調なハードカットを打破）
+	if (isRetrying_) {
+		retryGlitchTimer_ += 1.0f / 60.0f;
+		if (retryGlitchTimer_ >= 0.22f) {
+			sceneID = SCENE::STAGE;
+			return;
+		}
+	}
+	// 項目3-1: リブート演出進行（SYSTEM REBOOTING... → ブラウン管画面収束でタイトルへ復帰）
+	else if (isRebooting_) {
 		rebootTimer_ += 1.0f / 60.0f;
-		if (rebootTimer_ >= 0.50f) {
-			// タイトルシーンへ「RebootFromGameOver」理由で遷移！
+		if (rebootTimer_ >= 0.65f) {
 			GameResult::GetInstance().titleEntryReason = TitleEntryReason::RebootFromGameOver;
 			sceneID = SCENE::TITLE;
 			return;
@@ -159,6 +185,8 @@ void GameOverScene::Update() {
 #ifdef USE_IMGUI
 	ImGui::Begin("GAME OVER SCENE DEBUG");
 	ImGui::Text("AnimTimer: %.2f", animTimer_);
+	ImGui::Text("VisibleLogs: %d/6", visibleLogCount_);
+	ImGui::Text("Retrying: %s (%.2f)", isRetrying_ ? "YES" : "NO", retryGlitchTimer_);
 	ImGui::Text("Rebooting: %s (%.2f)", isRebooting_ ? "YES" : "NO", rebootTimer_);
 	ImGui::End();
 #endif
@@ -185,27 +213,47 @@ void GameOverScene::DrawUI() {
 	// メインタイトル
 	gameOverText_.Draw();
 
-	// 項目3: 16進数メモリエラーログ（6行に厳選してDrawCallオーバーヘッドを劇的削減）
+	// 項目3: 16進数メモリエラーログ（コンソール風順次展開 & 印字中カーソル点滅）
 	float dumpStartX = 120.0f;
 	float dumpStartY = 160.0f;
-	int displayLineCount = 6;
+	int displayLineCount = visibleLogCount_; // 展開された行数のみ描画
 
 	for (int i = 0; i < displayLineCount; ++i) {
 		int idx = (dumpScrollIndex_ + i) % static_cast<int>(memoryDumpPool_.size());
 		float lineY = dumpStartY + i * 28.0f;
 
-		float lineAlpha = 0.90f - (static_cast<float>(i) / static_cast<float>(displayLineCount)) * 0.25f;
+		float lineAlpha = 0.90f - (static_cast<float>(i) / 6.0f) * 0.20f;
 		Vector4 textColor = (i == 0 || i == 3)
 			? Vector4{ 1.0f, 0.90f, 0.40f, lineAlpha }  // 警告行
 			: Vector4{ 0.95f, 0.35f, 0.35f, lineAlpha }; // 通常赤行
 
+		std::string lineStr = memoryDumpPool_[idx];
+		// まだ全展開中で末尾の行の場合、打鍵中カーソル _ を点滅表示
+		if (visibleLogCount_ < 6 && i == visibleLogCount_ - 1) {
+			lineStr += "_";
+		}
+
 		TextRenderer::GetInstance()->Print(
 			"HackGen",
-			memoryDumpPool_[idx].c_str(),
+			lineStr.c_str(),
 			dumpStartX,
 			lineY,
 			16.0f,
 			textColor
+		);
+	}
+
+	// 展開中にも最下行に点滅カーソル
+	if (visibleLogCount_ < 6) {
+		float nextY = dumpStartY + visibleLogCount_ * 28.0f;
+		float cursorPulse = (std::fmod(animTimer_, 0.20f) < 0.10f) ? 1.0f : 0.0f;
+		TextRenderer::GetInstance()->Print(
+			"HackGen",
+			"> _",
+			dumpStartX,
+			nextY,
+			16.0f,
+			{ 1.0f, 0.60f, 0.60f, cursorPulse }
 		);
 	}
 
@@ -214,7 +262,7 @@ void GameOverScene::DrawUI() {
 		"HackGen",
 		"----------------------------------------------------------------",
 		kScreenWidth * 0.5f,
-		dumpStartY + displayLineCount * 28.0f + 8.0f,
+		dumpStartY + 6 * 28.0f + 8.0f,
 		14.0f,
 		{ 0.70f, 0.20f, 0.20f, 0.80f },
 		{ 0.5f, 0.0f }
@@ -236,37 +284,128 @@ void GameOverScene::DrawUI() {
 	titleButton_.Draw();
 
 	// ------------------------------------------------------------
-	// 項目8: システム再起動（リブート）演出オーバーレイ
+	// 項目2-1: リトライ時のホワイトノイズ＆グリッチトランジション（0.22秒）
+	// 単調なハードカットを排除し、ミリタリー端末の走査線リブートを表現
 	// ------------------------------------------------------------
-	if (isRebooting_ && rebootBlackoutSprite_) {
-		float blackAlpha = (std::min)(1.0f, rebootTimer_ / 0.35f);
+	if (isRetrying_ && rebootBlackoutSprite_) {
+		float flashAlpha = 0.5f + 0.5f * std::sin(retryGlitchTimer_ * 60.0f);
+		rebootBlackoutSprite_->SetBlendMode(BlendMode::kAdd);
 		rebootBlackoutSprite_->SetPosition({ 0.0f, 0.0f });
 		rebootBlackoutSprite_->SetSize({ kScreenWidth, kScreenHeight });
-		rebootBlackoutSprite_->SetColor({ 0.0f, 0.0f, 0.0f, blackAlpha });
+		rebootBlackoutSprite_->SetColor({ 0.9f, 0.95f, 1.0f, flashAlpha * 0.40f });
 		rebootBlackoutSprite_->Update();
 		rebootBlackoutSprite_->Draw();
 
-		// SYSTEM REBOOTING... 点滅テキスト
-		float pulse = 0.7f + 0.3f * std::sin(rebootTimer_ * 30.0f);
-		TextRenderer::GetInstance()->Print(
-			"HackGen",
-			"SYSTEM REBOOTING...",
-			kScreenWidth * 0.5f,
-			kScreenHeight * 0.5f - 20.0f,
-			32.0f,
-			{ 1.0f, 0.95f, 0.95f, pulse },
-			{ 0.5f, 0.5f }
-		);
+		// ランダムグリッチバー
+		rebootBlackoutSprite_->SetBlendMode(BlendMode::kNormal);
+		float gY = std::fmod(retryGlitchTimer_ * 1200.0f, kScreenHeight);
+		rebootBlackoutSprite_->SetPosition({ 0.0f, gY });
+		rebootBlackoutSprite_->SetSize({ kScreenWidth, 30.0f });
+		rebootBlackoutSprite_->SetColor({ 0.0f, 0.0f, 0.0f, 0.85f });
+		rebootBlackoutSprite_->Update();
+		rebootBlackoutSprite_->Draw();
 
 		TextRenderer::GetInstance()->Print(
 			"HackGen",
-			"INITIALIZING HARDWARE RESTORE SEQUENCE",
+			">> RAPID RE-ENGAGE SEQUENCE INITIATED <<",
 			kScreenWidth * 0.5f,
-			kScreenHeight * 0.5f + 25.0f,
-			16.0f,
-			{ 0.75f, 0.75f, 0.80f, 0.85f },
+			kScreenHeight * 0.5f,
+			28.0f,
+			{ 1.0f, 0.9f, 0.9f, 0.95f },
 			{ 0.5f, 0.5f }
 		);
+	}
+
+	// ------------------------------------------------------------
+	// 項目3-1: システム再起動（リブート）演出オーバーレイ & ブラウン管電源遮断トランジション
+	// 0:37の唐突な暗転カットを打破し、画面が水平収束してプツッと消える美しい演出
+	// ------------------------------------------------------------
+	if (isRebooting_ && rebootBlackoutSprite_) {
+		if (rebootTimer_ < 0.35f) {
+			// Phase 1 (0.00〜0.35s): SYSTEM REBOOTING... 点滅ダイアログ
+			float blackAlpha = (std::min)(0.80f, rebootTimer_ / 0.20f);
+			rebootBlackoutSprite_->SetBlendMode(BlendMode::kNormal);
+			rebootBlackoutSprite_->SetPosition({ 0.0f, 0.0f });
+			rebootBlackoutSprite_->SetSize({ kScreenWidth, kScreenHeight });
+			rebootBlackoutSprite_->SetColor({ 0.0f, 0.0f, 0.0f, blackAlpha });
+			rebootBlackoutSprite_->Update();
+			rebootBlackoutSprite_->Draw();
+
+			float pulse = 0.7f + 0.3f * std::sin(rebootTimer_ * 30.0f);
+			TextRenderer::GetInstance()->Print(
+				"HackGen",
+				"SYSTEM REBOOTING...",
+				kScreenWidth * 0.5f,
+				kScreenHeight * 0.5f - 20.0f,
+				32.0f,
+				{ 1.0f, 0.95f, 0.95f, pulse },
+				{ 0.5f, 0.5f }
+			);
+
+			TextRenderer::GetInstance()->Print(
+				"HackGen",
+				"INITIALIZING HARDWARE RESTORE SEQUENCE",
+				kScreenWidth * 0.5f,
+				kScreenHeight * 0.5f + 25.0f,
+				16.0f,
+				{ 0.75f, 0.75f, 0.80f, 0.85f },
+				{ 0.5f, 0.5f }
+			);
+		} else {
+			// Phase 2 (0.35〜0.65s): ブラウン管テレビ電源遮断（CRT収束・プツッ消滅）トランジション！
+			float crtT = std::clamp((rebootTimer_ - 0.35f) / 0.30f, 0.0f, 1.0f);
+			float centerY = kScreenHeight * 0.5f;
+			float centerX = kScreenWidth * 0.5f;
+
+			rebootBlackoutSprite_->SetBlendMode(BlendMode::kNormal);
+
+			if (crtT < 0.65f) {
+				// 上下から黒マスク収束
+				float p = crtT / 0.65f;
+				float collapse = 1.0f - std::pow(1.0f - p, 3.0f);
+				float halfH = (kScreenHeight * 0.5f) * (1.0f - collapse);
+				if (halfH < 2.0f) halfH = 2.0f;
+
+				rebootBlackoutSprite_->SetColor({ 0.0f, 0.0f, 0.0f, 1.0f });
+				// 上
+				rebootBlackoutSprite_->SetPosition({ 0.0f, 0.0f });
+				rebootBlackoutSprite_->SetSize({ kScreenWidth, centerY - halfH });
+				rebootBlackoutSprite_->Update(); rebootBlackoutSprite_->Draw();
+				// 下
+				rebootBlackoutSprite_->SetPosition({ 0.0f, centerY + halfH });
+				rebootBlackoutSprite_->SetSize({ kScreenWidth, kScreenHeight - (centerY + halfH) });
+				rebootBlackoutSprite_->Update(); rebootBlackoutSprite_->Draw();
+
+				// 中央発光水平線
+				rebootBlackoutSprite_->SetBlendMode(BlendMode::kAdd);
+				rebootBlackoutSprite_->SetPosition({ 0.0f, centerY - 2.0f });
+				rebootBlackoutSprite_->SetSize({ kScreenWidth, 4.0f });
+				rebootBlackoutSprite_->SetColor({ 0.85f, 0.95f, 1.0f, 0.95f });
+				rebootBlackoutSprite_->Update(); rebootBlackoutSprite_->Draw();
+			} else if (crtT < 0.90f) {
+				// 水平線が左右から中央へ収縮
+				float p = (crtT - 0.65f) / 0.25f;
+				float shrink = 1.0f - p;
+				float halfW = (kScreenWidth * 0.5f) * shrink;
+
+				rebootBlackoutSprite_->SetPosition({ 0.0f, 0.0f });
+				rebootBlackoutSprite_->SetSize({ kScreenWidth, kScreenHeight });
+				rebootBlackoutSprite_->SetColor({ 0.0f, 0.0f, 0.0f, 1.0f });
+				rebootBlackoutSprite_->Update(); rebootBlackoutSprite_->Draw();
+
+				rebootBlackoutSprite_->SetBlendMode(BlendMode::kAdd);
+				rebootBlackoutSprite_->SetPosition({ centerX - halfW, centerY - 2.5f });
+				rebootBlackoutSprite_->SetSize({ halfW * 2.0f, 5.0f });
+				rebootBlackoutSprite_->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
+				rebootBlackoutSprite_->Update(); rebootBlackoutSprite_->Draw();
+			} else {
+				// プツッと極小光点が消滅
+				rebootBlackoutSprite_->SetPosition({ 0.0f, 0.0f });
+				rebootBlackoutSprite_->SetSize({ kScreenWidth, kScreenHeight });
+				rebootBlackoutSprite_->SetColor({ 0.0f, 0.0f, 0.0f, 1.0f });
+				rebootBlackoutSprite_->Update(); rebootBlackoutSprite_->Draw();
+			}
+		}
 	}
 }
 

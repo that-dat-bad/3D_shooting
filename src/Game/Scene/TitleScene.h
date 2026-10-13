@@ -56,14 +56,14 @@ private:
 	std::vector<std::unique_ptr<Sprite>> windowCloseMaskSprites_;   ///< 最小化時の外側4黒マスク
 	std::vector<std::unique_ptr<Sprite>> windowCloseBorderSprites_; ///< 最小化ウィンドウのOSタイトルバー＆サイバー枠線
 	float consoleBootTimer_ = 0.0f;     ///< クリック後のハッカー風コンソール演出タイマー
-	static constexpr float kConsoleBootDuration = 1.45f; ///< 味わい深く読めるタイピング速度
+	static constexpr float kConsoleBootDuration = 2.40f; ///< 各項目[OK]点灯のタメを味わえるタイピング速度
 	bool isRebootLog_ = false;          ///< 項目8: ゲームオーバーからの復旧ログ表示フラグ
 	float reauthTimer_ = 0.0f;          ///< 項目10: 再認証演出タイマー
 	static constexpr float kReauthDuration = 2.20f;
 	float consoleExitTimer_ = 0.0f;     ///< コンソールからメニューへのスムーズな接続アニメーションタイマー
 	static constexpr float kConsoleExitDuration = 0.32f; ///< サイバーグリッチ遷移
 	float menuEnterTimer_ = 0.0f;       ///< メニュー展開トランジションタイマー
-	static constexpr float kMenuEnterDuration = 0.30f;   ///< UI形成レーザースキャン
+	static constexpr float kMenuEnterDuration = 0.50f;   ///< OSデスクトップ順次立ち上がり（Staggered Launch）時間
 	float sortieTimer_ = 0.0f;          ///< 出撃シーケンスタイマー（項目1, 2, 3）
 	static constexpr float kSortieDuration = 2.40f;      ///< 出撃シーケンスの総時間（負荷タメ・認証停滞の緩急付き）
 	std::unique_ptr<Sprite> sortieFlashSprite_;          ///< 出撃トランジション用ブラックアウト（黒フェード）

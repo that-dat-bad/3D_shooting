@@ -46,12 +46,12 @@ void ClearScene::Initialize() {
 	backgroundPanel_.SetBackgroundColor({ 0.01f, 0.02f, 0.05f, 0.90f });
 
 	// ============================
-	// 「MISSION COMPLETE」テキスト
+	// 「MISSION COMPLETE」テキスト（項目12: タクティカル・ネオングリーンに統一）
 	// ============================
 	missionCompleteText_.Initialize("HackGen", "MISSION COMPLETE", 56.0f);
 	missionCompleteText_.SetAnchorPoint({ 0.5f, 0.0f });
 	missionCompleteText_.SetPosition({ kScreenWidth * 0.5f, 60.0f });
-	missionCompleteText_.SetColor({ 0.90f, 0.85f, 0.40f, 1.0f }); // ゴールド
+	missionCompleteText_.SetColor({ 0.20f, 1.0f, 0.55f, 1.0f }); // 統一タクティカル・ネオングリーン
 
 	// ============================
 	// リザルト情報パネル
@@ -125,9 +125,9 @@ void ClearScene::Initialize() {
 	}
 
 	// ============================
-	// ボタン
+	// ボタン（項目13: ハッカー風ブラケット装飾＆統一デザイン）
 	// ============================
-	float buttonWidth = 250.0f;
+	float buttonWidth = 270.0f;
 	float buttonHeight = 50.0f;
 	float buttonSpacing = 30.0f;
 	float buttonsStartY = panelY + panelHeight + 50.0f;
@@ -135,24 +135,28 @@ void ClearScene::Initialize() {
 	float totalButtonsWidth = buttonWidth * 2.0f + buttonSpacing;
 	float leftButtonX = (kScreenWidth - totalButtonsWidth) * 0.5f;
 
-	replayButton_.Initialize(spriteCommon, "REPLAY", 28.0f);
+	replayButton_.Initialize(spriteCommon, "[ REPLAY MISSION ]", 20.0f);
 	replayButton_.SetPosition({ leftButtonX, buttonsStartY });
 	replayButton_.SetSize({ buttonWidth, buttonHeight });
-	replayButton_.SetNormalColor({ 0.10f, 0.15f, 0.22f, 0.85f });
-	replayButton_.SetHoverColor({ 0.12f, 0.30f, 0.50f, 0.95f });
-	replayButton_.SetSelectedColor({ 0.15f, 0.40f, 0.65f, 0.95f });
+	replayButton_.SetNormalColor({ 0.04f, 0.12f, 0.08f, 0.88f });
+	replayButton_.SetHoverColor({ 0.08f, 0.32f, 0.18f, 0.95f });
+	replayButton_.SetSelectedColor({ 0.12f, 0.45f, 0.25f, 0.98f });
 	replayButton_.SetOnClick([this]() {
-		sceneID = SCENE::STAGE;
+		btnClickFlashTimer_ = 0.18f;
+		clickedButtonIdx_ = 0;
+		isRewinding_ = true;
+		rewindTimer_ = 0.0f;
 	});
 
-	titleButton_.Initialize(spriteCommon, "TITLE", 28.0f);
+	titleButton_.Initialize(spriteCommon, "[ RETURN TO BASE ]", 20.0f);
 	titleButton_.SetPosition({ leftButtonX + buttonWidth + buttonSpacing, buttonsStartY });
 	titleButton_.SetSize({ buttonWidth, buttonHeight });
-	titleButton_.SetNormalColor({ 0.10f, 0.15f, 0.22f, 0.85f });
-	titleButton_.SetHoverColor({ 0.12f, 0.30f, 0.50f, 0.95f });
-	titleButton_.SetSelectedColor({ 0.15f, 0.40f, 0.65f, 0.95f });
-	// 項目9: TITLE 押下時にデータアップロード演出を開始
+	titleButton_.SetNormalColor({ 0.04f, 0.12f, 0.08f, 0.88f });
+	titleButton_.SetHoverColor({ 0.08f, 0.32f, 0.18f, 0.95f });
+	titleButton_.SetSelectedColor({ 0.12f, 0.45f, 0.25f, 0.98f });
 	titleButton_.SetOnClick([this]() {
+		btnClickFlashTimer_ = 0.18f;
+		clickedButtonIdx_ = 1;
 		isUploading_ = true;
 		uploadTimer_ = 0.0f;
 	});
@@ -165,6 +169,10 @@ void ClearScene::Initialize() {
 	uploadSprite_->Initialize(spriteCommon, "assets/textures/white1x1.png");
 	isUploading_ = false;
 	uploadTimer_ = 0.0f;
+	isRewinding_ = false;
+	rewindTimer_ = 0.0f;
+	btnClickFlashTimer_ = 0.0f;
+	clickedButtonIdx_ = -1;
 
 	// UITextRegistryに登録
 	UITextRegistry::GetInstance()->Register("Clear_MissionComplete", &missionCompleteText_);
@@ -179,17 +187,33 @@ void ClearScene::Initialize() {
 }
 
 void ClearScene::Update() {
-	animTimer_ += 1.0f / 60.0f;
+	float dt = 1.0f / 60.0f;
+	animTimer_ += dt;
 
 	// フェードイン
 	if (fadeInAlpha_ < 1.0f) {
-		fadeInAlpha_ += 1.5f * (1.0f / 60.0f); // 約0.67秒でフェードイン完了
+		fadeInAlpha_ += 1.5f * dt; // 約0.67秒でフェードイン完了
 		if (fadeInAlpha_ > 1.0f) fadeInAlpha_ = 1.0f;
 	}
 
-	// 項目9: アップロード＆ウィンドウ閉鎖シーケンス更新
-	if (isUploading_) {
-		uploadTimer_ += 1.0f / 60.0f;
+	// 項目14: ボタン決定フラッシュ減衰
+	if (btnClickFlashTimer_ > 0.0f) {
+		btnClickFlashTimer_ -= dt;
+		if (btnClickFlashTimer_ < 0.0f) btnClickFlashTimer_ = 0.0f;
+	}
+
+	// 項目15: VHSテープのリワインド（巻き戻し）シーケンス更新
+	if (isRewinding_) {
+		rewindTimer_ += dt;
+		if (rewindTimer_ >= kRewindDuration) {
+			GameResult::GetInstance().isRetry = true;
+			sceneID = SCENE::STAGE;
+			return;
+		}
+	}
+	// 項目16, 17, 18: アップロード＆ウィンドウ閉鎖シーケンス更新
+	else if (isUploading_) {
+		uploadTimer_ += dt;
 		if (uploadTimer_ >= 1.50f) {
 			// タイトルへ「ReturnFromClear」で遷移！
 			GameResult::GetInstance().titleEntryReason = TitleEntryReason::ReturnFromClear;
@@ -214,6 +238,7 @@ void ClearScene::Update() {
 #ifdef USE_IMGUI
 	ImGui::Begin("CLEAR SCENE DEBUG");
 	ImGui::Text("FadeIn: %.2f", fadeInAlpha_);
+	ImGui::Text("Rewinding: %s (%.2f)", isRewinding_ ? "YES" : "NO", rewindTimer_);
 	ImGui::Text("Uploading: %s (%.2f)", isUploading_ ? "YES" : "NO", uploadTimer_);
 	const GameResult& result = GameResult::GetInstance();
 	ImGui::Text("Enemies: %d", result.enemiesDestroyed);
@@ -228,67 +253,189 @@ void ClearScene::Draw() {
 }
 
 void ClearScene::DrawUI() {
+	TextRenderer* tr = TextRenderer::GetInstance();
+
+	auto DrawRectHelper = [this](const Vector2& pos, const Vector2& size, const Vector4& col, BlendMode blend = BlendMode::kNormal) {
+		if (!uploadSprite_) return;
+		uploadSprite_->SetBlendMode(blend);
+		uploadSprite_->SetPosition(pos);
+		uploadSprite_->SetAnchorPoint({ 0.0f, 0.0f });
+		uploadSprite_->SetSize(size);
+		uploadSprite_->SetRotation(0.0f);
+		uploadSprite_->SetColor(col);
+		uploadSprite_->Update();
+		uploadSprite_->Draw();
+	};
+
+	auto DrawHollowBorder = [&DrawRectHelper](const Vector2& pos, const Vector2& size, const Vector4& col, float thick = 1.5f) {
+		DrawRectHelper(pos, { size.x, thick }, col);
+		DrawRectHelper({ pos.x, pos.y + size.y - thick }, { size.x, thick }, col);
+		DrawRectHelper(pos, { thick, size.y }, col);
+		DrawRectHelper({ pos.x + size.x - thick, pos.y }, { thick, size.y }, col);
+	};
+
+	// 項目18: アップロード完了後のウィンドウ最小化閉鎖スケール計算（1.10s〜1.50s）
+	float winScale = 1.0f;
+	Vector2 winOffset = { 0.0f, 0.0f };
+	if (isUploading_ && uploadTimer_ >= 1.10f) {
+		float closeT = std::clamp((uploadTimer_ - 1.10f) / 0.38f, 0.0f, 1.0f);
+		float easeT = closeT * closeT * closeT; // 急激に加速して吸い込まれる
+		winScale = (1.0f - easeT);
+		winOffset.y = easeT * (kScreenHeight * 0.45f); // 画面下部（タスクバー方向）へ吸い込まれる
+	}
+
 	// 背景
 	backgroundPanel_.Draw();
 
-	// MISSION COMPLETE
-	missionCompleteText_.Draw();
+	if (winScale > 0.02f) {
+		// MISSION COMPLETE
+		missionCompleteText_.Draw();
 
-	// リザルトパネル
-	resultPanel_.Draw();
+		// リザルトパネル
+		resultPanel_.Draw();
 
-	// リザルト情報
-	enemiesDestroyedLabel_.Draw();
-	enemiesDestroyedValue_.Draw();
-	clearTimeLabel_.Draw();
-	clearTimeValue_.Draw();
-	hpRemainingLabel_.Draw();
-	hpRemainingValue_.Draw();
+		// リザルト情報
+		enemiesDestroyedLabel_.Draw();
+		enemiesDestroyedValue_.Draw();
+		clearTimeLabel_.Draw();
+		clearTimeValue_.Draw();
+		hpRemainingLabel_.Draw();
+		hpRemainingValue_.Draw();
 
-	// ボタン
-	replayButton_.Draw();
-	titleButton_.Draw();
+		// ボタン
+		replayButton_.Draw();
+		titleButton_.Draw();
 
-	// 操作ガイド
-	TextRenderer::GetInstance()->Print(
-		"HackGen",
-		"←→: SELECT   SPACE/ENTER: DECIDE",
-		kScreenWidth * 0.5f - 170.0f,
-		kScreenHeight - 50.0f,
-		16.0f,
-		{ 0.5f, 0.5f, 0.55f, 0.6f }
-	);
-
-	// ------------------------------------------------------------
-	// 項目9: 「UPLOADING COMBAT DATA... 100% [OK]」& ウィンドウ縮小演出
-	// ------------------------------------------------------------
-	if (isUploading_ && uploadSprite_) {
-		auto DrawRectHelper = [this](const Vector2& pos, const Vector2& size, const Vector4& col) {
-			uploadSprite_->SetPosition(pos);
-			uploadSprite_->SetAnchorPoint({ 0.0f, 0.0f });
-			uploadSprite_->SetSize(size);
-			uploadSprite_->SetColor(col);
-			uploadSprite_->Update();
-			uploadSprite_->Draw();
+		// 項目13: ボタンの四隅サイバーブラケット（[ ] 枠線装飾）
+		auto DrawCyberBrackets = [&](const Vector2& pos, const Vector2& size, const Vector4& col) {
+			const float cLen = 10.0f;
+			const float cThick = 2.0f;
+			DrawRectHelper(pos, { cLen, cThick }, col);
+			DrawRectHelper(pos, { cThick, cLen }, col);
+			DrawRectHelper({ pos.x + size.x - cLen, pos.y }, { cLen, cThick }, col);
+			DrawRectHelper({ pos.x + size.x - cThick, pos.y }, { cThick, cLen }, col);
+			DrawRectHelper({ pos.x, pos.y + size.y - cThick }, { cLen, cThick }, col);
+			DrawRectHelper({ pos.x, pos.y + size.y - cLen }, { cThick, cLen }, col);
+			DrawRectHelper({ pos.x + size.x - cLen, pos.y + size.y - cThick }, { cLen, cThick }, col);
+			DrawRectHelper({ pos.x + size.x - cThick, pos.y + size.y - cLen }, { cThick, cLen }, col);
 		};
 
-		// 0.0s〜1.1s: データアップロードダイアログ
-		if (uploadTimer_ < 1.15f) {
-			float dlgW = 620.0f;
-			float dlgH = 120.0f;
+		DrawCyberBrackets(replayButton_.GetPosition(), replayButton_.GetSize(), { 0.25f, 0.95f, 0.55f, 0.90f });
+		DrawCyberBrackets(titleButton_.GetPosition(), titleButton_.GetSize(), { 0.25f, 0.95f, 0.55f, 0.90f });
+
+		// 項目14: ボタンクリック時の白反転フラッシュ＆波紋フィードバック
+		if (btnClickFlashTimer_ > 0.0f && clickedButtonIdx_ >= 0) {
+			Vector2 bPos = (clickedButtonIdx_ == 0) ? replayButton_.GetPosition() : titleButton_.GetPosition();
+			Vector2 bSize = (clickedButtonIdx_ == 0) ? replayButton_.GetSize() : titleButton_.GetSize();
+			float flashAlpha = btnClickFlashTimer_ / 0.18f;
+
+			// 白反転フラッシュ
+			DrawRectHelper(bPos, bSize, { 1.0f, 1.0f, 1.0f, 0.85f * flashAlpha }, BlendMode::kAdd);
+
+			// 外側へ広がる波紋リング
+			float rip = (1.0f - flashAlpha);
+			float expandX = rip * 22.0f;
+			float expandY = rip * 14.0f;
+			DrawHollowBorder({ bPos.x - expandX, bPos.y - expandY }, { bSize.x + expandX * 2.0f, bSize.y + expandY * 2.0f }, { 0.40f, 1.0f, 0.70f, flashAlpha * 0.90f }, 2.0f);
+		}
+
+		// 操作ガイド
+		tr->Print(
+			"HackGen",
+			"←→: SELECT   SPACE/ENTER: DECIDE",
+			kScreenWidth * 0.5f - 170.0f,
+			kScreenHeight - 50.0f,
+			16.0f,
+			{ 0.5f, 0.5f, 0.55f, 0.6f }
+		);
+	}
+
+	// ------------------------------------------------------------
+	// 項目15: 「VHSテープのリワインド（巻き戻し）」エフェクト
+	// ------------------------------------------------------------
+	if (isRewinding_) {
+		float rProg = rewindTimer_ / kRewindDuration;
+		float jitterX = ((rand() % 100) / 100.0f - 0.5f) * 16.0f;
+		float jitterY = ((rand() % 100) / 100.0f - 0.5f) * 8.0f;
+
+		// 画面全体のブルー・シアンVHSティント
+		DrawRectHelper({ 0.0f, 0.0f }, { kScreenWidth, kScreenHeight }, { 0.02f, 0.08f, 0.15f, 0.45f }, BlendMode::kNormal);
+
+		// 高速逆スクロール走査線バンド
+		const int numBands = 8;
+		for (int b = 0; b < numBands; ++b) {
+			float bandY = std::fmod((1.0f - rProg * 4.0f + b * 0.15f) * kScreenHeight, kScreenHeight);
+			if (bandY < 0.0f) bandY += kScreenHeight;
+			float bH = 8.0f + static_cast<float>(rand() % 24);
+			float bAlpha = 0.35f + 0.30f * std::sin(rProg * 30.0f + b);
+			DrawRectHelper({ 0.0f, bandY + jitterY }, { kScreenWidth, bH }, { 0.40f, 0.85f, 1.0f, bAlpha }, BlendMode::kAdd);
+		}
+
+		// テープノイズの水平ラインスプリット
+		for (int i = 0; i < 12; ++i) {
+			float ny = static_cast<float>(rand() % static_cast<int>(kScreenHeight));
+			float nw = 80.0f + static_cast<float>(rand() % 400);
+			float nx = static_cast<float>(rand() % static_cast<int>(kScreenWidth - nw));
+			DrawRectHelper({ nx + jitterX, ny }, { nw, 2.0f }, { 0.90f, 1.0f, 1.0f, 0.80f }, BlendMode::kAdd);
+		}
+
+		// 画面中央の巻き戻しステータスHUD
+		float hudBoxW = 560.0f;
+		float hudBoxH = 90.0f;
+		float hudBoxX = (kScreenWidth - hudBoxW) * 0.5f + jitterX;
+		float hudBoxY = (kScreenHeight - hudBoxH) * 0.5f + jitterY;
+
+		DrawRectHelper({ hudBoxX, hudBoxY }, { hudBoxW, hudBoxH }, { 0.01f, 0.04f, 0.08f, 0.90f });
+		DrawHollowBorder({ hudBoxX, hudBoxY }, { hudBoxW, hudBoxH }, { 0.30f, 0.90f, 1.0f, 0.95f }, 2.0f);
+
+		tr->Print(
+			"HackGen",
+			"<< REWINDING COMBAT LOG <<",
+			hudBoxX + hudBoxW * 0.5f,
+			hudBoxY + 16.0f,
+			24.0f,
+			{ 0.35f, 1.0f, 0.80f, 1.0f },
+			{ 0.5f, 0.0f }
+		);
+
+		// 逆回転タイムコード（例: 00:03:42:15 -> 00:00:00:00）
+		float remainTime = (1.0f - rProg) * 222.0f;
+		int rMin = static_cast<int>(remainTime) / 60;
+		int rSec = static_cast<int>(remainTime) % 60;
+		int rFrm = static_cast<int>((remainTime - std::floor(remainTime)) * 60.0f);
+		char timecodeBuf[64];
+		snprintf(timecodeBuf, sizeof(timecodeBuf), "TCR - %02d:%02d:%02d [FAST REWIND 16x]", rMin, rSec, rFrm);
+
+		tr->Print(
+			"HackGen",
+			timecodeBuf,
+			hudBoxX + hudBoxW * 0.5f,
+			hudBoxY + 52.0f,
+			17.0f,
+			{ 1.0f, 0.85f, 0.25f, 0.95f },
+			{ 0.5f, 0.0f }
+		);
+	}
+
+	// ------------------------------------------------------------
+	// 項目16, 17, 18: 「UPLOADING COMBAT DATA... 0% -> 100%」& ウィンドウ最小化閉鎖演出
+	// ------------------------------------------------------------
+	if (isUploading_ && uploadSprite_) {
+		// 0.0s〜1.10s: データアップロードダイアログ（確実に0%から伸びるアニメーション）
+		if (uploadTimer_ < 1.10f) {
+			float dlgW = 640.0f;
+			float dlgH = 130.0f;
 			float dlgX = (kScreenWidth - dlgW) * 0.5f;
 			float dlgY = (kScreenHeight - dlgH) * 0.5f + 160.0f;
 
 			// 半透明ダーク背景
 			DrawRectHelper({ dlgX, dlgY }, { dlgW, dlgH }, { 0.02f, 0.06f, 0.12f, 0.95f });
 			// シアン枠線
-			DrawRectHelper({ dlgX, dlgY }, { dlgW, 2.0f }, { 0.25f, 0.85f, 1.0f, 0.95f });
-			DrawRectHelper({ dlgX, dlgY + dlgH - 2.0f }, { dlgW, 2.0f }, { 0.25f, 0.85f, 1.0f, 0.95f });
-			DrawRectHelper({ dlgX, dlgY }, { 2.0f, dlgH }, { 0.25f, 0.85f, 1.0f, 0.95f });
-			DrawRectHelper({ dlgX + dlgW - 2.0f, dlgY }, { 2.0f, dlgH }, { 0.25f, 0.85f, 1.0f, 0.95f });
+			DrawHollowBorder({ dlgX, dlgY }, { dlgW, dlgH }, { 0.25f, 0.85f, 1.0f, 0.95f }, 2.0f);
 
-			// アップロード進行度（0.0s〜0.9sで100%へ到達）
-			float prog = std::clamp(uploadTimer_ / 0.85f, 0.0f, 1.0f);
+			// 項目16: 0%から確実に滑らかに100%まで伸びるイージング計算
+			float rawProg = std::clamp(uploadTimer_ / 0.85f, 0.0f, 1.0f);
+			float prog = rawProg * rawProg * (3.0f - 2.0f * rawProg); // SmoothStep
 			int pct = static_cast<int>(prog * 100.0f);
 
 			char headerText[64];
@@ -298,7 +445,7 @@ void ClearScene::DrawUI() {
 				snprintf(headerText, sizeof(headerText), "UPLOADING COMBAT DATA... %d%%", pct);
 			}
 
-			TextRenderer::GetInstance()->Print(
+			tr->Print(
 				"HackGen",
 				headerText,
 				dlgX + 24.0f,
@@ -311,30 +458,37 @@ void ClearScene::DrawUI() {
 			float barX = dlgX + 24.0f;
 			float barY = dlgY + 54.0f;
 			float barW = dlgW - 48.0f;
-			float barH = 14.0f;
+			float barH = 16.0f;
 			DrawRectHelper({ barX, barY }, { barW, barH }, { 0.05f, 0.12f, 0.20f, 0.80f });
+			DrawHollowBorder({ barX, barY }, { barW, barH }, { 0.20f, 0.50f, 0.70f, 0.60f }, 1.0f);
 
-			// プログレスバー本体
-			DrawRectHelper({ barX, barY }, { barW * prog, barH }, (pct >= 100) ? Vector4{ 0.20f, 0.95f, 0.50f, 0.95f } : Vector4{ 0.20f, 0.75f, 1.0f, 0.90f });
+			// プログレスバー本体（0%から伸びる）
+			if (prog > 0.001f) {
+				DrawRectHelper({ barX, barY }, { barW * prog, barH }, (pct >= 100) ? Vector4{ 0.20f, 0.95f, 0.50f, 0.95f } : Vector4{ 0.25f, 0.80f, 1.0f, 0.95f });
+			}
 
-			TextRenderer::GetInstance()->Print(
+			// 項目17: プログレスバー下部の暗号化処理テキストを拡大＆高コントラスト化 (14.0f -> 18.0f)
+			const char* subText = (pct >= 100) ? "STATUS: SYNCHRONIZATION COMPLETE // CLOSING CLIENT" : "ENCRYPTING TELEMETRY STREAM VIA SECURE LINK...";
+			Vector4 subCol = (pct >= 100) ? Vector4{ 0.40f, 1.0f, 0.70f, 1.0f } : Vector4{ 0.35f, 0.95f, 1.0f, 0.95f };
+
+			tr->Print(
 				"HackGen",
-				(pct >= 100) ? "STATUS: SYNCHRONIZATION COMPLETE // CLOSING CLIENT" : "ENCRYPTING TELEMETRY STREAM VIA SECURE LINK...",
+				subText,
 				dlgX + 24.0f,
-				dlgY + 82.0f,
-				14.0f,
-				{ 0.70f, 0.80f, 0.90f, 0.80f }
+				dlgY + 84.0f,
+				18.0f,
+				subCol
 			);
 		} else {
-			// 1.15s〜1.50s: 戦闘画面自体が「OSウィンドウ」として中央へ縮小されカチッと閉じる演出！
-			float closeT = std::clamp((uploadTimer_ - 1.15f) / 0.35f, 0.0f, 1.0f);
-			float winScale = 1.0f - closeT * closeT;
-			float halfW = (kScreenWidth * 0.5f) * winScale;
-			float halfH = (kScreenHeight * 0.5f) * winScale;
+			// 項目18: 1.10s〜1.50s: リザルト画面全体がOSウィンドウとしてタスクバーへ「最小化して閉じる」アニメーション！
+			float closeT = std::clamp((uploadTimer_ - 1.10f) / 0.38f, 0.0f, 1.0f);
+			float winEase = (1.0f - closeT);
+			float halfW = (kScreenWidth * 0.5f) * winEase;
+			float halfH = (kScreenHeight * 0.5f) * winEase;
 			float centerX = kScreenWidth * 0.5f;
-			float centerY = kScreenHeight * 0.5f;
+			float centerY = (kScreenHeight * 0.5f) + closeT * (kScreenHeight * 0.45f); // タスクバーへ降下
 
-			// 外側4つの黒マスクでウィンドウ縮小を表現
+			// 外側4つの黒マスクでウィンドウ縮小閉鎖を表現
 			// 上
 			DrawRectHelper({ 0.0f, 0.0f }, { kScreenWidth, centerY - halfH }, { 0.0f, 0.0f, 0.0f, 1.0f });
 			// 下
@@ -344,11 +498,8 @@ void ClearScene::DrawUI() {
 			// 右
 			DrawRectHelper({ centerX + halfW, centerY - halfH }, { kScreenWidth - (centerX + halfW), halfH * 2.0f }, { 0.0f, 0.0f, 0.0f, 1.0f });
 
-			// 縮小ウィンドウのOS枠線
-			DrawRectHelper({ centerX - halfW, centerY - halfH }, { halfW * 2.0f, 2.0f }, { 0.30f, 0.70f, 1.0f, 0.90f });
-			DrawRectHelper({ centerX - halfW, centerY + halfH - 2.0f }, { halfW * 2.0f, 2.0f }, { 0.30f, 0.70f, 1.0f, 0.90f });
-			DrawRectHelper({ centerX - halfW, centerY - halfH }, { 2.0f, halfH * 2.0f }, { 0.30f, 0.70f, 1.0f, 0.90f });
-			DrawRectHelper({ centerX + halfW - 2.0f, centerY - halfH }, { 2.0f, halfH * 2.0f }, { 0.30f, 0.70f, 1.0f, 0.90f });
+			// 縮小ウィンドウのサイバー枠線
+			DrawHollowBorder({ centerX - halfW, centerY - halfH }, { halfW * 2.0f, halfH * 2.0f }, { 0.35f, 0.85f, 1.0f, 0.95f * winEase }, 2.0f);
 		}
 	}
 }

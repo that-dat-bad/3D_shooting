@@ -14,6 +14,7 @@ struct GameResult {
 	float playerHPRemaining = 0.0f;	///< 残りHP
 	float playerMaxHP = 100.0f;		///< 最大HP
 	bool missionCleared = false;	///< ミッションクリアしたか
+	bool isRetry = false;           ///< リトライ出撃か（trueなら起動シーケンスを高速短縮）
 	TitleEntryReason titleEntryReason = TitleEntryReason::InitialBoot; ///< タイトル画面への突入理由
 
 	/// @brief 結果をリセットする
@@ -23,6 +24,7 @@ struct GameResult {
 		playerHPRemaining = 0.0f;
 		playerMaxHP = 100.0f;
 		missionCleared = false;
+		isRetry = false;
 		titleEntryReason = TitleEntryReason::InitialBoot;
 	}
 

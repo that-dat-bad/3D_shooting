@@ -22,6 +22,10 @@ public:
 	/// @brief 演出開始（音声再生とタイマーリセット）
 	void Start();
 
+	/// @brief リトライ用高速ブートモード設定（0.9秒で即座に戦闘復帰）
+	void SetQuickMode(bool quick) { isQuickMode_ = quick; }
+	bool IsQuickMode() const { return isQuickMode_; }
+
 	/// @brief 毎フレーム更新
 	/// @param dt 経過時間
 	void Update(float dt);
@@ -33,9 +37,10 @@ public:
 	void DrawBootUI();
 
 	/// @brief 演出が完了したか
-	bool IsFinished() const { return timer_ >= kDuration; }
+	bool IsFinished() const { return timer_ >= (isQuickMode_ ? kQuickDuration : kDuration); }
 
 	/// @brief 演出の総時間（秒）
+	float GetCurrentDuration() const { return isQuickMode_ ? kQuickDuration : kDuration; }
 	static constexpr float GetDuration() { return kDuration; }
 
 	/// @brief 現在の演出タイマー取得
@@ -68,6 +73,8 @@ private:
 
 	// タイマー管理
 	float timer_ = 0.0f;
-	static constexpr float kDuration = 4.80f; ///< 演出の総時間（秒: 暗転タメ＋タイピング＋シームレス移行）
+	static constexpr float kDuration = 4.80f;      ///< 演出の総時間（秒: 暗転タメ＋タイピング＋シームレス移行）
+	static constexpr float kQuickDuration = 0.90f; ///< リトライ時高速演出の総時間（秒）
+	bool isQuickMode_ = false;                    ///< リトライ用高速ブートフラグ
 	float fadeAlpha_ = 1.0f;
 };

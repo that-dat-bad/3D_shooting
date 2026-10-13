@@ -32,13 +32,19 @@ private:
 	float animTimer_ = 0.0f;
 	float fadeInAlpha_ = 0.0f;
 
-	// 項目3: 高速スクロール16進数メモリダンプ
+	// 項目3: コンソール風ログ展開アニメーション & 高速スクロール16進数メモリダンプ
 	std::vector<std::string> memoryDumpPool_;
 	int dumpScrollIndex_ = 0;
 	float dumpScrollTimer_ = 0.0f;
+	float logDeployTimer_ = 0.0f;     ///< コンソールのように1行ずつカタカタ打ち出されるタイマー
+	int visibleLogCount_ = 0;         ///< 現在表示されているログ行数
 
-	// 項目8: システム再起動（リブート）遷移
+	// 項目8: システム再起動（リブート）遷移 & ブラウン管電源遮断トランジション
 	bool isRebooting_ = false;
 	float rebootTimer_ = 0.0f;
 	std::unique_ptr<Sprite> rebootBlackoutSprite_;
+
+	// リトライ時のホワイトノイズ＆グリッチトランジション
+	bool isRetrying_ = false;
+	float retryGlitchTimer_ = 0.0f;
 };

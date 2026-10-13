@@ -114,6 +114,19 @@ static std::string MakeGlitchText(const std::string& base, float glitchIntensity
 void CombatBootSequence::Update(float dt) {
 	timer_ += dt;
 
+	// 高速リトライモード時の処理（0.9秒で完了）
+	if (isQuickMode_) {
+		if (timer_ <= 0.35f) {
+			fadeAlpha_ = 1.0f;
+		} else if (timer_ <= kQuickDuration) {
+			float p = (timer_ - 0.35f) / (kQuickDuration - 0.35f);
+			fadeAlpha_ = 1.0f - p;
+		} else {
+			fadeAlpha_ = 0.0f;
+		}
+		return;
+	}
+
 	// 音声再生（完全暗転中の静寂0.40秒後にピピッチャイムから再生開始：項目1）
 	if (!voicePlayed_ && timer_ >= 0.40f) {
 		if (!voiceData_.buffer.empty()) {
@@ -158,21 +171,93 @@ void CombatBootSequence::DrawBackgroundFade() {
 }
 
 void CombatBootSequence::DrawBootUI() {
-	if (timer_ >= kDuration) {
-		return;
-	}
-
-	// 項目1: 0.00s 〜 0.85s は完全暗転（UI描画なし、暗転のタメ）
-	if (timer_ < 0.85f) {
-		return;
-	}
-
 	const float sw = static_cast<float>(WinApp::kClientWidth);
 	const float sh = static_cast<float>(WinApp::kClientHeight);
 	const float cx = sw * 0.5f;
 	const float cy = sh * 0.46f; // ミリタリーHUD視線中央
-
 	TextRenderer* tr = TextRenderer::GetInstance();
+
+	// --------------------------------------------------------------------
+	// リトライ時高速モードの描画（0.9秒でキビキビと出撃復帰）
+	// --------------------------------------------------------------------
+	if (isQuickMode_) {
+		if (timer_ >= kQuickDuration) return;
+
+		float alpha = (timer_ < 0.65f) ? 1.0f : (1.0f - (timer_ - 0.65f) / 0.25f);
+		DrawTacticalBracket({ cx, cy }, { 600.0f, 90.0f }, 30.0f, 2.0f, { 0.25f, 0.95f, 0.55f, alpha * 0.9f });
+
+		tr->Print(
+			"HackGen",
+			">> RAPID COMBAT RE-ENGAGE <<",
+			cx,
+			cy - 16.0f,
+			32.0f,
+			{ 0.35f, 1.0f, 0.65f, alpha },
+			{ 0.5f, 0.5f }
+		);
+
+		tr->Print(
+			"HackGen",
+			"FLIGHT CONTROLS RESTORED // ALL SYSTEMS NOMINAL",
+			cx,
+			cy + 22.0f,
+			16.0f,
+			{ 0.85f, 0.95f, 0.90f, alpha * 0.85f },
+			{ 0.5f, 0.5f }
+		);
+		return;
+	}
+
+	if (timer_ >= kDuration) {
+		return;
+	}
+
+	// --------------------------------------------------------------------
+	// 項目2-2: ロード画面の余白対策（0.00s 〜 0.85s の暗転ロード中）
+	// 単なる真っ黒画面ではなく、回転するタクティカルHUDリングとプログレスバーを描画！
+	// --------------------------------------------------------------------
+	if (timer_ < 0.85f) {
+		float prog = std::clamp(timer_ / 0.80f, 0.0f, 1.0f);
+		int pct = static_cast<int>(prog * 100.0f);
+
+		// 回転するワイヤーフレームリング
+		DrawCircleRing({ cx, cy - 30.0f }, 45.0f, { 0.20f, 0.80f, 0.45f, 0.60f }, BlendMode::kAdd);
+		DrawCircleRing({ cx, cy - 30.0f }, 55.0f, { 0.15f, 0.50f, 0.35f, 0.40f }, BlendMode::kAdd);
+
+		// 四隅ブラケット
+		DrawTacticalBracket({ cx, cy - 30.0f }, { 130.0f, 130.0f }, 18.0f, 1.5f, { 0.25f, 0.90f, 0.50f, 0.70f });
+
+		tr->Print(
+			"HackGen",
+			"INITIALIZING COMBAT ENVIRONMENT...",
+			cx,
+			cy + 65.0f,
+			20.0f,
+			{ 0.35f, 1.0f, 0.60f, 0.95f },
+			{ 0.5f, 0.5f }
+		);
+
+		// ダミープログレスバー
+		float barW = 340.0f;
+		float barH = 8.0f;
+		float barX = cx - barW * 0.5f;
+		float barY = cy + 95.0f;
+		DrawRect({ barX, barY }, { barW, barH }, { 0.05f, 0.15f, 0.08f, 0.85f });
+		DrawRect({ barX, barY }, { barW * prog, barH }, { 0.25f, 0.95f, 0.50f, 0.95f });
+
+		char loadStatus[64];
+		snprintf(loadStatus, sizeof(loadStatus), "PRE-FLIGHT DIAGNOSTICS: %d%% [OK]", pct);
+		tr->Print(
+			"HackGen",
+			loadStatus,
+			cx,
+			cy + 120.0f,
+			13.0f,
+			{ 0.70f, 0.90f, 0.80f, 0.80f },
+			{ 0.5f, 0.5f }
+		);
+		return;
+	}
 
 	// ====================================================================
 	// 0. シネマティック上下レターボックス黒帯（AC6映画的演出）

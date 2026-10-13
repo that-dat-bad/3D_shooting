@@ -115,8 +115,13 @@ void StageScene::Initialize() {
 
 	// 出撃イントロ（AC6メインシステム戦闘モード起動シーケンス & 黒フェード）初期化
 	SpriteCommon* spriteCommon = SpriteCommon::GetInstance();
+	if (GameResult::GetInstance().isRetry) {
+		combatBootSequence_.SetQuickMode(true);
+		GameResult::GetInstance().isRetry = false; // リトライ出撃フラグを消費
+	}
 	combatBootSequence_.Initialize(spriteCommon);
 	combatBootSequence_.Start();
+	sortieIntroDuration_ = combatBootSequence_.GetCurrentDuration();
 	sortieIntroTimer_ = 0.0f;
 	hud_.ResetDeploy();
 
@@ -540,7 +545,7 @@ void StageScene::Update() {
 
 	// --- 射撃入力（マウス左クリック） ---
 	isFiringThisFrame_ = false;
-	if (input->PushMouse(0) && !isMissionCleared_ && !isMissionFailed_ && sortieIntroTimer_ >= kSortieIntroDuration) {
+	if (input->PushMouse(0) && !isMissionCleared_ && !isMissionFailed_ && sortieIntroTimer_ >= sortieIntroDuration_) {
 		int ammoBefore = gunpod_.GetCurrentAmmo();
 		gunpod_.Fire();
 		if (gunpod_.GetCurrentAmmo() < ammoBefore) {
@@ -837,10 +842,10 @@ void StageScene::Update() {
 	// ============================
 	// 追従カメラ ＆ 出撃イントロカメラワーク（項目4: シームレス円弧旋回移行）
 	// ============================
-	if (sortieIntroTimer_ < kSortieIntroDuration) {
+	if (sortieIntroTimer_ < sortieIntroDuration_) {
 		sortieIntroTimer_ += gameDeltaTime;
 		combatBootSequence_.Update(gameDeltaTime);
-		float introProg = std::clamp(sortieIntroTimer_ / kSortieIntroDuration, 0.0f, 1.0f);
+		float introProg = std::clamp(sortieIntroTimer_ / sortieIntroDuration_, 0.0f, 1.0f);
 
 		// 重厚なカタパルト射出加速（初速約80km/hから徐々に180km/hへ滑走）
 		float boostSpeed = 22.0f + 28.0f * (1.0f - std::exp(-introProg * 2.2f));
@@ -1290,7 +1295,7 @@ void StageScene::Update() {
 		float bootAberration = 0.004f;
 		float bootVignette = 0.40f;
 
-		if (sortieIntroTimer_ < kSortieIntroDuration) {
+		if (sortieIntroTimer_ < sortieIntroDuration_) {
 			bootVignette = 0.55f; // 演出中は外周を少し暗くして中央バナーを強調
 
 			if (sortieIntroTimer_ < 0.85f) {
@@ -1624,13 +1629,14 @@ void StageScene::DrawUI() {
 	combatBootSequence_.DrawBackgroundFade();
 
 	// 2. 戦闘HUD（残弾数・照準・タイマー）描画
-	// 出撃演出の起動バナー展開中は非表示にし、戦闘モード確立完了後（3.60s以降）にスムーズ順次展開（項目9）
-	if (sortieIntroTimer_ >= 3.60f) {
+	// 高速リトライ時は0.4sで即座に展開、初回通常時は3.6s以降に順次展開
+	float hudThreshold = combatBootSequence_.IsQuickMode() ? 0.40f : 3.60f;
+	if (sortieIntroTimer_ >= hudThreshold) {
 		hud_.Draw();
 	}
 
 	// 3. AC6スタイル「メインシステム、戦闘モード起動...」ブートUI描画（最前面）
-	if (sortieIntroTimer_ < kSortieIntroDuration) {
+	if (sortieIntroTimer_ < sortieIntroDuration_) {
 		combatBootSequence_.DrawBootUI();
 	}
 
@@ -2055,22 +2061,22 @@ void StageScene::UpdateEndSequence(float dt) {
 
 	// --- ゲームオーバー系（キビキビとした緊迫感のある高速テンポへ最適化: 計1.10秒）---
 	if (endSequence_ == StageEndSequence::GameOver_Critical) {
-		// 項目4: 0.0s - 0.30s: 撃墜瞬間の被弾スローモーション & 赤反転点滅
+		// 項目4: 0.0s - 0.25s: 撃墜瞬間の被弾スローモーション & 赤反転点滅
 		timeScale_ = 0.20f;
-		if (endSeqTimer_ >= 0.30f) {
+		if (endSeqTimer_ >= 0.25f) {
 			endSequence_ = StageEndSequence::GameOver_SignalLost;
 		}
 	} else if (endSequence_ == StageEndSequence::GameOver_SignalLost) {
-		// 項目1: 0.30s - 0.75s: 一瞬の通信途絶・フリーズ & SIGNAL LOST表示
+		// 項目1: 0.25s - 0.70s: 致命的通信途絶・フリーズ & 激しいグリッチノイズ & SIGNAL LOST
 		timeScale_ = 0.0f;
-		if (endSeqTimer_ >= 0.75f) {
+		if (endSeqTimer_ >= 0.70f) {
 			endSequence_ = StageEndSequence::GameOver_CrtShutdown;
 		}
 	} else if (endSequence_ == StageEndSequence::GameOver_CrtShutdown) {
-		// 項目2: 0.75s - 1.10s: ブラウン管テレビの電源遮断演出（水平収束・プツッ暗転）
+		// 項目2: 0.70s - 0.95s: ブラウン管テレビの電源遮断演出（水平収束・プツッ消滅）
+		// 空白時間を作らず、プツッと消えた瞬間（0.95s）に即座にGameOverSceneへ移行！
 		timeScale_ = 0.0f;
-		if (endSeqTimer_ >= 1.10f) {
-			// ゲームオーバー画面へ即座に遷移
+		if (endSeqTimer_ >= 0.95f) {
 			sceneID = SCENE::GAMEOVER;
 		}
 	}
@@ -2187,34 +2193,67 @@ void StageScene::DrawEndSequenceUI() {
 	// ------------------------------------------------------------
 	else if (endSequence_ == StageEndSequence::GameOver_SignalLost) {
 		// 薄暗い赤黒ノイズベール（1枚のみ）
-		DrawSolidRect({ 0.0f, 0.0f }, { screenW, screenH }, { 0.15f, 0.01f, 0.01f, 0.35f });
+		// 項目1: 致命的通信途絶・フリーズ & 激しい画面の乱れ（ジッター・RGBスプリット・グリッチ走査）
+		// 画面水平ジッター（致命的エラーによる同期ズレ）
+		float jitterX = std::sin(endSeqTimer_ * 110.0f) * 8.0f;
+		if (std::fmod(endSeqTimer_, 0.08f) < 0.03f) {
+			jitterX += ((std::rand() % 20) - 10) * 1.5f;
+		}
 
-		// 画面を横切る大きなグリッチ走査バー（数本のみ描画で超軽量かつスタイリッシュ）
-		float glitchOffset = std::fmod(endSeqTimer_ * 800.0f, screenH);
-		DrawSolidRect({ 0.0f, glitchOffset }, { screenW, 16.0f }, { 0.9f, 0.9f, 0.9f, 0.15f });
-		float glitchOffset2 = std::fmod(endSeqTimer_ * 1300.0f + 200.0f, screenH);
-		DrawSolidRect({ 0.0f, glitchOffset2 }, { screenW, 32.0f }, { 0.8f, 0.1f, 0.1f, 0.20f });
+		// 赤黒ノイズベール
+		DrawSolidRect({ 0.0f, 0.0f }, { screenW, screenH }, { 0.20f, 0.02f, 0.02f, 0.40f });
 
-		// 中央警告カード
-		float cardW = 740.0f;
-		float cardH = 150.0f;
-		float cardX = (screenW - cardW) * 0.5f;
+		// 走査線インターレースグリッチ（数本が激しく上下を走る）
+		float glitchOffset1 = std::fmod(endSeqTimer_ * 950.0f, screenH);
+		DrawSolidRect({ 0.0f, glitchOffset1 }, { screenW, 20.0f }, { 0.95f, 0.95f, 1.0f, 0.25f }, BlendMode::kAdd);
+		float glitchOffset2 = std::fmod(endSeqTimer_ * 1400.0f + 240.0f, screenH);
+		DrawSolidRect({ 0.0f, glitchOffset2 }, { screenW, 40.0f }, { 1.0f, 0.15f, 0.15f, 0.35f }, BlendMode::kAdd);
+		float glitchOffset3 = std::fmod(endSeqTimer_ * 600.0f + 480.0f, screenH);
+		DrawSolidRect({ 0.0f, glitchOffset3 }, { screenW, 8.0f }, { 0.2f, 0.8f, 1.0f, 0.30f }, BlendMode::kAdd);
+
+		// 中央警告カード（ジッター振動）
+		float cardW = 760.0f;
+		float cardH = 155.0f;
+		float cardX = (screenW - cardW) * 0.5f + jitterX;
 		float cardY = (screenH - cardH) * 0.5f;
 
-		// カード背景と赤枠（DrawHollowBorderに集約して超軽量化）
-		DrawSolidRect({ cardX, cardY }, { cardW, cardH }, { 0.06f, 0.01f, 0.01f, 0.92f });
-		DrawHollowBorder({ cardX, cardY }, { cardW, cardH }, { 0.95f, 0.20f, 0.20f, 0.95f }, 2.5f);
-		DrawSolidRect({ cardX, cardY }, { cardW, 4.0f }, { 1.0f, 0.30f, 0.30f, 1.0f });
+		// カード背景と赤枠
+		DrawSolidRect({ cardX, cardY }, { cardW, cardH }, { 0.08f, 0.01f, 0.01f, 0.94f });
+		DrawHollowBorder({ cardX, cardY }, { cardW, cardH }, { 1.0f, 0.25f, 0.20f, 0.95f }, 2.5f);
+		DrawSolidRect({ cardX, cardY }, { cardW, 4.0f }, { 1.0f, 0.40f, 0.40f, 1.0f });
 
-		// 点滅する「SIGNAL LOST」
-		float signalPulse = 0.6f + 0.4f * std::sin(endSeqTimer_ * 20.0f);
+		// 点滅＆RGB色ズレする「SIGNAL LOST」
+		float signalPulse = 0.7f + 0.3f * std::sin(endSeqTimer_ * 30.0f);
+		
+		// グリッチ文字化（周期的に一瞬化ける）
+		const char* signalLostTitle = (std::fmod(endSeqTimer_, 0.12f) < 0.03f) ? "S!GN#L L0ST // ERR" : "SIGNAL LOST";
+
+		// RGBスプリット（シアン影＋赤影で致命的画面乱れ感を演出）
 		TextRenderer::GetInstance()->Print(
 			"HackGen",
-			"SIGNAL LOST",
-			screenW * 0.5f,
+			signalLostTitle,
+			screenW * 0.5f + jitterX + 3.0f,
 			cardY + 20.0f,
 			46.0f,
-			{ 1.0f, 0.20f, 0.20f, signalPulse },
+			{ 0.10f, 0.85f, 1.0f, signalPulse * 0.6f },
+			{ 0.5f, 0.0f }
+		);
+		TextRenderer::GetInstance()->Print(
+			"HackGen",
+			signalLostTitle,
+			screenW * 0.5f + jitterX - 3.0f,
+			cardY + 20.0f,
+			46.0f,
+			{ 1.0f, 0.15f, 0.15f, signalPulse * 0.8f },
+			{ 0.5f, 0.0f }
+		);
+		TextRenderer::GetInstance()->Print(
+			"HackGen",
+			signalLostTitle,
+			screenW * 0.5f + jitterX,
+			cardY + 20.0f,
+			46.0f,
+			{ 1.0f, 0.95f, 0.95f, signalPulse },
 			{ 0.5f, 0.0f }
 		);
 
@@ -2222,29 +2261,30 @@ void StageScene::DrawEndSequenceUI() {
 		TextRenderer::GetInstance()->Print(
 			"HackGen",
 			"TELEMETRY DISCONNECTED (遠隔測定切断)",
-			screenW * 0.5f,
+			screenW * 0.5f + jitterX,
 			cardY + 76.0f,
 			22.0f,
-			{ 0.95f, 0.85f, 0.85f, 0.95f },
+			{ 1.0f, 0.85f, 0.85f, 0.95f },
 			{ 0.5f, 0.0f }
 		);
 
 		TextRenderer::GetInstance()->Print(
 			"HackGen",
 			"CARRIER FREQUENCY TERMINATED // SYSTEM FAULT 0x000000FA",
-			screenW * 0.5f,
+			screenW * 0.5f + jitterX,
 			cardY + 110.0f,
 			14.0f,
-			{ 0.80f, 0.35f, 0.35f, 0.80f },
+			{ 0.95f, 0.40f, 0.40f, 0.85f },
 			{ 0.5f, 0.0f }
 		);
 	}
 
 	// ------------------------------------------------------------
-	// 項目2: システム強制シャットダウン（ブラウン管テレビのプツッ暗転: 0.35秒でキビキビと閉鎖）
+	// 項目2: システム強制シャットダウン（ブラウン管テレビのプツッ暗転: 0.25秒で鋭く閉鎖）
+	// 空白時間を作らず、暗転直後（0.95s）に即座にGameOverSceneへバトンタッチ！
 	// ------------------------------------------------------------
 	else if (endSequence_ == StageEndSequence::GameOver_CrtShutdown) {
-		float crtT = std::clamp((endSeqTimer_ - 0.75f) / 0.35f, 0.0f, 1.0f);
+		float crtT = std::clamp((endSeqTimer_ - 0.70f) / 0.25f, 0.0f, 1.0f);
 		float centerY = screenH * 0.5f;
 		float centerX = screenW * 0.5f;
 
@@ -2259,23 +2299,23 @@ void StageScene::DrawEndSequenceUI() {
 			DrawSolidRect({ 0.0f, centerY + halfH }, { screenW, screenH - (centerY + halfH) }, { 0.0f, 0.0f, 0.0f, 1.0f });
 
 			// 中央水平発光線
-			float lineAlpha = 0.8f + 0.2f * std::sin(endSeqTimer_ * 50.0f);
-			DrawSolidRect({ 0.0f, centerY - 2.0f }, { screenW, 4.0f }, { 0.85f, 0.95f, 1.0f, lineAlpha }, BlendMode::kAdd);
-		} else if (crtT < 0.85f) {
-			// Phase 2 (0.60〜0.85): 水平線が左右から急速に収縮！
-			float p = (crtT - 0.60f) / 0.25f;
+			float lineAlpha = 0.9f + 0.1f * std::sin(endSeqTimer_ * 60.0f);
+			DrawSolidRect({ 0.0f, centerY - 2.0f }, { screenW, 4.0f }, { 0.90f, 0.95f, 1.0f, lineAlpha }, BlendMode::kAdd);
+		} else if (crtT < 0.88f) {
+			// Phase 2 (0.60〜0.88): 水平線が左右から急速に収縮！
+			float p = (crtT - 0.60f) / 0.28f;
 			float shrink = 1.0f - p;
 			float halfW = (screenW * 0.5f) * shrink;
 
 			DrawSolidRect({ 0.0f, 0.0f }, { screenW, screenH }, { 0.0f, 0.0f, 0.0f, 1.0f });
 			DrawSolidRect({ centerX - halfW, centerY - 2.5f }, { halfW * 2.0f, 5.0f }, { 1.0f, 1.0f, 1.0f, 1.0f }, BlendMode::kAdd);
 		} else {
-			// Phase 3 (0.85〜1.00): 「プツッ」と極小の光点が光って完全暗転！
-			float p = (crtT - 0.85f) / 0.15f;
+			// Phase 3 (0.88〜1.00): 「プツッ」と極小の光点が光って暗転完了（即時次シーンへ）
+			float p = (crtT - 0.88f) / 0.12f;
 			DrawSolidRect({ 0.0f, 0.0f }, { screenW, screenH }, { 0.0f, 0.0f, 0.0f, 1.0f });
 
-			if (p < 0.40f) {
-				float popAlpha = 1.0f - (p / 0.40f);
+			if (p < 0.50f) {
+				float popAlpha = 1.0f - (p / 0.50f);
 				DrawSolidRect({ centerX - 4.0f, centerY - 4.0f }, { 8.0f, 8.0f }, { 1.0f, 1.0f, 1.0f, popAlpha }, BlendMode::kAdd);
 			}
 		}
@@ -2362,12 +2402,27 @@ void StageScene::DrawEndSequenceUI() {
 	}
 
 	// ------------------------------------------------------------
-	// 項目7: タクティカルマップ移行 & SECTOR CLEARED スタンプ押下
+	// 項目10, 11: タクティカルマップ移行（デジタル急ズームワイプ＆稼働する動的戦術マップ）
 	// ------------------------------------------------------------
 	else if (endSequence_ == StageEndSequence::Clear_TacticalMapZoom) {
+		float mapTimer = endSeqTimer_ - 2.8f; // 0.0s 〜 1.7s
+
+		// 項目11: 動的にスクロールする背景グリッド（稼働感の演出）
+		const float gridSpacing = 64.0f;
+		float gridScrollX = std::fmod(endSeqTimer_ * 32.0f, gridSpacing);
+		float gridScrollY = std::fmod(endSeqTimer_ * 20.0f, gridSpacing);
+		Vector4 gridLineCol = { 0.15f, 0.45f, 0.30f, 0.22f };
+
+		for (float gx = -gridSpacing + gridScrollX; gx < screenW + gridSpacing; gx += gridSpacing) {
+			DrawSolidRect({ gx, 0.0f }, { 1.0f, screenH }, gridLineCol);
+		}
+		for (float gy = -gridSpacing + gridScrollY; gy < screenH + gridSpacing; gy += gridSpacing) {
+			DrawSolidRect({ 0.0f, gy }, { screenW, 1.0f }, gridLineCol);
+		}
+
 		// 戦術マップ走査ライングリッド風オーバーレイ
-		float scanPulse = 0.15f + 0.05f * std::sin(endSeqTimer_ * 10.0f);
-		DrawSolidRect({ 0.0f, 0.0f }, { screenW, screenH }, { 0.02f, 0.15f, 0.08f, scanPulse });
+		float scanPulse = 0.18f + 0.06f * std::sin(endSeqTimer_ * 12.0f);
+		DrawSolidRect({ 0.0f, 0.0f }, { screenW, screenH }, { 0.01f, 0.08f, 0.04f, scanPulse });
 
 		// 四隅の戦術座標ブラケット
 		float bracketLen = 50.0f;
@@ -2382,14 +2437,61 @@ void StageScene::DrawEndSequenceUI() {
 		DrawSolidRect({ screenW - margin - bracketLen, screenH - margin }, { bracketLen, 2.0f }, tactCol);
 		DrawSolidRect({ screenW - margin, screenH - margin - bracketLen }, { 2.0f, bracketLen }, tactCol);
 
+		// 項目11: リアルタイムGPS・衛星テレメトリ情報（システム稼働感）
+		int latNoise = static_cast<int>(std::abs(std::sin(endSeqTimer_ * 14.0f)) * 99.0f);
+		int lonNoise = static_cast<int>(std::abs(std::cos(endSeqTimer_ * 18.0f)) * 99.0f);
+		char coordBuf[128];
+		snprintf(coordBuf, sizeof(coordBuf), "SAT_ORBIT: 420.4KM | LAT: 35.68%02d N | LON: 139.76%02d E | RATE: 10.4 Gbps", latNoise, lonNoise);
 		TextRenderer::GetInstance()->Print(
 			"HackGen",
 			"TACTICAL MAP // SATELLITE ORBIT VIEW [GRID: 44-ALPHA]",
 			margin + 10.0f,
-			margin + 10.0f,
+			margin + 8.0f,
 			16.0f,
 			tactCol
 		);
+		TextRenderer::GetInstance()->Print(
+			"HackGen",
+			coordBuf,
+			margin + 10.0f,
+			margin + 28.0f,
+			12.0f,
+			{ 0.35f, 0.85f, 0.60f, 0.75f }
+		);
+
+		// 項目11: 自機アイコン（画面中央）と円形走査レーダー波
+		float pX = screenW * 0.5f;
+		float pY = screenH * 0.5f;
+
+		// レーダー走査パルス波（外側に広がるリング）
+		float pulseCycle = std::fmod(endSeqTimer_ * 1.5f, 1.0f);
+		float ringRad = 20.0f + pulseCycle * 140.0f;
+		float ringAlpha = (1.0f - pulseCycle) * 0.70f;
+		DrawHollowBorder({ pX - ringRad, pY - ringRad }, { ringRad * 2.0f, ringRad * 2.0f }, { 0.20f, 0.95f, 0.55f, ringAlpha }, 1.5f);
+
+		// 自機アイコンシンボル（デルタ翼・十字レティクル）
+		DrawSolidRect({ pX - 12.0f, pY - 1.0f }, { 24.0f, 2.0f }, { 0.40f, 1.0f, 0.70f, 0.95f });
+		DrawSolidRect({ pX - 1.0f, pY - 12.0f }, { 2.0f, 24.0f }, { 0.40f, 1.0f, 0.70f, 0.95f });
+		DrawHollowBorder({ pX - 8.0f, pY - 8.0f }, { 16.0f, 16.0f }, { 0.40f, 1.0f, 0.70f, 0.95f }, 1.5f);
+
+		// 自機コールサイン
+		TextRenderer::GetInstance()->Print(
+			"HackGen",
+			"▲ PLAYER [MiG-21] (RTB)",
+			pX + 16.0f,
+			pY - 14.0f,
+			12.5f,
+			{ 0.40f, 1.0f, 0.70f, 0.90f }
+		);
+
+		// 項目10: 移行直後（0.0s〜0.26s）の鋭利な垂直急ズーム＋走査デジタルワイプ
+		if (mapTimer < 0.26f) {
+			float wipeProg = mapTimer / 0.26f;
+			float bandH = screenH * 0.25f;
+			float bandY = wipeProg * (screenH + bandH) - bandH;
+			DrawSolidRect({ 0.0f, bandY }, { screenW, bandH }, { 0.25f, 1.0f, 0.60f, (1.0f - wipeProg) * 0.75f }, BlendMode::kAdd);
+			DrawSolidRect({ 0.0f, bandY + bandH * 0.5f }, { screenW, 4.0f }, { 0.90f, 1.0f, 0.95f, (1.0f - wipeProg) * 0.95f }, BlendMode::kAdd);
+		}
 
 		// 3.5s に達した瞬間、SECTOR CLEARED のスタンプがドンッと押される！
 		if (endSeqTimer_ >= 3.5f) {
