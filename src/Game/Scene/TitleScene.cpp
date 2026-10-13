@@ -66,13 +66,13 @@ void TitleScene::Initialize() {
 	consoleBgSprite_->SetColor({ 0.0f, 0.0f, 0.0f, 1.0f });
 	consoleBgSprite_->Update();
 
-	// 出撃シーケンス用ホワイトアウトスプライト（項目1）
+	// 出撃シーケンス用ブラックアウトスプライト（黒フェード）
 	sortieFlashSprite_ = std::make_unique<Sprite>();
 	sortieFlashSprite_->Initialize(spriteCommon, "assets/textures/white1x1.png");
 	sortieFlashSprite_->SetAnchorPoint({ 0.0f, 0.0f });
 	sortieFlashSprite_->SetPosition({ 0.0f, 0.0f });
 	sortieFlashSprite_->SetSize({ kScreenWidth, kScreenHeight });
-	sortieFlashSprite_->SetColor({ 1.0f, 1.0f, 1.0f, 0.0f });
+	sortieFlashSprite_->SetColor({ 0.0f, 0.0f, 0.0f, 0.0f });
 	sortieFlashSprite_->Update();
 
 	// フルOSデスクトップ環境の初期化
@@ -538,13 +538,13 @@ void TitleScene::Initialize() {
 	// フルOSデスクトップ環境の初期化
 	InitializeOSDesktop(spriteCommon);
 
-	// 出撃トランジション用ホワイトアウトスプライトの初期化
+	// 出撃トランジション用ブラックアウトスプライトの初期化（黒フェード）
 	sortieFlashSprite_ = std::make_unique<Sprite>();
 	sortieFlashSprite_->Initialize(spriteCommon, "assets/textures/white1x1.png");
 	sortieFlashSprite_->SetAnchorPoint({ 0.0f, 0.0f });
 	sortieFlashSprite_->SetPosition({ 0.0f, 0.0f });
 	sortieFlashSprite_->SetSize({ kScreenWidth, kScreenHeight });
-	sortieFlashSprite_->SetColor({ 1.0f, 1.0f, 1.0f, 0.0f });
+	sortieFlashSprite_->SetColor({ 0.0f, 0.0f, 0.0f, 0.0f });
 	sortieFlashSprite_->Update();
 
 	// 高品位アフターバーナーの初期化（Mig-21 単発エンジン・ショックダイヤモンド）
@@ -1075,7 +1075,7 @@ void TitleScene::Update() {
 		// 背景カメラをゆっくり進める
 		UpdateLocationCamera(loc, dt, true);
 
-		// 出撃シーケンスのポストエフェクト（項目3: ボタンクリック時の波紋グリッチ ＋ 項目1: ホワイトアウト発光）
+		// 出撃シーケンスのポストエフェクト（項目3: ボタンクリック時の波紋グリッチ ＋ アフターバーナー加速感）
 		PostEffect* postEffect = PostEffect::GetInstance();
 		postEffect->ClearActiveEffects();
 
@@ -1099,22 +1099,28 @@ void TitleScene::Update() {
 			scanline.intensity = 0.18f * shock;
 			postEffect->AddActiveEffect(scanline);
 		} else {
-			// 発光ブルームの急上昇（アフターバーナー点火・ホワイトアウトへの助走：項目1）
+			// 黒フェードアウト進行に伴う減光処理
+			float fadeProgress = 0.0f;
+			if (sortieTimer_ > 1.25f) {
+				fadeProgress = std::clamp((sortieTimer_ - 1.25f) / (kSortieDuration - 1.25f), 0.0f, 1.0f);
+			}
+			float fadeMult = 1.0f - fadeProgress * 0.75f;
+
 			ActivePostEffect bloom;
 			bloom.type = PostEffectType::kBloom;
-			bloom.intensity = 2.5f + 4.5f * normT;
+			bloom.intensity = (1.8f + 1.8f * normT) * fadeMult;
 			bloom.dirX = 1.3f;
 			bloom.dirY = 0.70f;
 			postEffect->AddActiveEffect(bloom);
 
 			ActivePostEffect ab;
 			ab.type = PostEffectType::kChromaticAberration;
-			ab.intensity = 0.008f + 0.025f * normT;
+			ab.intensity = (0.008f + 0.018f * normT) * fadeMult;
 			postEffect->AddActiveEffect(ab);
 
 			ActivePostEffect scanline;
 			scanline.type = PostEffectType::kScanLine;
-			scanline.intensity = 0.04f;
+			scanline.intensity = 0.04f * fadeMult;
 			postEffect->AddActiveEffect(scanline);
 		}
 	}
@@ -2695,15 +2701,18 @@ void TitleScene::DrawSortieSequence() {
 	// フルOSデスクトップ環境（マルチウィンドウ・タスクバー・ターミナル内統合出撃コンソール）
 	DrawOSDesktop();
 
-	// 終盤のホワイトアウト発光（項目1: ハードカット解消）
+	// 終盤のブラックアウト発光（黒フェードアウト）
 	if (sortieFlashSprite_) {
-		float whiteAlpha = 0.0f;
+		float blackAlpha = 0.0f;
 		if (sortieTimer_ > 1.25f) {
 			float p = (sortieTimer_ - 1.25f) / (kSortieDuration - 1.25f);
 			p = (std::min)(1.0f, (std::max)(0.0f, p));
-			whiteAlpha = p * p; // 指数的に強烈な白熱化
+			blackAlpha = p * (3.0f - 2.0f * p); // スムーズなイージングで暗転
 		}
-		sortieFlashSprite_->SetColor({ 1.0f, 1.0f, 1.0f, whiteAlpha });
+		if (blackAlpha > 0.001f) {
+			TextRenderer::GetInstance()->Flush(); // UIテキストを先に描画し、その上に黒フェードを覆い被せる
+		}
+		sortieFlashSprite_->SetColor({ 0.0f, 0.0f, 0.0f, blackAlpha });
 		sortieFlashSprite_->Update();
 		sortieFlashSprite_->Draw();
 	}

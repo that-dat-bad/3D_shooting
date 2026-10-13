@@ -1,18 +1,6 @@
 {
     "description": "5 seconds survival demonstration mission. Maintain flight and clear the mission after 5 seconds.",
-    "enemies": [
-        {
-            "aiType": "CruiseEvade",
-            "health": 50.0,
-            "modelPath": "Resources/planeplane.obj",
-            "position": {
-                "x": 0.0,
-                "y": 100.0,
-                "z": 350.0
-            },
-            "waypointPathName": ""
-        }
-    ],
+    "enemies": [],
     "groundEnemies": [],
     "name": "Demo: 5-Second Survival",
     "objectives": [

@@ -100,69 +100,16 @@ void MissionManager::CreateDefaultMission(const std::string& filepath) {
 	currentMission_.timeLimit = 300.0f;
 	
 	// 空中目標
-	currentMission_.enemies = {
-		{ {  100.0f, 100.0f,  200.0f }, "Resources/planeplane.obj", 50.0f, AIType::ChaseAttack },
-		{ {  -80.0f, 100.0f,  300.0f }, "Resources/planeplane.obj", 50.0f, AIType::ChaseAttack },
-		{ {  200.0f, 100.0f,  450.0f }, "Resources/planeplane.obj", 50.0f, AIType::ChaseAttack },
-		{ { -150.0f, 100.0f,  500.0f }, "Resources/planeplane.obj", 50.0f, AIType::CruiseEvade },
-		{ {   50.0f, 100.0f,  700.0f }, "Resources/planeplane.obj", 50.0f, AIType::CruiseEvade },
-	};
+	currentMission_.enemies = {};
 
 	// 地上目標
-	GroundEnemySpawnData turret1;
-	turret1.position = { 0.0f, 0.0f, 400.0f };
-	turret1.aiType = GroundAIType::Turret;
-	turret1.health = 60.0f;
-
-	GroundEnemySpawnData turret2;
-	turret2.position = { -120.0f, 0.0f, 600.0f };
-	turret2.aiType = GroundAIType::Turret;
-	turret2.health = 60.0f;
-
-	GroundEnemySpawnData structure1;
-	structure1.position = { 150.0f, 0.0f, 550.0f };
-	structure1.aiType = GroundAIType::Structure;
-	structure1.health = 120.0f;
-
-	GroundEnemySpawnData vehicle1;
-	vehicle1.position = { -50.0f, 0.0f, 300.0f };
-	vehicle1.aiType = GroundAIType::PatrolVehicle;
-	vehicle1.health = 45.0f;
-
-	currentMission_.groundEnemies = { turret1, turret2, structure1, vehicle1 };
+	currentMission_.groundEnemies = {};
 
 	// --- Phase 1: デフォルト目標 ---
-	MissionObjective primaryObj;
-	primaryObj.name = "Destroy All Targets";
-	primaryObj.description = "Destroy all enemy aircraft and ground installations.";
-	primaryObj.type = ObjectiveType::DestroyAll;
-	primaryObj.status = ObjectiveStatus::Active;
-	primaryObj.isPrimary = true;
-	currentMission_.objectives.push_back(primaryObj);
+	currentMission_.objectives.clear();
 
 	// --- Phase 1: デフォルトトリガー ---
-	// 60秒後に増援出現
-	MissionTrigger reinforcementTrigger;
-	reinforcementTrigger.name = "Reinforcement Wave";
-	reinforcementTrigger.condition = TriggerCondition::OnTimer;
-	reinforcementTrigger.timerSeconds = 60.0f;
-	reinforcementTrigger.isEnabled = true;
-
-	TriggerAction msgAction;
-	msgAction.type = TriggerActionType::ShowMessage;
-	msgAction.message = "Warning: Enemy reinforcements detected!";
-	msgAction.messageDuration = 4.0f;
-	reinforcementTrigger.actions.push_back(msgAction);
-
-	TriggerAction spawnAction;
-	spawnAction.type = TriggerActionType::SpawnEnemies;
-	spawnAction.spawnEnemies = {
-		{ { 300.0f, 150.0f, 800.0f }, "Resources/planeplane.obj", 50.0f, AIType::ChaseAttack },
-		{ { -300.0f, 150.0f, 900.0f }, "Resources/planeplane.obj", 50.0f, AIType::ChaseAttack },
-	};
-	reinforcementTrigger.actions.push_back(spawnAction);
-
-	currentMission_.triggers.push_back(reinforcementTrigger);
+	currentMission_.triggers.clear();
 
 	Save(filepath);
 }

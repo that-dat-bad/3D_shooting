@@ -112,14 +112,14 @@ void StageScene::Initialize() {
 		}
 	}
 
-	// 出撃イントロ用ホワイトアウト復帰フェードスプライト（項目1）
+	// 出撃イントロ用ブラックアウト復帰フェードスプライト（黒フェードイン）
 	SpriteCommon* spriteCommon = SpriteCommon::GetInstance();
 	introFadeSprite_ = std::make_unique<Sprite>();
 	introFadeSprite_->Initialize(spriteCommon, "assets/textures/white1x1.png");
 	introFadeSprite_->SetAnchorPoint({ 0.0f, 0.0f });
 	introFadeSprite_->SetPosition({ 0.0f, 0.0f });
 	introFadeSprite_->SetSize({ static_cast<float>(WinApp::kClientWidth), static_cast<float>(WinApp::kClientHeight) });
-	introFadeSprite_->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
+	introFadeSprite_->SetColor({ 0.0f, 0.0f, 0.0f, 1.0f });
 	introFadeSprite_->Update();
 	sortieIntroTimer_ = 0.0f;
 
@@ -254,6 +254,10 @@ void StageScene::Initialize() {
 
 	// Phase 1: 目標・トリガーのランタイム状態リセット
 	missionManager.ResetRuntimeState();
+
+	// 画面が黒いうちに全データ（地形・モデル・テクスチャ・敵・ミッション）のGPU転送を確実に確定
+	DirectXCommon::GetInstance()->FlushTextureUploads();
+	DirectXCommon::GetInstance()->WaitForGPU();
 }
 
 void StageScene::TriggerGameOver() {
@@ -1536,10 +1540,21 @@ void StageScene::DrawUI() {
 			tr->Print("HackGen", ">>> FLIGHT CONTROL ASSIGNED TO PILOT >>>", WinApp::kClientWidth * 0.5f, 98.0f, 13.0f, { 0.40f, 1.0f, 0.70f, 0.95f }, { 0.5f, 0.0f });
 		}
 
-		// ホワイトアウトからの復帰フェード（項目1）
-		if (introFadeSprite_ && sortieIntroTimer_ < 0.45f) {
-			float whiteAlpha = std::clamp(1.0f - (sortieIntroTimer_ / 0.45f), 0.0f, 1.0f);
-			introFadeSprite_->SetColor({ 1.0f, 1.0f, 1.0f, whiteAlpha });
+		// ブラックアウトからの復帰フェード（黒フェードイン）
+		// 最初の0.25秒間は暗転（完全ブラック）を維持し、全データの描画とGPUパイプラインが確実に安定してから滑らかに明転
+		constexpr float kFadeHoldDuration = 0.25f;
+		constexpr float kFadeInDuration = 0.65f;
+		constexpr float kTotalFadeDuration = kFadeHoldDuration + kFadeInDuration; // 0.90秒
+
+		if (introFadeSprite_ && sortieIntroTimer_ < kTotalFadeDuration) {
+			TextRenderer::GetInstance()->Flush();
+			float blackAlpha = 1.0f;
+			if (sortieIntroTimer_ > kFadeHoldDuration) {
+				float p = (sortieIntroTimer_ - kFadeHoldDuration) / kFadeInDuration;
+				p = std::clamp(p, 0.0f, 1.0f);
+				blackAlpha = 1.0f - p * (3.0f - 2.0f * p); // スムーズなイージングで明転
+			}
+			introFadeSprite_->SetColor({ 0.0f, 0.0f, 0.0f, blackAlpha });
 			introFadeSprite_->Update();
 			introFadeSprite_->Draw();
 		}
@@ -1583,13 +1598,7 @@ void StageScene::DrawGround() {
 	float snapX = std::floor(aircraftPos.x / tileSize) * tileSize;
 	float snapZ = std::floor(aircraftPos.z / tileSize) * tileSize;
 
-	// 出撃イントロ中のRez構築進行度（奥から手前へ光りながら構築：項目7）
-	bool isRezActive = (sortieIntroTimer_ < kSortieIntroDuration);
-	float rezProg = isRezActive ? std::clamp(sortieIntroTimer_ / (kSortieIntroDuration * 0.70f), 0.0f, 1.0f) : 1.0f;
-	const float lineExtent = tileRange * tileSize;
-	float rezWaveZ = snapZ + lineExtent * (1.0f - rezProg * 2.0f); // 奥から手前へ走るRez波面
-
-	// タイルを敷き詰めて描画
+	// タイルを敷き詰めて描画（画面が黒いうちに100%ロード完了した完全な地形として安定描画）
 	for (int ix = -tileRange; ix <= tileRange; ix++) {
 		for (int iz = -tileRange; iz <= tileRange; iz++) {
 			float cx = snapX + ix * tileSize;
@@ -1604,23 +1613,6 @@ void StageScene::DrawGround() {
 				? Vector4{ 0.25f, 0.35f, 0.20f, 1.0f }   // 暗い草色
 				: Vector4{ 0.35f, 0.50f, 0.28f, 1.0f };   // 明るい草色
 
-			// Rez演出中：波面近傍のタイルが発光し、未構築部はダークサイバー調
-			if (isRezActive) {
-				float distToWave = std::abs(cz - rezWaveZ);
-				if (cz > rezWaveZ) {
-					// 波面より奥（すでにRez構築完了）：徐々に通常色へ
-					float settle = std::clamp((cz - rezWaveZ) / (lineExtent * 0.6f), 0.0f, 1.0f);
-					color = { 0.15f + 0.15f * settle, 0.35f + 0.10f * settle, 0.22f + 0.08f * settle, 1.0f };
-				} else if (distToWave < tileSize * 1.5f) {
-					// 波面通過中：強烈なネオングリーンのRezフラッシュ
-					float flash = 1.0f - (distToWave / (tileSize * 1.5f));
-					color = { 0.35f + 0.40f * flash, 0.85f + 0.15f * flash, 0.50f + 0.35f * flash, 1.0f };
-				} else {
-					// 波面より手前（未構築）：漆黒の仮想空間
-					color = { 0.02f, 0.05f, 0.03f, 1.0f };
-				}
-			}
-
 			Vector3 scale = { tileSize, 1.0f, tileSize };
 			Vector3 rotate = { 0.0f, 0.0f, 0.0f };
 			Vector3 translate = { cx + tileSize * 0.5f, 0.0f, cz + tileSize * 0.5f };
@@ -1633,15 +1625,12 @@ void StageScene::DrawGround() {
 	}
 
 	// --- グリッドライン（100m間隔） ---
-	// 仮想戦闘空間のタクティカルネオングリッド（項目7）
+	// 仮想戦闘空間のタクティカルネオングリッド
+	const float lineExtent = tileRange * tileSize;
+	const Vector4 lineCol = { 0.15f, 0.50f, 0.28f, 0.75f };
+
 	for (int i = -tileRange; i <= tileRange; i++) {
 		float x = snapX + i * tileSize;
-		Vector4 lineCol = { 0.12f, 0.40f, 0.22f, 0.70f };
-		if (isRezActive) {
-			float lineAlpha = std::clamp((x - snapX + lineExtent) / (lineExtent * 2.0f), 0.3f, 1.0f);
-			lineCol = { 0.25f, 0.95f, 0.55f, 0.85f * lineAlpha };
-		}
-
 		PrimitiveModel::GetInstance()->DrawLine3D(
 			{ x, 0.1f, snapZ - lineExtent },
 			{ x, 0.1f, snapZ + lineExtent },
@@ -1651,19 +1640,6 @@ void StageScene::DrawGround() {
 
 	for (int i = -tileRange; i <= tileRange; i++) {
 		float z = snapZ + i * tileSize;
-		Vector4 lineCol = { 0.12f, 0.40f, 0.22f, 0.70f };
-		if (isRezActive) {
-			float dist = std::abs(z - rezWaveZ);
-			if (dist < tileSize * 1.2f) {
-				// 波面上のグリッド線が最も明るく発光
-				lineCol = { 0.65f, 1.0f, 0.80f, 1.0f };
-			} else if (z > rezWaveZ) {
-				lineCol = { 0.25f, 0.85f, 0.50f, 0.75f };
-			} else {
-				lineCol = { 0.05f, 0.20f, 0.10f, 0.35f };
-			}
-		}
-
 		PrimitiveModel::GetInstance()->DrawLine3D(
 			{ snapX - lineExtent, 0.1f, z },
 			{ snapX + lineExtent, 0.1f, z },

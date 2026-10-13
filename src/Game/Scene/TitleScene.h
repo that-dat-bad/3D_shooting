@@ -62,7 +62,7 @@ private:
 	static constexpr float kMenuEnterDuration = 0.30f;   ///< UI形成レーザースキャン
 	float sortieTimer_ = 0.0f;          ///< 出撃シーケンスタイマー（項目1, 2, 3）
 	static constexpr float kSortieDuration = 1.9f;       ///< 出撃シーケンスの総時間
-	std::unique_ptr<Sprite> sortieFlashSprite_;          ///< 出撃トランジション用ホワイトアウト
+	std::unique_ptr<Sprite> sortieFlashSprite_;          ///< 出撃トランジション用ブラックアウト（黒フェード）
 	bool isCursorShown_ = false;
 	void SetCursorVisible(bool visible);
 
