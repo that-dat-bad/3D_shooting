@@ -15,15 +15,19 @@ void UIPanel::Update() {
 
 	UpdateAnimation(1.0f / 60.0f);
 
-	backgroundSprite_->SetPosition(GetRenderPosition());
-	backgroundSprite_->SetSize(GetRenderSize());
-	backgroundSprite_->SetColor(GetRenderColor());
-	backgroundSprite_->SetAnchorPoint(anchorPoint_);
-	backgroundSprite_->Update();
+	if (backgroundSprite_) {
+		backgroundSprite_->SetPosition(GetRenderPosition());
+		backgroundSprite_->SetSize(GetRenderSize());
+		backgroundSprite_->SetColor(GetRenderColor());
+		backgroundSprite_->SetAnchorPoint(anchorPoint_);
+		backgroundSprite_->Update();
+	}
 }
 
 void UIPanel::Draw() {
 	if (!isVisible_) return;
 
-	backgroundSprite_->Draw();
+	if (backgroundSprite_) {
+		backgroundSprite_->Draw();
+	}
 }

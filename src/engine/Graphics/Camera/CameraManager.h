@@ -33,6 +33,12 @@ public:
 	// アクティブカメラの取得 (描画やオブジェクト側で使う)
 	Camera* GetActiveCamera() const { return activeCamera_; }
 
+	// 名前指定でカメラを取得 (存在しない場合はnullptr)
+	Camera* GetCamera(const std::string& name) const;
+
+	// 指定名のカメラが存在するか
+	bool HasCamera(const std::string& name) const;
+
 	// 更新 (アクティブなカメラだけ更新する)
 	void Update();
 

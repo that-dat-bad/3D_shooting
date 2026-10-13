@@ -151,6 +151,12 @@ bool AircraftVisualModel::IsPartVisible(DamagePart part) const {
 	return false;
 }
 
+void AircraftVisualModel::ResetAllPartsVisible() {
+	for (auto& [part, node] : partNodes_) {
+		node.isVisible = true;
+	}
+}
+
 void AircraftVisualModel::Update(const Matrix4x4& parentWorldMatrix, float deltaTime) {
 	// プロペラ回転角の更新
 	if (propellerRpm_ > 0.001f) {

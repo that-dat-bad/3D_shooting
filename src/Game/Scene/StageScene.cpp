@@ -33,16 +33,24 @@ static constexpr float kDeltaTime = 1.0f / 60.0f;
 void StageScene::Initialize() {
 	sceneID = SCENE::STAGE;
 
-	// マウスポインターを非表示（項目9: マウスポインターの残留を完全解消）
-	while (::ShowCursor(FALSE) >= 0) {}
-	::SetCursor(nullptr);
-	HWND hwnd = Input::GetInstance() ? Input::GetInstance()->GetHwnd() : nullptr;
-	if (hwnd) {
-		::SetClassLongPtr(hwnd, GCLP_HCURSOR, 0);
+	if (!isAssetsInitialized_) {
+		InitializeAssets();
+		isAssetsInitialized_ = true;
 	}
 
+	ResetGameplayState();
+}
+
+void StageScene::PrewarmAssets() {
+	if (!isAssetsInitialized_) {
+		InitializeAssets();
+		isAssetsInitialized_ = true;
+	}
+}
+
+void StageScene::InitializeAssets() {
 	// ============================
-	// 機体設定（CFG）のロード（非同期プリロードキャッシュを活用）
+	// 機体設定（CFG）のロード
 	// ============================
 	std::string aircraftCfgPath = aircraftConfig_.GetCurrentFilePath();
 	if (aircraftCfgPath.empty()) {
@@ -51,36 +59,16 @@ void StageScene::Initialize() {
 	if (!AsyncPreloadManager::GetInstance()->ApplyPreloadedAircraftConfig(aircraftConfig_)) {
 		aircraftConfig_.LoadFromCfg(aircraftCfgPath);
 	}
-
-	const auto& airframeData = aircraftConfig_.GetAirframe();
-	const auto& engineData = aircraftConfig_.GetEngine();
-	const auto& gunpodData = aircraftConfig_.GetGunpod();
 	const auto& generalConfig = aircraftConfig_.GetGeneral();
 
-	flightModel_.Initialize(airframeData, engineData);
-
-	// 初期位置: 上空100mから開始
-	flightModel_.SetPosition({ 0.0f, 100.0f, 0.0f });
-
-	// 開始時の速度を250km/hに設定
-	float initialSpeed = 250.0f / 3.6f;
-	flightModel_.SetVelocity(Multiply(initialSpeed, flightModel_.GetForwardDirection()));
-
-	// スロットルを60%に初期化（速度維持のため）
-	throttle_ = 0.6f;
-	flightModel_.SetThrottle(throttle_);
-
-	// TerrainSyncManager の初期化と同期開始
-	TerrainSyncManager::GetInstance()->Initialize("localhost", 8765);
-	TerrainSyncManager::GetInstance()->StartSync();
-
 	// ============================
-	// 描画オブジェクトの初期化
+	// 描画オブジェクト・モデル・テクスチャの初期化（初回のみ）
 	// ============================
-
-	// テクスチャのプリロード
 	TextureManager::GetInstance()->LoadTexture("assets/textures/uvChecker.png");
 	TextureManager::GetInstance()->LoadTexture("assets/textures/circle2.png");
+	TextureManager::GetInstance()->LoadTexture("assets/textures/white1x1.png");
+	TextureManager::GetInstance()->LoadTexture("assets/textures/circle.png");
+	groundTextureIndex_ = TextureManager::GetInstance()->GetTextureIndexByFilePath("assets/textures/white1x1.png");
 
 	// 機体モデル
 	ModelManager::GetInstance()->LoadModel(generalConfig.modelPath);
@@ -94,17 +82,15 @@ void StageScene::Initialize() {
 		aircraftObject_->GetModel()->SetShininess(generalConfig.shininess);
 	}
 
-	// --- 部位破壊対応マルチパーツビジュアルモデル初期化 ---
+	// 部位破壊対応マルチパーツビジュアルモデル初期化
 	aircraftVisualModel_.Initialize(Object3dCommon::GetInstance(), CameraManager::GetInstance()->GetActiveCamera());
 	DebrisManager::GetInstance()->Initialize(Object3dCommon::GetInstance(), CameraManager::GetInstance()->GetActiveCamera());
 
 	// 1つのモデルファイルからノード名に基づいて自動セットアップ
 	aircraftVisualModel_.SetupFromSingleModel(generalConfig.modelPath);
-	// キャノピーの半透明マテリアルと反射・ハイライト設定（項目8: 自機モデルの質感のギャップを解消）
 	aircraftVisualModel_.SetupCanopyMaterial();
 	aircraftVisualModel_.SetMaterialProperties(48.0f, 1.35f, 0.45f);
-	
-	// フォールバックとして、もし何も読み込まれなかった場合（ノードが見つからなかった場合）のために
+
 	if (!aircraftVisualModel_.IsPartVisible(DamagePart::Fuse)) {
 		std::vector<DamagePart> parts = {
 			DamagePart::Fuse, DamagePart::Engine1, DamagePart::Wing_L, DamagePart::Wing_R,
@@ -116,23 +102,7 @@ void StageScene::Initialize() {
 		}
 	}
 
-	// 出撃イントロ（AC6メインシステム戦闘モード起動シーケンス & 黒フェード）初期化
-	SpriteCommon* spriteCommon = SpriteCommon::GetInstance();
-	if (GameResult::GetInstance().isRetry) {
-		combatBootSequence_.SetQuickMode(true);
-		GameResult::GetInstance().isRetry = false; // リトライ出撃フラグを消費
-	}
-	combatBootSequence_.Initialize(spriteCommon);
-	combatBootSequence_.Start();
-	sortieIntroDuration_ = combatBootSequence_.GetCurrentDuration();
-	sortieIntroTimer_ = 0.0f;
-	hud_.ResetDeploy();
-
-	// 地面テクスチャ
-	TextureManager::GetInstance()->LoadTexture("assets/textures/white1x1.png");
-	groundTextureIndex_ = TextureManager::GetInstance()->GetTextureIndexByFilePath("assets/textures/white1x1.png");
-
-	// 項目7: 大空・夕暮れの雲・山脈が広がるピュアスカイボックス（黒背景を解消）
+	// スカイボックス
 	TextureManager::GetInstance()->LoadTexture("assets/textures/qwantani_dusk_2_puresky_2k.dds");
 	skybox_ = std::make_unique<Skybox>();
 	skybox_->Initialize(SkyboxCommon::GetInstance());
@@ -142,45 +112,92 @@ void StageScene::Initialize() {
 	skybox_->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
 	Object3dCommon::GetInstance()->SetDefaultEnvTextureIndex(skyboxTexIndex);
 
-	// ============================
-	// ライティング設定（太陽・環境）
-	// ============================
+	// ライティング設定
 	environmentManager_.Initialize();
-	// ライティングモデル設定
 	Object3dCommon::GetInstance()->SetLightType(1);
 	Object3dCommon::GetInstance()->SetShadingModel(1);
 	Object3dCommon::GetInstance()->SetSpecularModel(2);
 
-	// ============================
+	// 戦闘HUD・出撃イントロ・演出スプライト初期化
+	SpriteCommon* spriteCommon = SpriteCommon::GetInstance();
+	combatBootSequence_.Initialize(spriteCommon);
+	hud_.Initialize(spriteCommon);
 
-	// ============================
-	// カメラ初期位置（機体の後方）
-	// ============================
+	seqOverlaySprite_ = std::make_unique<Sprite>();
+	seqOverlaySprite_->Initialize(spriteCommon, "assets/textures/white1x1.png");
+	seqNoiseSprite_ = std::make_unique<Sprite>();
+	seqNoiseSprite_->Initialize(spriteCommon, "assets/textures/white1x1.png");
+
+	// パーティクルグループの登録（初回のみ）
+	ParticleManager::GetInstance()->CreateParticleGroup("HitSpark", "assets/textures/white1x1.png");
+	ParticleManager::GetInstance()->CreateParticleGroup("Vortex", "assets/textures/circle2.png");
+	ParticleManager::GetInstance()->CreateParticleGroup("Casing", "assets/textures/white1x1.png");
+	ParticleManager::GetInstance()->CreateParticleGroup("ExplosionSpark", "assets/textures/circle.png");
+	ParticleManager::GetInstance()->SetBlendMode("ExplosionSpark", BlendMode::kAdd);
+	ParticleManager::GetInstance()->CreateParticleGroup("ExplosionFire", "assets/textures/circle2.png");
+	ParticleManager::GetInstance()->SetBlendMode("ExplosionFire", BlendMode::kAdd);
+	ParticleManager::GetInstance()->CreateParticleGroup("ExplosionSmoke", "assets/textures/circle2.png");
+	ParticleManager::GetInstance()->SetBlendMode("ExplosionSmoke", BlendMode::kNormal);
+
+	GPUParticleManager::GetInstance()->SetTexture(TextureManager::GetInstance()->GetTextureIndexByFilePath("assets/textures/circle.png"));
+
+	// 初回のみテクスチャアップロードを確定
+	DirectXCommon::GetInstance()->FlushTextureUploads();
+}
+
+void StageScene::ResetGameplayState() {
+	// マウスポインターを非表示（自ウィンドウがアクティブな場合のみ）
+	HWND hwnd = Input::GetInstance() ? Input::GetInstance()->GetHwnd() : nullptr;
+	if (hwnd && ::GetForegroundWindow() == hwnd) {
+		while (::ShowCursor(FALSE) >= 0) {}
+		::SetCursor(nullptr);
+	}
+
+	// 機体設定（CFG）の最新反映
+	std::string aircraftCfgPath = aircraftConfig_.GetCurrentFilePath();
+	if (aircraftCfgPath.empty()) {
+		aircraftCfgPath = "Resources/aircraft/mig21.cfg";
+	}
+	if (!AsyncPreloadManager::GetInstance()->ApplyPreloadedAircraftConfig(aircraftConfig_)) {
+		aircraftConfig_.LoadFromCfg(aircraftCfgPath);
+	}
+
+	const auto& airframeData = aircraftConfig_.GetAirframe();
+	const auto& engineData = aircraftConfig_.GetEngine();
+	const auto& gunpodData = aircraftConfig_.GetGunpod();
+
+	flightModel_.Initialize(airframeData, engineData);
+	flightModel_.SetPosition({ 0.0f, 100.0f, 0.0f });
+
+	float initialSpeed = 250.0f / 3.6f;
+	flightModel_.SetVelocity(Multiply(initialSpeed, flightModel_.GetForwardDirection()));
+	throttle_ = 0.6f;
+	flightModel_.SetThrottle(throttle_);
+
+	// 自機パーツをすべて可視状態に復元
+	aircraftVisualModel_.ResetAllPartsVisible();
+
+#ifdef _DEBUG
+	// TerrainSyncManager の初期化（通信は自動開始せず、デバッグImGuiからの明示的な開始時のみ機能）
+	TerrainSyncManager::GetInstance()->Initialize("localhost", 8765);
+#endif
+
+	// カメラ初期位置
 	Vector3 initPos = flightModel_.GetPosition();
 	Vector3 initForward = flightModel_.GetForwardDirection();
-
 	playerCamera_.Initialize(initPos, initForward);
 	CameraManager::GetInstance()->Update();
 
-	// ============================
-	// マウスエイムコントローラの初期化
-	// ============================
+	// マウスエイムコントローラ
 	mouseAimController_.Initialize();
 	mouseAimEnabled_ = true;
-
-	// マウスエイム開始時はOSカーソルを非表示＆ロック
 	Input::GetInstance()->LockCursor();
 
-	// ============================
-	// 戦闘システムの初期化
-	// ============================
-
+	// 武装・弾丸
 	gunpod_.Initialize(gunpodData);
-
-	// 弾丸マネージャー初期化
 	bulletManager_.Initialize(512);
 
-	// ミッションデータのロード（非同期プリロードキャッシュを活用）
+	// ミッションデータのロード
 	auto& missionManager = MissionManager::GetInstance();
 	std::string loadPath = missionManager.GetCurrentFilePath();
 	if (loadPath.empty()) {
@@ -191,13 +208,10 @@ void StageScene::Initialize() {
 	}
 
 	const auto& mission = missionManager.GetCurrentMission();
-
-	// プレイヤーパラメータの設定
 	playerMaxHP_ = mission.playerHP;
 	playerHP_ = mission.playerHP;
 	flightModel_.SetPosition(mission.playerPosition);
 
-	// 敵の出現制御（enableEnemies_ が false の場合は敵をスポーンさせない）
 	static const std::vector<EnemySpawnData> kEmptyAirEnemies = {};
 	static const std::vector<GroundEnemySpawnData> kEmptyGroundEnemies = {};
 
@@ -211,24 +225,9 @@ void StageScene::Initialize() {
 		enableEnemies_ ? mission.groundEnemies : kEmptyGroundEnemies
 	);
 
-	// エフェクトマネージャー初期化
+	// エフェクトマネージャー初期化＆残存破片のクリア
 	EffectManager::GetInstance()->Initialize();
-	ParticleManager::GetInstance()->CreateParticleGroup("HitSpark", "assets/textures/white1x1.png");
-	ParticleManager::GetInstance()->CreateParticleGroup("Vortex", "assets/textures/circle2.png");
-	ParticleManager::GetInstance()->CreateParticleGroup("Casing", "assets/textures/white1x1.png");
-
-	// 爆発用パーティクルグループの登録
-	TextureManager::GetInstance()->LoadTexture("assets/textures/circle.png");
-	ParticleManager::GetInstance()->CreateParticleGroup("ExplosionSpark", "assets/textures/circle.png");
-	ParticleManager::GetInstance()->SetBlendMode("ExplosionSpark", BlendMode::kAdd);
-
-	ParticleManager::GetInstance()->CreateParticleGroup("ExplosionFire", "assets/textures/circle2.png");
-	ParticleManager::GetInstance()->SetBlendMode("ExplosionFire", BlendMode::kAdd);
-
-	ParticleManager::GetInstance()->CreateParticleGroup("ExplosionSmoke", "assets/textures/circle2.png");
-	ParticleManager::GetInstance()->SetBlendMode("ExplosionSmoke", BlendMode::kNormal);
-
-	GPUParticleManager::GetInstance()->SetTexture(TextureManager::GetInstance()->GetTextureIndexByFilePath("assets/textures/circle.png"));
+	DebrisManager::GetInstance()->Clear();
 
 	// ゲーム状態リセット
 	isMissionCleared_ = false;
@@ -240,10 +239,9 @@ void StageScene::Initialize() {
 	totalTime_ = 0.0f;
 	missionElapsedTime_ = 0.0f;
 
-	// プレイヤー当たり判定ボディの初期化
 	playerBody_.scene_ = this;
 
-	// ミッション制限時間の初期化（MissionDataから取得）
+	// 制限時間の初期化
 	remainingTime_ = mission.timeLimit;
 	int initMin = static_cast<int>(remainingTime_) / 60;
 	int initSec = static_cast<int>(remainingTime_) % 60;
@@ -253,32 +251,30 @@ void StageScene::Initialize() {
 	timeText_.SetAnchorPoint({ 0.5f, 0.0f });
 	timeText_.SetPosition({ WinApp::kClientWidth * 0.5f, 20.0f });
 	timeText_.SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
-
 	timeText_.SetCondition("Warning", [this]() { return remainingTime_ <= 30.0f; });
-
-	// UITextRegistryに登録
 	UITextRegistry::GetInstance()->Register("Stage_Time", &timeText_);
 
-	// 戦闘HUD初期化
-	hud_.Initialize(SpriteCommon::GetInstance());
+	// 出撃イントロ
+	if (GameResult::GetInstance().isRetry) {
+		combatBootSequence_.SetQuickMode(true);
+		GameResult::GetInstance().isRetry = false;
+	} else {
+		combatBootSequence_.SetQuickMode(false);
+	}
+	combatBootSequence_.Start();
+	sortieIntroDuration_ = combatBootSequence_.GetCurrentDuration();
+	sortieIntroTimer_ = 0.0f;
+
+	// HUDリセット
 	hud_.SetWarningColorMode(false);
 	hud_.ResetShutdown();
+	hud_.ResetDeploy();
 	isFiringThisFrame_ = false;
 
-	// 演出用スプライトの初期化
-	seqOverlaySprite_ = std::make_unique<Sprite>();
-	seqOverlaySprite_->Initialize(SpriteCommon::GetInstance(), "assets/textures/white1x1.png");
-	seqNoiseSprite_ = std::make_unique<Sprite>();
-	seqNoiseSprite_->Initialize(SpriteCommon::GetInstance(), "assets/textures/white1x1.png");
 	endSequence_ = StageEndSequence::None;
 	endSeqTimer_ = 0.0f;
 
-	// Phase 1: 目標・トリガーのランタイム状態リセット
 	missionManager.ResetRuntimeState();
-
-	// 画面が黒いうちに全データ（地形・モデル・テクスチャ・敵・ミッション）のGPU転送を確実に確定
-	DirectXCommon::GetInstance()->FlushTextureUploads();
-	DirectXCommon::GetInstance()->WaitForGPU();
 }
 
 void StageScene::TriggerGameOver() {
@@ -298,6 +294,11 @@ void StageScene::TriggerGameOver() {
 	hud_.SetWarningColorMode(true);
 
 	EffectManager::GetInstance()->EmitDestroyEffect(flightModel_.GetPosition());
+
+	// カメラシェイクによる被弾・撃墜の強烈な物理的衝撃（指摘1）
+	if (CameraManager::GetInstance()->GetActiveCamera()) {
+		CameraManager::GetInstance()->GetActiveCamera()->Shake(1.2f, 4.0f);
+	}
 }
 
 void StageScene::TriggerGameClear() {
@@ -396,13 +397,20 @@ void StageScene::Update() {
 	totalTime_ += gameDeltaTime;
 
 	// ============================
-	// 項目8: マウスポインター非表示の徹底（ImGuiやOSメッセージによる再表示を防止）
+	// マウスポインター制御（自アプリがフォアグラウンドの時のみ非表示にし、他アプリ操作時は標準カーソルを復元）
 	// ============================
+	HWND hwnd = Input::GetInstance() ? Input::GetInstance()->GetHwnd() : nullptr;
+	bool isForeground = (hwnd && ::GetForegroundWindow() == hwnd);
+	if (isForeground) {
 #ifdef USE_IMGUI
-	ImGui::SetMouseCursor(ImGuiMouseCursor_None);
+		ImGui::SetMouseCursor(ImGuiMouseCursor_None);
 #endif
-	while (::ShowCursor(FALSE) >= 0) {}
-	::SetCursor(nullptr);
+		while (::ShowCursor(FALSE) >= 0) {}
+		::SetCursor(nullptr);
+	} else {
+		while (::ShowCursor(TRUE) < 0) {}
+		::SetCursor(::LoadCursor(nullptr, IDC_ARROW));
+	}
 
 	// ============================
 	// プレイヤー入力 → FlightModel（ゲームオーバー中は操作遮断）
@@ -684,8 +692,10 @@ void StageScene::Update() {
 	// 破片オブジェクト群の物理シミュレーション更新
 	DebrisManager::GetInstance()->Update(gameDeltaTime);
 
-	// 地形パラメータのMCP同期更新
+#ifdef _DEBUG
+	// 地形パラメータのMCP同期更新（デバッグ時のみ）
 	TerrainSyncManager::GetInstance()->Update();
+#endif
 
 	// --- 翼端ボルテックスエフェクトの発生 ---
 	float currentG = flightModel_.GetCurrentG();
@@ -1657,13 +1667,18 @@ void StageScene::DrawUI() {
 
 void StageScene::Finalize() {
 	combatBootSequence_.Finalize();
+#ifdef _DEBUG
 	TerrainSyncManager::GetInstance()->Finalize();
+#endif
 	
 	// シーン終了時にカーソルを復帰
 	Input::GetInstance()->UnlockCursor();
+	while (::ShowCursor(TRUE) < 0) {}
+	::SetCursor(::LoadCursor(nullptr, IDC_ARROW));
 
 	// エフェクトマネージャーの後片付け
 	EffectManager::GetInstance()->Finalize();
+	DebrisManager::GetInstance()->Clear();
 
 	// ポストエフェクトをクリア
 	PostEffect::GetInstance()->ClearActiveEffects();
@@ -2054,8 +2069,7 @@ void StageScene::DrawMissionMessages() {
 }
 
 void StageScene::Restart() {
-	Finalize();
-	Initialize();
+	ResetGameplayState();
 }
 
 // ============================================================
@@ -2069,51 +2083,157 @@ void StageScene::UpdateEndSequence(float dt) {
 
 	endSeqTimer_ += dt;
 
-	// --- ゲームオーバー系（キビキビとした緊迫感のある高速テンポへ最適化: 計1.10秒）---
+	PostEffect* postEffect = PostEffect::GetInstance();
+	postEffect->ClearActiveEffects();
+
+	// --- ゲームオーバー系（被弾・撃墜のシステム破壊演出をシェーダーで画面全体に展開：指摘1, 5）---
 	if (endSequence_ == StageEndSequence::GameOver_Critical) {
-		// 項目4: 0.0s - 0.25s: 撃墜瞬間の被弾スローモーション & 赤反転点滅
+		// 0.0s - 0.25s: 撃墜瞬間の被弾スローモーション & 激しい画面破壊シェーダー
 		timeScale_ = 0.20f;
+
+		// 1. 赤色警告ティントストロボ点滅
+		ActivePostEffect tint;
+		tint.type = PostEffectType::kColorTint;
+		tint.colorR = 1.0f;
+		tint.colorG = (std::fmod(endSeqTimer_, 0.08f) < 0.04f) ? 0.15f : 0.40f;
+		tint.colorB = 0.10f;
+		postEffect->AddActiveEffect(tint);
+
+		// 2. 衝撃レンズ歪み
+		ActivePostEffect dist;
+		dist.type = PostEffectType::kLensDistortion;
+		dist.intensity = 0.25f;
+		postEffect->AddActiveEffect(dist);
+
+		// 3. 激しい色収差 (RGB分離)
+		ActivePostEffect ca;
+		ca.type = PostEffectType::kChromaticAberration;
+		ca.intensity = 0.08f;
+		postEffect->AddActiveEffect(ca);
+
+		// 4. ランダム破壊ノイズ
+		ActivePostEffect noise;
+		noise.type = PostEffectType::kRandom;
+		noise.intensity = 0.35f;
+		postEffect->AddActiveEffect(noise);
+
 		if (endSeqTimer_ >= 0.25f) {
 			endSequence_ = StageEndSequence::GameOver_SignalLost;
 		}
 	} else if (endSequence_ == StageEndSequence::GameOver_SignalLost) {
-		// 項目1: 0.25s - 0.70s: 致命的通信途絶・フリーズ & 激しいグリッチノイズ & SIGNAL LOST
+		// 0.25s - 0.70s: 致命的通信途絶・フリーズ & 激しい走査線同期乱れ & SIGNAL LOST
 		timeScale_ = 0.0f;
+
+		// 1. 走査線の乱れ
+		ActivePostEffect scan;
+		scan.type = PostEffectType::kScanLine;
+		scan.kernelSize = 0;
+		scan.intensity = 0.45f;
+		scan.dirX = 250.0f;
+		scan.dirY = -30.0f;
+		postEffect->AddActiveEffect(scan);
+
+		// 2. デジタルグリッチノイズ
+		ActivePostEffect noise;
+		noise.type = PostEffectType::kRandom;
+		noise.intensity = 0.45f;
+		postEffect->AddActiveEffect(noise);
+
+		// 3. 色収差
+		ActivePostEffect ca;
+		ca.type = PostEffectType::kChromaticAberration;
+		ca.intensity = 0.06f;
+		postEffect->AddActiveEffect(ca);
+
+		// 4. 赤暗化ビネット
+		ActivePostEffect vig;
+		vig.type = PostEffectType::kVignette;
+		vig.intensity = 1.4f;
+		postEffect->AddActiveEffect(vig);
+
 		if (endSeqTimer_ >= 0.70f) {
 			endSequence_ = StageEndSequence::GameOver_CrtShutdown;
 		}
 	} else if (endSequence_ == StageEndSequence::GameOver_CrtShutdown) {
-		// 項目2: 0.70s - 0.95s: ブラウン管テレビの電源遮断演出（水平収束・プツッ消滅）
-		// 空白時間を作らず、プツッと消えた瞬間（0.95s）に即座にGameOverSceneへ移行！
+		// 0.70s - 0.95s: ブラウン管テレビの電源遮断演出（水平収束・プツッ消滅）
 		timeScale_ = 0.0f;
+
+		ActivePostEffect dist;
+		dist.type = PostEffectType::kLensDistortion;
+		dist.intensity = 0.35f;
+		postEffect->AddActiveEffect(dist);
+
+		ActivePostEffect scan;
+		scan.type = PostEffectType::kScanLine;
+		scan.intensity = 0.5f;
+		scan.dirX = 800.0f;
+		scan.dirY = 5.0f;
+		postEffect->AddActiveEffect(scan);
+
 		if (endSeqTimer_ >= 0.95f) {
+			postEffect->ClearActiveEffects();
 			sceneID = SCENE::GAMEOVER;
+			return;
 		}
 	}
 	// --- ステージクリア系 ---
 	else if (endSequence_ == StageEndSequence::Clear_HudShutdown) {
-		// 項目5: 0.0s - 1.4s: HUD各パーツが「OFFLINE」となり順次消滅、MISSION ACCOMPLISHED タイピング
+		// 0.0s - 1.2s: 目標達成ファンファーレ & 発光
 		timeScale_ = 1.0f;
-		if (endSeqTimer_ >= 1.4f) {
+
+		ActivePostEffect bloom;
+		bloom.type = PostEffectType::kBloom;
+		bloom.intensity = 2.5f;
+		bloom.dirX = 1.2f;
+		bloom.dirY = 0.7f;
+		postEffect->AddActiveEffect(bloom);
+
+		if (endSeqTimer_ >= 1.2f) {
 			endSequence_ = StageEndSequence::Clear_AutopilotReturn;
 		}
 	} else if (endSequence_ == StageEndSequence::Clear_AutopilotReturn) {
-		// 項目6: 1.4s - 2.8s: ENTERING AUTOPILOT MODE... RETURNING TO BASE、自機急加速・急上昇
+		// 1.2s - 2.5s: オートパイロット帰還時の超音速ワープ急加速演出（指摘2: ラジアルブラー画面全体シェーダー）
 		timeScale_ = 1.0f;
-		// オートパイロットによる自機急上昇加速制御
-		float climbT = std::clamp((endSeqTimer_ - 1.4f) / 1.4f, 0.0f, 1.0f);
-		float speed = 120.0f + climbT * 420.0f;
+		float climbT = std::clamp((endSeqTimer_ - 1.2f) / 1.3f, 0.0f, 1.0f);
+		float speed = 120.0f + climbT * 600.0f; // 圧倒的最高速
 		Vector3 curFwd = flightModel_.GetForwardDirection();
-		Vector3 climbDir = Normalize(Add(curFwd, { 0.0f, 0.60f * climbT, 0.0f }));
+		Vector3 climbDir = Normalize(Add(curFwd, { 0.0f, 0.65f * climbT, 0.0f }));
 		flightModel_.SetVelocity(Multiply(speed, climbDir));
 
-		if (endSeqTimer_ >= 2.8f) {
+		// 1. ラジアルブラー（スピード感・ワープ感の画面全体演出）
+		ActivePostEffect blur;
+		blur.type = PostEffectType::kRadialBlur;
+		blur.kernelSize = 8;
+		blur.intensity = climbT * 0.08f;
+		postEffect->AddActiveEffect(blur);
+
+		// 2. 色収差（光速突入の色ズレ）
+		ActivePostEffect ca;
+		ca.type = PostEffectType::kChromaticAberration;
+		ca.intensity = climbT * 0.04f;
+		postEffect->AddActiveEffect(ca);
+
+		if (endSeqTimer_ >= 2.5f) {
 			endSequence_ = StageEndSequence::Clear_TacticalMapZoom;
 		}
 	} else if (endSequence_ == StageEndSequence::Clear_TacticalMapZoom) {
-		// 項目7: 2.8s - 4.5s: 垂直急ズームアウト、戦術マップ化、3.5sでSECTOR CLEAREDスタンプ押下
+		// 2.5s - 3.8s: 戦術マップ表示（走査線 + ビネット）＆ ターミナル転送接続（指摘3, 4）
 		timeScale_ = 1.0f;
-		if (endSeqTimer_ >= 4.5f) {
+
+		ActivePostEffect scan;
+		scan.type = PostEffectType::kScanLine;
+		scan.intensity = 0.25f;
+		scan.dirX = 500.0f;
+		scan.dirY = -3.0f;
+		postEffect->AddActiveEffect(scan);
+
+		ActivePostEffect vig;
+		vig.type = PostEffectType::kVignette;
+		vig.intensity = 1.1f;
+		postEffect->AddActiveEffect(vig);
+
+		if (endSeqTimer_ >= 3.8f) {
+			postEffect->ClearActiveEffects();
 			// クリアリザルトへ記録を保存して遷移
 			auto& res = GameResult::GetInstance();
 			res.missionCleared = true;
@@ -2121,6 +2241,7 @@ void StageScene::UpdateEndSequence(float dt) {
 			res.playerHPRemaining = playerHP_;
 			res.playerMaxHP = playerMaxHP_;
 			sceneID = SCENE::CLEAR;
+			return;
 		}
 	}
 }
@@ -2332,50 +2453,40 @@ void StageScene::DrawEndSequenceUI() {
 	}
 
 	// ------------------------------------------------------------
-	// 項目5: ステージクリア時のMISSION ACCOMPLISHEDタイピング
+	// ステージクリア時の巨大ファンファーレUI（大きく「OPERATION CLEARED」演出：指摘1）
 	// ------------------------------------------------------------
 	else if (endSequence_ == StageEndSequence::Clear_HudShutdown) {
-		if (endSeqTimer_ >= 0.40f) {
-			const std::string fullTitle = "MISSION ACCOMPLISHED";
-			float typeTime = endSeqTimer_ - 0.40f;
-			int charCount = static_cast<int>(typeTime / 0.045f);
-			if (charCount > static_cast<int>(fullTitle.size())) {
-				charCount = static_cast<int>(fullTitle.size());
-			}
-			std::string displayTitle = fullTitle.substr(0, charCount);
+		float bannerW = 880.0f;
+		float bannerH = 120.0f;
+		float bannerX = (screenW - bannerW) * 0.5f;
+		float bannerY = screenH * 0.5f - 60.0f;
 
-			// カーソル点滅
-			bool showCursor = (static_cast<int>(typeTime * 10.0f) % 2 == 0);
-			if (charCount < static_cast<int>(fullTitle.size()) && showCursor) {
-				displayTitle += "_";
-			}
+		// 発光バックグラウンド
+		float pulseAlpha = 0.88f + 0.12f * std::sin(endSeqTimer_ * 15.0f);
+		DrawSolidRect({ bannerX, bannerY }, { bannerW, bannerH }, { 0.02f, 0.12f, 0.06f, 0.92f });
+		DrawHollowBorder({ bannerX, bannerY }, { bannerW, bannerH }, { 0.30f, 1.0f, 0.60f, pulseAlpha }, 3.0f);
+		DrawSolidRect({ bannerX, bannerY }, { bannerW, 4.0f }, { 0.60f, 1.0f, 0.80f, 1.0f });
 
-			float centerY = screenH * 0.5f - 40.0f;
+		// 巨大な "OPERATION CLEARED" スタンプ
+		TextRenderer::GetInstance()->Print(
+			"HackGen",
+			"// OPERATION CLEARED //",
+			screenW * 0.5f,
+			bannerY + 14.0f,
+			48.0f,
+			{ 0.35f, 1.0f, 0.60f, 1.0f },
+			{ 0.5f, 0.0f }
+		);
 
-			// タイピングテキスト
-			TextRenderer::GetInstance()->Print(
-				"HackGen",
-				displayTitle.c_str(),
-				screenW * 0.5f,
-				centerY,
-				42.0f,
-				{ 0.35f, 1.0f, 0.60f, 0.95f },
-				{ 0.5f, 0.0f }
-			);
-
-			// 日本語補足「(作戦完了)」
-			if (charCount >= static_cast<int>(fullTitle.size())) {
-				TextRenderer::GetInstance()->Print(
-					"HackGen",
-					"(作戦完了)",
-					screenW * 0.5f,
-					centerY + 50.0f,
-					22.0f,
-					{ 0.70f, 0.95f, 0.80f, 0.85f },
-					{ 0.5f, 0.0f }
-				);
-			}
-		}
+		TextRenderer::GetInstance()->Print(
+			"HackGen",
+			"ALL PRIMARY OBJECTIVES ACHIEVED // AIRSPACE SECURED (作戦空域完全制圧)",
+			screenW * 0.5f,
+			bannerY + 74.0f,
+			20.0f,
+			{ 0.80f, 1.0f, 0.90f, 0.95f },
+			{ 0.5f, 0.0f }
+		);
 	}
 
 	// ------------------------------------------------------------
@@ -2537,6 +2648,25 @@ void StageScene::DrawEndSequenceUI() {
 				boxY + 74.0f * stampScale,
 				22.0f * stampScale,
 				{ 1.0f, 0.85f, 0.80f, 0.95f },
+				{ 0.5f, 0.0f }
+			);
+		}
+
+		// 項目4: 戦術マップとリザルト画面（デスクトップ）の視覚的繋がり（転送ブリッジ）
+		if (mapTimer >= 0.60f) {
+			float transBannerW = 740.0f;
+			float transBannerH = 52.0f;
+			float transBannerX = (screenW - transBannerW) * 0.5f;
+			float transBannerY = screenH - 100.0f;
+			DrawSolidRect({ transBannerX, transBannerY }, { transBannerW, transBannerH }, { 0.02f, 0.08f, 0.16f, 0.92f });
+			DrawHollowBorder({ transBannerX, transBannerY }, { transBannerW, transBannerH }, { 0.25f, 0.85f, 1.0f, 0.95f }, 1.5f);
+			TextRenderer::GetInstance()->Print(
+				"HackGen",
+				"TRANSFERRING TELEMETRY TO TACTICAL TERMINAL // DEBRIEF READY...",
+				screenW * 0.5f,
+				transBannerY + 16.0f,
+				18.0f,
+				{ 0.40f, 0.95f, 1.0f, 1.0f },
 				{ 0.5f, 0.0f }
 			);
 		}

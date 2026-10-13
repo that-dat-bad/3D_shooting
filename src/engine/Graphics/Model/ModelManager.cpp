@@ -3,6 +3,8 @@
 #include "../System/DirectXCommon.h"
 #include "../System/SrvManager.h"
 #include <filesystem>
+#include <future>
+#include <vector>
 
 std::unique_ptr<ModelManager> ModelManager::instance_ = nullptr;
 
@@ -49,6 +51,44 @@ void ModelManager::LoadModel(const std::string& filePath)
 
 	//モデルをmapコンテナに格納する
 	models_.insert(std::make_pair(filePath, std::move(model)));
+}
+
+void ModelManager::LoadModelsParallel(const std::vector<std::string>& filePaths)
+{
+	std::vector<std::string> toLoad;
+	for (const auto& path : filePaths) {
+		if (!models_.contains(path)) {
+			toLoad.push_back(path);
+		}
+	}
+	if (toLoad.empty()) {
+		return;
+	}
+
+	// 1. 全コアを活用した複数スレッド並列ファイルパース（Assimp）
+	std::vector<std::future<std::pair<std::string, Model::ModelData>>> futures;
+	futures.reserve(toLoad.size());
+
+	for (const auto& path : toLoad) {
+		futures.push_back(std::async(std::launch::async, [path]() {
+			std::string fullPath;
+			if (std::filesystem::exists(path)) {
+				fullPath = path;
+			} else {
+				fullPath = "assets/" + path;
+			}
+			Model::ModelData data = Model::LoadModelFile("", fullPath);
+			return std::make_pair(path, std::move(data));
+		}));
+	}
+
+	// 2. パース完了順にGPUリソース生成と登録
+	for (auto& fut : futures) {
+		auto [path, modelData] = fut.get();
+		auto model = std::make_unique<Model>();
+		model->InitializeFromModelData(modelCommon_.get(), std::move(modelData));
+		models_.insert(std::make_pair(path, std::move(model)));
+	}
 }
 
 Model* ModelManager::FindModel(const std::string& filePath)

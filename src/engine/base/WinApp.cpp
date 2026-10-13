@@ -20,6 +20,21 @@ LRESULT CALLBACK WinApp::WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM l
 #endif // USE_IMGUI
 
 	switch (msg) {
+	case WM_ACTIVATE:
+		if (LOWORD(wparam) == WA_INACTIVE) {
+			// 他のアプリにフォーカスが移った時: カーソル制限を全解除し、OS標準カーソルを確実に復元
+			while (::ShowCursor(TRUE) < 0) {}
+			::SetCursor(::LoadCursor(nullptr, IDC_ARROW));
+			::ClipCursor(nullptr);
+		}
+		break;
+	case WM_SETCURSOR:
+		// クライアント領域外（タイトルバーやウィンドウ枠）または非アクティブ時は標準カーソルを表示
+		if (LOWORD(lparam) != HTCLIENT || ::GetForegroundWindow() != hwnd) {
+			::SetCursor(::LoadCursor(nullptr, IDC_ARROW));
+			return DefWindowProc(hwnd, msg, wparam, lparam);
+		}
+		break;
 	case WM_CLOSE:
 		DestroyWindow(hwnd);
 		return 0;

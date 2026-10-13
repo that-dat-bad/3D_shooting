@@ -52,6 +52,8 @@ Vector2 TextRenderer::CalculateTextSize(const std::string& fontName, const std::
         auto it = info->glyphs.find(codepoint);
         if (it != info->glyphs.end()) {
             totalWidth += it->second.xadvance * scale;
+        } else {
+            totalWidth += (codepoint > 0x7F) ? size : (size * 0.5f);
         }
     }
     float fontHeight = (info->ascent - info->descent) * scale;
@@ -126,6 +128,10 @@ void TextRenderer::Print(const std::string& fontName, const std::string& text, f
 
             // 次の文字へ進める
             startX += b->xadvance * scale;
+        } else {
+            // 未登録文字または特殊スペース時の文字送りフォールバック
+            float adv = (codepoint > 0x7F) ? size : (size * 0.5f);
+            startX += adv;
         }
     }
 }

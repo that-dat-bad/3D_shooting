@@ -130,8 +130,14 @@ void UIButton::Draw() {
 			float btnLeft = position_.x - size_.x * anchorPoint_.x;
 			float textCenterY = position_.y + size_.y * (0.5f - anchorPoint_.y) + textOffset_.y;
 
-			// 1. 左側余白の ">>"（ボタン左端から28pxの位置に端正に配置）
-			float promptX = btnLeft + 28.0f;
+			// 1. 左側余白の ">>"（テキストの左手前に端正に配置し、重なりを完全防止）
+			float promptX = 0.0f;
+			if (textAlignment_ == TextAlignment::Left) {
+				promptX = btnLeft + (std::max)(8.0f, leftPadding_ - 24.0f);
+			} else {
+				float textCenterX = position_.x + size_.x * (0.5f - anchorPoint_.x) + textOffset_.x;
+				promptX = textCenterX - textSize.x * 0.5f - 24.0f;
+			}
 			tr->Print(fontName, ">>", promptX, textCenterY, fontSize_, selectedTextColor_, { 0.0f, 0.5f });
 
 			// 2. テキスト末尾の点滅カーソル "_"（0.36秒周期で点滅）

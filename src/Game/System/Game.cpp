@@ -6,6 +6,7 @@
 #include "../../engine/Graphics/Particle/GPUParticleManager.h"
 #include "../../engine/Graphics/Text/FontManager.h"
 #include "../../engine/Graphics/Text/TextRenderer.h"
+#include "../../engine/Graphics/Model/ModelManager.h"
 #include "../Scene/SceneFactory.h"
 #include "../Scene/TitleScene.h"
 
@@ -48,6 +49,22 @@ void Game::Initialize() {
 	};
 	FontManager::GetInstance()->LoadFontsParallel(fontRequests);
 
+	// マルチスレッド並列モデルロード：全CPUコアを活用してAssimpパースを同時並列実行
+	std::vector<std::string> modelRequests = {
+		"Resources/models/m21_wg.gltf",
+		"Resources/models/m21.gltf",
+		"Resources/models/m21_crashed.gltf",
+		"Resources/models/title/Tunnel.obj",
+		"Resources/models/title/Tunnel_road.obj",
+		"Resources/models/title/Tunnel_guide.obj",
+		"Resources/models/title/Tunnel_rotate.obj",
+		"models/sphere.obj",
+		"models/plane.gltf",
+		"models/plane.obj",
+		"models/terrain.obj"
+	};
+	ModelManager::GetInstance()->LoadModelsParallel(modelRequests);
+
 	imguiManager = std::make_unique<ImGuiManager>();
 	imguiManager->Initialize(winApp.get(), DirectXCommon::GetInstance(), srvManager.get());
 
@@ -57,7 +74,11 @@ void Game::Initialize() {
 	PostEffect::GetInstance()->Initialize(DirectXCommon::GetInstance(), srvManager.get());
 
 	// 5. シーンマネージャの生成 (全ての準備が整ってから)
-	sceneManager = std::make_unique<SceneManager>(std::make_unique<SceneFactory>()); // 内部でシーンの Initialize が走る
+	sceneManager = std::make_unique<SceneManager>(std::make_unique<SceneFactory>()); // 内部で初期シーン(TITLE)の Initialize が走る
+
+	// 全シーン事前ウォームアップ：全シーン（STAGE, GAMEOVER, CLEAR）を先行初期化してプールに保管
+	// これにより、プレイ中の全シーン移行（Title⇄Stage⇄GameOver⇄Clear）が完全に0msシームレスになる
+	sceneManager->PrewarmAllScenes();
 
 	// 6. Win32 ネイティブ UIエディタ別ウィンドウの初期化
 	UIEditorWindow::GetInstance()->Initialize(winApp->GetHwnd());
@@ -138,6 +159,8 @@ void Game::Draw() {
 
 	// フレーム終了処理（PRESENTに遷移、submit、present）
 	DirectXCommon::GetInstance()->EndFrame();
+
+
 }
 
 void Game::Run() {

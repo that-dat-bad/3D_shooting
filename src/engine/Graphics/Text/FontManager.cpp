@@ -72,31 +72,28 @@ FontRasterResult FontManager::RasterizeFontInternal(const std::string& fontName,
         return result;
     }
 
-    // 高解像度パッキング（4096 x 4096テクスチャ）
-    stbtt_pack_context spc;
-    result.texWidth = 4096;
-    result.texHeight = 4096;
-    std::vector<unsigned char> tempBitmap(result.texWidth * result.texHeight);
-
-    if (!stbtt_PackBegin(&spc, tempBitmap.data(), result.texWidth, result.texHeight, 0, 1, nullptr)) {
-        return result;
-    }
-    stbtt_PackSetOversampling(&spc, 1, 1);
-
-    // 主要漢字のリスト
-    static const std::u32string kCommonKanji =
-        U"戦雷撃破残数時間操作設定終了勝敗点次戻再開始面難易度音量効果主要任務完成失敗機体敵弾速度高力残量命中率得点最新記録結果状態確認情報選択決定戻る"
-        U"一二三四五六七八九十百千万億円日月火水木金土年月日日時分秒前後左右上下東西南北"
-        U"無有正誤入出大小中長短多少高低新旧良悪強弱勝負生死光暗炎氷雷風水土毒盾剣銃"
-        U"自他友敵王神魔竜人女男子供赤青緑黄黒白金銀"
-        U"攻撃防御回避回復移動飛行加速減速照準索敵通信警告危険注意停止開始設定初期起動式換"
-        U"画面解像度音質言語全般表示描画処理速度"
-        U"第章節段級位界宇宙星空陸海川山森都市街建物道路橋"
-        U"自機僚機標的目標迎撃索敵追尾離脱接近交戦戦果作戦指令司令部防衛制圧";
+    // このゲームで実際に使用されている全漢字（901文字）の事前登録リスト
+    static const std::u32string kUsedGameKanji =
+        U"一七万三上下不与両並中丸主久乗九乱了予事二互五井亡交人今仕他付代令以仮仰件任伏会伴伸似位低体何余作使例供依価便係保信修俯"
+        U"個倍倒候値偏停側偶備傷傾働像僚億優元充先光克入全八公六共具典内円再冒写冷処出分切列初判別利到制刷刺刻則削前剛剣副剰割力功"
+        U"加助効動務勝勢化北区十千半南単印危即厚原厳去参友双反収取受口句可台右号司各合同名向含吸吹告周味呼命和哀品問善喪器噴四回囲"
+        U"図固土圧在地均垂型埃埋域基堂報場塔塗填境増墜壁壊声変夕外多夜大天太央失奇奥奨女始委姿威子字存学孫宇安完宙定宜実宣害容寂寄"
+        U"密寸対寿専射将導小少尾屈届屋展属層履山崩嵐川巡左巨差巻市布帯帰帳常幅幕干平年幾広床序底度座庫廃延建式引弦弧弱張強弾当形影"
+        U"役往径待後徐従得御復微徹心必応念思急性恐悪情想愁意感態慣慮成戒戦戻所手打扱承抑投抗折抜択抵押抽担招拠拡括持指挙挫振捉捗掌"
+        U"排掛探接控推揃描提揚換握揺損搭携摘摩撃撤操擦擬支改攻放故敗散数整敵敷文斉料斜斬断新方施旋既日旦旧早昇明昏易星映昼時普景暖"
+        U"暗暮曲更書替最月有期木未末本材束条来東板析枚果枠枯染柔柱査栄核根格案梁棄森検楕業極概構様標権横樽橋機次止正武歪歴死殊残殲"
+        U"段毎毒比気水氷求汎汚決沈沢油沿況法波注洗活派流浮海消淡深渇済減渡温測湾満源準溜溝滅滑滞漂漆漏演漢潰激濃瀬火灯災炎点烈無焦"
+        U"然焼煙煤照熱燃爆片版物特状独狭猛猶率王珠現球理璧環生産用由甲男画界留略番異疑症痕発登白百的盛監盤目直相盾省真着瞬瞰矢知矩"
+        U"短砂砲破確示神票禁秒称移程種稼積穏穴空突立竜章端第等策箇算管箱節範築簡粉粋粒精系約紅紋納純級素索細終組経結統絶継続維綺緊"
+        U"総緑線編緩練縁縦縮繊繋繰置美群義翼考耐肌背胴能脅脈脚脱腹膜膨臨自致航般舵良色芒花若英茶荒荷莢落蒸蓄蔵蔽薄薬虚行術街衛衝表"
+        U"衰被装裏裕補複西要覆見規視覚覧親観角解触言計記訪設許診証評詰該詳認誘語誤説読課調識警譲護象負費質赤走起超足距跡路跳身車軌"
+        U"軍転軸軽較載輝輪辺込辿迎近返迫追退送逆透途這通速造連進遅遊運過道達遠適遮遷選避還部郭都配重野量金鉄銀銃銅鋭鋼錐録鍮鎖鏡長"
+        U"閃閉開間関閾闘防降限除陸険陽隅階随隔隙際障隠隣集離難雲雷電震青静非面音響頂項順須領頭頻題類風飛食飾首駄駆骨骸高魔鮮鶏麗黄"
+        U"黒";
 
     // 必要な全コードポイントを1つの配列に集約
     std::vector<int> codepoints;
-    codepoints.reserve(1024);
+    codepoints.reserve(2048);
 
     // 1. ASCII (32-126)
     for (int c = 32; c <= 126; ++c) codepoints.push_back(c);
@@ -113,8 +110,18 @@ FontRasterResult FontManager::RasterizeFontInternal(const std::string& fontName,
     // 5. 全角記号・英数 (0xFF01-0xFF5E)
     for (int c = 0xFF01; c <= 0xFF5E; ++c) codepoints.push_back(c);
 
-    // 6. 主要漢字
-    for (char32_t c : kCommonKanji) {
+    // 6. 一般的な追加特殊記号 (度数、矢印、幾何学記号、三点リーダー等)
+    static const char32_t kCommonSymbols[] = {
+        U'°', U'±', U'×', U'÷', U'…', U'※', U'★', U'☆',
+        U'■', U'□', U'▲', U'△', U'▼', U'▽', U'◆', U'◇',
+        U'○', U'●', U'◎', U'→', U'←', U'↑', U'↓'
+    };
+    for (char32_t c : kCommonSymbols) {
+        codepoints.push_back(static_cast<int>(c));
+    }
+
+    // 7. このゲームで使われている全漢字 (901文字)
+    for (char32_t c : kUsedGameKanji) {
         if (c > 0 && c <= 0x10FFFF) {
             codepoints.push_back(static_cast<int>(c));
         }
@@ -123,18 +130,38 @@ FontRasterResult FontManager::RasterizeFontInternal(const std::string& fontName,
     std::sort(codepoints.begin(), codepoints.end());
     codepoints.erase(std::unique(codepoints.begin(), codepoints.end()), codepoints.end());
 
+    // 高解像度パッキング（基本は 4096 x 4096 テクスチャ、必要時に自動拡張）
+    int texDim = 4096;
+    stbtt_pack_context spc;
+    std::vector<unsigned char> tempBitmap;
     std::vector<stbtt_packedchar> packedChars(codepoints.size());
 
-    stbtt_pack_range range{};
-    range.font_size = pixelHeight;
-    range.first_unicode_codepoint_in_range = 0;
-    range.array_of_unicode_codepoints = codepoints.data();
-    range.num_chars = static_cast<int>(codepoints.size());
-    range.chardata_for_range = packedChars.data();
+    for (int attempt = 0; attempt < 2; ++attempt) {
+        tempBitmap.assign(texDim * texDim, 0);
+        if (!stbtt_PackBegin(&spc, tempBitmap.data(), texDim, texDim, 0, 1, nullptr)) {
+            return result;
+        }
+        stbtt_PackSetOversampling(&spc, 1, 1);
 
-    stbtt_PackFontRanges(&spc, ttfBuffer.data(), 0, &range, 1);
-    stbtt_PackEnd(&spc);
+        stbtt_pack_range range{};
+        range.font_size = pixelHeight;
+        range.first_unicode_codepoint_in_range = 0;
+        range.array_of_unicode_codepoints = codepoints.data();
+        range.num_chars = static_cast<int>(codepoints.size());
+        range.chardata_for_range = packedChars.data();
 
+        int ret = stbtt_PackFontRanges(&spc, ttfBuffer.data(), 0, &range, 1);
+        stbtt_PackEnd(&spc);
+
+        if (ret == 1) {
+            break;
+        }
+        // 万が一文字サイズが巨大で収まらなかった場合は 8192 に拡張してリトライ
+        texDim = 8192;
+    }
+
+    result.texWidth = texDim;
+    result.texHeight = texDim;
     result.info.size = pixelHeight;
     result.info.textureName = fontName + "_Tex";
     result.info.textureIndex = 0;

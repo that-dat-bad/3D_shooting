@@ -38,6 +38,18 @@ void CameraManager::SetActiveCamera(const std::string& name) {
 	}
 }
 
+Camera* CameraManager::GetCamera(const std::string& name) const {
+	auto it = cameras_.find(name);
+	if (it != cameras_.end()) {
+		return it->second.get();
+	}
+	return nullptr;
+}
+
+bool CameraManager::HasCamera(const std::string& name) const {
+	return cameras_.contains(name);
+}
+
 void CameraManager::Update() {
 	if (activeCamera_) {
 		activeCamera_->Update();

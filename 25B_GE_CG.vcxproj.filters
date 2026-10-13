@@ -347,7 +347,8 @@
     <ClInclude Include="src\engine\Graphics\UI\UIText.h">
       <Filter>郢晏･繝｣郢敖郢晢ｽｼ 郢晁ｼ斐＜郢ｧ・､郢晢ｽｫ</Filter>
     </ClInclude>
-    <ClInclude Include="src\engine\Graphics\UI\UIPanel.h">
+    <ClInclude Include="src\engine\Graphics\UI\UIPanel.h" />
+    <ClInclude Include="src\engine\Graphics\UI\PseudoOS.h" />
       <Filter>郢晏･繝｣郢敖郢晢ｽｼ 郢晁ｼ斐＜郢ｧ・､郢晢ｽｫ</Filter>
     <ClInclude Include="src\Game\System\GameResult.h">
       <Filter>郢晏€･繝｣郢敖€郢晢ｽｼ 郢晁ｼ斐＜郢ｧ・､郢晢ｽｫ</Filter>
@@ -628,7 +629,10 @@
       <Filter>郢ｧ・ｽ郢晢ｽｼ郢ｧ・ｹ 郢晁ｼ斐＜郢ｧ・､郢晢ｽｫ</Filter>
     </ClCompile>
     <ClCompile Include="src\engine\Graphics\UI\UIPanel.cpp">
-      <Filter>郢ｧ・ｽ郢晢ｽｼ郢ｧ・ｹ 郢晁ｼ斐＜郢ｧ・､郢晢ｽｫ</Filter>
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="src\engine\Graphics\UI\PseudoOS.cpp">
+      <Filter>ソース ファイル</Filter>
     </ClCompile>
     <ClCompile Include="src\engine\io\MCPClient.cpp">
       <Filter>郢ｧ・ｽ郢晢ｽｼ郢ｧ・ｹ 郢晁ｼ斐＜郢ｧ・､郢晢ｽｫ</Filter>

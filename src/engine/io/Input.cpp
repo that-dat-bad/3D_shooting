@@ -83,8 +83,17 @@ void Input::Update()
 		mouseState_.rgbButtons[2] = 0x80;
 	}
 
-	// カーソルロック中は毎フレーム、OSカーソルをウィンドウ中央に戻す
-	if (cursorLocked_ && hwnd_) {
+	// Win32 API のキー状態も統合（フォーカス遷移時やDirectInput一時ロスト時にも確実に検出）
+	if ((::GetAsyncKeyState(VK_SPACE) & 0x8000) != 0) {
+		keys_[DIK_SPACE] = 0x80;
+	}
+	if ((::GetAsyncKeyState(VK_RETURN) & 0x8000) != 0) {
+		keys_[DIK_RETURN] = 0x80;
+	}
+
+	// カーソルロック中は自ウィンドウがフォアグラウンドの時のみ、OSカーソルをウィンドウ中央に戻す
+	bool isForeground = (hwnd_ && (::GetForegroundWindow() == hwnd_));
+	if (cursorLocked_ && isForeground) {
 		RECT rect;
 		::GetClientRect(hwnd_, &rect);
 		POINT center;
@@ -157,7 +166,9 @@ void Input::LockCursor()
 {
 	if (!cursorLocked_) {
 		cursorLocked_ = true;
-		while (::ShowCursor(FALSE) >= 0) {}
+		if (hwnd_ && ::GetForegroundWindow() == hwnd_) {
+			while (::ShowCursor(FALSE) >= 0) {}
+		}
 	}
 }
 
@@ -166,5 +177,6 @@ void Input::UnlockCursor()
 	if (cursorLocked_) {
 		cursorLocked_ = false;
 		while (::ShowCursor(TRUE) < 0) {}
+		::SetCursor(::LoadCursor(nullptr, IDC_ARROW));
 	}
 }

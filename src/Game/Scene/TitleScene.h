@@ -12,6 +12,7 @@
 #include "../Graphics/AircraftVisualModel.h"
 #include "../Graphics/Afterburner.h"
 #include "../../engine/Graphics/PostProcess/PostEffect.h"
+#include "../../engine/Graphics/UI/PseudoOS.h"
 
 /// @brief タイトルシーン
 class TitleScene : public IScene {
@@ -20,6 +21,7 @@ public:
 	void Update() override;
 	void Draw() override;
 	void DrawUI() override;
+	void PrewarmAssets() override;
 	void Finalize() override;
 
 	/// @brief アプリケーション終了時に静的リソースキャッシュを完全解放する
@@ -58,11 +60,24 @@ private:
 	static constexpr float kWindowCloseDuration = 0.35f; ///< スタイリッシュなウィンドウ最小化
 	std::vector<std::unique_ptr<Sprite>> windowCloseMaskSprites_;   ///< 最小化時の外側4黒マスク
 	std::vector<std::unique_ptr<Sprite>> windowCloseBorderSprites_; ///< 最小化ウィンドウのOSタイトルバー＆サイバー枠線
-	float consoleBootTimer_ = 0.0f;     ///< クリック後のハッカー風コンソール演出タイマー
-	static constexpr float kConsoleBootDuration = 2.40f; ///< 各項目[OK]点灯のタメを味わえるタイピング速度
+	float consoleBootTimer_ = 0.0f;     ///< クリック後のローディング演出タイマー
+	float currentConsoleDuration_ = 1.40f; ///< ログ表示時間（緊急リブート時は高速化）
 	bool isRebootLog_ = false;          ///< 項目8: ゲームオーバーからの復旧ログ表示フラグ
+	std::string previousSortieLog_;     ///< 直前の戦闘ログ引継ぎ（連続性演出）
+	Vector4 previousSortieColor_ = { 0.35f, 0.85f, 0.50f, 0.80f };
+
+	// ローディング演出用ステート（コマンドのやつ -> loading...[||||||||||]を表示）
+	static constexpr float kCommandTypingDuration = 0.45f; ///< コマンドタイピング演出時間
+	float loadingProgress_ = 0.0f;       ///< 0.0f〜1.0f の読み込み進捗率
+	bool isLoadingComplete_ = false;     ///< 全アセット読み込み完了フラグ
+	float completeHoldTimer_ = 0.0f;     ///< complete 表示キープタイマー
+	static constexpr float kCompleteHoldDuration = 0.28f;
+	int prewarmPhase_ = 0;               ///< ローディング中のカメラ・ロケーション段階的ウォームアップフェーズ
+	bool isTitleCamerasPrewarmed_ = false; ///< タイトルの全カメラ・全3D背景モデルの読み込み・ウォームアップ完了
+	const char* loadingPhaseText_ = "INITIALIZING OPTICAL CAMERAS...";
+	void PrewarmAllTitleCamerasAndLocations(float dt);
 	float reauthTimer_ = 0.0f;          ///< 項目10: 再認証演出タイマー
-	static constexpr float kReauthDuration = 2.20f;
+	static constexpr float kReauthDuration = 1.40f;
 	float consoleExitTimer_ = 0.0f;     ///< コンソールからメニューへのスムーズな接続アニメーションタイマー
 	static constexpr float kConsoleExitDuration = 0.32f; ///< サイバーグリッチ遷移
 	float menuEnterTimer_ = 0.0f;       ///< メニュー展開トランジションタイマー
@@ -119,6 +134,8 @@ private:
 	void DrawSortieSequence();
 
 	// --- フルOSデスクトップ環境 ---
+	PseudoOS pseudoOS_;
+
 	struct OSWindow {
 		int id = 0;
 		std::string title;
@@ -301,7 +318,7 @@ private:
 	/// @brief 現在ロケーションのライトを Object3dCommon に反映
 	void ApplyLocationLighting(const LocationData& loc);
 	/// @brief 現在ロケーションの周回カメラを更新
-	void UpdateLocationCamera(const LocationData& loc, float dt, bool menuMode);
+	void UpdateLocationCamera(const LocationData& loc, float dt, bool menuMode, Camera* targetCamera = nullptr);
 	/// @brief ロケーション切替
 	void ChangeLocation(int index);
 	LocationData& CurrentLocation() { return locations_[currentLocationIndex_]; }

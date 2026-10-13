@@ -41,6 +41,8 @@ public:
 	/// @brief パーツの表示状態制御
 	void SetPartVisible(DamagePart part, bool visible);
 	bool IsPartVisible(DamagePart part) const;
+	/// @brief 全パーツを可視状態にリセット（リトライ・再出撃用）
+	void ResetAllPartsVisible();
 
 	/// @brief プロペラ回転速度の設定 (rad/sec)
 	void SetPropellerRpm(float rpm) { propellerRpm_ = rpm; }

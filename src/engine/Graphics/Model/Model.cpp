@@ -73,16 +73,16 @@ Vector3 CalculateScale(const std::vector<Model::KeyframeVector3>& keys, float ti
 
 
 void Model::Initialize(ModelCommon* modelCommon, const std::string& directorypath, const std::string& filename) {
+	ModelData data = LoadModelFile(directorypath, filename);
+	InitializeFromModelData(modelCommon, std::move(data));
+}
 
+void Model::InitializeFromModelData(ModelCommon* modelCommon, ModelData modelData) {
 	modelCommon_ = modelCommon;
 	DirectXCommon* dxCommon = modelCommon_->GetDirectXCommon();
-
-	// 1. モデル読み込み
-	modelData_ = LoadModelFile(directorypath, filename);
+	modelData_ = std::move(modelData);
 
 	// 2. 頂点データの初期化 (GPUリソース作成)
-
-	// バッファリソース作成 (サイズは読み込んだ頂点数に合わせる)
 	// 頂点がない場合のガード
 	if (modelData_.vertices.empty() || modelData_.indices.empty()) {
 		return;

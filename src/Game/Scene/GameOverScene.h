@@ -4,12 +4,13 @@
 #include "../../engine/Graphics/UI/UIText.h"
 #include "../../engine/Graphics/UI/UIButton.h"
 #include "../../engine/Graphics/UI/UISelectionManager.h"
+#include "../../engine/Graphics/UI/PseudoOS.h"
 #include "../../engine/Graphics/Sprite/Sprite.h"
 #include <vector>
 #include <string>
 #include <memory>
 
-/// @brief ゲームオーバー専用シーン（ミリタリーOSカーネルパニック、16進数メモリダンプ、OS再起動）
+/// @brief ゲームオーバー専用シーン（疑似OS環境：ミリタリーOSカーネルパニック、16進数メモリダンプ、OS再起動）
 class GameOverScene : public IScene {
 public:
 	GameOverScene();
@@ -18,9 +19,15 @@ public:
 	void Update() override;
 	void Draw() override;
 	void DrawUI() override;
+	void PrewarmAssets() override;
 	void Finalize() override;
 
 private:
+	bool isUIInitialized_ = false;
+
+	// 疑似OSデスクトップ環境（カーネルパニック仕様）
+	PseudoOS pseudoOS_;
+
 	UIPanel backgroundPanel_;
 	UIText gameOverText_;
 	
@@ -47,4 +54,15 @@ private:
 	// リトライ時のホワイトノイズ＆グリッチトランジション
 	bool isRetrying_ = false;
 	float retryGlitchTimer_ = 0.0f;
+
+	// ボタンクリックフィードバック & ヘッダータイピング
+	float btnClickFlashTimer_ = 0.0f;
+	int clickedButtonIdx_ = -1;
+	float headerTypeTimer_ = 0.0f;
+	int headerVisibleChars_ = 0;
+
+	// 各ウィンドウ内部の描画ヘルパー
+	void DrawCrashRecoveryWindow(const PseudoOS::Window& win);
+	void DrawMemoryExceptionWindow(const PseudoOS::Window& win);
+	void DrawHardwareFailureWindow(const PseudoOS::Window& win);
 };

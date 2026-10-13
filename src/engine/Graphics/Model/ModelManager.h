@@ -32,6 +32,12 @@ public:
 	/// </summary>
 	/// <param name="filePath"></param>
 	void LoadModel(const std::string& filePath);
+
+	/// <summary>
+	/// 複数スレッドを活用したモデルの並列読み込み（全CPUコアでAssimpパースを同時実行）
+	/// </summary>
+	void LoadModelsParallel(const std::vector<std::string>& filePaths);
+
 	Model::Animation LoadAnimation(const std::string& filePath);
 	std::vector<std::string> LoadAnimationNames(const std::string& filePath);
 	/// <summary>

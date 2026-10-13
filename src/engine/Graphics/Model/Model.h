@@ -138,6 +138,11 @@ public:
 	static std::vector<std::string> LoadAnimationNames(const std::string& directoryPath, const std::string& filename, const std::string& animationName = "");
 	ModelData GetModelData() const { return modelData_; }
 
+	/// <summary>
+	/// 事前パース済みモデルデータからの初期化（マルチスレッド並列ロード対応）
+	/// </summary>
+	void InitializeFromModelData(ModelCommon* modelCommon, ModelData modelData);
+
 	// アニメーションを再生スタートする関数
 	void PlayAnimation(Animation* animation);
 

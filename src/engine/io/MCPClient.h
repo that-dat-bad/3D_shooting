@@ -73,6 +73,8 @@ private:
 	int pollingIntervalMs_ = 1000;
 	std::function<void(const nlohmann::json&)> pollingCallback_;
 
+	std::atomic<int> failureCount_{ 0 };
+
 	mutable std::mutex mutex_;
 	std::string lastError_;
 };

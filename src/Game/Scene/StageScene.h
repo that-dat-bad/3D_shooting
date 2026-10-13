@@ -28,6 +28,7 @@
 class StageScene : public IScene {
 public:
 	void Initialize() override;
+	void PrewarmAssets() override;
 	void Update() override;
 	void Draw() override;
 	void DrawUI() override;
@@ -35,6 +36,10 @@ public:
 	void Restart();
 
 private:
+	bool isAssetsInitialized_ = false; ///< アセット（3Dモデル・スカイボックス・バッファ）初回生成完了フラグ
+	void InitializeAssets();           ///< 初回アセット生成
+	void ResetGameplayState();         ///< ゲームプレイ状態リセット（リトライ・再出撃用高速処理）
+
 	// フライトモデル（物理）
 	FlightModel flightModel_;
 

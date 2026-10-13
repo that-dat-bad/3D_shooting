@@ -30,6 +30,8 @@ public:
 	virtual void Draw() = 0;
 	/// <summary>2D UI描画処理</summary>
 	virtual void DrawUI() {}
+	/// <summary>重いリソースの事前非同期/バックグラウンド生成（ゲーム状態はアクティブ化しない）</summary>
+	virtual void PrewarmAssets() {}
 	/// <summary>終了処理</summary>
 	virtual void Finalize() = 0;
 	

@@ -17,6 +17,7 @@
 #include "../../engine/Graphics/System/DirectXCommon.h"
 #include "../../engine/Graphics/Particle/ParticleManager.h"
 #include "WinApp.h"
+#include "../../engine/io/Input.h"
 #include <cmath>
 #include <filesystem>
 
@@ -40,7 +41,9 @@ void TitleScene::SetCursorVisible(bool visible) {
 #ifdef USE_IMGUI
 	ImGui::SetMouseCursor(visible ? ImGuiMouseCursor_Arrow : ImGuiMouseCursor_None);
 #endif
-	if (visible) {
+	HWND hwnd = Input::GetInstance() ? Input::GetInstance()->GetHwnd() : nullptr;
+	bool isForeground = (hwnd && ::GetForegroundWindow() == hwnd);
+	if (visible || !isForeground) {
 		while (ShowCursor(TRUE) < 0) {}
 		::SetCursor(LoadCursor(nullptr, IDC_ARROW));
 	} else {
@@ -63,9 +66,17 @@ void TitleScene::Initialize() {
 	isEngineTesting_ = false;
 	engineTestTimer_ = 0.0f;
 	defconLevel_ = 2;
+	loadingProgress_ = 0.0f;
+	isLoadingComplete_ = false;
+	completeHoldTimer_ = 0.0f;
+	prewarmPhase_ = 0;
+	isTitleCamerasPrewarmed_ = false;
+	loadingPhaseText_ = "INITIALIZING OPTICAL CAMERAS...";
+
 
 	SpriteCommon* spriteCommon = SpriteCommon::GetInstance();
 	TextureManager* tm = TextureManager::GetInstance();
+
 
 	// 必須テクスチャのロード
 	tm->LoadTexture("assets/textures/white1x1.png");
@@ -159,7 +170,16 @@ void TitleScene::Initialize() {
 		}
 
 		menuWindowPos_ = { 392.0f, 44.0f };
-		UpdateMenuWindowPosition(menuWindowPos_);
+		menuCardPanel_.Initialize(spriteCommon);
+		menuCardPanel_.SetPosition(menuWindowPos_);
+		menuCardPanel_.SetSize({ 520.0f, 616.0f });
+		menuCardPanel_.SetBackgroundColor({ 0.0f, 0.0f, 0.0f, 1.0f });
+
+		menuHeaderPanel_.Initialize(spriteCommon);
+		menuHeaderPanel_.SetPosition(menuWindowPos_);
+		menuHeaderPanel_.SetSize({ 520.0f, 34.0f });
+		menuHeaderPanel_.SetBackgroundColor({ 0.05f, 0.22f, 0.12f, 0.98f });
+
 		isWindowDragging_ = false;
 		wasLButtonDown_ = false;
 		isStartMenuOpen_ = false;
@@ -404,16 +424,30 @@ void TitleScene::Initialize() {
 		// 項目8: ゲームオーバーからの復帰時、起動コンソール画面に繋がり、再びOSが立ち上がってタイトルメニューに戻る
 		state_ = TitleState::ConsoleBoot;
 		consoleBootTimer_ = 0.0f;
+		currentConsoleDuration_ = 0.85f; // 緊急リブート: 2.5倍速で切迫感のあるタイピング速度
 		consoleExitTimer_ = 0.0f;
+		loadingProgress_ = 0.0f;
+		isLoadingComplete_ = false;
+		completeHoldTimer_ = 0.0f;
+		prewarmPhase_ = 0;
+		isTitleCamerasPrewarmed_ = false;
+		loadingPhaseText_ = "INITIALIZING OPTICAL CAMERAS...";
 		isRebootLog_ = true;
+		previousSortieLog_ = "PREVIOUS SORTIE: KERNEL PANIC // EMERGENCY SYSTEM RECOVERY ACTIVE";
+		previousSortieColor_ = { 1.0f, 0.40f, 0.35f, 0.90f };
 	} else if (entryReason == TitleEntryReason::ReturnFromClear) {
 		// 項目10: クリアからの復帰時、セッション終了・再認証セキュリティ演出
 		state_ = TitleState::ReAuthentication;
 		reauthTimer_ = 0.0f;
 		isRebootLog_ = false;
+		currentConsoleDuration_ = 1.40f;
+		previousSortieLog_ = "PREVIOUS SORTIE: MISSION ACCOMPLISHED // FLIGHT LOG ARCHIVED";
+		previousSortieColor_ = { 0.35f, 1.0f, 0.65f, 0.90f };
 	} else {
 		state_ = TitleState::DroneView;
 		isRebootLog_ = false;
+		currentConsoleDuration_ = 1.40f;
+		previousSortieLog_ = "";
 	}
 	// エントリ理由をリセット
 	GameResult::GetInstance().titleEntryReason = TitleEntryReason::InitialBoot;
@@ -648,6 +682,9 @@ void TitleScene::Initialize() {
 	UITextRegistry::GetInstance()->Register("Title_BtnSettings", settingsButton_.GetLabelText());
 	UITextRegistry::GetInstance()->Register("Title_BtnExit", exitButton_.GetLabelText());
 	UITextRegistry::GetInstance()->Register("Title_PressSpace", &pressSpaceText_);
+
+	// 全UI初期化完了後にメニューウィンドウ位置を確定更新
+	UpdateMenuWindowPosition(menuWindowPos_);
 }
 
 void TitleScene::Update() {
@@ -655,8 +692,13 @@ void TitleScene::Update() {
 	animTimer_ += dt;
 	stateTimer_ += dt;
 
-	// マウスカーソルが非表示モードの場合、毎フレーム確実に消去（ImGuiの復活処理を抑止：項目3）
-	if (!isCursorShown_) {
+	// マウスカーソルが非表示モードの場合、自アプリがフォアグラウンドの時のみ消去（他アプリ操作時はOS標準カーソルを表示）
+	HWND hwnd = Input::GetInstance() ? Input::GetInstance()->GetHwnd() : nullptr;
+	bool isForeground = (hwnd && ::GetForegroundWindow() == hwnd);
+	if (!isForeground) {
+		while (ShowCursor(TRUE) < 0) {}
+		::SetCursor(LoadCursor(nullptr, IDC_ARROW));
+	} else if (!isCursorShown_) {
 #ifdef USE_IMGUI
 		ImGui::SetMouseCursor(ImGuiMouseCursor_None);
 #endif
@@ -818,7 +860,8 @@ void TitleScene::Update() {
 		// スペースキー、Enterキー、またはマウスクリック（左クリック）でOSウィンドウ最小化演出を経てコンソールへ（項目1）
 		Input* input = Input::GetInstance();
 		bool clickTriggered = input->TriggerMouse(0) || ((::GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0 && !wasLButtonDown_);
-		bool enterTriggered = input->TriggerKey(DIK_SPACE) || input->TriggerKey(DIK_RETURN);
+		bool enterTriggered = input->TriggerKey(DIK_SPACE) || input->TriggerKey(DIK_RETURN)
+			|| ((::GetAsyncKeyState(VK_SPACE) & 0x8000) != 0) || ((::GetAsyncKeyState(VK_RETURN) & 0x8000) != 0);
 		wasLButtonDown_ = ((::GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0) || input->PushMouse(0);
 
 		if (enterTriggered || clickTriggered) {
@@ -827,6 +870,8 @@ void TitleScene::Update() {
 			if (CurrentLocation().id == TitleLocation::CrashedForest) {
 				ChangeLocation(0); // 通信途絶現場からメニュー移行時は基地メイン回線（格納庫）に接続復帰
 			}
+			// ローディング中にバックグラウンドで並行準備できるようプリロードを開始
+			AsyncPreloadManager::GetInstance()->StartStagePreloadAsync();
 		}
 
 		// ポストエフェクト (ドローン風 + ブルーム発光)
@@ -933,13 +978,20 @@ void TitleScene::Update() {
 		Input* input = Input::GetInstance();
 		bool clickTriggered = input->TriggerMouse(0) || ((::GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0 && !wasLButtonDown_);
 		wasLButtonDown_ = ((::GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0) || input->PushMouse(0);
-		bool enterTriggered = input->TriggerKey(DIK_SPACE) || input->TriggerKey(DIK_RETURN);
+		bool enterTriggered = input->TriggerKey(DIK_SPACE) || input->TriggerKey(DIK_RETURN)
+			|| ((::GetAsyncKeyState(VK_SPACE) & 0x8000) != 0) || ((::GetAsyncKeyState(VK_RETURN) & 0x8000) != 0);
 
 		// クリックやSpaceで即時スキップ、または時間経過で即コンソールへ
 		if (enterTriggered || clickTriggered || windowCloseTimer_ >= kWindowCloseDuration) {
 			state_ = TitleState::ConsoleBoot;
 			consoleBootTimer_ = 0.0f;
 			consoleExitTimer_ = 0.0f;
+			loadingProgress_ = 0.0f;
+			isLoadingComplete_ = false;
+			completeHoldTimer_ = 0.0f;
+			prewarmPhase_ = 0;
+			isTitleCamerasPrewarmed_ = false;
+			loadingPhaseText_ = "INITIALIZING OPTICAL CAMERAS...";
 		}
 
 		PostEffect* postEffect = PostEffect::GetInstance();
@@ -952,33 +1004,62 @@ void TitleScene::Update() {
 		postEffect->AddActiveEffect(scanline);
 
 	} else if (state_ == TitleState::ConsoleBoot) {
-		SetCursorVisible(false); // コンソール演出中もマウスカーソル非表示
+		SetCursorVisible(false); // コマンド・ローディング演出中もマウスカーソル非表示
 		consoleBootTimer_ += dt;
-		Input* input = Input::GetInstance();
-		bool clickTriggered = input->TriggerMouse(0) || ((::GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0 && !wasLButtonDown_);
-		wasLButtonDown_ = ((::GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0) || input->PushMouse(0);
-		bool skipTriggered = (input->TriggerKey(DIK_SPACE) || input->TriggerKey(DIK_RETURN) || clickTriggered);
 
-		// スキップキー押下で待ち時間ゼロで即座にメニュー展開！
-		if (skipTriggered) {
-			state_ = TitleState::Menu;
-			stateTimer_ = 0.0f;
-			consoleExitTimer_ = 0.0f;
-			menuEnterTimer_ = kMenuEnterDuration;
-			SetCursorVisible(true);
-			if (CurrentLocation().id == TitleLocation::CrashedForest) {
-				ChangeLocation(0);
+		// コマンドタイピング時間経過後にローディングバーを開始
+		float loadTime = consoleBootTimer_ - kCommandTypingDuration;
+		if (loadTime < 0.0f) {
+			loadingProgress_ = 0.0f;
+		} else {
+			// タイトルの全カメラ・全3Dロケーションモデルを段階的に先行読み込み・ウォームアップ！
+			if (!isTitleCamerasPrewarmed_) {
+				PrewarmAllTitleCamerasAndLocations(dt);
 			}
-		} else if (consoleBootTimer_ >= kConsoleBootDuration) {
-			consoleExitTimer_ += dt;
-			if (consoleExitTimer_ >= kConsoleExitDuration) {
-				state_ = TitleState::Menu;
-				stateTimer_ = 0.0f;
-				consoleExitTimer_ = 0.0f;
-				menuEnterTimer_ = kMenuEnterDuration; // メニュー起動トランジション開始！
-				SetCursorVisible(true);               // メニューに入ったら確実にマウスカーソルを表示！
-				if (CurrentLocation().id == TitleLocation::CrashedForest) {
-					ChangeLocation(0);
+
+			// バックグラウンドでのプリロード完了判定
+			bool isStageReady = AsyncPreloadManager::GetInstance()->IsStagePreloadReady();
+
+			// フェーズ進行度に基づく最低進捗率 (0.0f, 0.25f, 0.50f, 0.75f, 1.0f)
+			float phaseProgress = 0.25f * static_cast<float>(prewarmPhase_);
+			float timeProgress = loadTime / 0.85f;
+			float targetProgress = (std::min)(0.95f, (std::max)(phaseProgress * 0.95f, timeProgress));
+
+			// 全カメラ・ロケーションのウォームアップ完了 & ステージプリロード完了 & 最低バー演出時間（0.70秒）経過で 100% (1.0f) へ
+			if (isTitleCamerasPrewarmed_ && isStageReady && loadTime >= 0.70f) {
+				targetProgress = 1.0f;
+			}
+
+			// 滑らかにプログレスを追従
+			loadingProgress_ += (targetProgress - loadingProgress_) * (std::min)(1.0f, dt * 8.0f);
+			if (targetProgress >= 1.0f && (1.0f - loadingProgress_) < 0.008f) {
+				loadingProgress_ = 1.0f;
+			}
+
+			// 100% 達成で complete 状態に突入
+			if (loadingProgress_ >= 1.0f && !isLoadingComplete_) {
+				isLoadingComplete_ = true;
+				completeHoldTimer_ = 0.0f;
+			}
+
+			if (isLoadingComplete_) {
+				completeHoldTimer_ += dt;
+				// complete 表示が少しキープされたらメニューへスムーズに遷移
+				if (completeHoldTimer_ >= kCompleteHoldDuration) {
+					consoleExitTimer_ += dt;
+					if (consoleExitTimer_ >= kConsoleExitDuration) {
+						state_ = TitleState::Menu;
+						stateTimer_ = 0.0f;
+						consoleExitTimer_ = 0.0f;
+						menuEnterTimer_ = kMenuEnterDuration; // メニュー起動トランジション開始！
+						SetCursorVisible(true);
+						if (CurrentLocation().id == TitleLocation::CrashedForest) {
+							ChangeLocation(0);
+						}
+						// メインカメラを TitleCamera に確実に同期
+						CameraManager::GetInstance()->SetActiveCamera("TitleCamera");
+						UpdateLocationCamera(CurrentLocation(), 0.0f, true);
+					}
 				}
 			}
 		}
@@ -1583,7 +1664,10 @@ void TitleScene::ApplyLocationLighting(const LocationData& loc) {
 	}
 }
 
-void TitleScene::UpdateLocationCamera(const LocationData& loc, float dt, bool menuMode) {
+void TitleScene::UpdateLocationCamera(const LocationData& loc, float dt, bool menuMode, Camera* targetCamera) {
+	Camera* titleCamera = targetCamera ? targetCamera : CameraManager::GetInstance()->GetActiveCamera();
+	if (!titleCamera) { return; }
+
 	const LocationCamera& c = loc.camera;
 
 	// メニュー中は少し引いてゆっくり、傾きも穏やかに
@@ -1632,12 +1716,9 @@ void TitleScene::UpdateLocationCamera(const LocationData& loc, float dt, bool me
 		float swayVx = std::cos(cameraTheta_) * 1.3f;
 		float droneRoll = -swayVx * bankTilt * 0.05f;
 
-		Camera* titleCamera = CameraManager::GetInstance()->GetActiveCamera();
-		if (titleCamera) {
-			titleCamera->SetTranslate(camPos);
-			titleCamera->SetRotate({ pitch, yaw, droneRoll });
-			titleCamera->Update();
-		}
+		titleCamera->SetTranslate(camPos);
+		titleCamera->SetRotate({ pitch, yaw, droneRoll });
+		titleCamera->Update();
 		return;
 	}
 
@@ -1675,13 +1756,195 @@ void TitleScene::UpdateLocationCamera(const LocationData& loc, float dt, bool me
 		camPos.y += subtleVibe;
 	}
 
-	Camera* titleCamera = CameraManager::GetInstance()->GetActiveCamera();
-	if (titleCamera) {
-		titleCamera->SetTranslate(camPos);
-		titleCamera->SetRotate({ pitch, yaw, dynamicRoll });
-		titleCamera->Update();
+	titleCamera->SetTranslate(camPos);
+	titleCamera->SetRotate({ pitch, yaw, dynamicRoll });
+	titleCamera->Update();
+}
+
+void TitleScene::PrewarmAssets() {
+	PrewarmAllTitleCamerasAndLocations(0.016f);
+}
+
+void TitleScene::PrewarmAllTitleCamerasAndLocations(float dt) {
+	CameraManager* cm = CameraManager::GetInstance();
+	if (!cm) { return; }
+
+	// 1. メインの TitleCamera を取得または作成
+	if (!cm->HasCamera("TitleCamera")) {
+		cm->CreateCamera("TitleCamera");
+	}
+	Camera* titleCamera = cm->GetCamera("TitleCamera");
+	if (!titleCamera) {
+		titleCamera = cm->GetActiveCamera();
+	}
+
+	// 2. タイトルの全ロケーション専用カメラ（Hangar, Tunnel, CrashedForest）を作成・登録
+	const char* camNames[] = {
+		"TitleCamera_Hangar",
+		"TitleCamera_Tunnel",
+		"TitleCamera_CrashedForest"
+	};
+
+	for (int i = 0; i < 3; ++i) {
+		if (!cm->HasCamera(camNames[i])) {
+			cm->CreateCamera(camNames[i]);
+		}
+	}
+
+	if (prewarmPhase_ == 0) {
+		// ============================================================
+		// Phase 0: タイトルの全カメラ（周回・定点・Live Feed用）のパラメータ計算・更新
+		// ============================================================
+		for (size_t i = 0; i < locations_.size() && i < 3; ++i) {
+			const LocationData& loc = locations_[i];
+			Camera* cam = cm->GetCamera(camNames[i]);
+			if (cam) {
+				UpdateLocationCamera(loc, 0.0f, false, cam);
+			}
+		}
+
+		// メインカメラ (TitleCamera) をメニュー遷移時ロケーションに合わせて先行更新
+		if (!locations_.empty()) {
+			int targetLocIdx = (CurrentLocation().id == TitleLocation::CrashedForest) ? 0 : currentLocationIndex_;
+			if (targetLocIdx >= 0 && targetLocIdx < static_cast<int>(locations_.size())) {
+				UpdateLocationCamera(locations_[targetLocIdx], 0.0f, true, titleCamera);
+			}
+		}
+
+		// Skybox と Afterburner を TitleCamera に接続・更新
+		if (skybox_) {
+			skybox_->SetCamera(titleCamera);
+			skybox_->Update();
+		}
+		if (afterburner_) {
+			afterburner_->Update(dt, afterburner_->GetIntensity());
+		}
+
+		loadingPhaseText_ = "PREWARMING HANGAR & CRASHED FOREST ASSETS...";
+		prewarmPhase_ = 1;
+		OutputDebugStringA("[TitleScene] Loading Phase 0 complete: All Title Cameras & Optical Links initialized.\n");
+	} else if (prewarmPhase_ == 1) {
+		// ============================================================
+		// Phase 1: Hangar (CH 01) & CrashedForest (CH 03) の全オブジェクト行列更新
+		// ============================================================
+		for (size_t i : { static_cast<size_t>(TitleLocation::Hangar), static_cast<size_t>(TitleLocation::CrashedForest) }) {
+			if (i < locations_.size()) {
+				LocationData& loc = locations_[i];
+				if (titleCamera) {
+					if (loc.envObject) loc.envObject->SetCamera(titleCamera);
+					for (auto& extra : loc.extraEnvParts) {
+						if (extra.object) extra.object->SetCamera(titleCamera);
+					}
+					if (loc.visualModel) loc.visualModel->SetCamera(titleCamera);
+					if (loc.debrisModel) loc.debrisModel->SetCamera(titleCamera);
+				}
+
+				// 機体モデルの行列計算
+				MyMath::Vector3 pos = MyMath::Add(loc.origin, loc.aircraftOffset);
+				Matrix4x4 acMat = MyMath::MakeAffineMatrix({ 1.0f, 1.0f, 1.0f }, loc.aircraftRotation, pos);
+				if (loc.visualModel) {
+					loc.visualModel->Update(acMat, dt);
+				}
+
+				// 残骸モデルの行列計算
+				if (loc.debrisModel) {
+					MyMath::Vector3 debrisPos = MyMath::Add(loc.origin, loc.debrisOffset);
+					Matrix4x4 debMat = MyMath::MakeAffineMatrix({ 1.0f, 1.0f, 1.0f }, loc.debrisRotation, debrisPos);
+					loc.debrisModel->Update(debMat, dt);
+				}
+
+				// 背景セットモデル
+				if (loc.envObject) {
+					loc.envObject->SetScale(loc.envScale);
+					loc.envObject->SetRotate(loc.envRotation);
+					loc.envObject->SetTranslate(loc.origin);
+					loc.envObject->Update();
+				}
+
+				// 追加パーツ群
+				for (auto& extra : loc.extraEnvParts) {
+					if (extra.object) {
+						MyMath::Vector3 ep = MyMath::Add(loc.origin, extra.offset);
+						extra.object->SetScale(extra.scale);
+						extra.object->SetRotate(extra.rotation);
+						extra.object->SetTranslate(ep);
+						extra.object->Update();
+					}
+				}
+			}
+		}
+
+		loadingPhaseText_ = "SYNCHRONIZING TUNNEL PIPELINES & GPU BUFFERS...";
+		prewarmPhase_ = 2;
+		OutputDebugStringA("[TitleScene] Loading Phase 1 complete: Hangar & Crashed Forest 3D assets prewarmed.\n");
+	} else if (prewarmPhase_ == 2) {
+		// ============================================================
+		// Phase 2: Tunnel (CH 02) の全オブジェクト（31セグメント約100パーツ）更新 & テクスチャフラッシュ
+		// ============================================================
+		if (static_cast<size_t>(TitleLocation::Tunnel) < locations_.size()) {
+			LocationData& loc = locations_[static_cast<size_t>(TitleLocation::Tunnel)];
+			if (titleCamera) {
+				if (loc.envObject) loc.envObject->SetCamera(titleCamera);
+				for (auto& extra : loc.extraEnvParts) {
+					if (extra.object) extra.object->SetCamera(titleCamera);
+				}
+				if (loc.visualModel) loc.visualModel->SetCamera(titleCamera);
+			}
+
+			// 機体モデルの行列計算
+			MyMath::Vector3 pos = MyMath::Add(loc.origin, loc.aircraftOffset);
+			Matrix4x4 acMat = MyMath::MakeAffineMatrix({ 1.0f, 1.0f, 1.0f }, loc.aircraftRotation, pos);
+			if (loc.visualModel) {
+				loc.visualModel->Update(acMat, dt);
+			}
+
+			// トンネル中央背景
+			if (loc.envObject) {
+				loc.envObject->SetScale(loc.envScale);
+				loc.envObject->SetRotate(loc.envRotation);
+				loc.envObject->SetTranslate(loc.origin);
+				loc.envObject->Update();
+			}
+
+			// トンネルの全セグメントパーツ（約100パーツ）
+			for (auto& extra : loc.extraEnvParts) {
+				if (extra.object) {
+					MyMath::Vector3 ep = MyMath::Add(loc.origin, extra.offset);
+					extra.object->SetScale(extra.scale);
+					extra.object->SetRotate(extra.rotation);
+					extra.object->SetTranslate(ep);
+					extra.object->Update();
+				}
+			}
+		}
+
+		// GPUテクスチャアップロードの同期完了
+		DirectXCommon::GetInstance()->FlushTextureUploads();
+
+		loadingPhaseText_ = "FINALIZING ALL TITLE CAMERAS & DESKTOP ROOT...";
+		prewarmPhase_ = 3;
+		OutputDebugStringA("[TitleScene] Loading Phase 2 complete: Tunnel 100+ segments & GPU textures flushed.\n");
+	} else if (prewarmPhase_ == 3) {
+		// ============================================================
+		// Phase 3: 全カメラ・UIの最終確定
+		// ============================================================
+		menuCardPanel_.Update();
+		menuHeaderPanel_.Update();
+		if (consoleBgSprite_) { consoleBgSprite_->Update(); }
+
+		// 現在ロケーションのカメラを再確定
+		int targetLocIdx = (CurrentLocation().id == TitleLocation::CrashedForest) ? 0 : currentLocationIndex_;
+		if (targetLocIdx >= 0 && targetLocIdx < static_cast<int>(locations_.size())) {
+			UpdateLocationCamera(locations_[targetLocIdx], 0.0f, true, titleCamera);
+		}
+
+		loadingPhaseText_ = "ALL TITLE CAMERAS SYNCHRONIZED";
+		prewarmPhase_ = 4;
+		isTitleCamerasPrewarmed_ = true;
+		OutputDebugStringA("[TitleScene] Loading Phase 3 complete: ALL TITLE CAMERAS & LOCATIONS FULLY SYNCHRONIZED!\n");
 	}
 }
+
 
 void TitleScene::ChangeLocation(int index) {
 	if (locations_.empty()) { return; }
@@ -1882,8 +2145,10 @@ void TitleScene::UpdateMenuWindowPosition(const Vector2& newPos) {
 	}
 
 	for (size_t i = 0; i < menuBorderSprites_.size() && i < menuBorderOffsets_.size(); ++i) {
-		menuBorderSprites_[i]->SetPosition({ menuWindowPos_.x + menuBorderOffsets_[i].x, menuWindowPos_.y + menuBorderOffsets_[i].y });
-		menuBorderSprites_[i]->Update();
+		if (menuBorderSprites_[i]) {
+			menuBorderSprites_[i]->SetPosition({ menuWindowPos_.x + menuBorderOffsets_[i].x, menuWindowPos_.y + menuBorderOffsets_[i].y });
+			menuBorderSprites_[i]->Update();
+		}
 	}
 
 	if (titleLogoSprite_) {
@@ -1912,14 +2177,18 @@ void TitleScene::UpdateMenuWindowPosition(const Vector2& newPos) {
 		auto& group = buttonBorders_[i];
 		if (i < buttonBorderOutlineOffsets_.size()) {
 			for (size_t j = 0; j < group.outlines.size() && j < buttonBorderOutlineOffsets_[i].size(); ++j) {
-				group.outlines[j]->SetPosition({ menuWindowPos_.x + buttonBorderOutlineOffsets_[i][j].x, menuWindowPos_.y + buttonBorderOutlineOffsets_[i][j].y });
-				group.outlines[j]->Update();
+				if (group.outlines[j]) {
+					group.outlines[j]->SetPosition({ menuWindowPos_.x + buttonBorderOutlineOffsets_[i][j].x, menuWindowPos_.y + buttonBorderOutlineOffsets_[i][j].y });
+					group.outlines[j]->Update();
+				}
 			}
 		}
 		if (i < buttonBorderBracketOffsets_.size()) {
 			for (size_t j = 0; j < group.brackets.size() && j < buttonBorderBracketOffsets_[i].size(); ++j) {
-				group.brackets[j]->SetPosition({ menuWindowPos_.x + buttonBorderBracketOffsets_[i][j].x, menuWindowPos_.y + buttonBorderBracketOffsets_[i][j].y });
-				group.brackets[j]->Update();
+				if (group.brackets[j]) {
+					group.brackets[j]->SetPosition({ menuWindowPos_.x + buttonBorderBracketOffsets_[i][j].x, menuWindowPos_.y + buttonBorderBracketOffsets_[i][j].y });
+					group.brackets[j]->Update();
+				}
 			}
 		}
 		if (i < buttonBorderIndicatorOffsets_.size() && group.indicator) {
@@ -2745,7 +3014,7 @@ void TitleScene::DrawConsoleBoot() {
 	if (consoleBgSprite_) {
 		consoleBgSprite_->Draw();
 	}
-	backgroundPanel_.SetBackgroundColor({ 0.0f, 0.0f, 0.0f, 1.0f });
+	backgroundPanel_.SetBackgroundColor({ 0.012f, 0.02f, 0.035f, 1.0f });
 	backgroundPanel_.Draw();
 
 	float textAlpha = 1.0f;
@@ -2753,138 +3022,102 @@ void TitleScene::DrawConsoleBoot() {
 		textAlpha = (std::max)(0.0f, 1.0f - consoleExitTimer_ / kConsoleExitDuration);
 	}
 
-	// コンソールからメニューへの切り替え時の一瞬の文字グリッチノイズ演出（項目10）
-	auto glitchText = [this](const std::string& orig) -> std::string {
-		if (consoleExitTimer_ <= 0.0f) { return orig; }
-		std::string s = orig;
-		float glitchRatio = consoleExitTimer_ / kConsoleExitDuration;
-		static const char kGlitchChars[] = "01#*/_[]><X$!%&~";
-		for (size_t i = 0; i < s.size(); ++i) {
-			if (s[i] != ' ' && ((rand() % 100) < static_cast<int>(glitchRatio * 65.0f))) {
-				s[i] = kGlitchChars[rand() % (sizeof(kGlitchChars) - 1)];
-			}
-		}
-		return s;
-	};
-
 	TextRenderer* tr = TextRenderer::GetInstance();
-	const float startX = 140.0f;
-	float currentY = 140.0f;
-	const float fontSize = 19.0f;
-	const MyMath::Vector4 greenCol = { 0.20f, 0.95f, 0.45f, 0.96f * textAlpha };
-	const MyMath::Vector4 cyanCol  = { 0.25f, 0.90f, 1.0f, 0.90f * textAlpha };
+	const float centerX = kScreenWidth * 0.5f;
+	const float centerY = kScreenHeight * 0.5f;
 
-	if (isRebootLog_) {
-		// 項目8: ゲームオーバーからの復旧ログ（各項目の[OK]が順に点灯するタメの演出）
-		tr->Print("HackGen", glitchText("/// DAWN-OS KERNEL REBOOT SEQUENCE // EMERGENCY RECOVERY ///"), startX, currentY, 15.0f, { 1.0f, 0.40f, 0.35f, 0.95f * textAlpha });
-		currentY += 34.0f;
-		tr->Print("HackGen", glitchText("==================================================================="), startX, currentY, 12.0f, { 0.8f, 0.3f, 0.2f, 0.45f * textAlpha });
-		currentY += 24.0f;
+	// 中央ターミナルパネル枠
+	const float panelW = 680.0f;
+	const float panelH = 210.0f;
+	const float panelX = centerX - panelW * 0.5f;
+	const float panelY = centerY - panelH * 0.5f;
 
-		// 項目1: 0.10s〜 開始、0.48s で [OK] 点灯
-		if (consoleBootTimer_ >= 0.10f) {
-			bool ok1 = (consoleBootTimer_ >= 0.48f);
-			if (ok1) {
-				tr->Print("HackGen", glitchText("[0x0010] KERNEL_REBOOT : CLEARING CRASH EXCEPTION STACK... [OK]"), startX, currentY, fontSize, greenCol);
-			} else {
-				bool blink = (std::fmod(consoleBootTimer_, 0.16f) < 0.08f);
-				std::string line = "[0x0010] KERNEL_REBOOT : CLEARING CRASH EXCEPTION STACK...";
-				if (blink) line += " _";
-				tr->Print("HackGen", glitchText(line), startX, currentY, fontSize, { 1.0f, 0.85f, 0.30f, 0.92f * textAlpha });
-			}
-			currentY += 32.0f;
-		}
-		// 項目2: 0.58s〜 開始、0.98s で [OK] 点灯
-		if (consoleBootTimer_ >= 0.58f) {
-			bool ok2 = (consoleBootTimer_ >= 0.98f);
-			if (ok2) {
-				tr->Print("HackGen", glitchText("[0x005A] SYSTEM_RESTORE: RESTORING FLIGHT AVIONICS SUBSYSTEMS... [OK]"), startX, currentY, fontSize, greenCol);
-			} else {
-				bool blink = (std::fmod(consoleBootTimer_, 0.16f) < 0.08f);
-				std::string line = "[0x005A] SYSTEM_RESTORE: RESTORING FLIGHT AVIONICS SUBSYSTEMS...";
-				if (blink) line += " _";
-				tr->Print("HackGen", glitchText(line), startX, currentY, fontSize, { 1.0f, 0.85f, 0.30f, 0.92f * textAlpha });
-			}
-			currentY += 32.0f;
-		}
-		// 項目3: 1.08s〜 開始、1.48s で [OK] 点灯
-		if (consoleBootTimer_ >= 1.08f) {
-			bool ok3 = (consoleBootTimer_ >= 1.48f);
-			if (ok3) {
-				tr->Print("HackGen", glitchText("[0x011B] RECOVERY_DAEMON: RELOADING SECURE OPERATING CONSOLE... [OK]"), startX, currentY, fontSize, greenCol);
-			} else {
-				bool blink = (std::fmod(consoleBootTimer_, 0.16f) < 0.08f);
-				std::string line = "[0x011B] RECOVERY_DAEMON: RELOADING SECURE OPERATING CONSOLE...";
-				if (blink) line += " _";
-				tr->Print("HackGen", glitchText(line), startX, currentY, fontSize, { 1.0f, 0.85f, 0.30f, 0.92f * textAlpha });
-			}
-			currentY += 32.0f;
-		}
-		// 項目4: 1.58s〜 コマンド印字
-		if (consoleBootTimer_ >= 1.58f) {
-			bool blink = (std::fmod(consoleBootTimer_, 0.20f) < 0.10f);
-			std::string passLine = "root@dawn-core:~$ ./restore_session --mode reboot_complete";
-			if (blink) { passLine += " _"; }
-			tr->Print("HackGen", glitchText(passLine), startX, currentY, fontSize, { 0.35f, 1.0f, 0.55f, 1.0f * textAlpha });
-			currentY += 38.0f;
-		}
-		// 項目5: 1.98s〜 完了アナウンス発光
-		if (consoleBootTimer_ >= 1.98f) {
-			tr->Print("HackGen", glitchText(">> [ SYSTEM REBOOT COMPLETE : RETURNING TO MAIN MENU ] <<"), startX, currentY, 20.0f, { 0.40f, 1.0f, 0.65f, 0.95f * textAlpha });
-		}
-	} else {
-		// 通常の初回起動ログ
-		tr->Print("HackGen", glitchText("/// TACTICAL DEFENSE MAINFRAME // SECURE TERMINAL v4.12 ///"), startX, currentY, 15.0f, cyanCol);
-		currentY += 34.0f;
-		tr->Print("HackGen", glitchText("==================================================================="), startX, currentY, 12.0f, { 0.18f, 0.70f, 0.40f, 0.45f * textAlpha });
-		currentY += 24.0f;
+	// パネル背景とサイバー枠線
+	pseudoOS_.DrawPanel({ panelX, panelY }, { panelW, panelH },
+		{ 0.01f, 0.03f, 0.05f, 0.92f * textAlpha },
+		{ 0.20f, 0.70f, 0.90f, 0.85f * textAlpha }, 1.2f);
 
-		if (consoleBootTimer_ >= 0.06f) {
-			tr->Print("HackGen", glitchText("[0x0040] BOOT_SEQ: INITIATING TACTICAL SUBSYSTEMS... OK"), startX, currentY, fontSize, greenCol);
-			currentY += 32.0f;
+	// ヘッダータイトル
+	tr->Print("HackGen", "DAWN_OS TACTICAL TERMINAL [v4.12.0] // SECURE SESSION",
+		centerX, panelY + 16.0f, 12.0f,
+		{ 0.45f, 0.85f, 0.95f, 0.90f * textAlpha }, { 0.5f, 0.0f });
+
+	pseudoOS_.DrawRect({ panelX + 16.0f, panelY + 36.0f }, { panelW - 32.0f, 1.0f },
+		{ 0.20f, 0.50f, 0.65f, 0.40f * textAlpha });
+
+	// 1. コマンド行演出（コマンドのやつ）
+	std::string fullCmd = isRebootLog_
+		? "root@dawn-core:~$ ./emergency_recovery --restore-desktop"
+		: "root@dawn-core:~$ ./authenticate_sortie --launch-system";
+
+	float typingProg = std::clamp(consoleBootTimer_ / 0.38f, 0.0f, 1.0f);
+	int showChars = static_cast<int>(typingProg * fullCmd.size());
+	std::string dispCmd = fullCmd.substr(0, showChars);
+
+	// 点滅カーソル
+	bool cursorBlink = (std::fmod(consoleBootTimer_, 0.22f) < 0.12f);
+	if (typingProg < 1.0f || consoleBootTimer_ < kCommandTypingDuration) {
+		if (cursorBlink) { dispCmd += "_"; }
+	}
+
+	tr->Print("HackGen", dispCmd.c_str(), panelX + 28.0f, panelY + 50.0f, 16.0f,
+		{ 0.35f, 1.0f, 0.65f, 0.98f * textAlpha });
+
+	// 2. ローディング演出（コマンドのやつ -> loading...）
+	if (consoleBootTimer_ >= kCommandTypingDuration) {
+		// ローディングバーの文字列構築（ユーザー指定: loading...[||||||||||]）
+		constexpr int kTotalBars = 24;
+		int filledBars = static_cast<int>(loadingProgress_ * kTotalBars);
+		if (filledBars > kTotalBars) filledBars = kTotalBars;
+
+		std::string barStr = "loading... [";
+		for (int i = 0; i < filledBars; ++i) {
+			barStr += "|";
 		}
-		if (consoleBootTimer_ >= 0.28f) {
-			tr->Print("HackGen", glitchText("[0x008A] SCAN_FEED: ACQUIRING 3-AXIS DRONE TELEMETRY... [ONLINE]"), startX, currentY, fontSize, greenCol);
-			currentY += 32.0f;
+		for (int i = 0; i < (kTotalBars - filledBars); ++i) {
+			barStr += " "; // 未完了空白スロット
 		}
-		if (consoleBootTimer_ >= 0.58f) {
-			tr->Print("HackGen", glitchText("[0x012F] MOUNT_FS : OPERATION DIRECTIVE 'DAWN' DATABASE... OK"), startX, currentY, fontSize, greenCol);
-			currentY += 32.0f;
-		}
-		if (consoleBootTimer_ >= 0.90f) {
-			bool blink = (std::fmod(consoleBootTimer_, 0.20f) < 0.10f);
-			std::string passLine = "root@dawn-core:~$ ./authenticate_sortie --key **********";
-			if (blink) { passLine += " _"; }
-			tr->Print("HackGen", glitchText(passLine), startX, currentY, fontSize, { 0.35f, 1.0f, 0.55f, 1.0f * textAlpha });
-			currentY += 38.0f;
-		}
-		if (consoleBootTimer_ >= 1.20f) {
-			tr->Print("HackGen", glitchText(">> [ ACCESS GRANTED : WELCOME TO THE COMBAT ZONE ] <<"), startX, currentY, 20.0f, { 1.0f, 0.92f, 0.25f, 0.95f * textAlpha });
+		barStr += "]";
+
+		// 色
+		Vector4 barColor = isLoadingComplete_
+			? Vector4{ 0.35f, 1.0f, 0.65f, 1.0f * textAlpha }   // complete時はエレクトリックグリーン
+			: Vector4{ 0.25f, 0.90f, 1.0f, 0.98f * textAlpha }; // 進行中は鮮やかなシアン
+
+		tr->Print("HackGen", barStr.c_str(), panelX + 28.0f, panelY + 95.0f, 20.0f, barColor);
+
+		// パーセント or complete 表示
+		if (isLoadingComplete_) {
+			bool blink = (std::fmod(completeHoldTimer_, 0.16f) < 0.10f);
+			Vector4 compCol = blink ? Vector4{ 0.45f, 1.0f, 0.70f, 1.0f * textAlpha } : Vector4{ 0.25f, 0.85f, 0.55f, 0.85f * textAlpha };
+			tr->Print("HackGen", "complete!", panelX + panelW - 28.0f, panelY + 95.0f, 20.0f, compCol, { 1.0f, 0.0f });
+
+			// 完了時ステータス
+			tr->Print("HackGen", ">> ACCESS GRANTED // RETURNING TO DESKTOP ROOT <<",
+				centerX, panelY + 152.0f, 15.0f, compCol, { 0.5f, 0.0f });
+		} else {
+			char pctBuf[32];
+			snprintf(pctBuf, sizeof(pctBuf), "%3d %%", static_cast<int>(loadingProgress_ * 100.0f));
+			tr->Print("HackGen", pctBuf, panelX + panelW - 28.0f, panelY + 95.0f, 18.0f,
+				{ 0.50f, 0.85f, 0.95f, 0.90f * textAlpha }, { 1.0f, 0.0f });
+
+			// ロードフェーズテキスト（タイトルの全カメラ等の事前読み込み状況をリアルタイム表示）
+			const char* phaseText = loadingPhaseText_;
+			if (!phaseText || phaseText[0] == '\0') {
+				phaseText = "LOADING ALL TITLE CAMERAS & SENSORS...";
+			}
+			tr->Print("HackGen", phaseText, centerX, panelY + 152.0f, 13.0f,
+				{ 0.35f, 0.75f, 0.85f, 0.80f * textAlpha }, { 0.5f, 0.0f });
 		}
 	}
 
-	// 画面下部にスキップ案内
-	tr->Print("HackGen", "[ PRESS SPACE OR CLICK TO SKIP ]", kScreenWidth * 0.5f, kScreenHeight - 45.0f, 14.0f, { 0.45f, 0.75f, 0.55f, 0.75f * textAlpha }, { 0.5f, 0.5f });
+	// 画面全体のゆっくり動く繊細な走査線
+	float scanY = std::fmod(consoleBootTimer_ * 120.0f, kScreenHeight);
+	pseudoOS_.DrawRect({ 0.0f, scanY }, { kScreenWidth, 1.0f }, { 0.20f, 0.70f, 0.90f, 0.15f * textAlpha });
 
-	// トランジション進行中：文字グリッチ＋中央メニューUI枠のレーザー形成演出（項目10）
+	// トランジション進行中：文字グリッチ演出
 	if (consoleExitTimer_ > 0.0f) {
 		DrawTransitionGlitch();
-
-		// メニューカードの位置（中央 460x400）に向かってUI枠をレーザースキャン形成
-		float exitProg = consoleExitTimer_ / kConsoleExitDuration;
-		const float cardW = 460.0f;
-		const float cardH = 400.0f;
-		const float cardX = (kScreenWidth - cardW) * 0.5f;
-		const float cardY = (kScreenHeight - cardH) * 0.5f + 25.0f;
-
-		float scanY = cardY + cardH * exitProg;
-		float drawnH = cardH * exitProg;
-
-		// 走査線（レーザーライン）
-		if (pressSpaceBannerBg_) {
-			// レーザースイープ線
-			tr->Print("HackGen", "-->> FORMING TACTICAL UI INTERFACE FRAME <<--", kScreenWidth * 0.5f, scanY - 14.0f, 12.0f, { 0.35f, 1.0f, 0.65f, 0.95f }, { 0.5f, 0.5f });
-		}
 	}
 }
 
@@ -3299,6 +3532,9 @@ void TitleScene::InitializeOSDesktop(SpriteCommon* spriteCommon) {
 		cursorSprites_.push_back(std::move(sp));
 	}
 
+	// 疑似OS共通基盤の初期化（テーマ設定）
+	pseudoOS_.Initialize(spriteCommon, PseudoOS::Theme::TerminalGreen);
+
 	ResetOSDesktopWindows();
 }
 
@@ -3431,6 +3667,12 @@ void TitleScene::UpdateOSDesktop(float dt, const Vector2& mousePos, bool isLDown
 				state_ = TitleState::ConsoleBoot;
 				consoleBootTimer_ = 0.0f;
 				consoleExitTimer_ = 0.0f;
+				loadingProgress_ = 0.0f;
+				isLoadingComplete_ = false;
+				completeHoldTimer_ = 0.0f;
+				prewarmPhase_ = 0;
+				isTitleCamerasPrewarmed_ = false;
+				loadingPhaseText_ = "INITIALIZING OPTICAL CAMERAS...";
 			} else if (pendingStartMenuAction_ == 5) {
 				PostQuitMessage(0);
 			}
@@ -3601,6 +3843,12 @@ void TitleScene::UpdateOSDesktop(float dt, const Vector2& mousePos, bool isLDown
 									state_ = TitleState::ConsoleBoot;
 									consoleBootTimer_ = 0.0f;
 									consoleExitTimer_ = 0.0f;
+									loadingProgress_ = 0.0f;
+									isLoadingComplete_ = false;
+									completeHoldTimer_ = 0.0f;
+									prewarmPhase_ = 0;
+									isTitleCamerasPrewarmed_ = false;
+									loadingPhaseText_ = "INITIALIZING OPTICAL CAMERAS...";
 								}
 							}
 							break;
@@ -4619,11 +4867,15 @@ void TitleScene::DrawOSDesktop() {
 	// 滑らかなイーズアウト進行度 (Ease-Out Sine: 最初素早く、最後しっとり定着)
 	float smoothProg = (enterProg >= 1.0f) ? 1.0f : std::sin(enterProg * 1.5707963f);
 
-	// 1. デスクトップ上部ヘッダー（OSウォーターマーク: 全体と同時にスムーズフェードイン）
+	// 1. デスクトップ上部ヘッダー（OSウォーターマーク & 戦闘連続性ログ：指摘4）
 	{
 		float hAlpha = smoothProg;
 		tr->Print("HackGen", "DAWN_OS TACTICAL DEFENSE MAINFRAME [v4.12.0]", 24.0f, 18.0f, 12.0f, { 0.30f, 0.85f, 0.50f, 0.70f * hAlpha });
 		tr->Print("HackGen", "CLEARANCE: LEVEL 5 // SECURE DESKTOP ENVIRONMENT", kScreenWidth - 380.0f, 18.0f, 11.5f, { 0.25f, 0.70f, 0.40f, 0.60f * hAlpha });
+
+		if (!previousSortieLog_.empty()) {
+			tr->Print("HackGen", previousSortieLog_.c_str(), 24.0f, 36.0f, 11.0f, { previousSortieColor_.x, previousSortieColor_.y, previousSortieColor_.z, previousSortieColor_.w * hAlpha });
+		}
 	}
 	tr->Flush(); // ヘッダーテキストを先に描画
 
