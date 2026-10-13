@@ -60,6 +60,14 @@ public:
 	void SetTextColor(const Vector4& color);
 	void SetSelectedTextColor(const Vector4& color);
 
+	/// @brief ラベルテキストのオフセット位置を設定（上下左右のアラインメント微調整用）
+	void SetTextOffset(const Vector2& offset) { textOffset_ = offset; }
+	const Vector2& GetTextOffset() const { return textOffset_; }
+
+	/// @brief 選択時のプロンプト装飾（左側余白の >> と末尾の点滅カーソル _）の有効化
+	void SetPromptDecoratorsEnabled(bool enabled) { enablePromptDecorators_ = enabled; }
+	bool IsPromptDecoratorsEnabled() const { return enablePromptDecorators_; }
+
 	/// @brief マウスが矩形の範囲内にいるかチェック
 	bool IsMouseInside() const;
 
@@ -88,4 +96,11 @@ private:
 
 	// アニメーション
 	float hoverAlpha_ = 0.0f; // 0.0〜1.0のホバーブレンド値
+
+	// テキストオフセット微調整
+	Vector2 textOffset_ = { 0.0f, 0.0f };
+
+	// プロンプト装飾（>> と _）
+	bool enablePromptDecorators_ = true;
+	float promptBlinkTimer_ = 0.0f;
 };

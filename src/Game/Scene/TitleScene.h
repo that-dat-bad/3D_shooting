@@ -137,6 +137,8 @@ private:
 	std::vector<OSWindow> osWindows_;
 	std::vector<DesktopIcon> desktopIcons_;
 	int activeWindowId_ = 0;
+	std::vector<int> windowZOrder_ = { 1, 2, 0 }; ///< ウィンドウ重なり順スタック（奥から手前の順、末尾が最前面・アクティブ）
+	void BringWindowToFront(int windowId);
 	bool isStartMenuOpen_ = false;
 
 	// スタートメニュー選択時の暗転・ノイズクッション演出
@@ -170,6 +172,14 @@ private:
 	int lastMenuSelIdx_ = 0;              ///< 前フレームの中央メニュー選択インデックス
 	float subWindowSwitchTimer_ = 0.0f;   ///< サブウィンドウ切り替えアニメーションタイマー
 	static constexpr float kSubWindowSwitchDuration = 0.22f; ///< 連動トランジション演出時間
+
+	// サブウィンドウ インタラクティブ操作ステート
+	int activeSatLayer_ = 1;              ///< 衛星マップレイヤー (0: TERRAIN, 1: RADAR, 2: THREAT)
+	int activeSysDetailTab_ = 0;          ///< システム診断詳細タブ (0: D3D12, 1: HEAP, 2: SHADER)
+	int activeIntelTarget_ = 0;           ///< 敵戦力ターゲット選択 (0: Su-27, 1: MiG-29, 2: Tor-M1)
+	bool isEngineTesting_ = false;        ///< エンジン推力テスト中フラグ
+	float engineTestTimer_ = 0.0f;        ///< 推力テストタイマー
+	int defconLevel_ = 2;                 ///< 警戒レベル (1 or 2)
 
 	// --- OSD (ドローンカメラビュー枠) ---
 	std::vector<std::unique_ptr<Sprite>> osdSprites_;

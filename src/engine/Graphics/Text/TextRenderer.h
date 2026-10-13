@@ -24,6 +24,11 @@ public:
     // 積まれた文字を実際に描画する（SceneのDraw等で一括で呼ぶ）
     void Draw();
 
+    // フレーム途中で、これまでに積まれた未描画の文字だけを描画する（描画順制御用）
+    // プールはリセットしないため、以降の Print は新しいスプライトを使用する
+    // （GPU実行前に定数バッファが上書きされるのを防ぐ）
+    void Flush();
+
 private:
     TextRenderer() = default;
     ~TextRenderer() = default;
@@ -35,6 +40,7 @@ private:
     // スプライトのプール
     std::vector<std::unique_ptr<Sprite>> spritePool_;
     uint32_t usedSpriteCount_ = 0;
+    uint32_t flushedSpriteCount_ = 0; ///< このフレームで Flush 済みのスプライト数
 
     Sprite* GetNextSprite();
 };

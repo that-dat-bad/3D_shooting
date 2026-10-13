@@ -130,9 +130,15 @@ void TextRenderer::Print(const std::string& fontName, const std::string& text, f
     }
 }
 
-void TextRenderer::Draw() {
-    for (uint32_t i = 0; i < usedSpriteCount_; ++i) {
+void TextRenderer::Flush() {
+    for (uint32_t i = flushedSpriteCount_; i < usedSpriteCount_; ++i) {
         spritePool_[i]->Draw();
     }
+    flushedSpriteCount_ = usedSpriteCount_;
+}
+
+void TextRenderer::Draw() {
+    Flush();
     usedSpriteCount_ = 0; // 次のフレーム用にリセット
+    flushedSpriteCount_ = 0;
 }
