@@ -166,6 +166,11 @@ private:
 	void DrawDesktopIcons();
 	void DrawCustomCursor();
 
+	// メニュー選択連動サブウィンドウ管理
+	int lastMenuSelIdx_ = 0;              ///< 前フレームの中央メニュー選択インデックス
+	float subWindowSwitchTimer_ = 0.0f;   ///< サブウィンドウ切り替えアニメーションタイマー
+	static constexpr float kSubWindowSwitchDuration = 0.22f; ///< 連動トランジション演出時間
+
 	// --- OSD (ドローンカメラビュー枠) ---
 	std::vector<std::unique_ptr<Sprite>> osdSprites_;
 	std::unique_ptr<Sprite> recDotSprite_;

@@ -1,0 +1,110 @@
+{
+    "description": "5 seconds survival demonstration mission. Maintain flight and clear the mission after 5 seconds.",
+    "enemies": [
+        {
+            "aiType": "CruiseEvade",
+            "health": 50.0,
+            "modelPath": "Resources/planeplane.obj",
+            "position": {
+                "x": 0.0,
+                "y": 100.0,
+                "z": 350.0
+            },
+            "waypointPathName": ""
+        }
+    ],
+    "groundEnemies": [],
+    "name": "Demo: 5-Second Survival",
+    "objectives": [
+        {
+            "areaCenter": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "areaRadius": 100.0,
+            "description": "Survive for 5 seconds to achieve mission clearance.",
+            "duration": 5.0,
+            "isHidden": false,
+            "isPrimary": true,
+            "minHP": 0.0,
+            "name": "Survive for 5 Seconds",
+            "requiredKills": 0,
+            "status": "Active",
+            "targetIndex": -1,
+            "type": "Survive"
+        }
+    ],
+    "playerHP": 100.0,
+    "playerPosition": {
+        "x": 0.0,
+        "y": 100.0,
+        "z": 0.0
+    },
+    "timeLimit": 60.0,
+    "triggers": [
+        {
+            "actions": [
+                {
+                    "activateTriggerIndex": -1,
+                    "message": "DEMO MISSION: MAINTAIN FLIGHT FOR 5 SECONDS",
+                    "messageDuration": 3.0,
+                    "newStatus": "Active",
+                    "objectiveIndex": -1,
+                    "type": "ShowMessage"
+                }
+            ],
+            "areaCenter": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "areaRadius": 100.0,
+            "condition": "OnMissionStart",
+            "enemyIndex": -1,
+            "hpThreshold": 0.0,
+            "isEnabled": true,
+            "isRepeatable": false,
+            "killCount": 0,
+            "name": "Start Notification",
+            "objectiveIndex": -1,
+            "timerSeconds": 0.0
+        },
+        {
+            "actions": [
+                {
+                    "activateTriggerIndex": -1,
+                    "message": "MISSION ACCOMPLISHED! 5 SECONDS SURVIVED.",
+                    "messageDuration": 3.0,
+                    "newStatus": "Active",
+                    "objectiveIndex": -1,
+                    "type": "ShowMessage"
+                },
+                {
+                    "activateTriggerIndex": -1,
+                    "message": "",
+                    "messageDuration": 0.0,
+                    "newStatus": "Active",
+                    "objectiveIndex": -1,
+                    "type": "MissionComplete"
+                }
+            ],
+            "areaCenter": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "areaRadius": 100.0,
+            "condition": "OnTimer",
+            "enemyIndex": -1,
+            "hpThreshold": 0.0,
+            "isEnabled": true,
+            "isRepeatable": false,
+            "killCount": 0,
+            "name": "5-Second Clear",
+            "objectiveIndex": -1,
+            "timerSeconds": 5.0
+        }
+    ],
+    "waypointPaths": []
+}
