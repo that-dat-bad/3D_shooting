@@ -20,6 +20,7 @@
 #include "../../engine/io/Input.h"
 #include <cmath>
 #include <filesystem>
+#include <chrono>
 
 #ifdef USE_IMGUI
 #include "../../../external/imgui/imgui.h"
@@ -53,6 +54,7 @@ void TitleScene::SetCursorVisible(bool visible) {
 }
 
 void TitleScene::Initialize() {
+	auto tStart = std::chrono::high_resolution_clock::now();
 	SetCursorVisible(false); // ドローン視点・コンソール画面ではOSカーソルを完全非表示（項目7）
 	sceneID = SCENE::TITLE;
 	selectionManager_.Clear();
@@ -685,6 +687,19 @@ void TitleScene::Initialize() {
 
 	// 全UI初期化完了後にメニューウィンドウ位置を確定更新
 	UpdateMenuWindowPosition(menuWindowPos_);
+
+	auto tEnd = std::chrono::high_resolution_clock::now();
+	double totalMs = std::chrono::duration<double, std::milli>(tEnd - tStart).count();
+	char buf[256];
+	snprintf(buf, sizeof(buf), "  [TitleScene::Initialize] Initialized in %.2f ms (%.4f s) [%s]\n",
+		totalMs, totalMs / 1000.0, fromCache ? "FROM CACHE" : "FRESH LOAD");
+	OutputDebugStringA(buf);
+
+	FILE* fp = nullptr;
+	if (fopen_s(&fp, "scene_transition.log", "a") == 0 && fp) {
+		fputs(buf, fp);
+		fclose(fp);
+	}
 }
 
 void TitleScene::Update() {

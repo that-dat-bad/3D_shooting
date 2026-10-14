@@ -9,10 +9,24 @@
 #include <filesystem>
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int) {
-	// 実行ファイルが存在するディレクトリを作業ディレクトリ（カレントディレクトリ）に固定
-	wchar_t exePath[MAX_PATH];
-	if (GetModuleFileNameW(nullptr, exePath, MAX_PATH) > 0) {
-		std::filesystem::current_path(std::filesystem::path(exePath).parent_path());
+	// 作業ディレクトリが Resources / assets を含むディレクトリになるよう調整
+	std::filesystem::path cur = std::filesystem::current_path();
+	if (!std::filesystem::exists(cur / "Resources") || !std::filesystem::exists(cur / "assets")) {
+		wchar_t exePath[MAX_PATH];
+		if (GetModuleFileNameW(nullptr, exePath, MAX_PATH) > 0) {
+			std::filesystem::path dir = std::filesystem::path(exePath).parent_path();
+			for (int depth = 0; depth < 5 && !dir.empty(); ++depth) {
+				if (std::filesystem::exists(dir / "Resources") && std::filesystem::exists(dir / "assets")) {
+					std::filesystem::current_path(dir);
+					break;
+				}
+				if (std::filesystem::exists(dir / "25B_GE_CG" / "Resources")) {
+					std::filesystem::current_path(dir / "25B_GE_CG");
+					break;
+				}
+				dir = dir.parent_path();
+			}
+		}
 	}
 
 	Dump::Install();

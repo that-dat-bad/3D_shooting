@@ -1,9 +1,10 @@
 #include "SceneManager.h"
-// Removed concrete scene includes
 #include "IScene.h"
 #include "../../engine/io/Input.h"
+#include "../../engine/Graphics/Text/TextRenderer.h"
 #include <chrono>
 #include <cstdio>
+#include <ctime>
 #include <Windows.h>
 
 #ifdef USE_IMGUI
@@ -11,19 +12,59 @@
 #include "../../engine/Debug/UIEditorWindow.h"
 #endif
 
+const char* SceneManager::GetSceneName(int sceneID) {
+	switch (sceneID) {
+	case SCENE::TITLE: return "TITLE";
+	case SCENE::STAGE: return "STAGE";
+	case SCENE::CLEAR: return "CLEAR";
+	case SCENE::GAMEOVER: return "GAMEOVER";
+	case SCENE::DEBUG: return "DEBUG";
+	case SCENE::MISSION_EDITOR: return "MISSION_EDITOR";
+	default: return "UNKNOWN";
+	}
+}
+
+void SceneManager::AppendLog(const std::string& logText) {
+	FILE* fp = nullptr;
+	if (fopen_s(&fp, "scene_transition.log", "a") == 0 && fp) {
+		fputs(logText.c_str(), fp);
+		fclose(fp);
+	}
+	OutputDebugStringA(logText.c_str());
+}
+
 SceneManager::SceneManager(std::unique_ptr<AbstractSceneFactory> factory) 
 	: sceneFactory_(std::move(factory)) {
+	
+	// ログファイルの初期化（ヘッダー書き込み）
+	FILE* fp = nullptr;
+	if (fopen_s(&fp, "scene_transition.log", "w") == 0 && fp) {
+		std::time_t now = std::time(nullptr);
+		std::tm localTm{};
+		localtime_s(&localTm, &now);
+		char timeBuf[64];
+		std::strftime(timeBuf, sizeof(timeBuf), "%Y-%m-%d %H:%M:%S", &localTm);
+
+		fprintf(fp, "======================================================================\n");
+		fprintf(fp, " Antigravity Engine - Scene Transition & Benchmark Profiler Log\n");
+		fprintf(fp, " Session Started: %s\n", timeBuf);
+		fprintf(fp, " Target Goal: Seamless 0ms Transition across all scenes\n");
+		fprintf(fp, "======================================================================\n\n");
+		fclose(fp);
+	}
+
 	// 初期シーン生成
+	auto tStart = std::chrono::high_resolution_clock::now();
 	currentScene = sceneFactory_->CreateScene(SCENE::TITLE);
 	currentScene->Initialize();
 	currentSceneID = SCENE::TITLE;
 	IScene::SetSceneID(SCENE::TITLE);
+	auto tEnd = std::chrono::high_resolution_clock::now();
+	double initMs = std::chrono::duration<double, std::milli>(tEnd - tStart).count();
 
-	FILE* fp = nullptr;
-	if (fopen_s(&fp, "C:/Users/gamer/source/repos/25B_GE_CG/scene_manager.log", "w") == 0 && fp) {
-		fprintf(fp, "[SceneManager] Initialized with Scene ID: %d (TITLE)\n", currentSceneID);
-		fclose(fp);
-	}
+	char buf[256];
+	snprintf(buf, sizeof(buf), "[SceneManager] Initial scene TITLE (0) initialized in %.2f ms (%.4f s)\n\n", initMs, initMs / 1000.0);
+	AppendLog(buf);
 }
 
 SceneManager::~SceneManager() {
@@ -41,16 +82,21 @@ SceneManager::~SceneManager() {
 }
 
 void SceneManager::SwitchScene(int nextSceneID) {
-	auto tStart = std::chrono::high_resolution_clock::now();
+	auto tTotalStart = std::chrono::high_resolution_clock::now();
 	int prevSceneID = currentSceneID;
 
+	// 1. 直前のシーンの Finalize（状態退避）
+	auto tFinStart = std::chrono::high_resolution_clock::now();
 	if (currentScene != nullptr) {
 		currentScene->Finalize();
 		// 現在のシーンを破棄せず、次回のためにキャッシュプールに退避（D3D12リソースを保持）
 		scenePool_[currentSceneID] = std::move(currentScene);
 	}
+	auto tFinEnd = std::chrono::high_resolution_clock::now();
+	double finalizeMs = std::chrono::duration<double, std::milli>(tFinEnd - tFinStart).count();
 
-	// キャッシュプールに次のシーンが存在すれば0ms高速再利用、未生成なら初回のみファクトリ生成
+	// 2. キャッシュプールから取り出し、未キャッシュなら初回生成
+	auto tRetStart = std::chrono::high_resolution_clock::now();
 	auto it = scenePool_.find(nextSceneID);
 	bool fromCache = false;
 	if (it != scenePool_.end() && it->second != nullptr) {
@@ -60,33 +106,132 @@ void SceneManager::SwitchScene(int nextSceneID) {
 	} else {
 		currentScene = sceneFactory_->CreateScene(nextSceneID);
 	}
+	auto tRetEnd = std::chrono::high_resolution_clock::now();
+	double retrieveMs = std::chrono::duration<double, std::milli>(tRetEnd - tRetStart).count();
 
+	// 3. 次のシーンの Initialize
+	auto tInitStart = std::chrono::high_resolution_clock::now();
 	if (currentScene != nullptr) {
 		currentScene->Initialize();
 	}
+	auto tInitEnd = std::chrono::high_resolution_clock::now();
+	double initializeMs = std::chrono::duration<double, std::milli>(tInitEnd - tInitStart).count();
 
 	currentSceneID = nextSceneID;
 	IScene::SetSceneID(nextSceneID);
 
-	auto tEnd = std::chrono::high_resolution_clock::now();
-	double elapsedMs = std::chrono::duration<double, std::milli>(tEnd - tStart).count();
-	char logBuf[256];
-	snprintf(logBuf, sizeof(logBuf), "[SceneManager] Scene Transition: %d -> %d (%s) took %.2f ms\n",
-		prevSceneID, nextSceneID, fromCache ? "CACHED" : "NEW", elapsedMs);
-	OutputDebugStringA(logBuf);
+	auto tTotalEnd = std::chrono::high_resolution_clock::now();
+	double totalMs = std::chrono::duration<double, std::milli>(tTotalEnd - tTotalStart).count();
 
-	FILE* fp = nullptr;
-	if (fopen_s(&fp, "C:/Users/gamer/source/repos/25B_GE_CG/scene_manager.log", "a") == 0 && fp) {
-		fprintf(fp, "%s", logBuf);
-		fclose(fp);
+	// タイムスタンプ取得
+	std::time_t now = std::time(nullptr);
+	std::tm localTm{};
+	localtime_s(&localTm, &now);
+	char timeBuf[32];
+	std::strftime(timeBuf, sizeof(timeBuf), "%H:%M:%S", &localTm);
+
+	// 記録作成
+	SceneTransitionRecord rec;
+	rec.fromSceneID = prevSceneID;
+	rec.toSceneID = nextSceneID;
+	rec.isCached = fromCache;
+	rec.finalizeTimeMs = finalizeMs;
+	rec.retrieveTimeMs = retrieveMs;
+	rec.initializeTimeMs = initializeMs;
+	rec.totalTimeMs = totalMs;
+	rec.timestamp = timeBuf;
+
+	lastTransition_ = rec;
+	hasTransitionOccurred_ = true;
+	transitionHistory_.push_back(rec);
+	if (transitionHistory_.size() > 50) {
+		transitionHistory_.erase(transitionHistory_.begin());
 	}
+	overlayBannerTimer_ = 5.0f; // 5秒間画面HUDに強調表示
+
+	// ログファイルとデバッグ出力へ詳細記録
+	char logBuf[512];
+	snprintf(logBuf, sizeof(logBuf),
+		"[%s] [Scene Transition] %s (%d) -> %s (%d) [%s]\n"
+		"  * Finalize   (Prev Scene) : %8.2f ms (%7.4f s)\n"
+		"  * Retrieve   (Pool/Alloc) : %8.2f ms (%7.4f s)\n"
+		"  * Initialize (Next Scene) : %8.2f ms (%7.4f s)\n"
+		"  => TOTAL TRANSITION TIME  : %8.2f ms (%7.4f s)\n\n",
+		timeBuf,
+		GetSceneName(prevSceneID), prevSceneID,
+		GetSceneName(nextSceneID), nextSceneID,
+		fromCache ? "CACHED (Pool Reused)" : "NEW (Allocated)",
+		finalizeMs, finalizeMs / 1000.0,
+		retrieveMs, retrieveMs / 1000.0,
+		initializeMs, initializeMs / 1000.0,
+		totalMs, totalMs / 1000.0
+	);
+
+	AppendLog(logBuf);
+}
+
+void SceneManager::PrewarmAllScenes() {
+	auto tStart = std::chrono::high_resolution_clock::now();
+	std::vector<int> preloadIDs = { SCENE::STAGE, SCENE::GAMEOVER, SCENE::CLEAR };
+	prewarmRecords_.clear();
+
+	std::string prewarmLog = 
+		"\n======================================================================\n"
+		"[Boot Prewarm] Initializing All Scenes in Background for 0ms Transition\n"
+		"======================================================================\n";
+
+	for (int id : preloadIDs) {
+		if (scenePool_.find(id) == scenePool_.end() && id != currentSceneID) {
+			auto sStart = std::chrono::high_resolution_clock::now();
+			auto scene = sceneFactory_->CreateScene(id);
+			if (scene) {
+				scene->PrewarmAssets();
+				scenePool_[id] = std::move(scene);
+			}
+			auto sEnd = std::chrono::high_resolution_clock::now();
+			double ms = std::chrono::duration<double, std::milli>(sEnd - sStart).count();
+
+			ScenePrewarmRecord prec;
+			prec.sceneID = id;
+			prec.timeMs = ms;
+			prewarmRecords_.push_back(prec);
+
+			char buf[128];
+			snprintf(buf, sizeof(buf), "  * Prewarmed Scene %-10s (ID: %d): %8.2f ms (%7.4f s)\n",
+				GetSceneName(id), id, ms, ms / 1000.0);
+			prewarmLog += buf;
+		}
+	}
+
+	// 初期シーンが確実にタイトル画面であることを保証
+	IScene::SetSceneID(SCENE::TITLE);
+
+	auto tEnd = std::chrono::high_resolution_clock::now();
+	totalPrewarmTimeMs_ = std::chrono::duration<double, std::milli>(tEnd - tStart).count();
+
+	char totalBuf[256];
+	snprintf(totalBuf, sizeof(totalBuf), 
+		"  => Total Boot Prewarm Time: %8.2f ms (%7.4f s)\n"
+		"======================================================================\n\n",
+		totalPrewarmTimeMs_, totalPrewarmTimeMs_ / 1000.0);
+	prewarmLog += totalBuf;
+
+	AppendLog(prewarmLog);
 }
 
 void SceneManager::Update() {
+	if (overlayBannerTimer_ > 0.0f) {
+		overlayBannerTimer_ -= 1.0f / 60.0f;
+	}
 
 	// 現在のシーンの更新
 	if (currentScene != nullptr) {
 		currentScene->Update();
+	}
+
+	// F2キーでプロファイラウィンドウ開閉
+	if (Input::GetInstance()->TriggerKey(DIK_F2)) {
+		ToggleProfilerWindow();
 	}
 
 #ifdef USE_IMGUI
@@ -103,20 +248,26 @@ void SceneManager::Update() {
 
 	if (ImGui::BeginMainMenuBar()) {
 		if (ImGui::BeginMenu("Scene")) {
-			if (ImGui::MenuItem("Title (F5)")) {
+			if (ImGui::MenuItem("Title (F5)", nullptr, currentSceneID == SCENE::TITLE)) {
 				IScene::SetSceneID(SCENE::TITLE);
 			}
-			if (ImGui::MenuItem("Stage (F6)")) {
+			if (ImGui::MenuItem("Stage (F6)", nullptr, currentSceneID == SCENE::STAGE)) {
 				IScene::SetSceneID(SCENE::STAGE);
 			}
-			if (ImGui::MenuItem("GameOver (F7)")) {
+			if (ImGui::MenuItem("GameOver (F7)", nullptr, currentSceneID == SCENE::GAMEOVER)) {
 				IScene::SetSceneID(SCENE::GAMEOVER);
 			}
-			if (ImGui::MenuItem("Clear (F8)")) {
+			if (ImGui::MenuItem("Clear (F8)", nullptr, currentSceneID == SCENE::CLEAR)) {
 				IScene::SetSceneID(SCENE::CLEAR);
 			}
-			if (ImGui::MenuItem("Debug")) {
+			if (ImGui::MenuItem("Debug", nullptr, currentSceneID == SCENE::DEBUG)) {
 				IScene::SetSceneID(SCENE::DEBUG);
+			}
+			ImGui::Separator();
+			if (ImGui::MenuItem("Scene Profiler (F2)", nullptr, showProfilerWindow_)) {
+				ToggleProfilerWindow();
+			}
+			if (ImGui::MenuItem("Show Transition Banner (HUD)", nullptr, &showOverlayBanner_)) {
 			}
 			ImGui::EndMenu();
 		}
@@ -125,10 +276,16 @@ void SceneManager::Update() {
 			if (ImGui::MenuItem("Native UI Editor (F1)", nullptr, isEditorVisible)) {
 				UIEditorWindow::GetInstance()->Toggle();
 			}
+			if (ImGui::MenuItem("Scene Profiler (F2)", nullptr, showProfilerWindow_)) {
+				ToggleProfilerWindow();
+			}
 			ImGui::EndMenu();
 		}
 		ImGui::EndMainMenuBar();
 	}
+
+	// プロファイラウィンドウの描画
+	DrawProfilerImGui();
 #endif
 
 	// シーン切り替え判定（static変数が変更されたかチェック）
@@ -148,42 +305,167 @@ void SceneManager::DrawUI() {
 	if (currentScene != nullptr) {
 		currentScene->DrawUI();
 	}
+
+	// 画面上部HUDオーバーレイの描画
+	DrawOverlayHUD();
 }
 
-void SceneManager::PrewarmAllScenes() {
-	// ゲーム起動時に全シーン（STAGE, GAMEOVER, CLEAR）を先行生成・GPUアセット初期化してプールに保管
-	// 各シーンの PrewarmAssets() のみを呼び出すため、実行時状態や static sceneID は一切汚染されない
-	// これにより、ゲーム起動時の初期シーンは100%タイトル画面となり、プレイ中の全シーン移行（Title⇄Stage⇄GameOver⇄Clear）は0msシームレスになる
-	auto tStart = std::chrono::high_resolution_clock::now();
-	std::vector<int> preloadIDs = { SCENE::STAGE, SCENE::GAMEOVER, SCENE::CLEAR };
-	for (int id : preloadIDs) {
-		if (scenePool_.find(id) == scenePool_.end() && id != currentSceneID) {
-			auto sStart = std::chrono::high_resolution_clock::now();
-			auto scene = sceneFactory_->CreateScene(id);
-			if (scene) {
-				scene->PrewarmAssets();
-				scenePool_[id] = std::move(scene);
-			}
-			auto sEnd = std::chrono::high_resolution_clock::now();
-			double ms = std::chrono::duration<double, std::milli>(sEnd - sStart).count();
-			char buf[128];
-			snprintf(buf, sizeof(buf), "[Prewarm] Scene %d prewarmed in %.2f ms\n", id, ms);
-			OutputDebugStringA(buf);
+void SceneManager::DrawOverlayHUD() {
+	if (!showOverlayBanner_ && overlayBannerTimer_ <= 0.0f) {
+		return;
+	}
+
+	TextRenderer* tr = TextRenderer::GetInstance();
+	if (!tr) return;
+
+	if (hasTransitionOccurred_) {
+		char line1[256];
+		snprintf(line1, sizeof(line1), "[TRANSITION BENCHMARK] %s -> %s | Total: %.2f ms (%.4f s) [%s]",
+			GetSceneName(lastTransition_.fromSceneID),
+			GetSceneName(lastTransition_.toSceneID),
+			lastTransition_.totalTimeMs,
+			lastTransition_.totalTimeMs / 1000.0,
+			lastTransition_.isCached ? "CACHED" : "NEW");
+
+		// 16.6ms未満ならグリーン、それ以上ならアンバー
+		Vector4 c1 = (lastTransition_.totalTimeMs <= 16.67) 
+			? Vector4{0.2f, 1.0f, 0.4f, 0.95f} 
+			: Vector4{1.0f, 0.85f, 0.2f, 0.95f};
+
+		tr->Print("HackGen", line1, 16.0f, 16.0f, 16.0f, c1);
+
+		char line2[256];
+		snprintf(line2, sizeof(line2), "  Breakdown: Finalize: %.2f ms | Retrieve: %.2f ms | Initialize: %.2f ms",
+			lastTransition_.finalizeTimeMs,
+			lastTransition_.retrieveTimeMs,
+			lastTransition_.initializeTimeMs);
+		tr->Print("HackGen", line2, 16.0f, 36.0f, 13.0f, { 0.85f, 0.9f, 0.95f, 0.85f });
+	} else if (totalPrewarmTimeMs_ > 0.0) {
+		char line1[256];
+		snprintf(line1, sizeof(line1), "[BOOT PREWARM] Ready: %d scenes prewarmed in %.2f ms (%.4f s)",
+			static_cast<int>(prewarmRecords_.size()),
+			totalPrewarmTimeMs_,
+			totalPrewarmTimeMs_ / 1000.0);
+		tr->Print("HackGen", line1, 16.0f, 16.0f, 16.0f, {0.3f, 0.9f, 1.0f, 0.95f});
+	}
+}
+
+void SceneManager::DrawProfilerImGui() {
+#ifdef USE_IMGUI
+	if (!showProfilerWindow_) return;
+
+	ImGui::SetNextWindowSize(ImVec2(560, 480), ImGuiCond_FirstUseEver);
+	if (ImGui::Begin("Scene Transition Profiler & Stats (F2)", &showProfilerWindow_)) {
+		ImGui::TextColored(ImVec4(0.2f, 1.0f, 0.4f, 1.0f), "/// SCENE TRANSITION BENCHMARK ///");
+		ImGui::Text("Current Active Scene: %s (ID: %d)", GetSceneName(currentSceneID), currentSceneID);
+		ImGui::Checkbox("Show HUD Overlay Banner on Screen", &showOverlayBanner_);
+		ImGui::Separator();
+
+		// 直前の遷移ステータス
+		if (hasTransitionOccurred_) {
+			ImGui::TextColored(ImVec4(0.4f, 0.8f, 1.0f, 1.0f), "LAST TRANSITION RESULT:");
+			ImGui::Indent();
+			ImGui::Text("Transition: %s -> %s", 
+				GetSceneName(lastTransition_.fromSceneID), 
+				GetSceneName(lastTransition_.toSceneID));
+			ImGui::Text("Mode      : %s", lastTransition_.isCached ? "CACHED (Pool Reused)" : "NEW (Factory Created)");
+
+			// ミリ秒と秒数を大きく表示
+			ImVec4 timeCol = (lastTransition_.totalTimeMs <= 16.67) 
+				? ImVec4(0.2f, 1.0f, 0.2f, 1.0f) 
+				: (lastTransition_.totalTimeMs <= 100.0 ? ImVec4(1.0f, 0.8f, 0.2f, 1.0f) : ImVec4(1.0f, 0.3f, 0.3f, 1.0f));
+
+			ImGui::TextColored(timeCol, "TOTAL TIME: %.2f ms  (%.4f sec)", 
+				lastTransition_.totalTimeMs, lastTransition_.totalTimeMs / 1000.0);
+
+			ImGui::Text("Phases Breakdown:");
+			ImGui::BulletText("Finalize   (Prev scene cleanup/pool save) : %.2f ms (%.4f s)", 
+				lastTransition_.finalizeTimeMs, lastTransition_.finalizeTimeMs / 1000.0);
+			ImGui::BulletText("Retrieve   (Pool find / Allocation)       : %.2f ms (%.4f s)", 
+				lastTransition_.retrieveTimeMs, lastTransition_.retrieveTimeMs / 1000.0);
+			ImGui::BulletText("Initialize (Next scene state setup)        : %.2f ms (%.4f s)", 
+				lastTransition_.initializeTimeMs, lastTransition_.initializeTimeMs / 1000.0);
+			ImGui::Unindent();
+		} else {
+			ImGui::TextDisabled("No scene transitions have occurred yet during this session.");
 		}
+
+		ImGui::Separator();
+
+		// 起動時ウォームアップ情報
+		if (ImGui::CollapsingHeader("Boot-up Prewarm Stats", ImGuiTreeNodeFlags_DefaultOpen)) {
+			ImGui::Text("Total Prewarm Time: %.2f ms (%.4f sec)", totalPrewarmTimeMs_, totalPrewarmTimeMs_ / 1000.0);
+			for (const auto& prec : prewarmRecords_) {
+				ImGui::BulletText("Scene %-10s : %.2f ms (%.4f s)", 
+					GetSceneName(prec.sceneID), prec.timeMs, prec.timeMs / 1000.0);
+			}
+		}
+
+		// キャッシュプール状況
+		if (ImGui::CollapsingHeader("Scene Pool Cache Status", ImGuiTreeNodeFlags_DefaultOpen)) {
+			std::vector<int> checkIDs = { SCENE::TITLE, SCENE::STAGE, SCENE::CLEAR, SCENE::GAMEOVER };
+			for (int id : checkIDs) {
+				bool isCurrent = (id == currentSceneID);
+				bool inPool = (scenePool_.find(id) != scenePool_.end() && scenePool_[id] != nullptr);
+				if (isCurrent) {
+					ImGui::TextColored(ImVec4(0.2f, 1.0f, 0.2f, 1.0f), "[ACTIVE]  Scene %-10s", GetSceneName(id));
+				} else if (inPool) {
+					ImGui::TextColored(ImVec4(0.4f, 0.8f, 1.0f, 1.0f), "[POOLED]  Scene %-10s (Cached in memory)", GetSceneName(id));
+				} else {
+					ImGui::TextDisabled("[UNCACHED] Scene %-10s", GetSceneName(id));
+				}
+			}
+		}
+
+		// クイック遷移テストボタン
+		ImGui::Separator();
+		ImGui::Text("Test Quick Transition:");
+		if (ImGui::Button("Title (F5)")) { IScene::SetSceneID(SCENE::TITLE); }
+		ImGui::SameLine();
+		if (ImGui::Button("Stage (F6)")) { IScene::SetSceneID(SCENE::STAGE); }
+		ImGui::SameLine();
+		if (ImGui::Button("GameOver (F7)")) { IScene::SetSceneID(SCENE::GAMEOVER); }
+		ImGui::SameLine();
+		if (ImGui::Button("Clear (F8)")) { IScene::SetSceneID(SCENE::CLEAR); }
+
+		// 遷移履歴テーブル
+		if (ImGui::CollapsingHeader("Transition History (Log)", ImGuiTreeNodeFlags_DefaultOpen)) {
+			if (ImGui::BeginTable("HistoryTable", 6, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY, ImVec2(0, 140))) {
+				ImGui::TableSetupColumn("Time", ImGuiTableColumnFlags_WidthFixed, 60);
+				ImGui::TableSetupColumn("From -> To", ImGuiTableColumnFlags_WidthFixed, 110);
+				ImGui::TableSetupColumn("Mode", ImGuiTableColumnFlags_WidthFixed, 65);
+				ImGui::TableSetupColumn("Fin (ms)", ImGuiTableColumnFlags_WidthFixed, 60);
+				ImGui::TableSetupColumn("Init (ms)", ImGuiTableColumnFlags_WidthFixed, 60);
+				ImGui::TableSetupColumn("Total (ms)", ImGuiTableColumnFlags_WidthFixed, 70);
+				ImGui::TableHeadersRow();
+
+				for (int i = static_cast<int>(transitionHistory_.size()) - 1; i >= 0; --i) {
+					const auto& h = transitionHistory_[i];
+					ImGui::TableNextRow();
+					ImGui::TableSetColumnIndex(0);
+					ImGui::Text("%s", h.timestamp.c_str());
+					ImGui::TableSetColumnIndex(1);
+					ImGui::Text("%s->%s", GetSceneName(h.fromSceneID), GetSceneName(h.toSceneID));
+					ImGui::TableSetColumnIndex(2);
+					ImGui::Text("%s", h.isCached ? "CACHE" : "NEW");
+					ImGui::TableSetColumnIndex(3);
+					ImGui::Text("%.1f", h.finalizeTimeMs);
+					ImGui::TableSetColumnIndex(4);
+					ImGui::Text("%.1f", h.initializeTimeMs);
+					ImGui::TableSetColumnIndex(5);
+					if (h.totalTimeMs <= 16.67) {
+						ImGui::TextColored(ImVec4(0.2f, 1.0f, 0.2f, 1.0f), "%.2f", h.totalTimeMs);
+					} else {
+						ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.2f, 1.0f), "%.2f", h.totalTimeMs);
+					}
+				}
+				ImGui::EndTable();
+			}
+		}
+
+		ImGui::Separator();
+		ImGui::TextDisabled("Log file: ./scene_transition.log");
 	}
-
-	// 初期シーンが確実にタイトル画面であることを100%保証
-	IScene::SetSceneID(SCENE::TITLE);
-
-	auto tEnd = std::chrono::high_resolution_clock::now();
-	double totalMs = std::chrono::duration<double, std::milli>(tEnd - tStart).count();
-	char buf[128];
-	snprintf(buf, sizeof(buf), "[Prewarm] Total scenes prewarmed in %.2f ms. Current scene confirmed as TITLE (0).\n", totalMs);
-	OutputDebugStringA(buf);
-
-	FILE* fp = nullptr;
-	if (fopen_s(&fp, "C:/Users/gamer/source/repos/25B_GE_CG/scene_manager.log", "a") == 0 && fp) {
-		fprintf(fp, "%s", buf);
-		fclose(fp);
-	}
+	ImGui::End();
+#endif
 }
