@@ -55,7 +55,11 @@ public:
 	/// @param theme カラーテーマ
 	void Initialize(SpriteCommon* spriteCommon, Theme theme = Theme::TerminalGreen);
 
-	/// @brief 毎フレーム更新
+	/// @brief 毎フレーム更新（内部で Input からスケーリング済みマウス座標とボタン入力を自動取得）
+	/// @param dt デルタタイム
+	void Update(float dt);
+
+	/// @brief 毎フレーム更新（マウス入力手動指定版）
 	/// @param dt デルタタイム
 	/// @param mousePos マウス画面座標
 	/// @param isLDown 左クリック押下中
@@ -84,6 +88,30 @@ public:
 	const std::vector<int>& GetWindowZOrder() const { return windowZOrder_; }
 
 	// ========================================================
+	// ウィンドウ開閉アニメーション・位置リセット
+	// ========================================================
+	enum class WindowAnimState {
+		None,
+		Opening,  ///< ズームイン展開中 (0.0 -> 1.0)
+		Closing,  ///< 縮小消滅中 (1.0 -> 0.0)
+	};
+
+	/// @brief 全ウィンドウの展開アニメーション開始
+	/// @param duration 所要時間（秒、デフォルト0.35s）
+	void PlayWindowOpenAnimation(float duration = 0.35f);
+
+	/// @brief 全ウィンドウの縮小消滅アニメーション開始
+	/// @param duration 所要時間（秒、デフォルト0.28s）
+	void PlayWindowCloseAnimation(float duration = 0.28f);
+
+	/// @brief 全ウィンドウの位置・スケールを初期状態にリセット
+	void ResetWindowPositions();
+
+	/// @brief ウィンドウアニメーションが完了しているか
+	bool IsWindowAnimComplete() const { return windowAnimState_ == WindowAnimState::None; }
+	WindowAnimState GetWindowAnimState() const { return windowAnimState_; }
+
+	// ========================================================
 	// スタートメニュー設定
 	// ========================================================
 	void SetStartMenuItems(const std::vector<StartMenuItem>& items) { startMenuItems_ = items; }
@@ -110,6 +138,23 @@ public:
 	void DrawSpectrumBars(const Vector2& pos, float width, float height, int barCount, float animSpeed, const Vector4& color);
 	void DrawGauge(const Vector2& pos, const Vector2& size, float ratio, const Vector4& fillColor, const Vector4& borderCol);
 	void DrawWindowCloseButton(const Vector2& pos, float size, bool isHovered);
+
+	// ========================================================
+	// 共通画面演出（CRT電源オフ収束・ボタン発光フィードバック）
+	// ========================================================
+	/// @brief CRTモニター電源オフ収束演出を描画（上下からスリット化し、横一線の光になって消滅）
+	/// @param progress 演出進行度 (0.0〜1.0)
+	/// @param screenWidth 画面幅 (デフォルト1280.0f)
+	/// @param screenHeight 画面高さ (デフォルト720.0f)
+	void DrawCRTShutdown(float progress, float screenWidth = 1280.0f, float screenHeight = 720.0f);
+
+	/// @brief ボタンクリック時の拡散発光ボーダーを描画
+	/// @param pos ボタン位置
+	/// @param size ボタンサイズ
+	/// @param timer 残りタイマー
+	/// @param duration 全体の所要時間 (デフォルト0.25f)
+	/// @param color 発光色
+	void DrawButtonFlash(const Vector2& pos, const Vector2& size, float timer, float duration = 0.25f, const Vector4& color = { 1.0f, 0.95f, 0.85f, 1.0f });
 
 	// ========================================================
 	// テーマカラー取得
@@ -177,4 +222,9 @@ private:
 	Vector4 colBorderActive_   = { 0.45f, 1.00f, 0.70f, 0.98f };
 	Vector4 colBorderInactive_ = { 0.12f, 0.35f, 0.20f, 0.50f };
 	Vector4 colLedActive_      = { 0.40f, 1.00f, 0.70f, 1.0f };
+
+	// ウィンドウアニメーション状態
+	WindowAnimState windowAnimState_ = WindowAnimState::None;
+	float windowAnimTimer_ = 0.0f;
+	float windowAnimDuration_ = 0.35f;
 };

@@ -64,9 +64,7 @@ void GameOverScene::PrewarmAssets() {
 			{ "[01] RETRY COMBAT MISSION", [this]() { retryButton_.Click(); }, false },
 			{ "[02] REBOOT OS TO TERMINAL", [this]() { titleButton_.Click(); }, false },
 			{ "[03] RESET WINDOW POSITIONS", [this]() {
-				auto* w0 = pseudoOS_.GetWindow(0); if (w0) w0->pos = w0->normalPos;
-				auto* w1 = pseudoOS_.GetWindow(1); if (w1) w1->pos = w1->normalPos;
-				auto* w2 = pseudoOS_.GetWindow(2); if (w2) w2->pos = w2->normalPos;
+				pseudoOS_.ResetWindowPositions();
 			}, false },
 			{ "[04] EMERGENCY SHUTDOWN", []() { ::PostQuitMessage(0); }, true }
 		};
@@ -187,6 +185,7 @@ void GameOverScene::PrewarmAssets() {
 				clickedButtonIdx_ = 1;
 				isRebooting_ = true;
 				rebootTimer_ = 0.0f;
+				pseudoOS_.PlayWindowCloseAnimation(0.35f);
 			}
 		});
 
@@ -228,10 +227,9 @@ void GameOverScene::Initialize() {
 
 	PrewarmAssets();
 
-	// ウィンドウ展開アニメーションスケールのみリセット
-	auto* w0 = pseudoOS_.GetWindow(0); if (w0) { w0->animScale = 0.0f; w0->pos = w0->normalPos; }
-	auto* w1 = pseudoOS_.GetWindow(1); if (w1) { w1->animScale = 0.0f; w1->pos = w1->normalPos; }
-	auto* w2 = pseudoOS_.GetWindow(2); if (w2) { w2->animScale = 0.0f; w2->pos = w2->normalPos; }
+	// ウィンドウ位置リセット＆展開アニメーション開始
+	pseudoOS_.ResetWindowPositions();
+	pseudoOS_.PlayWindowOpenAnimation(0.35f);
 	pseudoOS_.BringWindowToFront(0);
 
 	selectionManager_.Clear();
@@ -264,14 +262,8 @@ void GameOverScene::Update() {
 		if (fadeInAlpha_ > 1.0f) fadeInAlpha_ = 1.0f;
 	}
 
-	// マウス入力状態の取得（共通ユーティリティでスケーリング済み座標を取得）
-	Input* input = Input::GetInstance();
-	Vector2 mousePos = input->GetVirtualMousePosition(kScreenWidth, kScreenHeight);
-	bool isLDown = input->PushMouse(0);
-	bool isLTrig = input->TriggerMouse(0);
-
-	// 疑似OSデスクトップ環境更新
-	pseudoOS_.Update(dt, mousePos, isLDown, isLTrig);
+	// 疑似OSデスクトップ環境更新（入力自動取得＆ウィンドウ開閉アニメーション自動管理）
+	pseudoOS_.Update(dt);
 
 	// ログ展開アニメーション
 	if (visibleLogCount_ < 6) {
@@ -285,15 +277,6 @@ void GameOverScene::Update() {
 		if (dumpScrollTimer_ >= 0.040f) {
 			dumpScrollTimer_ = 0.0f;
 			dumpScrollIndex_ = (dumpScrollIndex_ + 1) % (std::max)(1, static_cast<int>(memoryDumpPool_.size()));
-		}
-	}
-
-	// ウィンドウ展開アニメーション（共通イージング関数を使用）
-	float expandT = Easing::Clamp01(animTimer_ / 0.35f);
-	float easedScale = Easing::EaseOutCubic(expandT);
-	for (auto& w : pseudoOS_.GetWindows()) {
-		if (w.isOpen && !w.isMinimized) {
-			w.animScale = easedScale;
 		}
 	}
 
@@ -485,68 +468,25 @@ void GameOverScene::DrawUI() {
 			{ 0.25f, 0.95f, 1.0f, 1.0f }, { 0.05f, 0.20f, 0.30f, 0.85f });
 	}
 
-	// ボタンクリックフィードバック発光（指摘2）
+	// ボタンクリックフィードバック発光（共通エフェクトを使用）
 	if (btnClickFlashTimer_ > 0.0f) {
-		float alpha = btnClickFlashTimer_ / 0.25f;
 		Vector2 flashPos = (clickedButtonIdx_ == 0) ? retryButton_.GetPosition() : titleButton_.GetPosition();
 		Vector2 flashSize = (clickedButtonIdx_ == 0) ? retryButton_.GetSize() : titleButton_.GetSize();
-		float expand = (1.0f - alpha) * 16.0f;
-		pseudoOS_.DrawBorder({ flashPos.x - expand, flashPos.y - expand },
-			{ flashSize.x + expand * 2.0f, flashSize.y + expand * 2.0f },
-			{ 1.0f, 0.95f, 0.85f, alpha }, 2.5f);
+		pseudoOS_.DrawButtonFlash(flashPos, flashSize, btnClickFlashTimer_, 0.25f);
 	}
 
 	// ------------------------------------------------------------
 	// 項目3-1: リブート演出進行（SYSTEM REBOOTING... → ブラウン管画面収束でタイトルへ復帰）
 	// ------------------------------------------------------------
-	if (isRebooting_ && rebootBlackoutSprite_) {
-		TextRenderer* tr = TextRenderer::GetInstance();
+	if (isRebooting_) {
 		float rebootProgress = rebootTimer_ / 0.65f;
+		pseudoOS_.DrawCRTShutdown(rebootProgress, kScreenWidth, kScreenHeight);
+
 		if (rebootProgress < 0.35f) {
-			float p = rebootProgress / 0.35f;
-			float curH = kScreenHeight * (1.0f - p);
-			float curY = (kScreenHeight - curH) * 0.5f;
-
-			rebootBlackoutSprite_->SetBlendMode(BlendMode::kNormal);
-			rebootBlackoutSprite_->SetColor({ 0.0f, 0.0f, 0.0f, 1.0f });
-
-			rebootBlackoutSprite_->SetPosition({ 0.0f, 0.0f });
-			rebootBlackoutSprite_->SetSize({ kScreenWidth, curY });
-			rebootBlackoutSprite_->Update();
-			rebootBlackoutSprite_->Draw();
-
-			rebootBlackoutSprite_->SetPosition({ 0.0f, curY + curH });
-			rebootBlackoutSprite_->SetSize({ kScreenWidth, kScreenHeight - (curY + curH) });
-			rebootBlackoutSprite_->Update();
-			rebootBlackoutSprite_->Draw();
-
 			bool blink = (std::fmod(rebootTimer_, 0.12f) < 0.06f);
 			if (blink) {
-				tr->Print("HackGen", ">> SYSTEM REBOOT INITIATED // RELOADING DAWN KERNEL <<",
+				TextRenderer::GetInstance()->Print("HackGen", ">> SYSTEM REBOOT INITIATED // RELOADING DAWN KERNEL <<",
 					kScreenWidth * 0.5f, kScreenHeight * 0.5f - 10.0f, 18.0f, { 1.0f, 0.35f, 0.35f, 1.0f }, { 0.5f, 0.5f });
-			}
-		} else {
-			float p = (rebootProgress - 0.35f) / 0.30f;
-			p = (std::min)(1.0f, p);
-			float curW = kScreenWidth * (1.0f - p);
-			float curX = (kScreenWidth - curW) * 0.5f;
-			float lineH = 3.0f * (1.0f - p);
-			float lineY = (kScreenHeight - lineH) * 0.5f;
-
-			rebootBlackoutSprite_->SetBlendMode(BlendMode::kNormal);
-			rebootBlackoutSprite_->SetColor({ 0.0f, 0.0f, 0.0f, 1.0f });
-			rebootBlackoutSprite_->SetPosition({ 0.0f, 0.0f });
-			rebootBlackoutSprite_->SetSize({ kScreenWidth, kScreenHeight });
-			rebootBlackoutSprite_->Update();
-			rebootBlackoutSprite_->Draw();
-
-			if (curW > 2.0f && lineH > 0.5f) {
-				rebootBlackoutSprite_->SetBlendMode(BlendMode::kAdd);
-				rebootBlackoutSprite_->SetColor({ 1.0f, 0.40f, 0.40f, 1.0f - p });
-				rebootBlackoutSprite_->SetPosition({ curX, lineY });
-				rebootBlackoutSprite_->SetSize({ curW, lineH });
-				rebootBlackoutSprite_->Update();
-				rebootBlackoutSprite_->Draw();
 			}
 		}
 	}

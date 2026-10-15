@@ -5,6 +5,8 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include "../../io/Input.h"
+#include "../../base/Math/Easing.h"
 
 static constexpr float kScreenWidth = static_cast<float>(WinApp::kClientWidth);
 static constexpr float kScreenHeight = static_cast<float>(WinApp::kClientHeight);
@@ -184,6 +186,18 @@ void PseudoOS::DrawGauge(const Vector2& pos, const Vector2& size, float ratio, c
 	DrawBorder(pos, size, borderCol, 1.0f);
 }
 
+void PseudoOS::Update(float dt) {
+	Input* input = Input::GetInstance();
+	if (input) {
+		Vector2 mousePos = input->GetVirtualMousePosition(kScreenWidth, kScreenHeight);
+		bool isLDown = input->PushMouse(0);
+		bool isLTrig = input->TriggerMouse(0);
+		Update(dt, mousePos, isLDown, isLTrig);
+	} else {
+		Update(dt, { 640.0f, 360.0f }, false, false);
+	}
+}
+
 void PseudoOS::Update(float dt, const Vector2& mousePos, bool isLDown, bool isLTrig) {
 	animTimer_ += dt;
 	cursorPos_ = mousePos;
@@ -200,13 +214,37 @@ void PseudoOS::Update(float dt, const Vector2& mousePos, bool isLDown, bool isLT
 	float my = mousePos.y;
 	const float tbY = 688.0f;
 
-	// 1. 各ウィンドウの最小化・復元アニメーション (Tween)
-	for (auto& win : windows_) {
-		float targetScale = (win.isMinimized || !win.isOpen) ? 0.0f : 1.0f;
-		float speed = 12.0f;
-		win.animScale += (targetScale - win.animScale) * (1.0f - std::exp(-speed * dt));
-		if (std::abs(win.animScale - targetScale) < 0.005f) {
-			win.animScale = targetScale;
+	// 1. ウィンドウ開閉アニメーション / 最小化・復元アニメーション (Tween)
+	if (windowAnimState_ == WindowAnimState::Opening) {
+		windowAnimTimer_ += dt;
+		float t = Easing::Clamp01(windowAnimTimer_ / (std::max)(0.001f, windowAnimDuration_));
+		float scale = Easing::EaseOutCubic(t);
+		for (auto& win : windows_) {
+			if (win.isOpen && !win.isMinimized) {
+				win.animScale = scale;
+			}
+		}
+		if (t >= 1.0f) {
+			windowAnimState_ = WindowAnimState::None;
+		}
+	} else if (windowAnimState_ == WindowAnimState::Closing) {
+		windowAnimTimer_ += dt;
+		float t = Easing::Clamp01(windowAnimTimer_ / (std::max)(0.001f, windowAnimDuration_));
+		float scale = (1.0f - t) * (1.0f - t);
+		for (auto& win : windows_) {
+			win.animScale = scale;
+		}
+		if (t >= 1.0f) {
+			windowAnimState_ = WindowAnimState::None;
+		}
+	} else {
+		for (auto& win : windows_) {
+			float targetScale = (win.isMinimized || !win.isOpen) ? 0.0f : 1.0f;
+			float speed = 12.0f;
+			win.animScale += (targetScale - win.animScale) * (1.0f - std::exp(-speed * dt));
+			if (std::abs(win.animScale - targetScale) < 0.005f) {
+				win.animScale = targetScale;
+			}
 		}
 	}
 
@@ -613,4 +651,73 @@ void PseudoOS::DrawCustomCursor() {
 		snprintf(locBuf, sizeof(locBuf), "[%d,%d]", static_cast<int>(mx), static_cast<int>(my));
 		tr->Print("HackGen", locBuf, mx + 16.0f, my + 14.0f, 9.5f, colSecondary_);
 	}
+}
+
+void PseudoOS::PlayWindowOpenAnimation(float duration) {
+	windowAnimState_ = WindowAnimState::Opening;
+	windowAnimTimer_ = 0.0f;
+	windowAnimDuration_ = duration;
+	for (auto& win : windows_) {
+		if (win.isOpen && !win.isMinimized) {
+			win.animScale = 0.0f;
+		}
+	}
+}
+
+void PseudoOS::PlayWindowCloseAnimation(float duration) {
+	windowAnimState_ = WindowAnimState::Closing;
+	windowAnimTimer_ = 0.0f;
+	windowAnimDuration_ = duration;
+}
+
+void PseudoOS::ResetWindowPositions() {
+	for (auto& win : windows_) {
+		win.pos = win.normalPos;
+		win.size = win.normalSize;
+		win.isOpen = true;
+		win.isMinimized = false;
+		win.animScale = 1.0f;
+	}
+}
+
+void PseudoOS::DrawCRTShutdown(float progress, float screenWidth, float screenHeight) {
+	float p = Easing::Clamp01(progress);
+	if (p <= 0.0f) return;
+
+	// フェーズ1: 上下から黒帯が迫り、中央のスリットに画面が収束 (0.0〜0.35)
+	if (p < 0.35f) {
+		float phaseT = p / 0.35f;
+		float curH = screenHeight * (1.0f - phaseT);
+		float curY = (screenHeight - curH) * 0.5f;
+
+		// 上黒帯
+		DrawRect({ 0.0f, 0.0f }, { screenWidth, curY }, { 0.0f, 0.0f, 0.0f, 1.0f });
+		// 下黒帯
+		DrawRect({ 0.0f, curY + curH }, { screenWidth, screenHeight - (curY + curH) }, { 0.0f, 0.0f, 0.0f, 1.0f });
+	} else {
+		// フェーズ2: 画面全体が暗転し、中央の白い水平線が左右から縮小して点となって消える (0.35〜1.0)
+		float phaseT = (p - 0.35f) / 0.65f;
+		phaseT = (std::min)(1.0f, phaseT);
+
+		// 全画面ブラックアウト
+		DrawRect({ 0.0f, 0.0f }, { screenWidth, screenHeight }, { 0.0f, 0.0f, 0.0f, 1.0f });
+
+		// 中央水平光線
+		float curW = screenWidth * (1.0f - phaseT);
+		float curX = (screenWidth - curW) * 0.5f;
+		float lineH = (std::max)(1.0f, 4.0f * (1.0f - phaseT));
+		float lineY = (screenHeight - lineH) * 0.5f;
+		float alpha = 1.0f - phaseT;
+
+		DrawRect({ curX, lineY }, { curW, lineH }, { 1.0f, 1.0f, 1.0f, alpha });
+	}
+}
+
+void PseudoOS::DrawButtonFlash(const Vector2& pos, const Vector2& size, float timer, float duration, const Vector4& color) {
+	if (timer <= 0.0f || duration <= 0.0f) return;
+	float alpha = Easing::Clamp01(timer / duration);
+	float expand = (1.0f - alpha) * 16.0f;
+	Vector4 col = color;
+	col.w *= alpha;
+	DrawBorder({ pos.x - expand, pos.y - expand }, { size.x + expand * 2.0f, size.y + expand * 2.0f }, col, 2.5f);
 }

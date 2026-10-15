@@ -60,10 +60,7 @@ void ClearScene::PrewarmAssets() {
 			{ "[01] REPLAY COMBAT SORTIE", [this]() { replayButton_.Click(); }, false },
 			{ "[02] RETURN TO ROOT OS (TITLE)", [this]() { titleButton_.Click(); }, false },
 			{ "[03] RESET WINDOW POSITIONS", [this]() {
-				auto* w0 = pseudoOS_.GetWindow(0); if (w0) w0->pos = w0->normalPos;
-				auto* w1 = pseudoOS_.GetWindow(1); if (w1) w1->pos = w1->normalPos;
-				auto* w2 = pseudoOS_.GetWindow(2); if (w2) w2->pos = w2->normalPos;
-				auto* w3 = pseudoOS_.GetWindow(3); if (w3) w3->pos = w3->normalPos;
+				pseudoOS_.ResetWindowPositions();
 			}, false },
 			{ "[04] SYSTEM LOGOUT", []() { ::PostQuitMessage(0); }, true }
 		};
@@ -215,6 +212,7 @@ void ClearScene::PrewarmAssets() {
 			clickedButtonIdx_ = 1;
 			isUploading_ = true;
 			uploadTimer_ = 0.0f;
+			pseudoOS_.PlayWindowCloseAnimation(0.28f);
 		});
 
 		selectionManager_.AddButton(&replayButton_);
@@ -252,11 +250,9 @@ void ClearScene::Initialize() {
 
 	PrewarmAssets();
 
-	// ウィンドウアニメーションスケールのみリセット
-	auto* w0 = pseudoOS_.GetWindow(0); if (w0) { w0->animScale = 0.0f; w0->pos = w0->normalPos; }
-	auto* w1 = pseudoOS_.GetWindow(1); if (w1) { w1->animScale = 0.0f; w1->pos = w1->normalPos; }
-	auto* w2 = pseudoOS_.GetWindow(2); if (w2) { w2->animScale = 0.0f; w2->pos = w2->normalPos; }
-	auto* w3 = pseudoOS_.GetWindow(3); if (w3) { w3->animScale = 0.0f; w3->pos = w3->normalPos; }
+	// ウィンドウ位置リセット＆展開アニメーション開始
+	pseudoOS_.ResetWindowPositions();
+	pseudoOS_.PlayWindowOpenAnimation(0.35f);
 	pseudoOS_.BringWindowToFront(0);
 
 	// 最新リザルト値の反映
@@ -333,32 +329,10 @@ void ClearScene::Update() {
 		if (btnClickFlashTimer_ < 0.0f) btnClickFlashTimer_ = 0.0f;
 	}
 
-	// マウス入力状態の取得（共通ユーティリティでスケーリング済み座標を取得）
 	Input* input = Input::GetInstance();
-	Vector2 mousePos = input->GetVirtualMousePosition(kScreenWidth, kScreenHeight);
-	bool isLDown = input->PushMouse(0);
-	bool isLTrig = input->TriggerMouse(0);
 
-	// 疑似OSデスクトップ環境更新
-	pseudoOS_.Update(dt, mousePos, isLDown, isLTrig);
-
-	// ウィンドウ展開・縮小アニメーション（共通イージング関数を使用）
-	if (!isUploading_) {
-		float expandT = Easing::Clamp01(animTimer_ / 0.35f);
-		float easedScale = Easing::EaseOutCubic(expandT);
-		for (auto& w : pseudoOS_.GetWindows()) {
-			if (w.isOpen && !w.isMinimized) {
-				w.animScale = easedScale;
-			}
-		}
-	} else {
-		// ウィンドウ縮小閉鎖アニメーション（0.28秒で縮小消滅してデスクトップ復帰）
-		float shrinkT = Easing::Clamp01(uploadTimer_ / 0.28f);
-		float easedShrink = (1.0f - shrinkT) * (1.0f - shrinkT);
-		for (auto& w : pseudoOS_.GetWindows()) {
-			w.animScale = easedShrink;
-		}
-	}
+	// 疑似OSデスクトップ環境更新（入力自動取得＆ウィンドウ開閉アニメーション自動管理）
+	pseudoOS_.Update(dt);
 
 	// VHS巻き戻し演出
 	if (isRewinding_) {
