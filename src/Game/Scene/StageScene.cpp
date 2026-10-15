@@ -4,20 +4,58 @@ using namespace MyMath;
 using namespace StageSceneInternal;
 
 void StageScene::Initialize() {
+	auto tStart = std::chrono::high_resolution_clock::now();
 	sceneID = SCENE::STAGE;
 
+	double assetsMs = 0.0;
+	bool ranAssets = false;
 	if (!isAssetsInitialized_) {
+		auto aStart = std::chrono::high_resolution_clock::now();
 		InitializeAssets();
 		isAssetsInitialized_ = true;
+		auto aEnd = std::chrono::high_resolution_clock::now();
+		assetsMs = std::chrono::duration<double, std::milli>(aEnd - aStart).count();
+		ranAssets = true;
 	}
 
+	auto rStart = std::chrono::high_resolution_clock::now();
 	ResetGameplayState();
+	auto rEnd = std::chrono::high_resolution_clock::now();
+	double resetMs = std::chrono::duration<double, std::milli>(rEnd - rStart).count();
+
+	auto tEnd = std::chrono::high_resolution_clock::now();
+	double totalMs = std::chrono::duration<double, std::milli>(tEnd - tStart).count();
+
+	char buf[256];
+	snprintf(buf, sizeof(buf), 
+		"  [StageScene::Initialize] Total: %.2f ms (Assets: %.2f ms [%s], ResetGameplayState: %.2f ms)\n",
+		totalMs, assetsMs, ranAssets ? "FRESH LOAD" : "PREWARMED", resetMs);
+	OutputDebugStringA(buf);
+
+	FILE* fp = nullptr;
+	if (fopen_s(&fp, "scene_transition.log", "a") == 0 && fp) {
+		fputs(buf, fp);
+		fclose(fp);
+	}
 }
 
 void StageScene::PrewarmAssets() {
 	if (!isAssetsInitialized_) {
+		auto aStart = std::chrono::high_resolution_clock::now();
 		InitializeAssets();
 		isAssetsInitialized_ = true;
+		auto aEnd = std::chrono::high_resolution_clock::now();
+		double assetsMs = std::chrono::duration<double, std::milli>(aEnd - aStart).count();
+
+		char buf[256];
+		snprintf(buf, sizeof(buf), "  [StageScene::PrewarmAssets] GPU & Assets prewarmed in %.2f ms\n", assetsMs);
+		OutputDebugStringA(buf);
+
+		FILE* fp = nullptr;
+		if (fopen_s(&fp, "scene_transition.log", "a") == 0 && fp) {
+			fputs(buf, fp);
+			fclose(fp);
+		}
 	}
 }
 

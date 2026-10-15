@@ -13,6 +13,7 @@
 #include <cmath>
 #include <cstdio>
 #include <algorithm>
+#include <chrono>
 
 #ifdef USE_IMGUI
 #include "../../../external/imgui/imgui.h"
@@ -31,6 +32,7 @@ ClearScene::~ClearScene() {
 
 void ClearScene::PrewarmAssets() {
 	if (!isUIInitialized_) {
+		auto tStart = std::chrono::high_resolution_clock::now();
 		SpriteCommon* spriteCommon = SpriteCommon::GetInstance();
 
 		// 必須テクスチャのロード
@@ -222,10 +224,23 @@ void ClearScene::PrewarmAssets() {
 		uploadSprite_->Initialize(spriteCommon, "assets/textures/white1x1.png");
 
 		isUIInitialized_ = true;
+
+		auto tEnd = std::chrono::high_resolution_clock::now();
+		double prewarmMs = std::chrono::duration<double, std::milli>(tEnd - tStart).count();
+		char buf[256];
+		snprintf(buf, sizeof(buf), "  [ClearScene::PrewarmAssets] Assets prewarmed in %.2f ms\n", prewarmMs);
+		OutputDebugStringA(buf);
+
+		FILE* fp = nullptr;
+		if (fopen_s(&fp, "scene_transition.log", "a") == 0 && fp) {
+			fputs(buf, fp);
+			fclose(fp);
+		}
 	}
 }
 
 void ClearScene::Initialize() {
+	auto tStart = std::chrono::high_resolution_clock::now();
 	sceneID = SCENE::CLEAR;
 	Input::GetInstance()->UnlockCursor();
 	selectionManager_.Clear();
@@ -289,6 +304,18 @@ void ClearScene::Initialize() {
 	UITextRegistry::GetInstance()->Register("Clear_HPValue", &hpRemainingValue_);
 	UITextRegistry::GetInstance()->Register("Clear_BtnReplay", replayButton_.GetLabelText());
 	UITextRegistry::GetInstance()->Register("Clear_BtnTitle", titleButton_.GetLabelText());
+
+	auto tEnd = std::chrono::high_resolution_clock::now();
+	double totalMs = std::chrono::duration<double, std::milli>(tEnd - tStart).count();
+	char buf[256];
+	snprintf(buf, sizeof(buf), "  [ClearScene::Initialize] Initialized in %.2f ms (%.4f s)\n", totalMs, totalMs / 1000.0);
+	OutputDebugStringA(buf);
+
+	FILE* fp = nullptr;
+	if (fopen_s(&fp, "scene_transition.log", "a") == 0 && fp) {
+		fputs(buf, fp);
+		fclose(fp);
+	}
 }
 
 void ClearScene::Update() {

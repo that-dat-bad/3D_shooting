@@ -13,6 +13,7 @@
 #include <cmath>
 #include <cstdio>
 #include <algorithm>
+#include <chrono>
 
 #ifdef USE_IMGUI
 #include "../../../external/imgui/imgui.h"
@@ -31,6 +32,7 @@ GameOverScene::~GameOverScene() {
 
 void GameOverScene::PrewarmAssets() {
 	if (!isUIInitialized_) {
+		auto tStart = std::chrono::high_resolution_clock::now();
 		SpriteCommon* spriteCommon = SpriteCommon::GetInstance();
 
 		// 必須テクスチャのロード
@@ -188,10 +190,23 @@ void GameOverScene::PrewarmAssets() {
 		});
 
 		isUIInitialized_ = true;
+
+		auto tEnd = std::chrono::high_resolution_clock::now();
+		double prewarmMs = std::chrono::duration<double, std::milli>(tEnd - tStart).count();
+		char buf[256];
+		snprintf(buf, sizeof(buf), "  [GameOverScene::PrewarmAssets] Assets prewarmed in %.2f ms\n", prewarmMs);
+		OutputDebugStringA(buf);
+
+		FILE* fp = nullptr;
+		if (fopen_s(&fp, "scene_transition.log", "a") == 0 && fp) {
+			fputs(buf, fp);
+			fclose(fp);
+		}
 	}
 }
 
 void GameOverScene::Initialize() {
+	auto tStart = std::chrono::high_resolution_clock::now();
 	sceneID = SCENE::GAMEOVER;
 	Input::GetInstance()->UnlockCursor();
 	selectionManager_.Clear();
@@ -225,6 +240,18 @@ void GameOverScene::Initialize() {
 	UITextRegistry::GetInstance()->Register("GameOver_Header", &gameOverText_);
 	UITextRegistry::GetInstance()->Register("GameOver_BtnRetry", retryButton_.GetLabelText());
 	UITextRegistry::GetInstance()->Register("GameOver_BtnTitle", titleButton_.GetLabelText());
+
+	auto tEnd = std::chrono::high_resolution_clock::now();
+	double totalMs = std::chrono::duration<double, std::milli>(tEnd - tStart).count();
+	char buf[256];
+	snprintf(buf, sizeof(buf), "  [GameOverScene::Initialize] Initialized in %.2f ms (%.4f s)\n", totalMs, totalMs / 1000.0);
+	OutputDebugStringA(buf);
+
+	FILE* fp = nullptr;
+	if (fopen_s(&fp, "scene_transition.log", "a") == 0 && fp) {
+		fputs(buf, fp);
+		fclose(fp);
+	}
 }
 
 void GameOverScene::Update() {
