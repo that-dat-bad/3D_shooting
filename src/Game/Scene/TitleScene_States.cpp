@@ -315,21 +315,9 @@ void TitleScene::UpdateMenuState(float dt) {
 	}
 
 	Input* input = Input::GetInstance();
-	HWND hwnd = input->GetHwnd();
-	Input::MousePosition mousePos = input->GetMouseScreenPosition();
-	float mx = static_cast<float>(mousePos.x);
-	float my = static_cast<float>(mousePos.y);
-
-	// クライアント領域スケーリング（DPIやリサイズによるゲーム解像度との不一致を完全解消）
-	if (hwnd) {
-		RECT rc;
-		if (::GetClientRect(hwnd, &rc) && (rc.right - rc.left > 0) && (rc.bottom - rc.top > 0)) {
-			float actualW = static_cast<float>(rc.right - rc.left);
-			float actualH = static_cast<float>(rc.bottom - rc.top);
-			mx *= (kScreenWidth / actualW);
-			my *= (kScreenHeight / actualH);
-		}
-	}
+	Vector2 mouseScaled = input->GetVirtualMousePosition(kScreenWidth, kScreenHeight);
+	float mx = mouseScaled.x;
+	float my = mouseScaled.y;
 
 	// マウスボタン押下判定（DirectInput ＋ Windows API の多重フォールバック）
 	bool isLButtonDown = input->PushMouse(0) || ((::GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0);

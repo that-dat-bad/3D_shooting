@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="4.0">
   <ItemGroup>
     <Filter Include="驛｢・ｧ繝ｻ・ｽ驛｢譎｢・ｽ・ｼ驛｢・ｧ繝ｻ・ｹ 驛｢譎・ｽｼ譁撰ｼ憺Δ・ｧ繝ｻ・､驛｢譎｢・ｽ・ｫ">
@@ -351,7 +351,7 @@
     <ClInclude Include="src\engine\Graphics\UI\UIText.h">
       <Filter>郢晏･繝｣郢敖郢晢ｽｼ 郢晁ｼ斐＜郢ｧ・､郢晢ｽｫ</Filter>
     </ClInclude>
-    <ClInclude Include="src\engine\Graphics\UI\UIPanel.h" />
+    <ClInclude Include="src\engine\Graphics\UI\UIPanel.h" />`r`n    <ClInclude Include="src\engine\base\Math\Easing.h" />`r`n    <ClInclude Include="src\engine\Graphics\UI\TypewriterEffect.h" />
     <ClInclude Include="src\engine\Graphics\UI\PseudoOS.h" />
       <Filter>郢晏･繝｣郢敖郢晢ｽｼ 郢晁ｼ斐＜郢ｧ・､郢晢ｽｫ</Filter>
     <ClInclude Include="src\Game\System\GameResult.h">
@@ -647,7 +647,7 @@
     <ClCompile Include="src\engine\Graphics\UI\UIPanel.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="src\engine\Graphics\UI\PseudoOS.cpp">
+    <ClCompile Include="src\engine\Graphics\UI\TypewriterEffect.cpp">`r`n      <Filter>ソース ファイル</Filter>`r`n    </ClCompile>`r`n    <ClCompile Include="src\engine\Graphics\UI\PseudoOS.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
     <ClCompile Include="src\engine\io\MCPClient.cpp">

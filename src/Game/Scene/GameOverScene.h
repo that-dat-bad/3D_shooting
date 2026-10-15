@@ -5,6 +5,7 @@
 #include "../../engine/Graphics/UI/UIButton.h"
 #include "../../engine/Graphics/UI/UISelectionManager.h"
 #include "../../engine/Graphics/UI/PseudoOS.h"
+#include "../../engine/Graphics/UI/TypewriterEffect.h"
 #include "../../engine/Graphics/Sprite/Sprite.h"
 #include <vector>
 #include <string>
@@ -58,8 +59,7 @@ private:
 	// ボタンクリックフィードバック & ヘッダータイピング
 	float btnClickFlashTimer_ = 0.0f;
 	int clickedButtonIdx_ = -1;
-	float headerTypeTimer_ = 0.0f;
-	int headerVisibleChars_ = 0;
+	TypewriterEffect headerTypewriter_;
 
 	// 各ウィンドウ内部の描画ヘルパー
 	void DrawCrashRecoveryWindow(const PseudoOS::Window& win);

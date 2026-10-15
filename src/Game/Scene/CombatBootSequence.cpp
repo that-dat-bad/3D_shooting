@@ -2,6 +2,7 @@
 #include "CombatBootSequence.h"
 #include "../../engine/Graphics/Text/TextRenderer.h"
 #include "../../engine/Graphics/System/TextureManager.h"
+#include "../../engine/Graphics/UI/TypewriterEffect.h"
 #include "../../engine/base/WinApp.h"
 #include <cmath>
 #include <algorithm>
@@ -63,36 +64,6 @@ void CombatBootSequence::Finalize() {
 	ringSprite_.reset();
 }
 
-// UTF-8 文字列の部分取得（マルチバイト文字境界保護）
-static std::string GetUtf8Substr(const std::string& str, size_t charCount) {
-	size_t byteIdx = 0;
-	size_t count = 0;
-	while (byteIdx < str.size() && count < charCount) {
-		unsigned char c = static_cast<unsigned char>(str[byteIdx]);
-		if (c < 0x80) byteIdx += 1;
-		else if ((c & 0xE0) == 0xC0) byteIdx += 2;
-		else if ((c & 0xF0) == 0xE0) byteIdx += 3;
-		else if ((c & 0xF8) == 0xF0) byteIdx += 4;
-		else byteIdx += 1;
-		count++;
-	}
-	return str.substr(0, byteIdx);
-}
-
-// UTF-8 文字数カウント
-static size_t GetUtf8CharCount(const std::string& str) {
-	size_t count = 0;
-	for (size_t i = 0; i < str.size();) {
-		unsigned char c = static_cast<unsigned char>(str[i]);
-		if (c < 0x80) i += 1;
-		else if ((c & 0xE0) == 0xC0) i += 2;
-		else if ((c & 0xF0) == 0xE0) i += 3;
-		else if ((c & 0xF8) == 0xF0) i += 4;
-		else i += 1;
-		count++;
-	}
-	return count;
-}
 
 // ランダムサイバーグリッチ（文字化けデコード演出）
 static std::string MakeGlitchText(const std::string& base, float glitchIntensity, uint32_t seed) {
@@ -343,28 +314,14 @@ void CombatBootSequence::DrawBootText(float cx, float cy, float topY, float over
 		const std::string fullJpText = "メインシステム、戦闘モード起動...";
 
 		float typingDuration = 0.65f; // 0.65秒で全文字タイピング
-		float typingProgress = std::clamp((timer_ - 1.35f) / typingDuration, 0.0f, 1.0f);
-
-		// 英語タイピング文字数
-		size_t enCharCount = static_cast<size_t>(typingProgress * static_cast<float>(fullEnText.size()));
-		std::string dispEn = fullEnText.substr(0, enCharCount);
-
-		// 末尾ブロックカーソルの点滅
-		bool cursorBlink = (static_cast<int>(timer_ * 16.0f) % 2) == 0;
-		if (typingProgress < 1.0f && cursorBlink) {
-			dispEn += "_";
-		}
+		float typingProgress = (timer_ - 1.35f) / typingDuration;
+		std::string dispEn = TypewriterEffect::GetTextByProgress(fullEnText, typingProgress, true, timer_, 16.0f, "_");
 
 		// 日本語タイピング（1.45sから開始）
 		std::string dispJp = "";
 		if (timer_ >= 1.45f) {
-			float jpProgress = std::clamp((timer_ - 1.45f) / (typingDuration * 0.9f), 0.0f, 1.0f);
-			size_t jpTotalChars = GetUtf8CharCount(fullJpText);
-			size_t jpCharCount = static_cast<size_t>(jpProgress * static_cast<float>(jpTotalChars));
-			dispJp = GetUtf8Substr(fullJpText, jpCharCount);
-			if (jpProgress < 1.0f && cursorBlink) {
-				dispJp += "_";
-			}
+			float jpProgress = (timer_ - 1.45f) / (typingDuration * 0.9f);
+			dispJp = TypewriterEffect::GetTextByProgress(fullJpText, jpProgress, true, timer_, 16.0f, "_");
 		}
 
 		// タイピング風微小点滅カラー

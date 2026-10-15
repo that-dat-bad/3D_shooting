@@ -143,6 +143,32 @@ Input::MousePosition Input::GetMouseScreenPosition(HWND hwnd)
 	return { pt.x, pt.y };
 }
 
+Vector2 Input::GetVirtualMousePosition(float virtualWidth, float virtualHeight, HWND hwnd)
+{
+	HWND targetHwnd = hwnd ? hwnd : hwnd_;
+	if (!targetHwnd)
+	{
+		return { 0.0f, 0.0f };
+	}
+
+	POINT pt;
+	::GetCursorPos(&pt);
+	::ScreenToClient(targetHwnd, &pt);
+
+	Vector2 mousePos = { static_cast<float>(pt.x), static_cast<float>(pt.y) };
+
+	RECT rc;
+	if (::GetClientRect(targetHwnd, &rc) && (rc.right - rc.left > 0) && (rc.bottom - rc.top > 0))
+	{
+		float actualW = static_cast<float>(rc.right - rc.left);
+		float actualH = static_cast<float>(rc.bottom - rc.top);
+		mousePos.x *= (virtualWidth / actualW);
+		mousePos.y *= (virtualHeight / actualH);
+	}
+
+	return mousePos;
+}
+
 bool Input::PushKey(BYTE keyNumber)
 {
 	if (keys_[keyNumber])

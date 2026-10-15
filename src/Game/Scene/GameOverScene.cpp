@@ -14,6 +14,7 @@
 #include <cstdio>
 #include <algorithm>
 #include <chrono>
+#include "../../engine/base/Math/Easing.h"
 
 #ifdef USE_IMGUI
 #include "../../../external/imgui/imgui.h"
@@ -222,8 +223,8 @@ void GameOverScene::Initialize() {
 	retryGlitchTimer_ = 0.0f;
 	btnClickFlashTimer_ = 0.0f;
 	clickedButtonIdx_ = -1;
-	headerTypeTimer_ = 0.0f;
-	headerVisibleChars_ = 0;
+	headerTypewriter_.SetText("MISSION FAILED // SYSTEM DOWN", 0.030f);
+	headerTypewriter_.SetCursorBlinkRate(12.0f);
 
 	PrewarmAssets();
 
@@ -263,22 +264,9 @@ void GameOverScene::Update() {
 		if (fadeInAlpha_ > 1.0f) fadeInAlpha_ = 1.0f;
 	}
 
-	// マウス入力状態の取得
+	// マウス入力状態の取得（共通ユーティリティでスケーリング済み座標を取得）
 	Input* input = Input::GetInstance();
-	Input::MousePosition mPos = input->GetMouseScreenPosition();
-	Vector2 mousePos = { static_cast<float>(mPos.x), static_cast<float>(mPos.y) };
-
-	HWND hwnd = input->GetHwnd();
-	if (hwnd) {
-		RECT rc;
-		if (::GetClientRect(hwnd, &rc) && (rc.right - rc.left > 0) && (rc.bottom - rc.top > 0)) {
-			float actualW = static_cast<float>(rc.right - rc.left);
-			float actualH = static_cast<float>(rc.bottom - rc.top);
-			mousePos.x *= (kScreenWidth / actualW);
-			mousePos.y *= (kScreenHeight / actualH);
-		}
-	}
-
+	Vector2 mousePos = input->GetVirtualMousePosition(kScreenWidth, kScreenHeight);
 	bool isLDown = input->PushMouse(0);
 	bool isLTrig = input->TriggerMouse(0);
 
@@ -300,27 +288,18 @@ void GameOverScene::Update() {
 		}
 	}
 
-	// ウィンドウ展開アニメーション（指摘2: 一瞬での全表示を解消し、0.35秒で滑らかに展開）
-	float expandT = std::clamp(animTimer_ / 0.35f, 0.0f, 1.0f);
-	float easedScale = 1.0f - std::pow(1.0f - expandT, 3.0f);
+	// ウィンドウ展開アニメーション（共通イージング関数を使用）
+	float expandT = Easing::Clamp01(animTimer_ / 0.35f);
+	float easedScale = Easing::EaseOutCubic(expandT);
 	for (auto& w : pseudoOS_.GetWindows()) {
 		if (w.isOpen && !w.isMinimized) {
 			w.animScale = easedScale;
 		}
 	}
 
-	// 項目3: ヘッダータイピングアニメーション（リアルタイムにエラーを検知・記録している稼働感）
-	const std::string fullHeader = "MISSION FAILED // SYSTEM DOWN";
-	headerTypeTimer_ += dt;
-	headerVisibleChars_ = static_cast<int>(headerTypeTimer_ / 0.030f);
-	if (headerVisibleChars_ > static_cast<int>(fullHeader.size())) {
-		headerVisibleChars_ = static_cast<int>(fullHeader.size());
-	}
-	std::string displayHeader = fullHeader.substr(0, headerVisibleChars_);
-	if (headerVisibleChars_ < static_cast<int>(fullHeader.size()) && (static_cast<int>(headerTypeTimer_ * 12.0f) % 2 == 0)) {
-		displayHeader += "_";
-	}
-	gameOverText_.SetText(displayHeader);
+	// 項目3: ヘッダータイピングアニメーション（共通TypewriterEffectを使用）
+	headerTypewriter_.Update(dt);
+	gameOverText_.SetText(headerTypewriter_.GetCurrentText());
 
 	if (btnClickFlashTimer_ > 0.0f) {
 		btnClickFlashTimer_ -= dt;
@@ -446,7 +425,7 @@ void GameOverScene::Update() {
 
 		// 完成形の文字列幅を基準に左端を決定（タイピング中も文字位置がずれないよう左上アンカーで固定）
 		Vector2 fullHeaderSize = TextRenderer::GetInstance()->CalculateTextSize(
-			gameOverText_.GetFontName(), fullHeader, gameOverText_.GetFontSize());
+			gameOverText_.GetFontName(), headerTypewriter_.GetTargetText(), gameOverText_.GetFontSize());
 		gameOverText_.SetAnchorPoint({ 0.0f, 0.0f });
 		gameOverText_.SetPosition({ w0->pos.x + (w0->size.x - fullHeaderSize.x) * 0.5f, w0->pos.y + 48.0f });
 		gameOverText_.Update();

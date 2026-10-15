@@ -314,6 +314,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="src\engine\io\Input.h" />
     <ClInclude Include="src\engine\base\StringUtility.h" />
     <ClInclude Include="src\engine\base\Math\Vector2.h" />
+    <ClInclude Include="src\engine\base\Math\Easing.h" />
     <ClInclude Include="src\engine\base\Math\Vector4.h" />
     <ClInclude Include="src\engine\base\Math\Transform.h" />
     <ClInclude Include="src\engine\Graphics\System\TextureManager.h" />
@@ -362,6 +363,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="src\engine\Graphics\UI\UIText.h" />
     <ClInclude Include="src\engine\Graphics\UI\UIPanel.h" />
     <ClInclude Include="src\engine\Graphics\UI\PseudoOS.h" />
+    <ClInclude Include="src\engine\Graphics\UI\TypewriterEffect.h" />
     <ClInclude Include="src\Game\System\GameResult.h" />
     <ClInclude Include="src\engine\io\MCPClient.h" />
     <ClInclude Include="src\engine\io\ConfigFile.h" />
@@ -498,6 +500,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="src\engine\Graphics\UI\UIText.cpp" />
     <ClCompile Include="src\engine\Graphics\UI\UIPanel.cpp" />
     <ClCompile Include="src\engine\Graphics\UI\PseudoOS.cpp" />
+    <ClCompile Include="src\engine\Graphics\UI\TypewriterEffect.cpp" />
     <ClCompile Include="src\engine\io\MCPClient.cpp" />
     <ClCompile Include="src\engine\io\ConfigFile.cpp" />
     <ClCompile Include="src\Game\FlightModel\AircraftConfig.cpp" />
