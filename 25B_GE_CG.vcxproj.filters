@@ -183,6 +183,7 @@
       <Filter>驛｢譎渉・･郢晢ｽ｣驛｢謨鳴驛｢譎｢・ｽ・ｼ 驛｢譎・ｽｼ譁撰ｼ憺Δ・ｧ繝ｻ・､驛｢譎｢・ｽ・ｫ</Filter>
     </ClInclude>
     <ClInclude Include="src\Game\Scene\GameOverScene.h">
+    <ClInclude Include="src\Game\Scene\GameOverSceneInternal.h" />
       <Filter>驛｢譎鞘ぎ・･郢晢ｽ｣驛｢謨問ぎ驛｢譎｢・ｽ・ｼ 驛｢譎・ｽｼ譁撰ｼ憺Δ・ｧ繝ｻ・､驛｢譎｢・ｽ・ｫ</Filter>
     </ClInclude>
     <ClInclude Include="src\Game\Scene\Iscene.h">
@@ -198,6 +199,7 @@
       <Filter>驛｢譎鞘ぎ・･郢晢ｽ｣驛｢謨問ぎ驛｢譎｢・ｽ・ｼ 驛｢譎・ｽｼ譁撰ｼ憺Δ・ｧ繝ｻ・､驛｢譎｢・ｽ・ｫ</Filter>
     </ClInclude>
     <ClInclude Include="src\Game\Scene\StageScene.h">
+    <ClInclude Include="src\Game\Scene\StageSceneInternal.h" />
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="src\Game\Scene\StageHUD.h">
@@ -207,6 +209,7 @@
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="src\Game\Scene\TitleScene.h">
+    <ClInclude Include="src\Game\Scene\TitleSceneInternal.h" />
       <Filter>驛｢譎渉・･郢晢ｽ｣驛｢謨鳴驛｢譎｢・ｽ・ｼ 驛｢譎・ｽｼ譁撰ｼ憺Δ・ｧ繝ｻ・､驛｢譎｢・ｽ・ｫ</Filter>
     </ClInclude>
     <ClInclude Include="src\engine\base\Math\Quaternion.h">
@@ -308,6 +311,7 @@
       <Filter>驛｢譎渉・･郢晢ｽ｣驛｢謨鳴驛｢譎｢・ｽ・ｼ 驛｢譎・ｽｼ譁撰ｼ憺Δ・ｧ繝ｻ・､驛｢譎｢・ｽ・ｫ</Filter>
     </ClInclude>
     <ClInclude Include="src\Game\Scene\ClearScene.h">
+    <ClInclude Include="src\Game\Scene\ClearSceneInternal.h" />
       <Filter>驛｢譎渉・･郢晢ｽ｣驛｢謨鳴驛｢譎｢・ｽ・ｼ 驛｢譎・ｽｼ譁撰ｼ憺Δ・ｧ繝ｻ・､驛｢譎｢・ｽ・ｫ</Filter>
     </ClInclude>
     <ClInclude Include="src\Game\Camera\PlayerCamera.h">
@@ -500,9 +504,12 @@
       <Filter>驛｢・ｧ繝ｻ・ｽ驛｢譎｢・ｽ・ｼ驛｢・ｧ繝ｻ・ｹ 驛｢譎・ｽｼ譁撰ｼ憺Δ・ｧ繝ｻ・､驛｢譎｢・ｽ・ｫ</Filter>
     </ClCompile>
     <ClCompile Include="src\Game\Scene\ClearScene.cpp">
+    <ClCompile Include="src\Game\Scene\ClearScene_Windows.cpp" />
+    <ClCompile Include="src\Game\Scene\ClearScene_Effects.cpp" />
       <Filter>驛｢・ｧ繝ｻ・ｽ驛｢譎｢・ｽ・ｼ驛｢・ｧ繝ｻ・ｹ 驛｢譎・ｽｼ譁撰ｼ憺Δ・ｧ繝ｻ・､驛｢譎｢・ｽ・ｫ</Filter>
     </ClCompile>
     <ClCompile Include="src\Game\Scene\GameOverScene.cpp">
+    <ClCompile Include="src\Game\Scene\GameOverScene_Windows.cpp" />
       <Filter>驛｢・ｧ繝ｻ・ｽ驛｢譎｢・ｽ・ｼ驛｢・ｧ繝ｻ・ｹ 驛｢譎・ｽｼ譁撰ｼ憺Δ・ｧ繝ｻ・､驛｢譎｢・ｽ・ｫ</Filter>
     </ClCompile>
     <ClCompile Include="src\Game\Scene\IScene.cpp">
@@ -515,6 +522,10 @@
       <Filter>驛｢・ｧ繝ｻ・ｽ驛｢譎｢・ｽ・ｼ驛｢・ｧ繝ｻ・ｹ 驛｢譎・ｽｼ譁撰ｼ憺Δ・ｧ繝ｻ・､驛｢譎｢・ｽ・ｫ</Filter>
     </ClCompile>
     <ClCompile Include="src\Game\Scene\StageScene.cpp">
+    <ClCompile Include="src\Game\Scene\StageScene_Combat.cpp" />
+    <ClCompile Include="src\Game\Scene\StageScene_Rendering.cpp" />
+    <ClCompile Include="src\Game\Scene\StageScene_Editor.cpp" />
+    <ClCompile Include="src\Game\Scene\StageScene_Gameplay.cpp" />
       <Filter>ソース ファイル</Filter>
     </ClCompile>
     <ClCompile Include="src\Game\Scene\StageHUD.cpp">
@@ -530,6 +541,11 @@
       <Filter>郢ｧ・ｽ郢晢ｽｼ郢ｧ・ｹ 郢晁ｼ斐＜郢ｧ・､郢晢ｽｫ</Filter>
     </ClCompile>
     <ClCompile Include="src\Game\Scene\TitleScene.cpp">
+    <ClCompile Include="src\Game\Scene\TitleScene_Locations.cpp" />
+    <ClCompile Include="src\Game\Scene\TitleScene_States.cpp" />
+    <ClCompile Include="src\Game\Scene\TitleScene_Menu.cpp" />
+    <ClCompile Include="src\Game\Scene\TitleScene_OSDesktop.cpp" />
+    <ClCompile Include="src\Game\Scene\TitleScene_Editor.cpp" />
       <Filter>驛｢・ｧ繝ｻ・ｽ驛｢譎｢・ｽ・ｼ驛｢・ｧ繝ｻ・ｹ 驛｢譎・ｽｼ譁撰ｼ憺Δ・ｧ繝ｻ・､驛｢譎｢・ｽ・ｫ</Filter>
     </ClCompile>
     <ClCompile Include="src\engine\base\Math\Quaternion.cpp">

@@ -73,6 +73,9 @@ private:
 	void DrawTimer();
 	void DrawAmmo();
 	void DrawReticles();
+	void DrawLeadGuidanceLine(const Vector2& noseScreen, const Vector2& aimScreen, float alpha);
+	void DrawMouseAimReticle(const Vector2& aimScreen, float reticleScale, const Vector4& baseAimCol, const Vector4& baseTickCol);
+	void DrawBoresightReticle(const Vector2& noseScreen, float reticleScale, float alpha);
 
 private:
 	SpriteCommon* spriteCommon_ = nullptr;

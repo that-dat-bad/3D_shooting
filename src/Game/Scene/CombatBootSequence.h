@@ -53,6 +53,17 @@ public:
 	void Finalize();
 
 private:
+	// --- ブートUI描画サブルーチン ---
+	void DrawQuickBootUI(float cx, float cy);
+	void DrawLoadingDiagnostics(float cx, float cy);
+	void DrawCinematicLetterbox(float sw, float sh);
+	void DrawScanningLaser(float sw, float cx, float cy);
+	void DrawTacticalBanner(float cx, float cy, float bannerW, float overallAlpha);
+	void DrawTacticalReticle(float cx, float cy, float easeExpand, float overallAlpha);
+	void DrawBootText(float cx, float cy, float topY, float overallAlpha);
+	void DrawTelemetryLogs(float cx, float cy, float bannerW, float overallAlpha);
+	void DrawPilotPrompt(float cx, float overallAlpha);
+
 	// --- 2D描画ヘルパー ---
 	void DrawLine(const Vector2& p1, const Vector2& p2, float thickness, const Vector4& color, BlendMode blendMode = BlendMode::kNormal);
 	void DrawRect(const Vector2& pos, const Vector2& size, const Vector4& color, const Vector2& anchor = { 0.0f, 0.0f }, BlendMode blendMode = BlendMode::kNormal);

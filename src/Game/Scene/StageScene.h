@@ -198,5 +198,17 @@ private:
 	void DrawAircraftTuningEditor();
 	void DrawMissionObjectivesHUD();
 	void DrawMissionMessages();
+
+	// ============================
+	// 分割ヘルパー関数群 (Gameplay / Rendering / Combat)
+	// ============================
+	void UpdateFlightControls(float gameDeltaTime);
+	void UpdateCombatFiring(float gameDeltaTime);
+	void UpdateFlightAndEffects(float gameDeltaTime);
+	void UpdateCombatAndMission(float gameDeltaTime);
+	void UpdateCamera(float gameDeltaTime);
+	void UpdateDebugAndStatusUI(float gameDeltaTime);
+	void DrawVaporConeEffect(Camera* cam);
+	void DrawMuzzleFlashEffect(Camera* cam);
 };
 

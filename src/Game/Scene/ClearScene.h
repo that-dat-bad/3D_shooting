@@ -65,4 +65,8 @@ private:
     void DrawFlightLogWindow(const PseudoOS::Window& win);
     void DrawIntelAssessmentWindow(const PseudoOS::Window& win);
     void DrawTheaterReconWindow(const PseudoOS::Window& win);
+
+    // 演出UI描画ヘルパー
+    void DrawRewindEffectUI();
+    void DrawUploadSequenceUI();
 };

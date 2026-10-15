@@ -361,6 +361,78 @@ void StageHUD::DrawAmmo() {
 	}
 }
 
+void StageHUD::DrawLeadGuidanceLine(const Vector2& noseScreen, const Vector2& aimScreen, float alpha) {
+	float dist = std::sqrt(
+		(aimScreen.x - noseScreen.x) * (aimScreen.x - noseScreen.x) +
+		(aimScreen.y - noseScreen.y) * (aimScreen.y - noseScreen.y)
+	);
+
+	if (dist > 12.0f) {
+		Vector4 lineCol = isWarningMode_
+			? Vector4{ 1.0f, 0.30f, 0.20f, 0.50f * alpha }
+			: Vector4{ 0.0f, 0.95f, 0.50f, 0.40f * alpha };
+		DrawLine(noseScreen, aimScreen, 1.5f, lineCol);
+
+		Vector2 midPos = {
+			(noseScreen.x + aimScreen.x) * 0.5f,
+			(noseScreen.y + aimScreen.y) * 0.5f
+		};
+		DrawDot(midPos, 2.0f, isWarningMode_ ? Vector4{ 1.0f, 0.40f, 0.20f, 0.70f * alpha } : Vector4{ 0.0f, 0.95f, 0.50f, 0.60f * alpha });
+	}
+}
+
+void StageHUD::DrawMouseAimReticle(const Vector2& aimScreen, float reticleScale, const Vector4& baseAimCol, const Vector4& baseTickCol) {
+	float reticleRadius = 18.0f * reticleScale;
+
+	// 外周リング
+	DrawRing(aimScreen, reticleRadius, baseAimCol);
+
+	// 中心ドット
+	DrawDot(aimScreen, 2.5f, baseTickCol);
+
+	// 外周4箇所の十字目盛（上下左右）
+	float tickInner = reticleRadius + 3.0f;
+	float tickOuter = reticleRadius + 10.0f;
+
+	// 上
+	DrawLine({ aimScreen.x, aimScreen.y - tickOuter }, { aimScreen.x, aimScreen.y - tickInner }, 1.5f, baseTickCol);
+	// 下
+	DrawLine({ aimScreen.x, aimScreen.y + tickInner }, { aimScreen.x, aimScreen.y + tickOuter }, 1.5f, baseTickCol);
+	// 左
+	DrawLine({ aimScreen.x - tickOuter, aimScreen.y }, { aimScreen.x - tickInner, aimScreen.y }, 1.5f, baseTickCol);
+	// 右
+	DrawLine({ aimScreen.x + tickInner, aimScreen.y }, { aimScreen.x + tickOuter, aimScreen.y }, 1.5f, baseTickCol);
+}
+
+void StageHUD::DrawBoresightReticle(const Vector2& noseScreen, float reticleScale, float alpha) {
+	float pulseScale = (firePunchTimer_ > 0.0f) ? 1.25f : 1.0f;
+	pulseScale *= reticleScale;
+	Vector4 crossColor;
+	if (isWarningMode_) {
+		crossColor = { 1.0f, 0.3f, 0.2f, 0.95f * alpha };
+	} else if (firePunchTimer_ > 0.0f) {
+		crossColor = { 1.0f, 0.85f, 0.40f, 1.0f * alpha };
+	} else {
+		crossColor = { 0.95f, 0.98f, 1.0f, 0.90f * alpha };
+	}
+
+	// 中心小リング
+	DrawRing(noseScreen, 5.0f * pulseScale, crossColor);
+
+	// 水平ウイングバー（左右の翼マーク）
+	float wingInner = 8.0f * pulseScale;
+	float wingOuter = 22.0f * pulseScale;
+	// 左ウイング
+	DrawLine({ noseScreen.x - wingOuter, noseScreen.y }, { noseScreen.x - wingInner, noseScreen.y }, 2.0f, crossColor);
+	// 右ウイング
+	DrawLine({ noseScreen.x + wingInner, noseScreen.y }, { noseScreen.x + wingOuter, noseScreen.y }, 2.0f, crossColor);
+
+	// 上部ピッチマーク
+	float topInner = 8.0f * pulseScale;
+	float topOuter = 15.0f * pulseScale;
+	DrawLine({ noseScreen.x, noseScreen.y - topOuter }, { noseScreen.x, noseScreen.y - topInner }, 2.0f, crossColor);
+}
+
 void StageHUD::DrawReticles() {
 	// 項目5: ステージクリア時のHUD順次シャットダウン（照準は真っ先に0.00s〜0.35sで消滅）
 	if (isShuttingDown_ && shutdownTimer_ >= 0.35f) {
@@ -399,80 +471,20 @@ void StageHUD::DrawReticles() {
 	// リードガイダンスライン（機首照準とマウス目標照準を結ぶHUDライン）
 	// -----------------------------------------------------------------
 	if (noseVisible && aimVisible) {
-		float dist = std::sqrt(
-			(aimScreen.x - noseScreen.x) * (aimScreen.x - noseScreen.x) +
-			(aimScreen.y - noseScreen.y) * (aimScreen.y - noseScreen.y)
-		);
-
-		if (dist > 12.0f) {
-			Vector4 lineCol = isWarningMode_
-				? Vector4{ 1.0f, 0.30f, 0.20f, 0.50f * alpha }
-				: Vector4{ 0.0f, 0.95f, 0.50f, 0.40f * alpha };
-			DrawLine(noseScreen, aimScreen, 1.5f, lineCol);
-
-			Vector2 midPos = {
-				(noseScreen.x + aimScreen.x) * 0.5f,
-				(noseScreen.y + aimScreen.y) * 0.5f
-			};
-			DrawDot(midPos, 2.0f, isWarningMode_ ? Vector4{ 1.0f, 0.40f, 0.20f, 0.70f * alpha } : Vector4{ 0.0f, 0.95f, 0.50f, 0.60f * alpha });
-		}
+		DrawLeadGuidanceLine(noseScreen, aimScreen, alpha);
 	}
 
 	// -----------------------------------------------------------------
 	// マウス目標照準（サークル＋十字目盛＋中心ドット）
 	// -----------------------------------------------------------------
 	if (aimVisible) {
-		float reticleRadius = 18.0f * reticleScale;
-
-		// 外周リング
-		DrawRing(aimScreen, reticleRadius, baseAimCol);
-
-		// 中心ドット
-		DrawDot(aimScreen, 2.5f, baseTickCol);
-
-		// 外周4箇所の十字目盛（上下左右）
-		float tickInner = reticleRadius + 3.0f;
-		float tickOuter = reticleRadius + 10.0f;
-
-		// 上
-		DrawLine({ aimScreen.x, aimScreen.y - tickOuter }, { aimScreen.x, aimScreen.y - tickInner }, 1.5f, baseTickCol);
-		// 下
-		DrawLine({ aimScreen.x, aimScreen.y + tickInner }, { aimScreen.x, aimScreen.y + tickOuter }, 1.5f, baseTickCol);
-		// 左
-		DrawLine({ aimScreen.x - tickOuter, aimScreen.y }, { aimScreen.x - tickInner, aimScreen.y }, 1.5f, baseTickCol);
-		// 右
-		DrawLine({ aimScreen.x + tickInner, aimScreen.y }, { aimScreen.x + tickOuter, aimScreen.y }, 1.5f, baseTickCol);
+		DrawMouseAimReticle(aimScreen, reticleScale, baseAimCol, baseTickCol);
 	}
 
 	// -----------------------------------------------------------------
 	// 自機が向いている方向（戦闘機HUD風ガンクロス / ボアシサイト）
 	// -----------------------------------------------------------------
 	if (noseVisible) {
-		float pulseScale = (firePunchTimer_ > 0.0f) ? 1.25f : 1.0f;
-		pulseScale *= reticleScale;
-		Vector4 crossColor;
-		if (isWarningMode_) {
-			crossColor = { 1.0f, 0.3f, 0.2f, 0.95f * alpha };
-		} else if (firePunchTimer_ > 0.0f) {
-			crossColor = { 1.0f, 0.85f, 0.40f, 1.0f * alpha };
-		} else {
-			crossColor = { 0.95f, 0.98f, 1.0f, 0.90f * alpha };
-		}
-
-		// 中心小リング
-		DrawRing(noseScreen, 5.0f * pulseScale, crossColor);
-
-		// 水平ウイングバー（左右の翼マーク）
-		float wingInner = 8.0f * pulseScale;
-		float wingOuter = 22.0f * pulseScale;
-		// 左ウイング
-		DrawLine({ noseScreen.x - wingOuter, noseScreen.y }, { noseScreen.x - wingInner, noseScreen.y }, 2.0f, crossColor);
-		// 右ウイング
-		DrawLine({ noseScreen.x + wingInner, noseScreen.y }, { noseScreen.x + wingOuter, noseScreen.y }, 2.0f, crossColor);
-
-		// 上部ピッチマーク
-		float topInner = 8.0f * pulseScale;
-		float topOuter = 15.0f * pulseScale;
-		DrawLine({ noseScreen.x, noseScreen.y - topOuter }, { noseScreen.x, noseScreen.y - topInner }, 2.0f, crossColor);
+		DrawBoresightReticle(noseScreen, reticleScale, alpha);
 	}
 }

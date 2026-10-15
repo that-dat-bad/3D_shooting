@@ -3,7 +3,6 @@
 #include <memory>
 #include "../System/MissionManager.h"
 #include "../System/MissionMapView.h"
-#include "../System/MissionMapView.h"
 
 class MissionEditorScene : public IScene {
 public:

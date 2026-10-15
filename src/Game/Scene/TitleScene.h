@@ -119,6 +119,19 @@ private:
 	void DrawMenuCard();
 	void DrawTransitionGlitch();
 
+	// --- 分割初期化・更新ヘルパー ---
+	void InitializeLocations3D(Camera* titleCamera, uint32_t duskSky, uint32_t whiteSky);
+	void InitializeUI(SpriteCommon* spriteCommon, bool fromCache);
+	void InitializeEntryState();
+
+	void UpdateLocations3D(float dt);
+	void UpdateDroneViewState(float dt);
+	void UpdateWindowCloseState(float dt);
+	void UpdateConsoleBootState(float dt);
+	void UpdateReAuthState(float dt);
+	void UpdateMenuState(float dt);
+	void UpdateSortieState(float dt);
+
 	// --- 疑似ウィンドウ（DAWN_OS ターミナル）のマウスドラッグ移動管理 ---
 	Vector2 menuWindowPos_ = { 392.0f, 44.0f }; ///< ウィンドウ左上座標
 	bool isWindowDragging_ = false;             ///< ドラッグ中フラグ
