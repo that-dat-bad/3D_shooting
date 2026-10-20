@@ -318,36 +318,46 @@ void TitleScene::UpdateMenuState(float dt) {
 	Vector2 mouseScaled = input->GetVirtualMousePosition(kScreenWidth, kScreenHeight);
 	float mx = mouseScaled.x;
 	float my = mouseScaled.y;
+	customCursorPos_ = { mx, my };
 
 	// マウスボタン押下判定（DirectInput ＋ Windows API の多重フォールバック）
 	bool isLButtonDown = input->PushMouse(0) || ((::GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0);
 	bool isLButtonTrigger = input->TriggerMouse(0) || (isLButtonDown && !wasLButtonDown_);
 	wasLButtonDown_ = isLButtonDown;
 
-	// フルOSデスクトップ環境の更新（タスクバー、マルチウィンドウドラッグ・最小化・フォーカス、デスクトップアイコン、カスタムカーソル）
-	UpdateOSDesktop(dt, { mx, my }, isLButtonDown, isLButtonTrigger);
+	if (lockedAlertTimer_ > 0.0f) {
+		lockedAlertTimer_ -= dt;
+	}
 
-	// メインターミナル（Window 0）がフォーカスされており、非最小化・表示中かつ非ドラッグ時のみメニュー操作を更新
-	bool isTermActive = (activeWindowId_ == 0 && osWindows_.size() > 0 && osWindows_[0].isOpen && !osWindows_[0].isMinimized);
-	if (isTermActive && !osWindows_[0].isDragging && osWindows_[0].animScale >= 0.85f) {
-		selectionManager_.Update();
+	if (isMissionSelectModalOpen_ || missionSelectModalAnim_ > 0.001f) {
+		// 全画面ミッション選択モーダルの更新（展開・縮小アニメーション完了まで他のUI入力をブロック）
+		UpdateMissionSelectModal(dt, { mx, my }, isLButtonDown, isLButtonTrigger);
+	} else {
+		// フルOSデスクトップ環境の更新（タスクバー、マルチウィンドウドラッグ・最小化・フォーカス、デスクトップアイコン、カスタムカーソル）
+		UpdateOSDesktop(dt, { mx, my }, isLButtonDown, isLButtonTrigger);
 
-		// マウスクリックでのダイレクトボタン判定（万が一の判定漏れ防止用フォールバック）
-		if (isLButtonTrigger) {
-			const float btnX = osWindows_[0].pos.x + 65.0f;
-			const float btnW = 390.0f;
-			const float btnH = 46.0f;
-			const float btnStartY = osWindows_[0].pos.y + 196.0f;
-			const float btnSpacing = 56.0f;
-			if (mx >= btnX && mx <= btnX + btnW) {
-				if (my >= btnStartY && my <= btnStartY + btnH) {
-					startButton_.Click();
-				} else if (my >= btnStartY + btnSpacing && my <= btnStartY + btnSpacing + btnH) {
-					editorButton_.Click();
-				} else if (my >= btnStartY + btnSpacing * 2.0f && my <= btnStartY + btnSpacing * 2.0f + btnH) {
-					settingsButton_.Click();
-				} else if (my >= btnStartY + btnSpacing * 3.0f && my <= btnStartY + btnSpacing * 3.0f + btnH) {
-					exitButton_.Click();
+		// メインターミナル（Window 0）がフォーカスされており、非最小化・表示中かつ非ドラッグ時のみメニュー操作を更新
+		bool isTermActive = (activeWindowId_ == 0 && osWindows_.size() > 0 && osWindows_[0].isOpen && !osWindows_[0].isMinimized);
+		if (isTermActive && !osWindows_[0].isDragging && osWindows_[0].animScale >= 0.85f) {
+			selectionManager_.Update();
+
+			// マウスクリックでのダイレクトボタン判定（万が一の判定漏れ防止用フォールバック）
+			if (isLButtonTrigger) {
+				const float btnX = osWindows_[0].pos.x + 65.0f;
+				const float btnW = 390.0f;
+				const float btnH = 46.0f;
+				const float btnStartY = osWindows_[0].pos.y + 196.0f;
+				const float btnSpacing = 56.0f;
+				if (mx >= btnX && mx <= btnX + btnW) {
+					if (my >= btnStartY && my <= btnStartY + btnH) {
+						startButton_.Click();
+					} else if (my >= btnStartY + btnSpacing && my <= btnStartY + btnSpacing + btnH) {
+						editorButton_.Click();
+					} else if (my >= btnStartY + btnSpacing * 2.0f && my <= btnStartY + btnSpacing * 2.0f + btnH) {
+						settingsButton_.Click();
+					} else if (my >= btnStartY + btnSpacing * 3.0f && my <= btnStartY + btnSpacing * 3.0f + btnH) {
+						exitButton_.Click();
+					}
 				}
 			}
 		}
@@ -496,4 +506,14 @@ void TitleScene::UpdateSortieState(float dt) {
 		scanline.intensity = 0.04f * fadeMult;
 		postEffect->AddActiveEffect(scanline);
 	}
+}
+
+void TitleScene::StartSortieSequence() {
+	state_ = TitleState::SortieSequence;
+	sortieTimer_ = 0.0f;
+	isEngineTesting_ = true;
+	engineTestTimer_ = kSortieDuration;
+	SetCursorVisible(false); // 出撃開始と同時にOSカーソルを消去
+	// 非同期処理による軽量化：出撃演出ムービーの裏でバックグラウンドスレッドでステージリソースを非同期プリロード！
+	AsyncPreloadManager::GetInstance()->StartStagePreloadAsync();
 }

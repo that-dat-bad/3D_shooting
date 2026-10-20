@@ -37,6 +37,8 @@ void Game::Initialize() {
 
 	FontManager::GetInstance()->Initialize();
 	TextRenderer::GetInstance()->Initialize(SpriteCommon::GetInstance());
+	// ゲーム全体（全シーン）で文字描画によるD3D12バッファ生成ヒッチを防ぐため3000個を一括プリウォーム
+	TextRenderer::GetInstance()->PrewarmPool(3000);
 
 	// 非同期処理による軽量化：全コアを使ったマルチスレッド並列フォントラスタライズ
 	std::vector<FontLoadRequest> fontRequests = {

@@ -106,7 +106,9 @@ void Object3d::Draw() {
 	// 平行光源CBufferの設定 (RootParameter Index: 3)
 	commandList->SetGraphicsRootConstantBufferView(3, object3dCommon_->GetDirectionalLightResource()->GetGPUVirtualAddress());
 
-	commandList->SetGraphicsRootConstantBufferView(4, object3dCommon_->GetLightingSettingsResource()->GetGPUVirtualAddress());
+	// LightingSettingsまたはカスタム設定定数バッファの設定 (RootParameter Index: 4 / register b3)
+	ID3D12Resource* lightingRes = customLightingSettingsResource_ ? customLightingSettingsResource_.Get() : object3dCommon_->GetLightingSettingsResource();
+	commandList->SetGraphicsRootConstantBufferView(4, lightingRes->GetGPUVirtualAddress());
 
 	commandList->SetGraphicsRootConstantBufferView(5, object3dCommon_->GetPointLightResource()->GetGPUVirtualAddress());
 

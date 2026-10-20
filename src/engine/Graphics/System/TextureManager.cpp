@@ -28,6 +28,7 @@ void TextureManager::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager)
 	srvManager_ = srvManager;
 
 	textureDatas_.reserve(SrvManager::kMaxSRVCount_);
+	metadataByIndex_.fill(nullptr);
 }
 
 void TextureManager::Finalize() {
@@ -231,13 +232,19 @@ uint32_t TextureManager::GetTextureIndexByFilePath(const std::string& filePath) 
 }
 
 const DirectX::TexMetadata& TextureManager::GetMetaData(uint32_t textureIndex) {
+	if (textureIndex < metadataByIndex_.size() && metadataByIndex_[textureIndex]) {
+		return *metadataByIndex_[textureIndex];
+	}
+
 	for (const auto& [key, data] : textureDatas_) {
 		if (data.srvIndex == textureIndex) {
+			if (textureIndex < metadataByIndex_.size()) {
+				metadataByIndex_[textureIndex] = &data.metadata;
+			}
 			return data.metadata;
 		}
 	}
 
-	assert(false && "Texture not found.");
 	static DirectX::TexMetadata dummy{};
 	return dummy;
 }

@@ -90,6 +90,10 @@ public: // メンバ関数
 	void SetCustomPipelineState(ID3D12PipelineState* pso) { customPipelineState_ = pso; }
 	ID3D12PipelineState* GetCustomPipelineState() const { return customPipelineState_.Get(); }
 
+	// カスタム定数バッファ（特殊シェーダーのLightingSettingsスロットb3差し替え用）
+	void SetCustomLightingSettingsResource(ID3D12Resource* res) { customLightingSettingsResource_ = res; }
+	ID3D12Resource* GetCustomLightingSettingsResource() const { return customLightingSettingsResource_.Get(); }
+
 	// ゲッター
 	Vector3 GetScale() const { return transform_.scale; }
 	Vector3 GetRotate() const { return transform_.rotate; }
@@ -128,4 +132,5 @@ private:
 	std::string targetNodeName_ = "";
 	std::vector<std::string> targetNodeNames_;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> customPipelineState_ = nullptr;
+	Microsoft::WRL::ComPtr<ID3D12Resource> customLightingSettingsResource_ = nullptr;
 };

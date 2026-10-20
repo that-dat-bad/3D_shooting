@@ -1,0 +1,29 @@
+{
+    "version": "1.0",
+    "missions": [
+        {
+            "id": "[01]",
+            "filePath": "Resources/missions/mission01.json",
+            "title": "COMBINED STRIKE",
+            "aliasName": "OP: DAWN BREAK",
+            "subTitle": "空対空・空対地 統合防衛任務",
+            "isLocked": false
+        },
+        {
+            "id": "[02]",
+            "filePath": "Resources/missions/mission1.json",
+            "title": "AIRSPACE DEFENSE",
+            "aliasName": "OP: IRON SHIELD",
+            "subTitle": "敵要撃部隊 要撃スクランブル",
+            "isLocked": false
+        },
+        {
+            "id": "[03]",
+            "filePath": "Resources/missions/demo_5sec.json",
+            "title": "RAPID TEST",
+            "aliasName": "OP: QUICK BENCH",
+            "subTitle": "5秒間超短距離即応テスト",
+            "isLocked": false
+        }
+    ]
+}

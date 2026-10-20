@@ -9,6 +9,20 @@
 
 using namespace MyMath;
 
+class DirectXCommon;
+class AircraftVisualModel;
+
+/// @brief 戦闘モード起動スキャン定数バッファ構造体 (HLSL register b3 と同一アライメント)
+struct CombatBootScanSettings {
+	float scanProgress = 0.0f;      // 0.0: 未起動 -> 1.0: スキャン完了
+	float scanBandWidth = 3.5f;     // スキャン波形帯の幅
+	float scanMaxRadius = 13.0f;    // 機体中心からの最大走査半径
+	float scanWaveFreq = 3.5f;      // 波形干渉縞の周波数
+	Vector4 scanColor = { 0.15f, 1.0f, 0.55f, 1.0f }; // エメラルドグリーン強烈発光
+	float scanTime = 0.0f;          // 脈動パルス用タイマー
+	Vector3 centerOffset = { 0.0f, 0.0f, 0.0f }; // スキャン起点（中心オフセット）
+};
+
 /// @brief AC6（アーマード・コア6）スタイルの「メインシステム、戦闘モード起動...」演出シーケンス管理クラス
 class CombatBootSequence {
 public:
@@ -17,7 +31,17 @@ public:
 
 	/// @brief 初期化
 	/// @param spriteCommon SpriteCommonポインタ
-	void Initialize(SpriteCommon* spriteCommon);
+	/// @param dxCommon DirectXCommonポインタ (nullptrの場合はシングルトン利用)
+	void Initialize(SpriteCommon* spriteCommon, DirectXCommon* dxCommon = nullptr);
+
+	/// @brief 自機戦闘モード起動スキャン描画開始（案1: GSマテリアライズパイプライン適用）
+	/// @param visualModel 自機ビジュアルモデル
+	/// @param scanProgress スキャン進行度（0.0f: 完全不可視 〜 1.0f: 完全実体化）
+	void BeginAircraftScanDraw(AircraftVisualModel& visualModel, float scanProgress);
+
+	/// @brief 自機戦闘モード起動スキャン描画終了（通常パイプラインに復元）
+	/// @param visualModel 自機ビジュアルモデル
+	void EndAircraftScanDraw(AircraftVisualModel& visualModel);
 
 	/// @brief 演出開始（音声再生とタイマーリセット）
 	void Start();
@@ -84,8 +108,16 @@ private:
 
 	// タイマー管理
 	float timer_ = 0.0f;
-	static constexpr float kDuration = 4.80f;      ///< 演出の総時間（秒: 暗転タメ＋タイピング＋シームレス移行）
+	static constexpr float kDuration = 5.20f;      ///< 演出の総時間（秒: 作戦ブリーフィング＋戦闘起動＋操縦権移行）
 	static constexpr float kQuickDuration = 0.90f; ///< リトライ時高速演出の総時間（秒）
 	bool isQuickMode_ = false;                    ///< リトライ用高速ブートフラグ
 	float fadeAlpha_ = 1.0f;
+
+	// スキャンパイプライン（案1: 自機専用GSマテリアライズ）
+	void InitializeScanPipeline(DirectXCommon* dxCommon);
+
+	DirectXCommon* dxCommon_ = nullptr;
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> scanPipelineState_;
+	Microsoft::WRL::ComPtr<ID3D12Resource> scanSettingsResource_;
+	CombatBootScanSettings* scanSettingsData_ = nullptr;
 };

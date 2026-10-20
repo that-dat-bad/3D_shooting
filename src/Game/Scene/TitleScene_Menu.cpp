@@ -45,8 +45,11 @@ void TitleScene::InitializeUI(SpriteCommon* spriteCommon, bool fromCache) {
 	const Vector4 btnNormalText = { 0.35f, 0.92f, 0.55f, 0.95f };  // ターミナルグリーン文字
 	const Vector4 btnSelText    = { 0.85f, 1.00f, 0.90f, 1.00f };  // 鮮やかな白熱発光グリーン文字
 
-	// START ボタン
-	startButton_.Initialize(spriteCommon, "[01] EXECUTE SORTIE", 21.0f);
+	const Vector4 btnLockedBg   = { 0.04f, 0.08f, 0.06f, 0.70f };
+	const Vector4 btnLockedText = { 0.40f, 0.52f, 0.45f, 0.65f };
+
+	// START ボタン -> [01] MISSION SELECT
+	startButton_.Initialize(spriteCommon, "[01] MISSION SELECT", 21.0f);
 	startButton_.SetLeftAligned(true, 100.0f);
 	startButton_.SetTextOffset({ 0.0f, 3.0f });
 	startButton_.GetLabelText()->SetFontName("HackGen");
@@ -58,45 +61,45 @@ void TitleScene::InitializeUI(SpriteCommon* spriteCommon, bool fromCache) {
 	startButton_.SetTextColor(btnNormalText);
 	startButton_.SetSelectedTextColor(btnSelText);
 	startButton_.SetOnClick([this]() {
-		state_ = TitleState::SortieSequence;
-		sortieTimer_ = 0.0f;
-		isEngineTesting_ = true;
-		engineTestTimer_ = kSortieDuration;
-		SetCursorVisible(false); // 出撃開始と同時にOSカーソルを消去（項目9）
-		// 非同期処理による軽量化：出撃演出ムービーの裏でバックグラウンドスレッドでステージリソースを非同期プリロード！
-		AsyncPreloadManager::GetInstance()->StartStagePreloadAsync();
+		// 全画面ミッション選択モーダルを展開（他のUIを完全ブロック）
+		isMissionSelectModalOpen_ = true;
+		missionSelectModalAnim_ = 0.0f;
+		if (!missionCards_.empty()) {
+			int idx = std::clamp(selectedMissionIdx_, 0, static_cast<int>(missionCards_.size()) - 1);
+			MissionManager::GetInstance().SetCurrentFilePath(missionCards_[idx].filePath);
+		}
 	});
 
-	// EDITOR ボタン
-	editorButton_.Initialize(spriteCommon, "[02] MISSION EDITOR", 21.0f);
+	// FREE FLIGHT ボタン (未実装ロック表示・開けないように無効化)
+	editorButton_.Initialize(spriteCommon, "[02] FREE FLIGHT [LOCKED]", 21.0f);
 	editorButton_.SetLeftAligned(true, 100.0f);
 	editorButton_.SetTextOffset({ 0.0f, 3.0f });
 	editorButton_.GetLabelText()->SetFontName("HackGen");
 	editorButton_.SetPosition({ buttonX, buttonStartY + buttonSpacing });
 	editorButton_.SetSize({ buttonWidth, buttonHeight });
-	editorButton_.SetNormalColor(btnNormalBg);
-	editorButton_.SetHoverColor(btnHoverBg);
-	editorButton_.SetSelectedColor(btnSelectedBg);
-	editorButton_.SetTextColor(btnNormalText);
-	editorButton_.SetSelectedTextColor(btnSelText);
+	editorButton_.SetNormalColor(btnLockedBg);
+	editorButton_.SetHoverColor(btnLockedBg);
+	editorButton_.SetSelectedColor(btnLockedBg);
+	editorButton_.SetTextColor(btnLockedText);
+	editorButton_.SetSelectedTextColor(btnLockedText);
 	editorButton_.SetOnClick([this]() {
-		sceneID = SCENE::MISSION_EDITOR;
+		lockedAlertTimer_ = 1.8f;
 	});
 
-	// SETTINGS ボタン
-	settingsButton_.Initialize(spriteCommon, "[03] SYSTEM CONFIG", 21.0f);
+	// SETTINGS ボタン (未実装ロック表示・開けないように無効化)
+	settingsButton_.Initialize(spriteCommon, "[03] SYSTEM CONFIG [LOCKED]", 21.0f);
 	settingsButton_.SetLeftAligned(true, 100.0f);
 	settingsButton_.SetTextOffset({ 0.0f, 3.0f });
 	settingsButton_.GetLabelText()->SetFontName("HackGen");
 	settingsButton_.SetPosition({ buttonX, buttonStartY + buttonSpacing * 2.0f });
 	settingsButton_.SetSize({ buttonWidth, buttonHeight });
-	settingsButton_.SetNormalColor(btnNormalBg);
-	settingsButton_.SetHoverColor(btnHoverBg);
-	settingsButton_.SetSelectedColor(btnSelectedBg);
-	settingsButton_.SetTextColor(btnNormalText);
-	settingsButton_.SetSelectedTextColor(btnSelText);
+	settingsButton_.SetNormalColor(btnLockedBg);
+	settingsButton_.SetHoverColor(btnLockedBg);
+	settingsButton_.SetSelectedColor(btnLockedBg);
+	settingsButton_.SetTextColor(btnLockedText);
+	settingsButton_.SetSelectedTextColor(btnLockedText);
 	settingsButton_.SetOnClick([this]() {
-		// 設定画面は将来実装
+		lockedAlertTimer_ = 1.8f;
 	});
 
 	// EXIT ボタン
@@ -481,31 +484,44 @@ void TitleScene::UpdateMenuConsoleVisuals() {
 	titleText_.SetColor({ 0.22f, 1.0f, 0.52f, 1.0f });
 	subtitleText_.SetColor({ 0.35f, 0.95f, 0.60f, 0.95f });
 
-	// ボタンテキスト色を毎フレーム直接設定（白文字を完全排除し、鮮烈なターミナルグリーンに統一）
+	// ボタンテキスト色を動的設定（ロック中ボタンは減衰・アンバー調）
 	const Vector4 normalGreen = { 0.35f, 0.92f, 0.55f, 0.95f };
 	const Vector4 selectedGreen = { 0.85f, 1.00f, 0.90f, 1.00f };
+	const Vector4 lockedNormal = { 0.35f, 0.42f, 0.38f, 0.60f };
+	const Vector4 lockedSelected = { 0.85f, 0.55f, 0.30f, 0.85f };
+
 	startButton_.SetTextColor(normalGreen);
 	startButton_.SetSelectedTextColor(selectedGreen);
-	editorButton_.SetTextColor(normalGreen);
-	editorButton_.SetSelectedTextColor(selectedGreen);
-	settingsButton_.SetTextColor(normalGreen);
-	settingsButton_.SetSelectedTextColor(selectedGreen);
+	editorButton_.SetTextColor(lockedNormal);
+	editorButton_.SetSelectedTextColor(lockedSelected);
+	settingsButton_.SetTextColor(lockedNormal);
+	settingsButton_.SetSelectedTextColor(lockedSelected);
 	exitButton_.SetTextColor(normalGreen);
 	exitButton_.SetSelectedTextColor(selectedGreen);
 
-	// 各ボタンのラベル文字列は左揃え固定インデント配置（[01]〜[04]の頭出し位置を垂直に完全整列）
-	startButton_.SetLabel("[01] EXECUTE SORTIE");
-	editorButton_.SetLabel("[02] MISSION EDITOR");
-	settingsButton_.SetLabel("[03] SYSTEM CONFIG");
+	// 各ボタンのラベル文字列は左揃え固定インデント配置
+	startButton_.SetLabel("[01] MISSION SELECT");
+	editorButton_.SetLabel("[02] FREE FLIGHT [LOCKED]");
+	settingsButton_.SetLabel("[03] SYSTEM CONFIG [LOCKED]");
 	exitButton_.SetLabel("[04] ABORT / EXIT");
 
 	// 各ボタン枠スプライトの色動的更新
 	for (size_t i = 0; i < buttonBorders_.size(); ++i) {
 		bool isSel = (static_cast<int>(i) == selIdx);
-		// 選択時は白熱グリーン〜シアンで枠全体が美しく発光
-		MyMath::Vector4 outlineCol   = isSel ? MyMath::Vector4{ 0.75f, 1.0f, 0.85f, 0.95f } : MyMath::Vector4{ 0.15f, 0.45f, 0.28f, 0.35f };
-		MyMath::Vector4 bracketCol   = isSel ? MyMath::Vector4{ 0.90f, 1.0f, 0.95f, 1.00f } : MyMath::Vector4{ 0.20f, 0.65f, 0.42f, 0.50f };
-		MyMath::Vector4 indicatorCol = isSel ? MyMath::Vector4{ 0.35f, 1.0f, 0.65f, 1.00f } : MyMath::Vector4{ 0.08f, 0.22f, 0.16f, 0.20f };
+		bool isLocked = (i == 1 || i == 2);
+		MyMath::Vector4 outlineCol;
+		MyMath::Vector4 bracketCol;
+		MyMath::Vector4 indicatorCol;
+
+		if (isLocked) {
+			outlineCol   = isSel ? MyMath::Vector4{ 0.85f, 0.45f, 0.25f, 0.85f } : MyMath::Vector4{ 0.18f, 0.22f, 0.18f, 0.25f };
+			bracketCol   = isSel ? MyMath::Vector4{ 1.00f, 0.55f, 0.30f, 0.95f } : MyMath::Vector4{ 0.25f, 0.30f, 0.22f, 0.35f };
+			indicatorCol = isSel ? MyMath::Vector4{ 1.00f, 0.45f, 0.20f, 0.95f } : MyMath::Vector4{ 0.12f, 0.08f, 0.05f, 0.15f };
+		} else {
+			outlineCol   = isSel ? MyMath::Vector4{ 0.75f, 1.0f, 0.85f, 0.95f } : MyMath::Vector4{ 0.15f, 0.45f, 0.28f, 0.35f };
+			bracketCol   = isSel ? MyMath::Vector4{ 0.90f, 1.0f, 0.95f, 1.00f } : MyMath::Vector4{ 0.20f, 0.65f, 0.42f, 0.50f };
+			indicatorCol = isSel ? MyMath::Vector4{ 0.35f, 1.0f, 0.65f, 1.00f } : MyMath::Vector4{ 0.08f, 0.22f, 0.16f, 0.20f };
+		}
 
 		for (auto& sp : buttonBorders_[i].outlines) {
 			sp->SetColor(outlineCol);
@@ -681,16 +697,30 @@ void TitleScene::DrawMenuCard() {
 		settingsButton_.Draw();
 		exitButton_.Draw();
 
-		// 操作ガイド (HackGen 14.0f) - フッター枠（Y=482〜520）の中央にピッタリ収まる緑文字統一
-		tr->Print(
-			"HackGen",
-			"[ UP / DOWN ] SELECT     [ ENTER / SPACE ] EXECUTE",
-			cardX + cardWidth * 0.5f,
-			cardY + 449.0f,
-			14.0f,
-			{ 0.35f, 0.95f, 0.55f, 0.95f },
-			{ 0.5f, 0.5f }
-		);
+		// 操作ガイド (HackGen 14.0f) - ロック中の警告メッセージ表示対応
+		if (lockedAlertTimer_ > 0.0f) {
+			bool blinkAlert = (static_cast<int>(lockedAlertTimer_ * 14.0f) % 2) == 0;
+			Vector4 alertCol = blinkAlert ? Vector4{ 1.0f, 0.40f, 0.25f, 1.0f } : Vector4{ 0.70f, 0.25f, 0.15f, 0.85f };
+			tr->Print(
+				"HackGen",
+				"[ ! ] MODULE RESTRICTED // FEATURE CURRENTLY LOCKED",
+				cardX + cardWidth * 0.5f,
+				cardY + 449.0f,
+				14.0f,
+				alertCol,
+				{ 0.5f, 0.5f }
+			);
+		} else {
+			tr->Print(
+				"HackGen",
+				"[ UP / DOWN ] SELECT     [ ENTER / SPACE ] EXECUTE",
+				cardX + cardWidth * 0.5f,
+				cardY + 449.0f,
+				14.0f,
+				{ 0.35f, 0.95f, 0.55f, 0.95f },
+				{ 0.5f, 0.5f }
+			);
+		}
 	}
 
 	// ウィンドウ最下部ステータスバー (高さ26pxのバーの中央にジャスト配置・文字つぶれ防止)

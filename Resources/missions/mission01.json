@@ -1,12 +1,35 @@
 {
-    "description": "Destroy all target drones and ground defense installations.",
-    "enemies": [],
-    "groundEnemies": [],
-    "name": "Mission 01: Combined Strike",
+    "name": "COMBINED STRIKE",
+    "aliasName": "OP: DAWN BREAK",
+    "subTitle": "空対空・空対地 統合防衛任務",
+    "difficulty": "NORMAL [★★★☆☆]",
+    "areaName": "SECTOR 07 : BORDER LINE",
+    "description": "国境警備空域における敵防衛網への強行偵察及び航空迎撃作戦。敵防衛レーダー基地を破壊し、迎撃に発進した敵戦闘機隊を全機殲滅せよ。",
     "playerHP": 100.0,
     "playerPosition": {
         "x": 0.0,
         "y": 100.0,
         "z": 0.0
-    }
+    },
+    "timeLimit": 300.0,
+    "enemies": [],
+    "groundEnemies": [],
+    "objectives": [
+        {
+            "name": "Eliminate Hostile Aircraft",
+            "description": "敵制空戦闘機隊の全機撃墜 (AIRBORNE CONTACTS ELIMINATED)",
+            "type": "DestroyAll",
+            "isPrimary": true,
+            "status": "Active"
+        },
+        {
+            "name": "Destroy Ground Radar Sites",
+            "description": "地上レーダー基地・対空砲火の無力化 (RADAR INSTALLATIONS NEUTRALIZED)",
+            "type": "DestroyTarget",
+            "isPrimary": false,
+            "status": "Active"
+        }
+    ],
+    "triggers": [],
+    "waypointPaths": []
 }

@@ -46,4 +46,3 @@ VertexOutput main(VertexInput input)
     output.worldPosition = mul(skinnedPosition, gTransformationMatrix.World).xyz;
     return output;
 }
-

@@ -93,12 +93,27 @@ void Sprite::Update()
 		1.0f
 	};
 
-	Matrix4x4 worldMatrix = MakeAffineMatrix(finalScale, transform_.rotate, transform_.translate);
-	Matrix4x4 viewMatrix = Identity4x4();
-	Matrix4x4 projectionMatrix = makeOrthographicmMatrix(0.0f, 0.0f, static_cast<float>(WinApp::kClientWidth), static_cast<float>(WinApp::kClientHeight), -10.0f, 100.0f);
-	Matrix4x4 wvpMatrix = Multiply(worldMatrix, Multiply(viewMatrix, projectionMatrix));
+	// 正射影行列の静的キャッシュ（毎フレーム・毎スプライトの再計算を完全撤廃）
+	static const Matrix4x4 s_proj = makeOrthographicmMatrix(
+		0.0f, 0.0f,
+		static_cast<float>(WinApp::kClientWidth),
+		static_cast<float>(WinApp::kClientHeight),
+		-10.0f, 100.0f
+	);
 
-	materialData_->WVP = wvpMatrix;
+	// 回転0のスプライト（文字やUIパネル等99%以上）は4x4行列積算を行わず直接代入する高速パス
+	if (transform_.rotate.z == 0.0f && transform_.rotate.x == 0.0f && transform_.rotate.y == 0.0f) {
+		Matrix4x4 wvp = s_proj;
+		wvp.m[0][0] = finalScale.x * s_proj.m[0][0];
+		wvp.m[1][1] = finalScale.y * s_proj.m[1][1];
+		wvp.m[3][0] = transform_.translate.x * s_proj.m[0][0] + s_proj.m[3][0];
+		wvp.m[3][1] = transform_.translate.y * s_proj.m[1][1] + s_proj.m[3][1];
+		wvp.m[3][2] = transform_.translate.z * s_proj.m[2][2] + s_proj.m[3][2];
+		materialData_->WVP = wvp;
+	} else {
+		Matrix4x4 worldMatrix = MakeAffineMatrix(finalScale, transform_.rotate, transform_.translate);
+		materialData_->WVP = Multiply(worldMatrix, s_proj);
+	}
 }
 
 void Sprite::Draw()

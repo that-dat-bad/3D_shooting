@@ -229,6 +229,28 @@ void AircraftVisualModel::SetMaterialColor(const Vector4& color) {
 	}
 }
 
+void AircraftVisualModel::SetMaterialEmissive(const Vector3& color, float intensity) {
+	for (auto& [part, node] : partNodes_) {
+		if (node.object && node.object->GetModel()) {
+			Model* model = node.object->GetModel();
+			for (size_t i = 0; i < model->GetMaterialCount(); ++i) {
+				model->SetMaterialEmissive(static_cast<uint32_t>(i), color, intensity);
+			}
+		}
+	}
+}
+
+void AircraftVisualModel::SetMaterialEnableLighting(bool enable) {
+	for (auto& [part, node] : partNodes_) {
+		if (node.object && node.object->GetModel()) {
+			Model* model = node.object->GetModel();
+			for (size_t i = 0; i < model->GetMaterialCount(); ++i) {
+				model->SetMaterialEnableLighting(static_cast<uint32_t>(i), enable);
+			}
+		}
+	}
+}
+
 void AircraftVisualModel::SetupCanopyMaterial() {
 	for (auto& [part, node] : partNodes_) {
 		if (node.object && node.object->GetModel()) {
@@ -246,6 +268,22 @@ void AircraftVisualModel::SetupCanopyMaterial() {
 					model->SetMaterialEnvironmentCoefficient(static_cast<uint32_t>(m), 0.35f);
 				}
 			}
+		}
+	}
+}
+
+void AircraftVisualModel::SetCustomPipelineState(ID3D12PipelineState* pso) {
+	for (auto& [part, node] : partNodes_) {
+		if (node.object) {
+			node.object->SetCustomPipelineState(pso);
+		}
+	}
+}
+
+void AircraftVisualModel::SetCustomLightingSettingsResource(ID3D12Resource* res) {
+	for (auto& [part, node] : partNodes_) {
+		if (node.object) {
+			node.object->SetCustomLightingSettingsResource(res);
 		}
 	}
 }

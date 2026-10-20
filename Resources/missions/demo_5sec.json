@@ -1,8 +1,10 @@
 {
-    "description": "5 seconds survival demonstration mission. Maintain flight and clear the mission after 5 seconds.",
-    "enemies": [],
-    "groundEnemies": [],
-    "name": "Demo: 5-Second Survival",
+    "name": "RAPID TEST",
+    "aliasName": "OP: QUICK BENCH",
+    "subTitle": "5秒間超短距離即応テスト",
+    "difficulty": "EXPERT [★★★★★]",
+    "areaName": "PROVING GROUND // TACTICAL SIM",
+    "description": "超高機動即応ドッグファイトの極限シミュレーション。開始からわずか5秒間で接敵し、超至近距離での機銃・ミサイル即応射撃の精度を検証する。",
     "objectives": [
         {
             "areaCenter": {

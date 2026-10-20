@@ -2,8 +2,13 @@
 #include "CombatBootSequence.h"
 #include "../../engine/Graphics/Text/TextRenderer.h"
 #include "../../engine/Graphics/System/TextureManager.h"
+#include "../../engine/Graphics/System/DirectXCommon.h"
+#include "../../engine/Graphics/System/BlendMode.h"
+#include "../../engine/Graphics/Model/Object3dCommon.h"
+#include "../Graphics/AircraftVisualModel.h"
 #include "../../engine/Graphics/UI/TypewriterEffect.h"
 #include "../../engine/base/WinApp.h"
+#include "../System/MissionManager.h"
 #include <cmath>
 #include <algorithm>
 #include <cstdio>
@@ -12,8 +17,9 @@ CombatBootSequence::~CombatBootSequence() {
 	Finalize();
 }
 
-void CombatBootSequence::Initialize(SpriteCommon* spriteCommon) {
+void CombatBootSequence::Initialize(SpriteCommon* spriteCommon, DirectXCommon* dxCommon) {
 	spriteCommon_ = spriteCommon;
+	dxCommon_ = dxCommon ? dxCommon : DirectXCommon::GetInstance();
 
 	// テクスチャ読み込み
 	TextureManager::GetInstance()->LoadTexture("assets/textures/white1x1.png");
@@ -42,6 +48,104 @@ void CombatBootSequence::Initialize(SpriteCommon* spriteCommon) {
 	timer_ = 0.0f;
 	fadeAlpha_ = 1.0f;
 	voicePlayed_ = false;
+
+	// スキャンパイプライン（案1: 自機専用GSマテリアライズ）初期化
+	InitializeScanPipeline(dxCommon_);
+}
+
+void CombatBootSequence::InitializeScanPipeline(DirectXCommon* dxCommon) {
+	if (!dxCommon) {
+		dxCommon = DirectXCommon::GetInstance();
+	}
+	dxCommon_ = dxCommon;
+	if (!dxCommon_) return;
+
+	// 定数バッファの作成
+	scanSettingsResource_ = dxCommon_->CreateBufferResource(sizeof(CombatBootScanSettings));
+	scanSettingsResource_->Map(0, nullptr, reinterpret_cast<void**>(&scanSettingsData_));
+	scanSettingsData_->scanProgress = 0.0f;
+	scanSettingsData_->scanBandWidth = 3.5f;
+	scanSettingsData_->scanMaxRadius = 13.0f;
+	scanSettingsData_->scanWaveFreq = 3.5f;
+	scanSettingsData_->scanColor = { 0.15f, 1.0f, 0.55f, 1.0f }; // エメラルドグリーン強烈発光
+	scanSettingsData_->scanTime = 0.0f;
+	scanSettingsData_->centerOffset = { 0.0f, 0.0f, 0.0f };
+
+	// 専用シェーダーのコンパイル (VS, GS, PS)
+	Microsoft::WRL::ComPtr<IDxcBlob> vsBlob = dxCommon_->CompileShader(L"./assets/shaders/CombatBootScan.VS.hlsl", L"vs_6_0");
+	Microsoft::WRL::ComPtr<IDxcBlob> gsBlob = dxCommon_->CompileShader(L"./assets/shaders/CombatBootScan.GS.hlsl", L"gs_6_0");
+	Microsoft::WRL::ComPtr<IDxcBlob> psBlob = dxCommon_->CompileShader(L"./assets/shaders/CombatBootScan.PS.hlsl", L"ps_6_0");
+
+	if (!vsBlob || !gsBlob || !psBlob) {
+		OutputDebugStringA("[CombatBootSequence] Failed to compile CombatBootScan shaders!\n");
+		return;
+	}
+
+	// 頂点入力レイアウト (Object3dCommon と完全互換)
+	D3D12_INPUT_ELEMENT_DESC inputElementDescs[5] = {};
+	inputElementDescs[0] = { "POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 };
+	inputElementDescs[1] = { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 16, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 };
+	inputElementDescs[2] = { "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 };
+	inputElementDescs[3] = { "WEIGHT", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 48, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 };
+	inputElementDescs[4] = { "BLENDINDICES", 0, DXGI_FORMAT_R32G32B32A32_SINT, 0, 64, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 };
+
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc{};
+	psoDesc.pRootSignature = Object3dCommon::GetInstance()->GetRootSignature();
+	psoDesc.InputLayout = { inputElementDescs, _countof(inputElementDescs) };
+	psoDesc.VS = { vsBlob->GetBufferPointer(), vsBlob->GetBufferSize() };
+	psoDesc.GS = { gsBlob->GetBufferPointer(), gsBlob->GetBufferSize() };
+	psoDesc.PS = { psBlob->GetBufferPointer(), psBlob->GetBufferSize() };
+
+	// ラスタライザ: ホログラムワイヤーフレームが裏面メッシュも透けて光るよう CullMode = NONE
+	D3D12_RASTERIZER_DESC rasterizerDesc{};
+	rasterizerDesc.CullMode = D3D12_CULL_MODE_NONE;
+	rasterizerDesc.FillMode = D3D12_FILL_MODE_SOLID;
+	psoDesc.RasterizerState = rasterizerDesc;
+
+	// 深度ステンシル
+	D3D12_DEPTH_STENCIL_DESC depthStencilDesc{};
+	depthStencilDesc.DepthEnable = true;
+	depthStencilDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+	depthStencilDesc.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
+	psoDesc.DepthStencilState = depthStencilDesc;
+	psoDesc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
+
+	psoDesc.NumRenderTargets = 1;
+	psoDesc.RTVFormats[0] = dxCommon_->GetRTVFormat();
+	psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+	psoDesc.SampleDesc.Count = 1;
+	psoDesc.SampleMask = D3D12_DEFAULT_SAMPLE_MASK;
+
+	// 通常アルファブレンド
+	psoDesc.BlendState = GetBlendDesc(BlendMode::kNormal);
+
+	HRESULT hr = dxCommon_->GetDevice()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&scanPipelineState_));
+	if (FAILED(hr)) {
+		OutputDebugStringA("[CombatBootSequence] Failed to create CombatBootScan PSO!\n");
+	}
+}
+
+void CombatBootSequence::BeginAircraftScanDraw(AircraftVisualModel& visualModel, float scanProgress) {
+	if (!scanPipelineState_ || !scanSettingsData_) return;
+
+	// 定数バッファを更新（機体中心から広がるスキャン波形）
+	scanSettingsData_->scanProgress = std::clamp(scanProgress, 0.0f, 1.0f);
+	scanSettingsData_->scanBandWidth = 3.5f;
+	scanSettingsData_->scanMaxRadius = 13.0f;
+	scanSettingsData_->scanWaveFreq = 3.5f;
+	scanSettingsData_->scanColor = { 0.15f, 1.0f, 0.55f, 1.0f }; // サイバーグリーン
+	scanSettingsData_->scanTime = timer_;
+	scanSettingsData_->centerOffset = { 0.0f, 0.0f, 0.0f };
+
+	// 自機モデルの全パーツにスキャン専用PSOと定数バッファを適用
+	visualModel.SetCustomPipelineState(scanPipelineState_.Get());
+	visualModel.SetCustomLightingSettingsResource(scanSettingsResource_.Get());
+}
+
+void CombatBootSequence::EndAircraftScanDraw(AircraftVisualModel& visualModel) {
+	// 自機モデルのカスタム設定を解除して通常状態に復元
+	visualModel.SetCustomPipelineState(nullptr);
+	visualModel.SetCustomLightingSettingsResource(nullptr);
 }
 
 void CombatBootSequence::Start() {
@@ -62,6 +166,13 @@ void CombatBootSequence::Finalize() {
 	fadeSprite_.reset();
 	rectSprite_.reset();
 	ringSprite_.reset();
+
+	if (scanSettingsResource_) {
+		scanSettingsResource_->Unmap(0, nullptr);
+		scanSettingsData_ = nullptr;
+		scanSettingsResource_.Reset();
+	}
+	scanPipelineState_.Reset();
 }
 
 
@@ -98,8 +209,8 @@ void CombatBootSequence::Update(float dt) {
 		return;
 	}
 
-	// 音声再生（完全暗転中の静寂0.40秒後にピピッチャイムから再生開始：項目1）
-	if (!voicePlayed_ && timer_ >= 0.40f) {
+	// 音声再生（作戦ブリーフィング完了後、戦闘モード起動開始の2.10秒から再生開始！）
+	if (!voicePlayed_ && timer_ >= 2.10f) {
 		if (!voiceData_.buffer.empty()) {
 			AudioManager::GetInstance()->SoundPlayWave(voiceData_);
 		}
@@ -107,24 +218,23 @@ void CombatBootSequence::Update(float dt) {
 	}
 
 	// ====================================================================
-	// 背景の黒ディム推移（項目1: 暗転タメ 0.85s ＋ 背景ディム）
+	// 背景の黒ディム推移（作戦ブリーフィング ＋ 戦闘モード起動 ＋ フェードアウト！）
 	// ====================================================================
-	// 0.00s - 0.85s: 完全暗転（fadeAlpha = 1.0f: システム再起動の重厚なタメ）
-	// 0.85s - 1.40s: fadeAlpha = 1.0f（走査レーザー中も暗転維持）
-	// 1.40s - 2.10s: 完全透過にはせず、fadeAlpha = 0.55f（重厚なダークディム）へスムーズにイージング！
-	// 2.10s - 3.40s: fadeAlpha = 0.55f を維持！背景を暗く落として中央UIのコントラストを極大化！
-	// 3.40s - 4.80s: 演出完了に伴い、0.55f から 0.0f へ滑らかにフェードアウト！
-	if (timer_ <= 1.40f) {
-		fadeAlpha_ = 1.0f;
-	} else if (timer_ <= 2.10f) {
-		float p = (timer_ - 1.40f) / 0.70f;
+	// 0.00s - 2.10s: 作戦ブリーフィング（fadeAlpha = 0.95f: 高い可読性とシネマティック感！）
+	// 2.10s - 2.60s: fadeAlpha = 0.95f -> 0.55f へスムーズにイージング
+	// 2.60s - 4.20s: fadeAlpha = 0.55f（戦闘モードUIコントラスト維持）
+	// 4.20s - kDuration: 0.55f -> 0.0f へフェードアウト（戦闘へシームレス移行！）
+	if (timer_ <= 2.10f) {
+		fadeAlpha_ = 0.95f;
+	} else if (timer_ <= 2.60f) {
+		float p = (timer_ - 2.10f) / 0.50f;
 		p = std::clamp(p, 0.0f, 1.0f);
 		float smoothP = p * (3.0f - 2.0f * p);
-		fadeAlpha_ = 1.0f - smoothP * 0.45f; // 1.0f -> 0.55f へ
-	} else if (timer_ <= 3.40f) {
+		fadeAlpha_ = 0.95f - smoothP * 0.40f; // 0.95f -> 0.55f へ
+	} else if (timer_ <= 4.20f) {
 		fadeAlpha_ = 0.55f; // 暗幕バイザーディムをキープ
 	} else if (timer_ <= kDuration) {
-		float p = (timer_ - 3.40f) / (kDuration - 3.40f);
+		float p = (timer_ - 4.20f) / (kDuration - 4.20f);
 		p = std::clamp(p, 0.0f, 1.0f);
 		float smoothP = p * (3.0f - 2.0f * p);
 		fadeAlpha_ = 0.55f * (1.0f - smoothP); // 0.55f -> 0.0f へフェードアウト
@@ -227,10 +337,10 @@ void CombatBootSequence::DrawCinematicLetterbox(float sw, float sh) {
 }
 
 void CombatBootSequence::DrawScanningLaser(float sw, float cx, float cy) {
-	float phaseT = timer_ - 0.85f;
-	float scanProgress = std::clamp(phaseT / 0.36f, 0.0f, 1.0f);
+	float phaseT = timer_ - 2.00f;
+	float scanProgress = std::clamp(phaseT / 0.28f, 0.0f, 1.0f);
 	float beamLen = sw * scanProgress;
-	float beamAlpha = 1.0f - std::clamp((phaseT - 0.36f) / 0.14f, 0.0f, 1.0f);
+	float beamAlpha = 1.0f - std::clamp((phaseT - 0.28f) / 0.12f, 0.0f, 1.0f);
 
 	// 水平高輝度レーザースキャンライン
 	DrawRect({ 0.0f, cy - 2.0f }, { beamLen, 4.0f }, { 0.30f, 1.0f, 0.70f, 0.98f * beamAlpha }, { 0.0f, 0.0f }, BlendMode::kAdd);
@@ -304,23 +414,23 @@ void CombatBootSequence::DrawTacticalReticle(float cx, float cy, float easeExpan
 }
 
 void CombatBootSequence::DrawBootText(float cx, float cy, float topY, float overallAlpha) {
-	if (timer_ < 1.35f) return;
+	if (timer_ < 2.40f) return;
 
 	TextRenderer* tr = TextRenderer::GetInstance();
-	bool isConfirmed = (timer_ >= 2.20f);
+	bool isConfirmed = (timer_ >= 3.20f);
 
 	if (!isConfirmed) {
 		const std::string fullEnText = "MAIN SYSTEM : ACTIVATING COMBAT MODE";
 		const std::string fullJpText = "メインシステム、戦闘モード起動...";
 
 		float typingDuration = 0.65f; // 0.65秒で全文字タイピング
-		float typingProgress = (timer_ - 1.35f) / typingDuration;
+		float typingProgress = (timer_ - 2.40f) / typingDuration;
 		std::string dispEn = TypewriterEffect::GetTextByProgress(fullEnText, typingProgress, true, timer_, 16.0f, "_");
 
-		// 日本語タイピング（1.45sから開始）
+		// 日本語タイピング（2.50sから開始）
 		std::string dispJp = "";
-		if (timer_ >= 1.45f) {
-			float jpProgress = (timer_ - 1.45f) / (typingDuration * 0.9f);
+		if (timer_ >= 2.50f) {
+			float jpProgress = (timer_ - 2.50f) / (typingDuration * 0.9f);
 			dispJp = TypewriterEffect::GetTextByProgress(fullJpText, jpProgress, true, timer_, 16.0f, "_");
 		}
 
@@ -345,15 +455,15 @@ void CombatBootSequence::DrawBootText(float cx, float cy, float topY, float over
 		}
 
 	} else {
-		float pulse = 0.85f + 0.15f * std::sin((timer_ - 2.20f) * 14.0f);
+		float pulse = 0.85f + 0.15f * std::sin((timer_ - 3.20f) * 14.0f);
 		Vector4 confirmedCol = { 0.50f * pulse, 1.0f, 0.80f * pulse, 1.00f * overallAlpha };
 
 		std::string enNominal = "ALL SYSTEMS NOMINAL /// COMBAT MODE ONLINE";
 		std::string jpNominal = "全システム正常 ・ 戦闘モード起動完了";
 
-		// 3.40s以降は退場フェーズ：グリッチノイズとフェードアウト（項目10）
-		if (timer_ > 3.40f) {
-			float fadeT = (timer_ - 3.40f) / 0.80f; // 0.0 -> 1.0
+		// 4.20s以降は退場フェーズ：グリッチノイズとフェードアウト
+		if (timer_ > 4.20f) {
+			float fadeT = (timer_ - 4.20f) / 0.80f; // 0.0 -> 1.0
 			float glitchChance = std::clamp(fadeT * 0.45f, 0.0f, 0.45f);
 			uint32_t glitchSeed = static_cast<uint32_t>(timer_ * 60.0f);
 			enNominal = MakeGlitchText(enNominal, glitchChance, glitchSeed);
@@ -373,10 +483,10 @@ void CombatBootSequence::DrawBootText(float cx, float cy, float topY, float over
 }
 
 void CombatBootSequence::DrawTelemetryLogs(float cx, float cy, float bannerW, float overallAlpha) {
-	if (timer_ < 1.50f || bannerW <= 400.0f) return;
+	if (timer_ < 2.50f || bannerW <= 400.0f) return;
 
 	TextRenderer* tr = TextRenderer::GetInstance();
-	float logAlpha = std::clamp((timer_ - 1.50f) / 0.50f, 0.0f, 1.0f) * overallAlpha;
+	float logAlpha = std::clamp((timer_ - 2.50f) / 0.50f, 0.0f, 1.0f) * overallAlpha;
 	const Vector4 logCol = { 0.35f, 0.95f, 0.65f, 0.88f * logAlpha };
 	const Vector4 logValCol = { 0.90f, 1.0f, 0.95f, 0.95f * logAlpha };
 
@@ -407,11 +517,11 @@ void CombatBootSequence::DrawTelemetryLogs(float cx, float cy, float bannerW, fl
 }
 
 void CombatBootSequence::DrawPilotPrompt(float cx, float overallAlpha) {
-	if (timer_ < 3.60f) return;
+	if (timer_ < 4.00f) return;
 
-	float promptAlpha = std::clamp((timer_ - 3.60f) / 0.40f, 0.0f, 1.0f);
-	if (timer_ > 4.40f) {
-		promptAlpha = std::clamp(1.0f - (timer_ - 4.40f) / 0.40f, 0.0f, 1.0f);
+	float promptAlpha = std::clamp((timer_ - 4.00f) / 0.40f, 0.0f, 1.0f);
+	if (timer_ > 4.80f) {
+		promptAlpha = std::clamp(1.0f - (timer_ - 4.80f) / 0.40f, 0.0f, 1.0f);
 	}
 	bool blink = (static_cast<int>(timer_ * 10.0f) % 2) == 0;
 	Vector4 promptCol = blink
@@ -436,31 +546,159 @@ void CombatBootSequence::DrawBootUI() {
 		return;
 	}
 
-	// 0.00s 〜 0.85s の暗転ロード中診断
-	if (timer_ < 0.85f) {
-		DrawLoadingDiagnostics(cx, cy);
+	// ====================================================================
+	// Phase 0: TACTICAL MISSION BRIEFING (0.00s 〜 2.00s)
+	// ステージシーン冒頭の作戦ブリーフィング表示
+	// ====================================================================
+	if (timer_ < 2.00f) {
+		const auto& mission = MissionManager::GetInstance().GetCurrentMission();
+		TextRenderer* tr = TextRenderer::GetInstance();
+
+		// ブリーフィングパネルフェードイン（0.00s〜0.20sでフェードイン、1.75s〜2.00sでフェードアウト）
+		float briefAlpha = 1.0f;
+		if (timer_ < 0.20f) {
+			briefAlpha = timer_ / 0.20f;
+		} else if (timer_ > 1.75f) {
+			briefAlpha = std::clamp(1.0f - (timer_ - 1.75f) / 0.25f, 0.0f, 1.0f);
+		}
+
+		// 上下シネマティック黒帯
+		float lbH = 46.0f;
+		DrawRect({ 0.0f, 0.0f }, { sw, lbH }, { 0.0f, 0.0f, 0.0f, 0.90f * briefAlpha });
+		DrawRect({ 0.0f, sh - lbH }, { sw, lbH }, { 0.0f, 0.0f, 0.0f, 0.90f * briefAlpha });
+		DrawLine({ 0.0f, lbH }, { sw, lbH }, 1.5f, { 0.35f, 1.0f, 0.65f, 0.85f * briefAlpha }, BlendMode::kAdd);
+		DrawLine({ 0.0f, sh - lbH }, { sw, sh - lbH }, 1.5f, { 0.35f, 1.0f, 0.65f, 0.85f * briefAlpha }, BlendMode::kAdd);
+
+		// 上部帯タイトル
+		tr->Print("HackGen", "[ TACTICAL SORTIE BRIEFING // OPERATION DIRECTIVE ]", 28.0f, 14.0f, 13.0f, { 0.40f, 1.0f, 0.70f, 0.95f * briefAlpha });
+		tr->Print("HackGen", "CLEARANCE: LEVEL 5 // COMBAT PROTOCOL LOADED", sw - 380.0f, 14.0f, 12.0f, { 0.25f, 0.75f, 0.45f, 0.80f * briefAlpha });
+
+		// 中央大型ブリーフィングウィンドウ
+		const float panelW = 960.0f;
+		const float panelH = 380.0f;
+		const float px = cx - panelW * 0.5f;
+		const float py = cy - panelH * 0.5f - 8.0f;
+
+		// ウィンドウ背景
+		DrawRect({ px, py }, { panelW, panelH }, { 0.01f, 0.04f, 0.02f, 0.94f * briefAlpha });
+		DrawRect({ px + 2.0f, py + 2.0f }, { panelW - 4.0f, panelH - 4.0f }, { 0.005f, 0.02f, 0.01f, 0.90f * briefAlpha });
+
+		// 二重枠線 ＆ タクティカルブラケット
+		Vector4 pBorder = { 0.35f, 0.95f, 0.60f, 0.95f * briefAlpha };
+		DrawLine({ px, py }, { px + panelW, py }, 2.0f, pBorder, BlendMode::kAdd);
+		DrawLine({ px, py + panelH }, { px + panelW, py + panelH }, 2.0f, pBorder, BlendMode::kAdd);
+		DrawLine({ px, py }, { px, py + panelH }, 2.0f, pBorder, BlendMode::kAdd);
+		DrawLine({ px + panelW, py }, { px + panelW, py + panelH }, 2.0f, pBorder, BlendMode::kAdd);
+		DrawTacticalBracket({ cx, py + panelH * 0.5f }, { panelW + 24.0f, panelH + 24.0f }, 32.0f, 2.0f, { 0.45f, 1.0f, 0.75f, 0.90f * briefAlpha });
+
+		// パネルタイトルバー
+		float tbH = 34.0f;
+		DrawRect({ px, py }, { panelW, tbH }, { 0.04f, 0.18f, 0.09f, 0.95f * briefAlpha });
+		DrawLine({ px, py + tbH }, { px + panelW, py + tbH }, 1.5f, pBorder, BlendMode::kAdd);
+
+		// 点滅LED
+		bool blink = (std::fmod(timer_, 0.6f) < 0.35f);
+		Vector4 ledCol = blink ? Vector4{ 0.40f, 1.0f, 0.65f, 1.0f * briefAlpha } : Vector4{ 0.15f, 0.45f, 0.25f, 0.6f * briefAlpha };
+		DrawRect({ px + 14.0f, py + 12.0f }, { 10.0f, 10.0f }, ledCol);
+		tr->Print("HackGen", "MISSION FILE: SORTIE_DIRECTIVE_ARCHIVE", px + 32.0f, py + 8.0f, 13.5f, { 0.90f, 1.0f, 0.95f, 1.0f * briefAlpha });
+
+		// 作戦名（特大ハイライト表示）
+		float contentY = py + tbH + 18.0f;
+		std::string opHeader = mission.aliasName.empty() ? "// OPERATION NAME" : ("// OPERATION PROTOCOL : " + mission.aliasName);
+		tr->Print("HackGen", opHeader, px + 32.0f, contentY, 11.5f, { 0.35f, 0.85f, 0.55f, 0.85f * briefAlpha });
+		contentY += 18.0f;
+
+		std::string opTitle = mission.name.empty() ? "OPERATION COMBINED STRIKE" : mission.name;
+		std::string opSubTitle = mission.subTitle.empty() ? "" : (" // " + mission.subTitle);
+		tr->Print("HackGen", opTitle + opSubTitle, px + 32.0f, contentY, 24.0f, { 0.95f, 1.0f, 0.98f, 1.0f * briefAlpha });
+		contentY += 36.0f;
+
+		// セパレータライン
+		DrawLine({ px + 24.0f, contentY }, { px + panelW - 24.0f, contentY }, 1.0f, { 0.20f, 0.60f, 0.35f, 0.50f * briefAlpha });
+		contentY += 14.0f;
+
+		// 左カラム: 主目標 (PRIMARY OBJECTIVE)
+		float colLeftX = px + 32.0f;
+		float colMidX = px + panelW * 0.55f;
+
+		tr->Print("HackGen", "[ PRIMARY OBJECTIVES ]", colLeftX, contentY, 13.0f, { 0.45f, 1.0f, 0.70f, 0.95f * briefAlpha });
+		float objY = contentY + 22.0f;
+
+		if (!mission.objectives.empty()) {
+			for (size_t o = 0; o < (std::min)(mission.objectives.size(), size_t(3)); ++o) {
+				const auto& obj = mission.objectives[o];
+				std::string objTxt = "> " + obj.description;
+				tr->Print("HackGen", objTxt, colLeftX + 6.0f, objY, 13.0f, { 0.85f, 0.95f, 0.90f, 0.95f * briefAlpha });
+				objY += 22.0f;
+			}
+		} else {
+			tr->Print("HackGen", "> DESTROY ALL HOSTILE AIR & GROUND CONTACTS", colLeftX + 6.0f, objY, 13.0f, { 0.85f, 0.95f, 0.90f, 0.95f * briefAlpha });
+			objY += 22.0f;
+			tr->Print("HackGen", "> MAINTAIN AIRSPACE SUPERIORITY UNTIL EVAC", colLeftX + 6.0f, objY, 13.0f, { 0.70f, 0.85f, 0.75f, 0.80f * briefAlpha });
+			objY += 22.0f;
+		}
+
+		// 作戦指示 (DIRECTIVE / SITUATION)
+		objY += 10.0f;
+		tr->Print("HackGen", "[ SITUATION & DIRECTIVE ]", colLeftX, objY, 13.0f, { 0.45f, 1.0f, 0.70f, 0.95f * briefAlpha });
+		objY += 22.0f;
+		std::string desc = mission.description.empty() ? "Engage all designated hostile targets. Exercise extreme caution in dense combat zones." : mission.description;
+		tr->Print("HackGen", desc, colLeftX + 6.0f, objY, 12.0f, { 0.65f, 0.85f, 0.72f, 0.90f * briefAlpha });
+
+		// 右カラム: 戦力情報 & 戦況パラメーター (INTEL / CONDITIONS)
+		tr->Print("HackGen", "[ TACTICAL INTEL & FORCES ]", colMidX, contentY, 13.0f, { 0.45f, 1.0f, 0.70f, 0.95f * briefAlpha });
+		float intelY = contentY + 22.0f;
+
+		char airBuf[64];
+		snprintf(airBuf, sizeof(airBuf), "HOSTILE AIRBORNE : %zu UNITS", mission.enemies.size());
+		tr->Print("HackGen", airBuf, colMidX + 6.0f, intelY, 12.5f, { 0.95f, 0.40f, 0.35f, 0.95f * briefAlpha });
+		intelY += 22.0f;
+
+		char gndBuf[64];
+		snprintf(gndBuf, sizeof(gndBuf), "HOSTILE GROUND   : %zu SITES", mission.groundEnemies.size());
+		tr->Print("HackGen", gndBuf, colMidX + 6.0f, intelY, 12.5f, { 0.95f, 0.70f, 0.30f, 0.95f * briefAlpha });
+		intelY += 22.0f;
+
+		char areaBuf[128];
+		snprintf(areaBuf, sizeof(areaBuf), "COMBAT AIRSPACE  : %s", mission.areaName.c_str());
+		tr->Print("HackGen", areaBuf, colMidX + 6.0f, intelY, 12.0f, { 0.35f, 0.85f, 0.55f, 0.90f * briefAlpha });
+		intelY += 20.0f;
+
+		char diffBuf[128];
+		snprintf(diffBuf, sizeof(diffBuf), "MISSION THREAT   : %s", mission.difficulty.c_str());
+		tr->Print("HackGen", diffBuf, colMidX + 6.0f, intelY, 12.0f, { 1.0f, 0.85f, 0.30f, 0.95f * briefAlpha });
+		intelY += 24.0f;
+
+		tr->Print("HackGen", "// AVIONICS : FCS RADAR ONLINE", colMidX + 6.0f, intelY, 11.5f, { 0.35f, 0.80f, 0.50f, 0.80f * briefAlpha });
+		intelY += 18.0f;
+		tr->Print("HackGen", "// IFF LINK : SQUADRON SYNCED", colMidX + 6.0f, intelY, 11.5f, { 0.35f, 0.80f, 0.50f, 0.80f * briefAlpha });
+
+		// 下部案内
+		tr->Print("HackGen", ">> ENGAGING COMBAT AVIONICS SYSTEMS...", cx, py + panelH - 24.0f, 13.0f, { 0.35f, 1.0f, 0.65f, 0.90f * briefAlpha }, { 0.5f, 0.0f });
+
+		tr->Flush();
 		return;
 	}
 
 	// シネマティック上下レターボックス黒帯
 	DrawCinematicLetterbox(sw, sh);
 
-	// Phase 1: 高速走査レーザービーム (0.85s 〜 1.35s)
-	if (timer_ < 1.35f) {
+	// Phase 1: 高速走査レーザービーム (2.00s 〜 2.50s)
+	if (timer_ < 2.50f) {
 		DrawScanningLaser(sw, cx, cy);
 		return;
 	}
 
-	// Phase 2〜4: AC6風システム起動バナー & レティクル展開 (1.35s 〜 4.80s)
+	// Phase 2〜4: AC6風システム起動バナー & レティクル展開 (2.40s 〜 5.20s)
 	float overallAlpha = 1.0f;
-	if (timer_ > 3.40f) {
-		overallAlpha = std::clamp(1.0f - (timer_ - 3.40f) / 1.00f, 0.0f, 1.0f);
+	if (timer_ > 4.20f) {
+		overallAlpha = std::clamp(1.0f - (timer_ - 4.20f) / 0.90f, 0.0f, 1.0f);
 	}
 
-	float expandT = std::clamp((timer_ - 1.35f) / 0.75f, 0.0f, 1.0f);
+	float expandT = std::clamp((timer_ - 2.40f) / 0.70f, 0.0f, 1.0f);
 	float easeExpand = 1.0f - std::pow(1.0f - expandT, 3.0f);
 
-	float bannerW = 860.0f * std::clamp((timer_ - 1.35f) / 0.45f, 0.0f, 1.0f);
+	float bannerW = 860.0f * std::clamp((timer_ - 2.40f) / 0.40f, 0.0f, 1.0f);
 	float bannerH = 112.0f;
 	float topY = cy - bannerH * 0.5f;
 

@@ -91,6 +91,74 @@ std::vector<std::string> MissionManager::GetMissionList() {
 	return missions;
 }
 
+bool MissionManager::LoadMissionManifest(const std::string& manifestPath) {
+	if (!fs::exists(manifestPath)) {
+		CreateDefaultMissionManifest(manifestPath);
+	}
+
+	std::ifstream file(manifestPath);
+	if (!file.is_open()) {
+		return false;
+	}
+
+	try {
+		nlohmann::json j;
+		file >> j;
+		missionEntries_.clear();
+		if (j.contains("missions")) {
+			missionEntries_ = j.at("missions").get<std::vector<MissionEntry>>();
+		}
+		isManifestLoaded_ = true;
+		return true;
+	}
+	catch (const std::exception& e) {
+		std::cerr << "Failed to parse mission manifest JSON: " << e.what() << std::endl;
+		return false;
+	}
+}
+
+bool MissionManager::SaveMissionManifest(const std::string& manifestPath) {
+	try {
+		fs::path path(manifestPath);
+		fs::path parent = path.parent_path();
+		if (!parent.empty() && !fs::exists(parent)) {
+			fs::create_directories(parent);
+		}
+
+		std::ofstream file(manifestPath);
+		if (!file.is_open()) {
+			return false;
+		}
+
+		nlohmann::json j;
+		j["version"] = "1.0";
+		j["missions"] = missionEntries_;
+		file << j.dump(4);
+		return true;
+	}
+	catch (const std::exception& e) {
+		std::cerr << "Failed to save mission manifest JSON: " << e.what() << std::endl;
+		return false;
+	}
+}
+
+const std::vector<MissionEntry>& MissionManager::GetMissionEntries() {
+	if (!isManifestLoaded_) {
+		LoadMissionManifest();
+	}
+	return missionEntries_;
+}
+
+void MissionManager::CreateDefaultMissionManifest(const std::string& manifestPath) {
+	missionEntries_ = {
+		{ "[01]", "Resources/missions/mission01.json", "COMBINED STRIKE", "OP: DAWN BREAK", "空対空・空対地 統合防衛任務", false },
+		{ "[02]", "Resources/missions/mission1.json", "AIRSPACE DEFENSE", "OP: IRON SHIELD", "敵要撃部隊 要撃スクランブル", false },
+		{ "[03]", "Resources/missions/demo_5sec.json", "RAPID TEST", "OP: QUICK BENCH", "5秒間超短距離即応テスト", false }
+	};
+	SaveMissionManifest(manifestPath);
+	isManifestLoaded_ = true;
+}
+
 void MissionManager::CreateDefaultMission(const std::string& filepath) {
 	currentMission_ = MissionData();
 	currentMission_.name = "Mission 01: Combined Strike";

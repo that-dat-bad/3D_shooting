@@ -1,5 +1,6 @@
 #pragma once
 #include <string>
+#include <array>
 #include "../../../external/DirectXTex/DirectXTex.h"
 #include <wrl/client.h>
 #include <d3d12.h>
@@ -94,4 +95,7 @@ private:
 
 	// レンダーテクスチャ用 RTV インデックス（スワップチェーン2枚の次から）
 	uint32_t rtvNextIndex_ = 2;
+
+	// O(1) 高速アクセスメタデータキャッシュ（512枚対応、線形探索を完全根絶）
+	std::array<const DirectX::TexMetadata*, 512> metadataByIndex_{};
 };

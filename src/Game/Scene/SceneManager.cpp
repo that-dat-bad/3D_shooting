@@ -46,9 +46,8 @@ SceneManager::SceneManager(std::unique_ptr<AbstractSceneFactory> factory)
 		std::strftime(timeBuf, sizeof(timeBuf), "%Y-%m-%d %H:%M:%S", &localTm);
 
 		fprintf(fp, "======================================================================\n");
-		fprintf(fp, " Antigravity Engine - Scene Transition & Benchmark Profiler Log\n");
+		fprintf(fp, " Dawn Engine - Scene Transition & Benchmark Profiler Log\n");
 		fprintf(fp, " Session Started: %s\n", timeBuf);
-		fprintf(fp, " Target Goal: Seamless 0ms Transition across all scenes\n");
 		fprintf(fp, "======================================================================\n\n");
 		fclose(fp);
 	}

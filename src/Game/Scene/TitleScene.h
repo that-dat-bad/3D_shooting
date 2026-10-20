@@ -13,6 +13,7 @@
 #include "../Graphics/Afterburner.h"
 #include "../../engine/Graphics/PostProcess/PostEffect.h"
 #include "../../engine/Graphics/UI/PseudoOS.h"
+#include "../System/MissionManager.h"
 
 /// @brief タイトルシーン
 class TitleScene : public IScene {
@@ -145,6 +146,7 @@ private:
 	void InitializeWindowCloseVisuals(SpriteCommon* spriteCommon);
 	void DrawWindowClose();
 	void DrawSortieSequence();
+	void StartSortieSequence();
 
 	// --- フルOSデスクトップ環境 ---
 	PseudoOS pseudoOS_;
@@ -183,6 +185,7 @@ private:
 	float startMenuTransitionTimer_ = 0.0f;
 	static constexpr float kStartMenuTransitionDuration = 0.14f;
 	int pendingStartMenuAction_ = -1;
+	float lockedAlertTimer_ = 0.0f; ///< ロック中モジュール選択時の警告表示タイマー
 
 	// カスタムサイバーマウスカーソル
 	Vector2 customCursorPos_ = { 640.0f, 360.0f };
@@ -206,6 +209,23 @@ private:
 	void DrawOSWindowTelemetry(const OSWindow& win);
 	void DrawDesktopIcons();
 	void DrawCustomCursor();
+
+	// 全画面ミッション選択モーダル（完全フルスクリーンHUD / 他UI操作を完全ブロック）
+	bool isMissionSelectModalOpen_ = false;
+	float missionSelectModalAnim_ = 0.0f;
+	void UpdateMissionSelectModal(float dt, const Vector2& mousePos, bool isLDown, bool isLTrig);
+	void DrawMissionSelectModal();
+	void ReloadMissionCardData();
+
+	// ミッション選択データ（JSONデータ構造連動）
+	struct MissionCardData {
+		MissionEntry entry;   ///< マニフェストエントリ（id, filePath, title, aliasName, subTitle, isLocked）
+		std::string id;       ///< "[01]", "[02]" 等の表示番号
+		std::string filePath; ///< JSONファイルパス
+		MissionData data;     ///< ロードされたミッション生データ
+	};
+	std::vector<MissionCardData> missionCards_;
+	int selectedMissionIdx_ = 0;
 
 	// メニュー選択連動サブウィンドウ管理
 	int lastMenuSelIdx_ = 0;              ///< 前フレームの中央メニュー選択インデックス

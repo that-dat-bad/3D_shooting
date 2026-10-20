@@ -69,6 +69,18 @@ public:
 	/// @brief 全パーツのベースカラー乗算色を設定（焦げ跡・ダメージ変色用）
 	void SetMaterialColor(const Vector4& color);
 
+	/// @brief 全パーツのエミッシブ自発光を設定（ワイヤーフレームホログラム演出用）
+	void SetMaterialEmissive(const Vector3& color, float intensity);
+
+	/// @brief 全パーツのライティング有効・無効を設定
+	void SetMaterialEnableLighting(bool enable);
+
+	/// @brief 全パーツにカスタムパイプラインステートを設定（特殊シェーダー用）
+	void SetCustomPipelineState(ID3D12PipelineState* pso);
+
+	/// @brief 全パーツにカスタム定数バッファ（LightingSettingsスロットb3差し替え用）を設定
+	void SetCustomLightingSettingsResource(ID3D12Resource* res);
+
 	/// @brief コクピットキャノピー（ガラス部）に半透明・高環境反射・シャープなスペキュラを設定（項目4）
 	void SetupCanopyMaterial();
 

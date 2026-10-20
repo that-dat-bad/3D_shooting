@@ -1,4 +1,5 @@
 #include "TitleSceneInternal.h"
+#include <fstream>
 
 using namespace TitleSceneInternal;
 
@@ -21,6 +22,10 @@ void TitleScene::InitializeOSDesktop(SpriteCommon* spriteCommon) {
 	}
 	osSpritePoolIdx_ = 0;
 
+	// テキストレンダラーのスプライトプールを事前確保（2500個）
+	// これによりミッション選択モーダル展開時のD3D12 CommittedResource動的生成（数千回のシステムコール）によるヒッチを完全根絶
+	TextRenderer::GetInstance()->PrewarmPool(2500);
+
 	// 専用カーソルスプライトの初期化（24個：プール枯渇と完全分離：項目5）
 	cursorSprites_.clear();
 	for (int i = 0; i < 24; ++i) {
@@ -38,6 +43,42 @@ void TitleScene::InitializeOSDesktop(SpriteCommon* spriteCommon) {
 	pseudoOS_.Initialize(spriteCommon, PseudoOS::Theme::TerminalGreen);
 
 	ResetOSDesktopWindows();
+}
+
+void TitleScene::ReloadMissionCardData() {
+	missionCards_.clear();
+	auto& mm = MissionManager::GetInstance();
+	const auto& entries = mm.GetMissionEntries();
+
+	for (const auto& entry : entries) {
+		MissionCardData card;
+		card.entry = entry;
+		card.id = entry.id;
+		card.filePath = entry.filePath;
+
+		std::ifstream file(entry.filePath);
+		if (file.is_open()) {
+			try {
+				nlohmann::json j;
+				file >> j;
+				card.data = j.get<MissionData>();
+				if (!entry.title.empty()) card.data.name = entry.title;
+				if (!entry.aliasName.empty()) card.data.aliasName = entry.aliasName;
+				if (!entry.subTitle.empty()) card.data.subTitle = entry.subTitle;
+			} catch (...) {
+				card.data.name = entry.title.empty() ? "PARSE ERROR" : entry.title;
+				card.data.description = "Failed to parse " + entry.filePath;
+			}
+		} else {
+			card.data.name = entry.title.empty() ? "NOT FOUND" : entry.title;
+			card.data.description = "Mission file not found: " + entry.filePath;
+		}
+		missionCards_.push_back(card);
+	}
+
+	if (selectedMissionIdx_ >= static_cast<int>(missionCards_.size())) {
+		selectedMissionIdx_ = 0;
+	}
 }
 
 void TitleScene::ResetOSDesktopWindows() {
@@ -89,6 +130,9 @@ void TitleScene::ResetOSDesktopWindows() {
 	windowZOrder_ = { 1, 2, 0 }; // メインターミナル（0）が最前面
 
 	desktopIcons_.clear();
+
+	// ミッションカードデータをJSONファイルから動的ロード
+	ReloadMissionCardData();
 }
 
 void TitleScene::BringWindowToFront(int windowId) {
@@ -151,10 +195,15 @@ void TitleScene::UpdateOSDesktop(float dt, const Vector2& mousePos, bool isLDown
 		startMenuTransitionTimer_ -= dt;
 		if (startMenuTransitionTimer_ <= 0.0f) {
 			if (pendingStartMenuAction_ == 1) {
-				state_ = TitleState::SortieSequence;
-				sortieTimer_ = 0.0f;
+				isMissionSelectModalOpen_ = true;
+				missionSelectModalAnim_ = 0.0f;
+				if (!missionCards_.empty()) {
+					int idx = std::clamp(selectedMissionIdx_, 0, static_cast<int>(missionCards_.size()) - 1);
+					MissionManager::GetInstance().SetCurrentFilePath(missionCards_[idx].filePath);
+				}
 			} else if (pendingStartMenuAction_ == 2) {
-				sceneID = SCENE::MISSION_EDITOR;
+				// ロック中のためシーン遷移しない（開けないように徹底）
+				lockedAlertTimer_ = 1.8f;
 			} else if (pendingStartMenuAction_ == 3) {
 				if (osWindows_.size() >= 3) {
 					osWindows_[0].pos = osWindows_[0].normalPos;
@@ -200,14 +249,13 @@ void TitleScene::UpdateOSDesktop(float dt, const Vector2& mousePos, bool isLDown
 			if (mx >= smX && mx <= smX + smW && my >= smY && my <= smY + smH) {
 				float relY = my - smY;
 				if (relY >= 32.0f && relY < 60.0f) {
-					// [01] EXECUTE SORTIE -> クッション演出経由（項目4）
+					// [01] EXECUTE MISSION SELECT -> クッション演出経由
 					startMenuTransitionTimer_ = kStartMenuTransitionDuration;
 					pendingStartMenuAction_ = 1;
 					isStartMenuOpen_ = false;
 				} else if (relY >= 60.0f && relY < 88.0f) {
-					// [02] MISSION EDITOR
-					startMenuTransitionTimer_ = kStartMenuTransitionDuration;
-					pendingStartMenuAction_ = 2;
+					// [02] FREE FLIGHT (LOCKED)
+					lockedAlertTimer_ = 1.8f;
 					isStartMenuOpen_ = false;
 				} else if (relY >= 88.0f && relY < 116.0f) {
 					// [03] RESET WINDOW LAYOUT
@@ -385,7 +433,7 @@ void TitleScene::UpdateOSDesktop(float dt, const Vector2& mousePos, bool isLDown
 								} else if (b == 1) {
 									activeIntelTarget_ = 1;
 								} else if (b == 2) {
-									// [EDIT MISS >>]: ミッションエディタ起動
+									// [LOCKED]: FREE FLIGHT ロック警告通知
 									editorButton_.Click();
 								}
 							} else if (selIdx == 2) {
@@ -551,8 +599,8 @@ void TitleScene::DrawOSTaskbar() {
 		tr->Print("HackGen", "DAWN_OS : ROOT SESSION", smX + 10.0f, smY + 6.0f, 11.5f, { 0.40f, 1.0f, 0.70f, 0.95f });
 
 		const char* menuItems[] = {
-			"[01] EXECUTE COMBAT SORTIE",
-			"[02] LAUNCH MISSION EDITOR",
+			"[01] EXECUTE MISSION SELECT",
+			"[02] FREE FLIGHT [LOCKED]",
 			"[03] RESET WINDOW LAYOUT",
 			"[04] REBOOT TERMINAL",
 			"[05] SHUTDOWN SYSTEM"
@@ -686,7 +734,7 @@ void TitleScene::DrawOSWindowCam(const OSWindow& win) {
 		}
 	} else if (selIdx == 1) {
 		// ==========================================
-		// [02] MISSION EDITOR: 作戦エリアの衛星マップ
+		// [02] FREE FLIGHT [LOCKED]: 作戦エリアの衛星マップ
 		// ==========================================
 		bool satBlink = (std::fmod(animTimer_, 0.8f) < 0.50f);
 		Vector4 satCol = satBlink ? Vector4{ 0.20f, 0.85f, 1.0f, 0.98f } : Vector4{ 0.05f, 0.25f, 0.45f, 0.40f };
@@ -1012,7 +1060,7 @@ void TitleScene::DrawOSWindowTelemetry(const OSWindow& win) {
 		}
 	} else if (selIdx == 1) {
 		// ==========================================
-		// [02] MISSION EDITOR: 敵戦力分析データ
+		// [02] FREE FLIGHT [LOCKED]: 敵戦力分析データ
 		// ==========================================
 		tr->Print("HackGen", "THEATER INTEL : CONFLICT ZONE 07", curPos.x + 14.0f, cy, 12.0f, { 1.0f, 0.45f, 0.35f, 0.98f });
 		cy += 20.0f;
@@ -1202,11 +1250,11 @@ void TitleScene::DrawOSWindowTelemetry(const OSWindow& win) {
 		{ 1.0f, 0.80f, 0.30f, 0.95f }
 		});
 		actBtns.push_back({
-		"[EDIT MISS >>]",
+		"[LOCKED]",
 		false,
-		{ 0.20f, 0.08f, 0.05f, 0.90f }, { 1.0f, 0.55f, 0.30f, 0.90f },
-		{ 0.40f, 0.15f, 0.08f, 0.98f }, { 1.0f, 0.75f, 0.45f, 1.0f },
-		{ 1.0f, 0.70f, 0.35f, 1.0f }
+		{ 0.12f, 0.08f, 0.06f, 0.85f }, { 0.50f, 0.35f, 0.20f, 0.80f },
+		{ 0.25f, 0.12f, 0.08f, 0.95f }, { 0.70f, 0.45f, 0.25f, 1.0f },
+		{ 0.85f, 0.55f, 0.35f, 0.95f }
 		});
 	} else if (selIdx == 2) {
 		actBtns.push_back({
@@ -1371,50 +1419,62 @@ void TitleScene::DrawOSDesktop() {
 	// 滑らかなイーズアウト進行度 (Ease-Out Sine: 最初素早く、最後しっとり定着)
 	float smoothProg = (enterProg >= 1.0f) ? 1.0f : std::sin(enterProg * 1.5707963f);
 
-	// 1. デスクトップ上部ヘッダー（OSウォーターマーク & 戦闘連続性ログ：指摘4）
-	{
-		float hAlpha = smoothProg;
-		tr->Print("HackGen", "DAWN_OS TACTICAL DEFENSE MAINFRAME [v4.12.0]", 24.0f, 18.0f, 12.0f, { 0.30f, 0.85f, 0.50f, 0.70f * hAlpha });
-		tr->Print("HackGen", "CLEARANCE: LEVEL 5 // SECURE DESKTOP ENVIRONMENT", kScreenWidth - 380.0f, 18.0f, 11.5f, { 0.25f, 0.70f, 0.40f, 0.60f * hAlpha });
+	// ミッション選択モーダルが画面をほぼ覆っている（anim >= 0.85f）ときは背後を完全カリング（描画スキップ）
+	// これにより毎フレームのDrawCall数・スプライト更新処理・テキスト生成負荷が半減し超軽快に動作する
+	bool isModalCovering = (missionSelectModalAnim_ >= 0.85f);
 
-		if (!previousSortieLog_.empty()) {
-			tr->Print("HackGen", previousSortieLog_.c_str(), 24.0f, 36.0f, 11.0f, { previousSortieColor_.x, previousSortieColor_.y, previousSortieColor_.z, previousSortieColor_.w * hAlpha });
+	if (!isModalCovering) {
+		// 1. デスクトップ上部ヘッダー（OSウォーターマーク & 戦闘連続性ログ：指摘4）
+		{
+			float hAlpha = smoothProg;
+			tr->Print("HackGen", "DAWN_OS TACTICAL DEFENSE MAINFRAME [v4.12.0]", 24.0f, 18.0f, 12.0f, { 0.30f, 0.85f, 0.50f, 0.70f * hAlpha });
+			tr->Print("HackGen", "CLEARANCE: LEVEL 5 // SECURE DESKTOP ENVIRONMENT", kScreenWidth - 380.0f, 18.0f, 11.5f, { 0.25f, 0.70f, 0.40f, 0.60f * hAlpha });
+
+			if (!previousSortieLog_.empty()) {
+				tr->Print("HackGen", previousSortieLog_.c_str(), 24.0f, 36.0f, 11.0f, { previousSortieColor_.x, previousSortieColor_.y, previousSortieColor_.z, previousSortieColor_.w * hAlpha });
+			}
 		}
-	}
-	tr->Flush(); // ヘッダーテキストを先に描画
+		tr->Flush(); // ヘッダーテキストを先に描画
 
-	// 2. ウィンドウ描画（全ウィンドウが時間差なく完全に同時にアニメーション展開！）
-	for (int winId : windowZOrder_) {
-		if (winId >= 0 && winId < static_cast<int>(osWindows_.size())) {
-			auto& win = osWindows_[winId];
-			if (winId == 0) {
-				if (win.isOpen && !win.isMinimized && win.animScale >= 0.01f) {
-					DrawMenuCard();
-					tr->Flush(); // メインターミナルのテキストを描画
-				}
-			} else if (winId == 1) {
-				if (win.isOpen && !win.isMinimized && win.animScale >= 0.01f) {
-					DrawOSWindowCam(win);
-					tr->Flush(); // サブウィンドウ1のテキストを描画
-				}
-			} else if (winId == 2) {
-				if (win.isOpen && !win.isMinimized && win.animScale >= 0.01f) {
-					DrawOSWindowTelemetry(win);
-					tr->Flush(); // サブウィンドウ2のテキストを描画
+		// 2. ウィンドウ描画（全ウィンドウが時間差なく完全に同時にアニメーション展開！）
+		for (int winId : windowZOrder_) {
+			if (winId >= 0 && winId < static_cast<int>(osWindows_.size())) {
+				auto& win = osWindows_[winId];
+				if (winId == 0) {
+					if (win.isOpen && !win.isMinimized && win.animScale >= 0.01f) {
+						DrawMenuCard();
+						tr->Flush(); // メインターミナルのテキストを描画
+					}
+				} else if (winId == 1) {
+					if (win.isOpen && !win.isMinimized && win.animScale >= 0.01f) {
+						DrawOSWindowCam(win);
+						tr->Flush(); // サブウィンドウ1のテキストを描画
+					}
+				} else if (winId == 2) {
+					if (win.isOpen && !win.isMinimized && win.animScale >= 0.01f) {
+						DrawOSWindowTelemetry(win);
+						tr->Flush(); // サブウィンドウ2のテキストを描画
+					}
 				}
 			}
 		}
+
+		// 3. デスクトップアイコン（同時にフェードイン）
+		DrawDesktopIcons();
+		tr->Flush();
+
+		// 4. タスクバー & スタートメニュー（同時にフェードイン）
+		DrawOSTaskbar();
+		tr->Flush();
 	}
 
-	// 3. デスクトップアイコン（同時にフェードイン）
-	DrawDesktopIcons();
-	tr->Flush();
+	// 5. 全画面ミッション選択モーダル（完全フルスクリーンHUD / アクティブ時は最前面に展開、他UIを完全遮蔽）
+	if (isMissionSelectModalOpen_ || missionSelectModalAnim_ > 0.001f) {
+		DrawMissionSelectModal();
+		tr->Flush();
+	}
 
-	// 4. タスクバー & スタートメニュー（同時にフェードイン）
-	DrawOSTaskbar();
-	tr->Flush();
-
-	// 5. ターミナルの色に合わせた緑色のカスタムカーソル（最前面: 同時に表示）
+	// 6. ターミナルの色に合わせた緑色のカスタムカーソル（最前面: 同時に表示）
 	DrawCustomCursor();
 	tr->Flush();
 
@@ -1424,4 +1484,362 @@ void TitleScene::DrawOSDesktop() {
 		tr->Print("HackGen", "[ DAWN-OS ALL SYSTEMS ONLINE ]", kScreenWidth * 0.5f, kScreenHeight - 65.0f, 13.0f, { 0.35f, 1.0f, 0.65f, 0.85f * hudAlpha }, { 0.5f, 0.5f });
 		tr->Flush();
 	}
+}
+
+void TitleScene::UpdateMissionSelectModal(float dt, const Vector2& mousePos, bool isLDown, bool isLTrig) {
+	customCursorPos_ = mousePos;
+	if (cursorRippleTimer_ > 0.0f) {
+		cursorRippleTimer_ -= dt;
+	}
+	if (isLTrig) {
+		cursorRippleTimer_ = 0.30f;
+		cursorRipplePos_ = mousePos;
+	}
+
+	float mx = mousePos.x;
+	float my = mousePos.y;
+	Input* input = Input::GetInstance();
+
+	// モーダル展開アニメーション進行（開くときは優雅に拡大、閉じるときは素早く収納）
+	if (isMissionSelectModalOpen_) {
+		missionSelectModalAnim_ = (std::min)(1.0f, missionSelectModalAnim_ + dt * 4.2f);
+	} else {
+		missionSelectModalAnim_ = (std::max)(0.0f, missionSelectModalAnim_ - dt * 5.0f);
+		return;
+	}
+
+	// ウィンドウ展開中（アニメーション未定着時）はクリック等の入力をガードして誤爆防止
+	if (missionSelectModalAnim_ < 0.75f) {
+		return;
+	}
+
+	// 1. 戻る / 閉じる操作判定 (ESCキー, 左下[戻る]ボタン)
+	// ※ ウィンドウ上部の[X]ボタンは完全撤廃し、画面左下の[ < RETURN TO DESKTOP [ESC] ]に一本化
+	bool escTriggered = input->TriggerKey(DIK_ESCAPE);
+	bool closeBtnTriggered = false;
+
+	// 左下 [ << RETURN TO DESKTOP [ESC] ] ボタン判定: pos={ 28, 648 }, size={ 270, 54 }
+	if (isLTrig && mx >= 28.0f && mx <= 298.0f && my >= 648.0f && my <= 702.0f) {
+		closeBtnTriggered = true;
+	}
+
+	if (escTriggered || closeBtnTriggered) {
+		isMissionSelectModalOpen_ = false;
+		cursorRippleTimer_ = 0.25f;
+		cursorRipplePos_ = mousePos;
+		return;
+	}
+
+	// 2. キーボードによるミッションカード選択
+	if (input->TriggerKey(DIK_UP) || input->TriggerKey(DIK_W)) {
+		if (!missionCards_.empty()) {
+			selectedMissionIdx_ = (selectedMissionIdx_ - 1 + static_cast<int>(missionCards_.size())) % static_cast<int>(missionCards_.size());
+			MissionManager::GetInstance().SetCurrentFilePath(missionCards_[selectedMissionIdx_].filePath);
+		}
+	} else if (input->TriggerKey(DIK_DOWN) || input->TriggerKey(DIK_S)) {
+		if (!missionCards_.empty()) {
+			selectedMissionIdx_ = (selectedMissionIdx_ + 1) % static_cast<int>(missionCards_.size());
+			MissionManager::GetInstance().SetCurrentFilePath(missionCards_[selectedMissionIdx_].filePath);
+		}
+	} else if (input->TriggerKey(DIK_RETURN) || input->TriggerKey(DIK_SPACE)) {
+		StartSortieSequence();
+		return;
+	}
+
+	// 3. マウスによるミッションカード選択判定
+	const float cardX = 28.0f;
+	const float cardStartY = 54.0f;
+	const float cardW = 440.0f;
+	const float cardH = 176.0f;
+	const float cardGap = 16.0f;
+
+	if (isLTrig) {
+		for (int m = 0; m < static_cast<int>(missionCards_.size()); ++m) {
+			float cy = cardStartY + m * (cardH + cardGap);
+			if (mx >= cardX && mx <= cardX + cardW && my >= cy && my <= cy + cardH) {
+				selectedMissionIdx_ = m;
+				MissionManager::GetInstance().SetCurrentFilePath(missionCards_[m].filePath);
+				cursorRippleTimer_ = 0.25f;
+				cursorRipplePos_ = mousePos;
+				break;
+			}
+		}
+	}
+
+	// 4. 右下 [ >> EXECUTE SORTIE (作戦出撃開始) >> ] ボタン判定: pos={ 840, 648 }, size={ 412, 54 }
+	const float sortieBtnX = 840.0f;
+	const float sortieBtnY = 648.0f;
+	const float sortieBtnW = 412.0f;
+	const float sortieBtnH = 54.0f;
+
+	if (isLTrig && mx >= sortieBtnX && mx <= sortieBtnX + sortieBtnW &&
+	    my >= sortieBtnY && my <= sortieBtnY + sortieBtnH) {
+		cursorRippleTimer_ = 0.30f;
+		cursorRipplePos_ = mousePos;
+		StartSortieSequence();
+		return;
+	}
+}
+
+void TitleScene::DrawMissionSelectModal() {
+	if (missionSelectModalAnim_ <= 0.001f) { return; }
+	TextRenderer* tr = TextRenderer::GetInstance();
+
+	float s = missionSelectModalAnim_;
+	// 滑らかでダイナミックなイージング (Ease-Out Cubic: 最初勢いよく開き、最後しっとり定着)
+	float easeProgress = 1.0f - std::pow(1.0f - s, 3.0f);
+
+	// ウィンドウ幾何形状（中央メインターミナルのメニューボタン付近から全画面へとズーム展開！）
+	// 開始位置：中央ターミナル内ボタン付近 { 450, 240 }、サイズ { 380, 180 }
+	// 目標位置：フルスクリーン { 0, 0 }、サイズ { 1280, 720 }
+	const Vector2 startPos = { 450.0f, 240.0f };
+	const Vector2 startSize = { 380.0f, 180.0f };
+	const Vector2 targetPos = { 0.0f, 0.0f };
+	const Vector2 targetSize = { kScreenWidth, kScreenHeight };
+
+	Vector2 winPos = {
+		startPos.x + (targetPos.x - startPos.x) * easeProgress,
+		startPos.y + (targetPos.y - startPos.y) * easeProgress
+	};
+	Vector2 winSize = {
+		startSize.x + (targetSize.x - startSize.x) * easeProgress,
+		startSize.y + (targetSize.y - startSize.y) * easeProgress
+	};
+
+	// 1. ウィンドウ背景プレート（展開スケールに合わせて暗幕が拡大＆フェード）
+	DrawOSRect(winPos, winSize, { 0.005f, 0.02f, 0.012f, 0.985f * easeProgress });
+
+	// 外周タクティカル二重枠線（展開中のウィンドウ外周にリアルタイム追従）
+	Vector4 borderCol = { 0.35f, 0.95f, 0.60f, 0.95f * easeProgress };
+	DrawOSBorder({ winPos.x + 8.0f, winPos.y + 8.0f }, { winSize.x - 16.0f, winSize.y - 16.0f }, borderCol, 1.8f);
+	DrawOSBorder({ winPos.x + 12.0f, winPos.y + 12.0f }, { winSize.x - 24.0f, winSize.y - 24.0f }, { 0.15f, 0.50f, 0.28f, 0.45f * easeProgress }, 1.0f);
+
+	// 四隅のサイバーL字ブラケット（拡大するウィンドウの四隅にリアルタイム追従）
+	const float cL = 20.0f * easeProgress;
+	const float cT = 2.5f;
+	const Vector4 bracketCol = { 0.55f, 1.0f, 0.75f, 0.95f * easeProgress };
+	// 左上
+	DrawOSRect({ winPos.x + 8.0f, winPos.y + 8.0f }, { cL, cT }, bracketCol);
+	DrawOSRect({ winPos.x + 8.0f, winPos.y + 8.0f }, { cT, cL }, bracketCol);
+	// 右上
+	DrawOSRect({ winPos.x + winSize.x - 8.0f - cL, winPos.y + 8.0f }, { cL, cT }, bracketCol);
+	DrawOSRect({ winPos.x + winSize.x - 8.0f - cT, winPos.y + 8.0f }, { cT, cL }, bracketCol);
+	// 左下
+	DrawOSRect({ winPos.x + 8.0f, winPos.y + winSize.y - 8.0f - cT }, { cL, cT }, bracketCol);
+	DrawOSRect({ winPos.x + 8.0f, winPos.y + winSize.y - 8.0f - cL }, { cT, cL }, bracketCol);
+	// 右下
+	DrawOSRect({ winPos.x + winSize.x - 8.0f - cL, winPos.y + winSize.y - 8.0f - cT }, { cL, cT }, bracketCol);
+	DrawOSRect({ winPos.x + winSize.x - 8.0f - cT, winPos.y + winSize.y - 8.0f - cL }, { cT, cL }, bracketCol);
+
+	// 展開アニメーション中の水平高速走査レーザー（開く瞬間のハイテクOS演出！）
+	if (easeProgress < 0.95f) {
+		float scanY = winPos.y + winSize.y * 0.5f;
+		DrawOSRect({ winPos.x + 14.0f, scanY - 1.0f }, { winSize.x - 28.0f, 2.0f }, { 0.50f, 1.0f, 0.80f, 0.90f * easeProgress });
+		tr->Print("HackGen", ">> MOUNTING TACTICAL THEATER HUD... <<", winPos.x + winSize.x * 0.5f, scanY - 16.0f, 12.0f, { 0.85f, 1.0f, 0.90f, 0.95f * easeProgress }, { 0.5f, 0.5f });
+	}
+
+	// 展開中はスタイリッシュな枠線ズーム・走査レーザー演出に専念し、
+	// ウィンドウがほぼ全画面に展開完了した段階（0.75以上）からコンテンツをスムーズにフェードイン
+	// これによりウィンドウズーム展開中の1000文字以上のスプライト更新負荷をゼロにし、超軽快な展開アニメーションを実現
+	if (easeProgress < 0.75f) { return; }
+
+	float contentAlpha = std::clamp((easeProgress - 0.75f) / 0.25f, 0.0f, 1.0f);
+	float smoothAlpha = contentAlpha * contentAlpha * (3.0f - 2.0f * contentAlpha);
+
+	// 2. 最上部タクティカルHUDヘッダー（OS風ウィンドウタイトルバー枠は作らず、シネマティックなHUDライン）
+	bool blink = (std::fmod(animTimer_, 0.6f) < 0.35f);
+	Vector4 ledCol = blink ? Vector4{ 0.45f, 1.0f, 0.70f, 1.0f * smoothAlpha } : Vector4{ 0.15f, 0.45f, 0.25f, 0.6f * smoothAlpha };
+	DrawOSRect({ 24.0f, 23.0f }, { 8.0f, 8.0f }, ledCol);
+
+	tr->Print("HackGen", "// TACTICAL THEATER COMMAND : COMBAT OPERATION SELECTION", 40.0f, 19.0f, 13.5f, { 0.90f, 1.0f, 0.95f, 1.0f * smoothAlpha });
+	tr->Print("HackGen", "CLEARANCE: LEVEL 5 // DEFCON 1 // EXCLUSIVE THEATER HUD", kScreenWidth - 490.0f, 19.0f, 12.0f, { 0.35f, 0.80f, 0.50f, 0.85f * smoothAlpha });
+
+	// 水平サイバーアクセントライン
+	DrawOSRect({ 24.0f, 42.0f }, { kScreenWidth - 48.0f, 1.5f }, { 0.25f, 0.80f, 0.45f, 0.70f * smoothAlpha });
+
+	// 3. 左カラム: 作戦選択カードリスト (幅 440px)
+	const float cardX = 28.0f;
+	const float cardStartY = 54.0f;
+	const float cardW = 440.0f;
+	const float cardH = 176.0f;
+	const float cardGap = 16.0f;
+
+	for (int m = 0; m < static_cast<int>(missionCards_.size()); ++m) {
+		const auto& card = missionCards_[m];
+		float myPos = cardStartY + m * (cardH + cardGap);
+		bool isSelected = (selectedMissionIdx_ == m);
+		bool isHover = (customCursorPos_.x >= cardX && customCursorPos_.x <= cardX + cardW &&
+		                customCursorPos_.y >= myPos && customCursorPos_.y <= myPos + cardH);
+
+		Vector4 cardBg = isSelected
+			? Vector4{ 0.05f, 0.18f, 0.10f, 0.96f }
+			: (isHover ? Vector4{ 0.025f, 0.11f, 0.06f, 0.92f } : Vector4{ 0.012f, 0.05f, 0.025f, 0.88f });
+
+		Vector4 cardBorder = isSelected
+			? Vector4{ 0.45f, 1.0f, 0.70f, 1.0f }
+			: (isHover ? Vector4{ 0.30f, 0.85f, 0.50f, 0.85f } : Vector4{ 0.12f, 0.38f, 0.20f, 0.65f });
+
+		DrawOSPanel({ cardX, myPos }, { cardW, cardH }, cardBg, cardBorder, isSelected ? 2.5f : 1.2f);
+
+		// 選択中カードの左端ネオンバー＆アクセント
+		if (isSelected) {
+			DrawOSRect({ cardX, myPos }, { 5.0f, cardH }, { 0.45f, 1.0f, 0.70f, 1.0f });
+			DrawOSRect({ cardX, myPos }, { cardW, 2.0f }, { 0.70f, 1.0f, 0.85f, 1.0f });
+		}
+
+		float tx = cardX + 16.0f;
+		float ty = myPos + 12.0f;
+
+		// 1行目: ID + 作戦名 + ステータスタグ
+		Vector4 titleCol = isSelected ? Vector4{ 1.0f, 1.0f, 1.0f, 1.0f } : Vector4{ 0.75f, 0.95f, 0.82f, 0.92f };
+		tr->Print("HackGen", card.id + " " + card.data.name, tx, ty, 15.5f, titleCol);
+
+		std::string statusTag = isSelected ? "[ARMED / SELECTED]" : "[STANDBY]";
+		Vector4 tagCol = isSelected ? Vector4{ 0.45f, 1.0f, 0.70f, 1.0f } : Vector4{ 0.25f, 0.60f, 0.35f, 0.75f };
+		tr->Print("HackGen", statusTag, cardX + cardW - 14.0f, ty + 2.0f, 11.5f, tagCol, { 1.0f, 0.0f });
+
+		// 2行目: 作戦別名（コードネーム）+ 日本語サブタイトル
+		std::string subLine = card.entry.aliasName.empty() ? card.data.subTitle : ("[" + card.entry.aliasName + "]  " + card.data.subTitle);
+		tr->Print("HackGen", subLine, tx, ty + 26.0f, 13.0f, { 0.40f, 0.90f, 0.60f, 0.95f });
+
+		// セパレータライン
+		DrawOSRect({ tx, ty + 50.0f }, { cardW - 28.0f, 1.0f }, { 0.15f, 0.45f, 0.25f, 0.50f });
+
+		// 3行目: 難易度 & 作戦空域
+		tr->Print("HackGen", "DIFFICULTY : " + card.data.difficulty, tx, ty + 58.0f, 11.5f, isSelected ? Vector4{ 0.95f, 0.85f, 0.35f, 0.95f } : Vector4{ 0.65f, 0.60f, 0.25f, 0.80f });
+		tr->Print("HackGen", "AIRSPACE   : " + card.data.areaName, tx, ty + 78.0f, 11.5f, { 0.40f, 0.80f, 0.55f, 0.85f });
+
+		// 4行目: 制限時間
+		char timeStr[64];
+		if (card.data.timeLimit > 0.0f) {
+			int tSec = static_cast<int>(card.data.timeLimit);
+			snprintf(timeStr, sizeof(timeStr), "%02d:%02d (%d SECONDS)", tSec / 60, tSec % 60, tSec);
+		} else {
+			snprintf(timeStr, sizeof(timeStr), "UNLIMITED (NO LIMIT)");
+		}
+		tr->Print("HackGen", "TIME LIMIT : " + std::string(timeStr), tx, ty + 98.0f, 11.0f, { 0.30f, 0.75f, 0.45f, 0.80f });
+
+		// 5行目: 敵勢力情報
+		char threatStr[64];
+		snprintf(threatStr, sizeof(threatStr), "THREAT     : %zu AIR / %zu GROUND SITES", card.data.enemies.size(), card.data.groundEnemies.size());
+		tr->Print("HackGen", threatStr, tx, ty + 118.0f, 11.0f, { 0.85f, 0.60f, 0.30f, 0.85f });
+
+		// マウスクリック案内
+		if (isHover && !isSelected) {
+			tr->Print("HackGen", "[ CLICK TO SELECT OPERATION ]", cardX + cardW - 14.0f, ty + 138.0f, 11.0f, { 0.65f, 1.0f, 0.75f, 0.90f }, { 1.0f, 0.0f });
+		}
+	}
+
+	// 4. 右カラム: 選択中ミッションの作戦ブリーフィング詳細パネル (幅 764px, 高さ 570px)
+	const float detX = 488.0f;
+	const float detY = 54.0f;
+	const float detW = 764.0f;
+	const float detH = 570.0f;
+
+	DrawOSPanel({ detX, detY }, { detW, detH }, { 0.01f, 0.04f, 0.02f, 0.96f }, borderCol, 1.8f);
+
+	// 詳細パネルヘッダーバー
+	float dTbH = 34.0f;
+	DrawOSRect({ detX, detY }, { detW, dTbH }, { 0.03f, 0.14f, 0.07f, 0.95f });
+	DrawOSRect({ detX, detY + dTbH - 1.0f }, { detW, 1.5f }, borderCol);
+	tr->Print("HackGen", "OPERATION BRIEFING DOSSIER // DECLASSIFIED COMBAT INTEL", detX + 16.0f, detY + 8.0f, 13.0f, { 0.85f, 1.0f, 0.92f, 1.0f });
+
+	if (selectedMissionIdx_ >= 0 && selectedMissionIdx_ < static_cast<int>(missionCards_.size())) {
+		const auto& curCard = missionCards_[selectedMissionIdx_];
+		float dy = detY + dTbH + 16.0f;
+		float dx = detX + 22.0f;
+
+		// 作戦名見出し（別名コードネーム連動）
+		std::string protoHeader = curCard.entry.aliasName.empty() ? "// TARGET OPERATION PROTOCOL" : ("// TARGET OPERATION PROTOCOL : " + curCard.entry.aliasName);
+		tr->Print("HackGen", protoHeader, dx, dy, 11.5f, { 0.35f, 0.85f, 0.55f, 0.85f });
+		dy += 18.0f;
+		tr->Print("HackGen", curCard.data.name + " // " + curCard.data.subTitle, dx, dy, 22.0f, { 0.95f, 1.0f, 0.98f, 1.0f });
+		dy += 32.0f;
+
+		// 空域 & 難易度 & 制限時間バッジ
+		char timeStr[64];
+		if (curCard.data.timeLimit > 0.0f) {
+			int tSec = static_cast<int>(curCard.data.timeLimit);
+			snprintf(timeStr, sizeof(timeStr), "%02d:%02d", tSec / 60, tSec % 60);
+		} else {
+			snprintf(timeStr, sizeof(timeStr), "UNLIMITED");
+		}
+		char metaBuf[160];
+		snprintf(metaBuf, sizeof(metaBuf), "AREA: %s  |  DIFFICULTY: %s  |  LIMIT: %s", curCard.data.areaName.c_str(), curCard.data.difficulty.c_str(), timeStr);
+		tr->Print("HackGen", metaBuf, dx, dy, 12.0f, { 0.50f, 1.0f, 0.75f, 0.95f });
+		dy += 26.0f;
+
+		// 区切り線
+		DrawOSRect({ dx, dy }, { detW - 44.0f, 1.5f }, { 0.20f, 0.65f, 0.35f, 0.60f });
+		dy += 18.0f;
+
+		// 作戦指示 (SITUATION & DIRECTIVE)
+		tr->Print("HackGen", "[ SITUATION & DIRECTIVE ]", dx, dy, 13.0f, { 0.45f, 1.0f, 0.70f, 0.98f });
+		dy += 22.0f;
+		tr->Print("HackGen", curCard.data.description, dx + 6.0f, dy, 12.5f, { 0.75f, 0.92f, 0.82f, 0.92f });
+		dy += 44.0f;
+
+		// 主目標 & 副目標 (MISSION OBJECTIVES)
+		tr->Print("HackGen", "[ PRIMARY MISSION OBJECTIVES ]", dx, dy, 13.0f, { 0.45f, 1.0f, 0.70f, 0.98f });
+		dy += 22.0f;
+		DrawOSPanel({ dx + 4.0f, dy }, { detW - 52.0f, 68.0f }, { 0.02f, 0.08f, 0.04f, 0.90f }, { 0.25f, 0.80f, 0.45f, 0.70f }, 1.2f);
+
+		if (!curCard.data.objectives.empty()) {
+			float objY = dy + 10.0f;
+			for (size_t o = 0; o < curCard.data.objectives.size() && o < 2; ++o) {
+				const auto& obj = curCard.data.objectives[o];
+				std::string line = (obj.isPrimary ? "> [PRIMARY]   : " : "> [SECONDARY] : ") + obj.description;
+				tr->Print("HackGen", line, dx + 16.0f, objY, 12.0f, obj.isPrimary ? Vector4{ 0.95f, 1.0f, 0.95f, 1.0f } : Vector4{ 0.55f, 0.85f, 0.65f, 0.85f });
+				objY += 24.0f;
+			}
+		} else {
+			tr->Print("HackGen", "> [PRIMARY]   : 全敵ユニットの殲滅 (DESTROY ALL HOSTILE FORCES)", dx + 16.0f, dy + 10.0f, 12.0f, { 0.95f, 1.0f, 0.95f, 1.0f });
+			tr->Print("HackGen", "> [SECONDARY] : 機体損傷率の極小化 (MINIMIZE DAMAGE TO AIRFRAME)", dx + 16.0f, dy + 34.0f, 12.0f, { 0.55f, 0.85f, 0.65f, 0.85f });
+		}
+		dy += 84.0f;
+
+		// 脅威分析 (ENEMY THREAT INTEL)
+		tr->Print("HackGen", "[ THREAT INTEL & COMBAT ENVIRONMENT ]", dx, dy, 13.0f, { 0.45f, 1.0f, 0.70f, 0.98f });
+		dy += 22.0f;
+		char threatHostileBuf[128];
+		snprintf(threatHostileBuf, sizeof(threatHostileBuf), "// DETECTED HOSTILES : %zu AIRBORNE FIGHTERS / %zu FORTIFIED SITES", curCard.data.enemies.size(), curCard.data.groundEnemies.size());
+		tr->Print("HackGen", threatHostileBuf, dx + 6.0f, dy, 12.5f, { 0.95f, 0.55f, 0.35f, 0.95f });
+		dy += 22.0f;
+		tr->Print("HackGen", "// AVIONICS: ALL WEAPON SYSTEMS ONLINE // FCS COMBAT ALGORITHM ARMED", dx + 6.0f, dy, 12.0f, { 0.35f, 0.85f, 0.55f, 0.85f });
+		dy += 22.0f;
+		tr->Print("HackGen", "// WEATHER : CLEAR VISIBILITY // WIND 280@12KT // G-LIMITER OFF", dx + 6.0f, dy, 11.5f, { 0.30f, 0.70f, 0.45f, 0.80f });
+	}
+
+	// 5. 最下部アクションバー（全画面フルスクリーンの下部コマンド）
+	// 左側: [ << RETURN TO DESKTOP [ESC] ] ボタン
+	const float backBtnX = 28.0f;
+	const float backBtnY = 648.0f;
+	const float backBtnW = 270.0f;
+	const float backBtnH = 54.0f;
+	bool backHov = (customCursorPos_.x >= backBtnX && customCursorPos_.x <= backBtnX + backBtnW &&
+	                customCursorPos_.y >= backBtnY && customCursorPos_.y <= backBtnY + backBtnH);
+	Vector4 backBg = backHov ? Vector4{ 0.15f, 0.25f, 0.18f, 0.95f } : Vector4{ 0.04f, 0.12f, 0.06f, 0.90f };
+	Vector4 backBorder = backHov ? Vector4{ 0.50f, 0.90f, 0.65f, 0.98f } : Vector4{ 0.20f, 0.55f, 0.30f, 0.75f };
+	DrawOSPanel({ backBtnX, backBtnY }, { backBtnW, backBtnH }, backBg, backBorder, backHov ? 2.0f : 1.2f);
+	tr->Print("HackGen", "<< RETURN TO DESKTOP [ESC]", backBtnX + backBtnW * 0.5f, backBtnY + 18.0f, 13.0f, backHov ? Vector4{ 1.0f, 1.0f, 1.0f, 1.0f } : Vector4{ 0.50f, 0.85f, 0.65f, 0.90f }, { 0.5f, 0.0f });
+
+	// 中央案内
+	tr->Print("HackGen", "NAVIGATE: [W/S] OR [UP/DOWN]   |   SORTIE: [ENTER] OR [SPACE]", 490.0f, backBtnY + 19.0f, 12.0f, { 0.35f, 0.80f, 0.50f, 0.80f });
+
+	// 右側: 巨大な [ >> EXECUTE SORTIE (出撃開始) >> ] ボタン
+	const float sortieBtnX = 840.0f;
+	const float sortieBtnY = 648.0f;
+	const float sortieBtnW = 412.0f;
+	const float sortieBtnH = 54.0f;
+	bool sBtnHov = (customCursorPos_.x >= sortieBtnX && customCursorPos_.x <= sortieBtnX + sortieBtnW &&
+	                customCursorPos_.y >= sortieBtnY && customCursorPos_.y <= sortieBtnY + sortieBtnH);
+	Vector4 sBtnBg = sBtnHov ? Vector4{ 0.15f, 0.55f, 0.28f, 0.98f } : Vector4{ 0.06f, 0.28f, 0.14f, 0.95f };
+	Vector4 sBtnBorder = sBtnHov ? Vector4{ 0.75f, 1.0f, 0.85f, 1.0f } : Vector4{ 0.40f, 1.0f, 0.65f, 0.95f };
+
+	DrawOSPanel({ sortieBtnX, sortieBtnY }, { sortieBtnW, sortieBtnH }, sBtnBg, sBtnBorder, sBtnHov ? 2.8f : 2.0f);
+	if (sBtnHov) {
+		DrawOSRect({ sortieBtnX, sortieBtnY }, { sortieBtnW, 2.5f }, { 0.85f, 1.0f, 0.95f, 1.0f });
+	}
+	Vector4 sTextCol = sBtnHov ? Vector4{ 1.0f, 1.0f, 1.0f, 1.0f } : Vector4{ 0.45f, 1.0f, 0.70f, 1.0f };
+	tr->Print("HackGen", ">> EXECUTE SORTIE (出撃開始) >>", sortieBtnX + sortieBtnW * 0.5f, sortieBtnY + 16.0f, 16.0f, sTextCol, { 0.5f, 0.0f });
 }

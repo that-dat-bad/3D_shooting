@@ -21,6 +21,9 @@ public:
     // 指定したフォントとサイズでの文字列の描画サイズを計算する
     Vector2 CalculateTextSize(const std::string& fontName, const std::string& text, float size);
 
+    // スプライトプールの事前確保（シーン遷移時のCreateCommittedResourceスパイクをゼロにする）
+    void PrewarmPool(size_t count);
+
     // 積まれた文字を実際に描画する（SceneのDraw等で一括で呼ぶ）
     void Draw();
 

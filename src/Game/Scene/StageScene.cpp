@@ -343,8 +343,31 @@ void StageScene::Draw() {
 	// 3Dオブジェクト描画（Object3dパイプライン）
 	Object3dCommon::GetInstance()->SetupCommonState();
 
-	// 部位破壊対応ビジュアルモデルと飛散破片の描画
-	aircraftVisualModel_.Draw();
+	// 部位破壊対応ビジュアルモデルの描画
+	// 【戦闘モード起動演出（自機専用スキャン波形マテリアライズ・パイプライン）】
+	if (!combatBootSequence_.IsFinished()) {
+		float dur = combatBootSequence_.GetCurrentDuration();
+		float bootT = std::clamp(combatBootSequence_.GetTimer() / (std::max)(dur, 0.001f), 0.0f, 1.0f);
+
+		if (bootT < 0.12f) {
+			// 1. 【無（完全不可視・ステルス）フェーズ】
+			// 起動開始前（作戦音声第一声）は完全不可視
+		} else if (bootT < 0.85f) {
+			// 2. 【スキャン波形マテリアライズフェーズ（機体中心から広がる波紋に沿ってピクセル単位で構築）】
+			// 機体中心からスキャン波形が外側へ伝播：[無(不可視) -> ネオンワイヤー＆波形パルス -> 3D実写装甲]
+			float scanProg = std::clamp((bootT - 0.12f) / 0.73f, 0.0f, 1.0f);
+
+			combatBootSequence_.BeginAircraftScanDraw(aircraftVisualModel_, scanProg);
+			aircraftVisualModel_.Draw();
+			combatBootSequence_.EndAircraftScanDraw(aircraftVisualModel_);
+		} else {
+			// 3. 【起動完了・完全実体装甲フェーズ】
+			aircraftVisualModel_.Draw();
+		}
+	} else {
+		// 通常戦闘時
+		aircraftVisualModel_.Draw();
+	}
 	DebrisManager::GetInstance()->Draw();
 
 	// 敵描画（空中敵＋地上敵）
@@ -375,7 +398,7 @@ void StageScene::DrawUI() {
 	combatBootSequence_.DrawBackgroundFade();
 
 	// 2. 戦闘HUD（残弾数・照準・タイマー）描画
-	float hudThreshold = combatBootSequence_.IsQuickMode() ? 0.40f : 3.60f;
+	float hudThreshold = combatBootSequence_.IsQuickMode() ? 0.40f : 4.00f;
 	if (sortieIntroTimer_ >= hudThreshold) {
 		hud_.Draw();
 	}

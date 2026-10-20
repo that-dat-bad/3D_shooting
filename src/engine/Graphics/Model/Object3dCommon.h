@@ -73,6 +73,10 @@ public:
 	// ブレンドモード設定
 	void SetBlendMode(BlendMode mode);
 
+	// ワイヤーフレーム描画モード切り替え（SFホログラム演出・デバッグ用）
+	void SetWireframeMode(bool isWireframe) { isWireframeMode_ = isWireframe; }
+	bool IsWireframeMode() const { return isWireframeMode_; }
+
 	// ライティング設定
 	void SetShadingModel(int32_t model) { lightingSettingsData->shadingModel = model; }
 	void SetSpecularModel(int32_t model) { lightingSettingsData->specularModel = model; }
@@ -96,6 +100,7 @@ public:
 	DirectionalLight* GetDirectionalLightData() { return directionalLightData; }
 	PointLight* GetPointLightData() { return pointLightData; }
 	SpotLight* GetSpotLightData() { return spotLightData; }
+	LightingSettings* GetLightingSettingsData() { return lightingSettingsData; }
 	
 	void SetDefaultEnvTextureIndex(uint32_t index) { defaultEnvTextureIndex_ = index; }
 	uint32_t GetDefaultEnvTextureIndex() const { return defaultEnvTextureIndex_; }
@@ -112,6 +117,8 @@ private:
 	Camera* defaultCamera_ = nullptr;
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSignature_;
 	std::array<Microsoft::WRL::ComPtr<ID3D12PipelineState>, static_cast<size_t>(BlendMode::kCountOf)> graphicsPipelineStates_;
+	std::array<Microsoft::WRL::ComPtr<ID3D12PipelineState>, static_cast<size_t>(BlendMode::kCountOf)> wireframePipelineStates_;
+	bool isWireframeMode_ = false;
 	Microsoft::WRL::ComPtr<ID3D12Resource> directionalLightResource_;
 	Microsoft::WRL::ComPtr<ID3D12Resource> pointLightResource_;
 	Microsoft::WRL::ComPtr<ID3D12Resource> spotLightResource_;

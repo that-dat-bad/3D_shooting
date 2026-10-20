@@ -447,7 +447,8 @@ void StageScene::UpdateCamera(float gameDeltaTime) {
 			camPos = Add(pos, camOffset);
 			lookTarget = Add(pos, Multiply(2.0f, forward));
 		} else {
-			float orbitProg = std::clamp((sortieIntroTimer_ - 2.30f) / 2.50f, 0.0f, 1.0f);
+			float orbitDuration = (std::max)(0.1f, sortieIntroDuration_ - 2.30f);
+			float orbitProg = std::clamp((sortieIntroTimer_ - 2.30f) / orbitDuration, 0.0f, 1.0f);
 			float smoothOrbit = orbitProg * orbitProg * (3.0f - 2.0f * orbitProg);
 
 			float angle = (3.14159265f * 0.50f) + smoothOrbit * (3.14159265f * 0.50f);

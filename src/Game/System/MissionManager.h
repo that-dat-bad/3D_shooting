@@ -9,9 +9,43 @@
 #include "MissionTrigger.h"
 #include "Waypoint.h"
 
+/// @brief ミッション一覧（マニフェスト）エントリデータ（各ミッションの件名・別名・ファイルパス等のメタデータ一元管理）
+struct MissionEntry {
+	std::string id = "[01]";                           ///< ミッションID（例: "[01]", "[02]"）
+	std::string filePath = "";                        ///< ミッションJSONファイルパス
+	std::string title = "";                           ///< 作戦件名・主要タイトル（例: "COMBINED STRIKE"）
+	std::string aliasName = "";                       ///< 作戦別名・コードネーム（例: "OP: DAWN BREAK"）
+	std::string subTitle = "";                        ///< 日本語件名・サブタイトル（例: "空対空・空対地 統合防衛任務"）
+	bool isLocked = false;                            ///< 解放フラグ
+};
+
+inline void to_json(nlohmann::json& j, const MissionEntry& e) {
+	j = nlohmann::json{
+		{"id", e.id},
+		{"filePath", e.filePath},
+		{"title", e.title},
+		{"aliasName", e.aliasName},
+		{"subTitle", e.subTitle},
+		{"isLocked", e.isLocked}
+	};
+}
+
+inline void from_json(const nlohmann::json& j, MissionEntry& e) {
+	if (j.contains("id")) j.at("id").get_to(e.id);
+	if (j.contains("filePath")) j.at("filePath").get_to(e.filePath);
+	if (j.contains("title")) j.at("title").get_to(e.title);
+	if (j.contains("aliasName")) j.at("aliasName").get_to(e.aliasName);
+	if (j.contains("subTitle")) j.at("subTitle").get_to(e.subTitle);
+	if (j.contains("isLocked")) j.at("isLocked").get_to(e.isLocked);
+}
+
 /// @brief ミッションの構成データ
 struct MissionData {
 	std::string name = "Default Mission";
+	std::string aliasName = "";                  ///< 作戦別名・コードネーム（例: "OP: DAWN BREAK"）
+	std::string subTitle = "";                   ///< サブタイトル（例: "空対空・空対地 統合防衛任務"）
+	std::string difficulty = "NORMAL";           ///< 難易度表示（例: "NORMAL", "HARD", "EXPERT"）
+	std::string areaName = "SECTOR 07";          ///< 作戦空域名称（例: "SECTOR 07 : BORDER LINE"）
 	std::string description = "Destroy all enemy aircraft and ground targets.";
 	float playerHP = 100.0f;
 	MyMath::Vector3 playerPosition = { 0.0f, 100.0f, 0.0f };
@@ -146,6 +180,10 @@ inline void from_json(const nlohmann::json& j, GroundEnemySpawnData& g) {
 inline void to_json(nlohmann::json& j, const MissionData& m) {
 	j = nlohmann::json{
 		{"name", m.name},
+		{"aliasName", m.aliasName},
+		{"subTitle", m.subTitle},
+		{"difficulty", m.difficulty},
+		{"areaName", m.areaName},
 		{"description", m.description},
 		{"playerHP", m.playerHP},
 		{"playerPosition", m.playerPosition},
@@ -160,6 +198,10 @@ inline void to_json(nlohmann::json& j, const MissionData& m) {
 
 inline void from_json(const nlohmann::json& j, MissionData& m) {
 	if (j.contains("name")) j.at("name").get_to(m.name);
+	if (j.contains("aliasName")) j.at("aliasName").get_to(m.aliasName);
+	if (j.contains("subTitle")) j.at("subTitle").get_to(m.subTitle);
+	if (j.contains("difficulty")) j.at("difficulty").get_to(m.difficulty);
+	if (j.contains("areaName")) j.at("areaName").get_to(m.areaName);
 	if (j.contains("description")) j.at("description").get_to(m.description);
 	if (j.contains("playerHP")) j.at("playerHP").get_to(m.playerHP);
 	if (j.contains("playerPosition")) j.at("playerPosition").get_to(m.playerPosition);
@@ -194,6 +236,20 @@ public:
 
 	/// @brief デフォルトのミッションデータを構築して保存
 	void CreateDefaultMission(const std::string& filepath);
+
+	// === ミッション一覧（マニフェスト・捏名一元管理） ===
+
+	/// @brief missions.json（ミッション一覧インデックス）をロード
+	bool LoadMissionManifest(const std::string& manifestPath = "Resources/missions/missions.json");
+
+	/// @brief missions.json にミッション一覧を保存
+	bool SaveMissionManifest(const std::string& manifestPath = "Resources/missions/missions.json");
+
+	/// @brief ミッションエントリ一覧を取得（未ロード時は自動ロード）
+	const std::vector<MissionEntry>& GetMissionEntries();
+
+	/// @brief デフォルトの missions.json を生成
+	void CreateDefaultMissionManifest(const std::string& manifestPath);
 
 	// === Phase 1: 目標 & トリガー評価 ===
 
@@ -265,6 +321,10 @@ private:
 
 	MissionData currentMission_;
 	std::string currentFilePath_;
+
+	// --- ミッション一覧（マニフェスト） ---
+	std::vector<MissionEntry> missionEntries_;
+	bool isManifestLoaded_ = false;
 
 	// --- ランタイム状態 ---
 	bool triggerMissionComplete_ = false;

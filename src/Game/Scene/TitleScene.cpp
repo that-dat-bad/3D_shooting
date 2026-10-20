@@ -51,6 +51,9 @@ void TitleScene::Initialize() {
 	SpriteCommon* spriteCommon = SpriteCommon::GetInstance();
 	TextureManager* tm = TextureManager::GetInstance();
 
+	// テキストスプライトプールを事前確保（実行時のD3D12バッファ生成ヒッチを完全防止）
+	TextRenderer::GetInstance()->PrewarmPool(2500);
+
 	// 必須テクスチャのロード
 	tm->LoadTexture("assets/textures/white1x1.png");
 	whiteTexIndex_ = tm->GetTextureIndexByFilePath("assets/textures/white1x1.png");

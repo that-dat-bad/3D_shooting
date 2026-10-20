@@ -15,6 +15,15 @@ void TextRenderer::Finalize() {
     spritePool_.clear();
 }
 
+void TextRenderer::PrewarmPool(size_t count) {
+    if (!spriteCommon_) { return; }
+    while (spritePool_.size() < count) {
+        auto sprite = std::make_unique<Sprite>();
+        sprite->Initialize(spriteCommon_, "");
+        spritePool_.push_back(std::move(sprite));
+    }
+}
+
 Sprite* TextRenderer::GetNextSprite() {
     if (usedSpriteCount_ >= spritePool_.size()) {
         auto sprite = std::make_unique<Sprite>();
@@ -67,8 +76,12 @@ void TextRenderer::Print(const std::string& fontName, const std::string& text, f
 
     float scale = size / info->size;
     
-    Vector2 textSize = CalculateTextSize(fontName, text, size);
-    float startX = x - textSize.x * anchorPoint.x;
+    // anchorPoint.x が 0.0f（左揃え）の場合はテキスト幅の事前計算をスキップして高速化
+    float startX = x;
+    if (std::abs(anchorPoint.x) > 0.0001f) {
+        Vector2 textSize = CalculateTextSize(fontName, text, size);
+        startX = x - textSize.x * anchorPoint.x;
+    }
     
     // フォントのascentとdescentに基づき、アンカーに応じたベースライン位置を正確に決定
     // anchorPoint.y = 0.0f: 上揃え (行上端が y) -> startY = y + ascent * scale
