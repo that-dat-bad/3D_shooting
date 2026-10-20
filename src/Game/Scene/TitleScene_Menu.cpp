@@ -562,7 +562,7 @@ void TitleScene::DrawMenuCard() {
 	const float cardY = menuWindowPos_.y;
 
 	// 端末ヘッダーテキスト (HackGen 13.0f) - タイトルバー左側（アクティブ時は鮮烈発光＆FOCUSバッジ）
-	bool isActive = (activeWindowId_ == 0);
+	bool isActive = (activeWindowId_ == 0) || isMissionSelectModalOpen_;
 	if (isActive) {
 		DrawOSRect({ cardX, cardY }, { cardWidth, 2.0f }, { 0.70f, 1.0f, 0.88f, 1.0f }); // 上端ネオンアクセントライン
 		DrawOSRect({ cardX + 14.0f, cardY + 11.0f }, { 8.0f, 8.0f }, { 0.40f, 1.0f, 0.70f, 1.0f }); // 高輝度LED
@@ -1518,7 +1518,7 @@ void TitleScene::DrawConsoleBoot() {
 	pseudoOS_.DrawRect({ 0.0f, scanY }, { kScreenWidth, 1.0f }, { 0.20f, 0.70f, 0.90f, 0.15f * textAlpha });
 
 	// ============================================================
-	// コンソールからデスクトップへのGUIモード切替・ワイヤーフレーム分岐演出
+	// コンソールからデスクトップへのGUIモード切替演出
 	// ============================================================
 	if (consoleExitTimer_ > 0.0f) {
 		// 1. 横断CRTラスタースキャンビーム（画面上端から下端へ一気に走査してデスクトップを展開）
@@ -1528,31 +1528,7 @@ void TitleScene::DrawConsoleBoot() {
 		pseudoOS_.DrawRect({ 0.0f, beamY - 8.0f }, { kScreenWidth, 16.0f },
 			{ 0.15f, 0.80f, 0.45f, (1.0f - exitT) * 0.30f });
 
-		// 2. ウィンドウ投影ワイヤーフレームの展開（中央ターミナルから3つのデスクトップウィンドウへ分岐）
-		float branchS = exitT * exitT * (3.0f - 2.0f * exitT); // スムーズステップ
-		Vector4 wfCol = { 0.25f, 0.95f, 0.55f, branchS * 0.80f };
-
-		// サブウィンドウ1 (CAM-01) への投影ワイヤーフレーム: 目標 { 18.0f, 44.0f, 356.0f, 260.0f }
-		Vector2 w1Pos = { panelX + (18.0f - panelX) * branchS, panelY + (44.0f - panelY) * branchS };
-		Vector2 w1Size = { panelW + (356.0f - panelW) * branchS, panelH + (260.0f - panelH) * branchS };
-		pseudoOS_.DrawBorder(w1Pos, w1Size, wfCol, 1.5f);
-		tr->Print("HackGen", "[VRAM: CAM_01 SINK ATTACHED]", w1Pos.x + 8.0f, w1Pos.y + 6.0f, 10.0f, wfCol);
-
-		// サブウィンドウ2 (SYS_DIAG) への投影ワイヤーフレーム: 目標 { 18.0f, 320.0f, 356.0f, 344.0f }
-		Vector2 w2Pos = { panelX + (18.0f - panelX) * branchS, panelY + (320.0f - panelY) * branchS };
-		Vector2 w2Size = { panelW + (356.0f - panelW) * branchS, panelH + (344.0f - panelH) * branchS };
-		pseudoOS_.DrawBorder(w2Pos, w2Size, wfCol, 1.5f);
-		tr->Print("HackGen", "[VRAM: TELEMETRY BUS LINKED]", w2Pos.x + 8.0f, w2Pos.y + 6.0f, 10.0f, wfCol);
-
-		// ウィンドウ間のデータバス接続ライン
-		float busX = w1Pos.x + w1Size.x;
-		float busW = (panelX > busX) ? (panelX - busX) : 0.0f;
-		if (busW > 2.0f) {
-			pseudoOS_.DrawRect({ busX, panelY + 40.0f }, { busW, 1.0f }, { 0.20f, 0.85f, 0.50f, branchS * 0.50f });
-			pseudoOS_.DrawRect({ busX, panelY + 120.0f }, { busW, 1.0f }, { 0.20f, 0.85f, 0.50f, branchS * 0.50f });
-		}
-
-		// 3. ランダムサイバーグリッチスライス
+		// 2. ランダムサイバーグリッチスライス
 		uint32_t seed = static_cast<uint32_t>(consoleExitTimer_ * 1000.0f) + 123;
 		for (size_t gi = 0; gi < glitchSprites_.size(); ++gi) {
 			seed = seed * 1664525u + 1013904223u;

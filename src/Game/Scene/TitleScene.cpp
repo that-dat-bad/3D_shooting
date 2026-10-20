@@ -27,7 +27,9 @@ void TitleScene::SetCursorVisible(bool visible) {
 }
 
 void TitleScene::Initialize() {
+#ifdef _DEBUG
 	auto tStart = std::chrono::high_resolution_clock::now();
+#endif
 	SetCursorVisible(false); // ドローン視点・コンソール画面ではOSカーソルを完全非表示（項目7）
 	sceneID = SCENE::TITLE;
 	pseudoOS_.ResetSpritePool();
@@ -228,6 +230,7 @@ void TitleScene::Initialize() {
 	// UI初期化
 	InitializeUI(spriteCommon, fromCache);
 
+#ifdef _DEBUG
 	auto tEnd = std::chrono::high_resolution_clock::now();
 	double totalMs = std::chrono::duration<double, std::milli>(tEnd - tStart).count();
 	char buf[256];
@@ -240,6 +243,7 @@ void TitleScene::Initialize() {
 		fputs(buf, fp);
 		fclose(fp);
 	}
+#endif
 }
 
 void TitleScene::Update() {

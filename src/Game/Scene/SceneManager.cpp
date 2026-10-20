@@ -25,18 +25,21 @@ const char* SceneManager::GetSceneName(int sceneID) {
 }
 
 void SceneManager::AppendLog(const std::string& logText) {
+#ifdef _DEBUG
 	FILE* fp = nullptr;
 	if (fopen_s(&fp, "scene_transition.log", "a") == 0 && fp) {
 		fputs(logText.c_str(), fp);
 		fclose(fp);
 	}
 	OutputDebugStringA(logText.c_str());
+#endif
 }
 
 SceneManager::SceneManager(std::unique_ptr<AbstractSceneFactory> factory) 
 	: sceneFactory_(std::move(factory)) {
 	
-	// ログファイルの初期化（ヘッダー書き込み）
+#ifdef _DEBUG
+	// ログファイルの初期化（ヘッダー書き込み：Debugビルドのみ）
 	FILE* fp = nullptr;
 	if (fopen_s(&fp, "scene_transition.log", "w") == 0 && fp) {
 		std::time_t now = std::time(nullptr);
@@ -52,18 +55,23 @@ SceneManager::SceneManager(std::unique_ptr<AbstractSceneFactory> factory)
 		fclose(fp);
 	}
 
-	// 初期シーン生成
 	auto tStart = std::chrono::high_resolution_clock::now();
+#endif
+
+	// 初期シーン生成
 	currentScene = sceneFactory_->CreateScene(SCENE::TITLE);
 	currentScene->Initialize();
 	currentSceneID = SCENE::TITLE;
 	IScene::SetSceneID(SCENE::TITLE);
+
+#ifdef _DEBUG
 	auto tEnd = std::chrono::high_resolution_clock::now();
 	double initMs = std::chrono::duration<double, std::milli>(tEnd - tStart).count();
 
 	char buf[256];
 	snprintf(buf, sizeof(buf), "[SceneManager] Initial scene TITLE (0) initialized in %.2f ms (%.4f s)\n\n", initMs, initMs / 1000.0);
 	AppendLog(buf);
+#endif
 }
 
 SceneManager::~SceneManager() {
@@ -81,21 +89,27 @@ SceneManager::~SceneManager() {
 }
 
 void SceneManager::SwitchScene(int nextSceneID) {
+#ifdef _DEBUG
 	auto tTotalStart = std::chrono::high_resolution_clock::now();
+#endif
 	int prevSceneID = currentSceneID;
 
 	// 1. 直前のシーンの Finalize（状態退避）
+#ifdef _DEBUG
 	auto tFinStart = std::chrono::high_resolution_clock::now();
+#endif
 	if (currentScene != nullptr) {
 		currentScene->Finalize();
 		// 現在のシーンを破棄せず、次回のためにキャッシュプールに退避（D3D12リソースを保持）
 		scenePool_[currentSceneID] = std::move(currentScene);
 	}
+#ifdef _DEBUG
 	auto tFinEnd = std::chrono::high_resolution_clock::now();
 	double finalizeMs = std::chrono::duration<double, std::milli>(tFinEnd - tFinStart).count();
 
 	// 2. キャッシュプールから取り出し、未キャッシュなら初回生成
 	auto tRetStart = std::chrono::high_resolution_clock::now();
+#endif
 	auto it = scenePool_.find(nextSceneID);
 	bool fromCache = false;
 	if (it != scenePool_.end() && it->second != nullptr) {
@@ -105,20 +119,25 @@ void SceneManager::SwitchScene(int nextSceneID) {
 	} else {
 		currentScene = sceneFactory_->CreateScene(nextSceneID);
 	}
+#ifdef _DEBUG
 	auto tRetEnd = std::chrono::high_resolution_clock::now();
 	double retrieveMs = std::chrono::duration<double, std::milli>(tRetEnd - tRetStart).count();
 
 	// 3. 次のシーンの Initialize
 	auto tInitStart = std::chrono::high_resolution_clock::now();
+#endif
 	if (currentScene != nullptr) {
 		currentScene->Initialize();
 	}
+#ifdef _DEBUG
 	auto tInitEnd = std::chrono::high_resolution_clock::now();
 	double initializeMs = std::chrono::duration<double, std::milli>(tInitEnd - tInitStart).count();
+#endif
 
 	currentSceneID = nextSceneID;
 	IScene::SetSceneID(nextSceneID);
 
+#ifdef _DEBUG
 	auto tTotalEnd = std::chrono::high_resolution_clock::now();
 	double totalMs = std::chrono::duration<double, std::milli>(tTotalEnd - tTotalStart).count();
 
@@ -167,26 +186,34 @@ void SceneManager::SwitchScene(int nextSceneID) {
 	);
 
 	AppendLog(logBuf);
+#endif
 }
 
 void SceneManager::PrewarmAllScenes() {
+#ifdef _DEBUG
 	auto tStart = std::chrono::high_resolution_clock::now();
+#endif
 	std::vector<int> preloadIDs = { SCENE::STAGE, SCENE::GAMEOVER, SCENE::CLEAR };
+#ifdef _DEBUG
 	prewarmRecords_.clear();
 
 	std::string prewarmLog = 
 		"\n======================================================================\n"
 		"[Boot Prewarm] Initializing All Scenes in Background for 0ms Transition\n"
 		"======================================================================\n";
+#endif
 
 	for (int id : preloadIDs) {
 		if (scenePool_.find(id) == scenePool_.end() && id != currentSceneID) {
+#ifdef _DEBUG
 			auto sStart = std::chrono::high_resolution_clock::now();
+#endif
 			auto scene = sceneFactory_->CreateScene(id);
 			if (scene) {
 				scene->PrewarmAssets();
 				scenePool_[id] = std::move(scene);
 			}
+#ifdef _DEBUG
 			auto sEnd = std::chrono::high_resolution_clock::now();
 			double ms = std::chrono::duration<double, std::milli>(sEnd - sStart).count();
 
@@ -199,12 +226,14 @@ void SceneManager::PrewarmAllScenes() {
 			snprintf(buf, sizeof(buf), "  * Prewarmed Scene %-10s (ID: %d): %8.2f ms (%7.4f s)\n",
 				GetSceneName(id), id, ms, ms / 1000.0);
 			prewarmLog += buf;
+#endif
 		}
 	}
 
 	// 初期シーンが確実にタイトル画面であることを保証
 	IScene::SetSceneID(SCENE::TITLE);
 
+#ifdef _DEBUG
 	auto tEnd = std::chrono::high_resolution_clock::now();
 	totalPrewarmTimeMs_ = std::chrono::duration<double, std::milli>(tEnd - tStart).count();
 
@@ -216,6 +245,7 @@ void SceneManager::PrewarmAllScenes() {
 	prewarmLog += totalBuf;
 
 	AppendLog(prewarmLog);
+#endif
 }
 
 void SceneManager::Update() {
@@ -228,10 +258,12 @@ void SceneManager::Update() {
 		currentScene->Update();
 	}
 
+#ifdef USE_IMGUI
 	// F2キーでプロファイラウィンドウ開閉
 	if (Input::GetInstance()->TriggerKey(DIK_F2)) {
 		ToggleProfilerWindow();
 	}
+#endif
 
 #ifdef USE_IMGUI
 	// ファンクションキーによるデバッグシーン切り替えショートカット
@@ -305,11 +337,14 @@ void SceneManager::DrawUI() {
 		currentScene->DrawUI();
 	}
 
-	// 画面上部HUDオーバーレイの描画
+#ifdef _DEBUG
+	// 画面上部HUDオーバーレイの描画（Debugビルドのみ）
 	DrawOverlayHUD();
+#endif
 }
 
 void SceneManager::DrawOverlayHUD() {
+#ifdef _DEBUG
 	if (!showOverlayBanner_ && overlayBannerTimer_ <= 0.0f) {
 		return;
 	}
@@ -347,6 +382,7 @@ void SceneManager::DrawOverlayHUD() {
 			totalPrewarmTimeMs_ / 1000.0);
 		tr->Print("HackGen", line1, 16.0f, 16.0f, 16.0f, {0.3f, 0.9f, 1.0f, 0.95f});
 	}
+#endif
 }
 
 void SceneManager::DrawProfilerImGui() {

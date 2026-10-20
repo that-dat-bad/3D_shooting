@@ -175,6 +175,16 @@ void TitleScene::DrawOSPanel(const Vector2& pos, const Vector2& size, const MyMa
 }
 
 void TitleScene::UpdateOSDesktop(float dt, const Vector2& mousePos, bool isLDown, bool isLTrig) {
+	// ミッション選択モーダル展開中は、背後のデスクトップウィンドウへのクリック・ドラッグ・フォーカス切り替えを完全遮断
+	if (isMissionSelectModalOpen_) {
+		isLDown = false;
+		isLTrig = false;
+		activeWindowId_ = 0; // メインターミナル（ミッション選択）にフォーカス固定
+		for (auto& win : osWindows_) {
+			win.isDragging = false;
+		}
+	}
+
 	customCursorPos_ = mousePos;
 	if (cursorRippleTimer_ > 0.0f) {
 		cursorRippleTimer_ -= dt;
@@ -525,7 +535,7 @@ void TitleScene::DrawOSTaskbar() {
 	}
 
 	// 2. スタートボタン [ ⯈ DAWN_OS ]
-	bool smHover = (customCursorPos_.x >= 8.0f && customCursorPos_.x <= 114.0f && customCursorPos_.y >= 690.0f && customCursorPos_.y <= 718.0f);
+	bool smHover = !isMissionSelectModalOpen_ && (customCursorPos_.x >= 8.0f && customCursorPos_.x <= 114.0f && customCursorPos_.y >= 690.0f && customCursorPos_.y <= 718.0f);
 	Vector4 startBg = (isStartMenuOpen_ || smHover) ? Vector4{ 0.10f, 0.40f, 0.20f, 0.92f } : Vector4{ 0.03f, 0.14f, 0.07f, 0.90f };
 	Vector4 startLine = (isStartMenuOpen_ || smHover) ? Vector4{ 0.45f, 1.0f, 0.70f, 1.0f } : Vector4{ 0.25f, 0.85f, 0.50f, 0.85f };
 	if (menuEnterTimer_ > 0.0f) {
@@ -541,9 +551,9 @@ void TitleScene::DrawOSTaskbar() {
 		float tabH = 24.0f;
 		float tabY = tbY + 4.0f;
 
-		bool isAct = (activeWindowId_ == win.id && !win.isMinimized && win.isOpen);
+		bool isAct = !isMissionSelectModalOpen_ && (activeWindowId_ == win.id && !win.isMinimized && win.isOpen);
 		bool isMin = (win.isMinimized || !win.isOpen);
-		bool isHov = (customCursorPos_.x >= tabX && customCursorPos_.x <= tabX + tabW && customCursorPos_.y >= tabY && customCursorPos_.y <= tabY + tabH);
+		bool isHov = !isMissionSelectModalOpen_ && (customCursorPos_.x >= tabX && customCursorPos_.x <= tabX + tabW && customCursorPos_.y >= tabY && customCursorPos_.y <= tabY + tabH);
 
 		Vector4 tBg = isAct ? Vector4{ 0.08f, 0.35f, 0.18f, 0.95f }
 		            : (isMin ? Vector4{ 0.04f, 0.10f, 0.06f, 0.85f }
@@ -672,7 +682,7 @@ void TitleScene::DrawOSWindowCam(const OSWindow& win) {
 	};
 	Vector2 curSize = { win.size.x * smoothS, win.size.y * smoothS };
 
-	bool isActive = (activeWindowId_ == win.id);
+	bool isActive = !isMissionSelectModalOpen_ && (activeWindowId_ == win.id);
 	// メインウィンドウ (TitleScene_Menu.cpp) の重厚なミリタリーグリーンパレットに完全同期
 	Vector4 borderCol = isActive ? Vector4{ 0.22f, 0.88f, 0.48f, 0.95f * smoothS } : Vector4{ 0.18f, 0.82f, 0.45f, 0.85f * smoothS };
 	Vector4 titleBarBg = { 0.03f, 0.10f, 0.06f, 1.0f }; // メインウィンドウのヘッダー色と100%同一
@@ -714,6 +724,7 @@ void TitleScene::DrawOSWindowCam(const OSWindow& win) {
 
 	// ボタンホバー判定ラムダ
 	auto isBtnHov = [&](float bx, float by, float bw, float bh) {
+		if (isMissionSelectModalOpen_) return false;
 		return (customCursorPos_.x >= bx && customCursorPos_.x <= bx + bw &&
 		        customCursorPos_.y >= by && customCursorPos_.y <= by + bh);
 	};
@@ -951,7 +962,7 @@ void TitleScene::DrawOSWindowTelemetry(const OSWindow& win) {
 	};
 	Vector2 curSize = { win.size.x * smoothS, win.size.y * smoothS };
 
-	bool isActive = (activeWindowId_ == win.id);
+	bool isActive = !isMissionSelectModalOpen_ && (activeWindowId_ == win.id);
 	// メインウィンドウ (TitleScene_Menu.cpp) の重厚なミリタリーグリーンパレットに完全同期
 	Vector4 borderCol = isActive ? Vector4{ 0.22f, 0.88f, 0.48f, 0.95f * smoothS } : Vector4{ 0.18f, 0.82f, 0.45f, 0.85f * smoothS };
 	Vector4 titleBarBg = { 0.03f, 0.10f, 0.06f, 1.0f }; // メインウィンドウのヘッダー色と100%同一
@@ -993,6 +1004,7 @@ void TitleScene::DrawOSWindowTelemetry(const OSWindow& win) {
 
 	// ホバー判定ヘルパーラムダ
 	auto isBtnHov = [&](float bx, float by, float bw, float bh) {
+		if (isMissionSelectModalOpen_) return false;
 		return (customCursorPos_.x >= bx && customCursorPos_.x <= bx + bw &&
 		        customCursorPos_.y >= by && customCursorPos_.y <= by + bh);
 	};
@@ -1456,20 +1468,6 @@ void TitleScene::DrawOSDesktop() {
 	}
 	tr->Flush(); // ヘッダーテキストを先に描画
 
-	// ウィンドウ展開進行度（Staggered Launch: メインターミナル -> サブウィンドウ1 -> サブウィンドウ2 が順次立ち上がり）
-	if (menuEnterTimer_ > 0.0f) {
-		auto easeOutCubic = [](float t) {
-			float f = 1.0f - t;
-			return 1.0f - f * f * f;
-		};
-		float p0 = std::clamp((enterProg - 0.00f) / 0.60f, 0.0f, 1.0f);
-		float p1 = std::clamp((enterProg - 0.12f) / 0.60f, 0.0f, 1.0f);
-		float p2 = std::clamp((enterProg - 0.22f) / 0.60f, 0.0f, 1.0f);
-		if (osWindows_.size() > 0 && !osWindows_[0].isMinimized && osWindows_[0].isOpen) osWindows_[0].animScale = easeOutCubic(p0);
-		if (osWindows_.size() > 1 && !osWindows_[1].isMinimized && osWindows_[1].isOpen) osWindows_[1].animScale = easeOutCubic(p1);
-		if (osWindows_.size() > 2 && !osWindows_[2].isMinimized && osWindows_[2].isOpen) osWindows_[2].animScale = easeOutCubic(p2);
-	}
-
 	// 2. ウィンドウ描画（全ウィンドウが時間差なく完全に同時にアニメーション展開！）
 	for (int winId : windowZOrder_) {
 		if (winId >= 0 && winId < static_cast<int>(osWindows_.size())) {
@@ -1497,26 +1495,25 @@ void TitleScene::DrawOSDesktop() {
 	if (menuEnterTimer_ > 0.0f) {
 		for (size_t wi = 0; wi < osWindows_.size(); ++wi) {
 			const auto& win = osWindows_[wi];
-			float s = win.animScale;
-			if (s > 0.02f && s < 0.99f && win.isOpen && !win.isMinimized) {
-				// 走査線（VRAMバッファ書き込み演出）
-				float curH = win.size.y * s;
+			if (win.isOpen && !win.isMinimized) {
+				// 走査線（VRAMバッファ書き込み演出: 画面上から下へ一気に走査）
+				float curH = win.size.y * enterProg;
 				float scanY = win.pos.y + curH;
-				DrawOSRect({ win.pos.x, scanY - 1.0f }, { win.size.x, 2.0f }, { 0.45f, 1.0f, 0.70f, (1.0f - s) * 0.90f });
-				DrawOSRect({ win.pos.x, scanY - 4.0f }, { win.size.x, 8.0f }, { 0.20f, 0.85f, 0.50f, (1.0f - s) * 0.25f });
+				DrawOSRect({ win.pos.x, scanY - 1.0f }, { win.size.x, 2.0f }, { 0.45f, 1.0f, 0.70f, (1.0f - enterProg) * 0.90f });
+				DrawOSRect({ win.pos.x, scanY - 4.0f }, { win.size.x, 8.0f }, { 0.20f, 0.85f, 0.50f, (1.0f - enterProg) * 0.25f });
 
 				// 四隅のサイバーブラケット（高輝度ネオン発光）
 				const float bLen = 16.0f;
 				const float bThick = 2.0f;
-				Vector4 bCol = { 0.85f, 1.0f, 0.95f, (1.0f - s) * 0.95f };
+				Vector4 bCol = { 0.85f, 1.0f, 0.95f, (1.0f - enterProg) * 0.95f };
 				DrawOSRect({ win.pos.x, win.pos.y }, { bLen, bThick }, bCol);
 				DrawOSRect({ win.pos.x, win.pos.y }, { bThick, bLen }, bCol);
 				DrawOSRect({ win.pos.x + win.size.x - bLen, win.pos.y }, { bLen, bThick }, bCol);
 				DrawOSRect({ win.pos.x + win.size.x - bThick, win.pos.y }, { bThick, bLen }, bCol);
-				DrawOSRect({ win.pos.x, win.pos.y + curH - bThick }, { bLen, bThick }, bCol);
-				DrawOSRect({ win.pos.x, win.pos.y + curH - bLen }, { bThick, bLen }, bCol);
-				DrawOSRect({ win.pos.x + win.size.x - bLen, win.pos.y + curH - bThick }, { bLen, bThick }, bCol);
-				DrawOSRect({ win.pos.x + win.size.x - bThick, win.pos.y + curH - bLen }, { bThick, bLen }, bCol);
+				DrawOSRect({ win.pos.x, win.pos.y + win.size.y - bThick }, { bLen, bThick }, bCol);
+				DrawOSRect({ win.pos.x, win.pos.y + win.size.y - bLen }, { bThick, bLen }, bCol);
+				DrawOSRect({ win.pos.x + win.size.x - bLen, win.pos.y + win.size.y - bThick }, { bLen, bThick }, bCol);
+				DrawOSRect({ win.pos.x + win.size.x - bThick, win.pos.y + win.size.y - bLen }, { bThick, bLen }, bCol);
 			}
 		}
 	}
@@ -1557,8 +1554,8 @@ void TitleScene::UpdateMissionSelectModal(float dt, const Vector2& mousePos, boo
 		cursorRipplePos_ = mousePos;
 	}
 
-	// OSデスクトップ全体の更新（ウィンドウドラッグやタスクバー操作などを維持）
-	UpdateOSDesktop(dt, mousePos, isLDown, isLTrig);
+	// OSデスクトップ全体の更新（モーダル展開中はクリック・ドラッグ入力を遮断し、アニメーション更新のみ維持）
+	UpdateOSDesktop(dt, mousePos, false, false);
 
 	if (!isMissionSelectModalOpen_) {
 		return;

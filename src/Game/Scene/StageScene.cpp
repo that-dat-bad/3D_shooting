@@ -4,22 +4,31 @@ using namespace MyMath;
 using namespace StageSceneInternal;
 
 void StageScene::Initialize() {
+#ifdef _DEBUG
 	auto tStart = std::chrono::high_resolution_clock::now();
-	sceneID = SCENE::STAGE;
-
 	double assetsMs = 0.0;
 	bool ranAssets = false;
+#endif
+	sceneID = SCENE::STAGE;
+
 	if (!isAssetsInitialized_) {
+#ifdef _DEBUG
 		auto aStart = std::chrono::high_resolution_clock::now();
+#endif
 		InitializeAssets();
 		isAssetsInitialized_ = true;
+#ifdef _DEBUG
 		auto aEnd = std::chrono::high_resolution_clock::now();
 		assetsMs = std::chrono::duration<double, std::milli>(aEnd - aStart).count();
 		ranAssets = true;
+#endif
 	}
 
+#ifdef _DEBUG
 	auto rStart = std::chrono::high_resolution_clock::now();
+#endif
 	ResetGameplayState();
+#ifdef _DEBUG
 	auto rEnd = std::chrono::high_resolution_clock::now();
 	double resetMs = std::chrono::duration<double, std::milli>(rEnd - rStart).count();
 
@@ -37,13 +46,17 @@ void StageScene::Initialize() {
 		fputs(buf, fp);
 		fclose(fp);
 	}
+#endif
 }
 
 void StageScene::PrewarmAssets() {
 	if (!isAssetsInitialized_) {
+#ifdef _DEBUG
 		auto aStart = std::chrono::high_resolution_clock::now();
+#endif
 		InitializeAssets();
 		isAssetsInitialized_ = true;
+#ifdef _DEBUG
 		auto aEnd = std::chrono::high_resolution_clock::now();
 		double assetsMs = std::chrono::duration<double, std::milli>(aEnd - aStart).count();
 
@@ -56,6 +69,7 @@ void StageScene::PrewarmAssets() {
 			fputs(buf, fp);
 			fclose(fp);
 		}
+#endif
 	}
 }
 

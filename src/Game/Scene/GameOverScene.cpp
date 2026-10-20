@@ -33,7 +33,9 @@ GameOverScene::~GameOverScene() {
 
 void GameOverScene::PrewarmAssets() {
 	if (!isUIInitialized_) {
+#ifdef _DEBUG
 		auto tStart = std::chrono::high_resolution_clock::now();
+#endif
 		SpriteCommon* spriteCommon = SpriteCommon::GetInstance();
 
 		// 必須テクスチャのロード
@@ -184,6 +186,7 @@ void GameOverScene::PrewarmAssets() {
 
 		isUIInitialized_ = true;
 
+#ifdef _DEBUG
 		auto tEnd = std::chrono::high_resolution_clock::now();
 		double prewarmMs = std::chrono::duration<double, std::milli>(tEnd - tStart).count();
 		char buf[256];
@@ -195,11 +198,14 @@ void GameOverScene::PrewarmAssets() {
 			fputs(buf, fp);
 			fclose(fp);
 		}
+#endif
 	}
 }
 
 void GameOverScene::Initialize() {
+#ifdef _DEBUG
 	auto tStart = std::chrono::high_resolution_clock::now();
+#endif
 	sceneID = SCENE::GAMEOVER;
 	Input::GetInstance()->UnlockCursor();
 	selectionManager_.Clear();
@@ -233,6 +239,7 @@ void GameOverScene::Initialize() {
 	UITextRegistry::GetInstance()->Register("GameOver_BtnRetry", retryButton_.GetLabelText());
 	UITextRegistry::GetInstance()->Register("GameOver_BtnTitle", titleButton_.GetLabelText());
 
+#ifdef _DEBUG
 	auto tEnd = std::chrono::high_resolution_clock::now();
 	double totalMs = std::chrono::duration<double, std::milli>(tEnd - tStart).count();
 	char buf[256];
@@ -244,6 +251,7 @@ void GameOverScene::Initialize() {
 		fputs(buf, fp);
 		fclose(fp);
 	}
+#endif
 }
 
 void GameOverScene::Update() {

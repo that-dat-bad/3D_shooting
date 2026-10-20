@@ -33,7 +33,9 @@ ClearScene::~ClearScene() {
 
 void ClearScene::PrewarmAssets() {
 	if (!isUIInitialized_) {
+#ifdef _DEBUG
 		auto tStart = std::chrono::high_resolution_clock::now();
+#endif
 		SpriteCommon* spriteCommon = SpriteCommon::GetInstance();
 
 		// 必須テクスチャのロード
@@ -217,6 +219,7 @@ void ClearScene::PrewarmAssets() {
 
 		isUIInitialized_ = true;
 
+#ifdef _DEBUG
 		auto tEnd = std::chrono::high_resolution_clock::now();
 		double prewarmMs = std::chrono::duration<double, std::milli>(tEnd - tStart).count();
 		char buf[256];
@@ -228,11 +231,14 @@ void ClearScene::PrewarmAssets() {
 			fputs(buf, fp);
 			fclose(fp);
 		}
+#endif
 	}
 }
 
 void ClearScene::Initialize() {
+#ifdef _DEBUG
 	auto tStart = std::chrono::high_resolution_clock::now();
+#endif
 	sceneID = SCENE::CLEAR;
 	Input::GetInstance()->UnlockCursor();
 	selectionManager_.Clear();
@@ -295,6 +301,7 @@ void ClearScene::Initialize() {
 	UITextRegistry::GetInstance()->Register("Clear_BtnReplay", replayButton_.GetLabelText());
 	UITextRegistry::GetInstance()->Register("Clear_BtnTitle", titleButton_.GetLabelText());
 
+#ifdef _DEBUG
 	auto tEnd = std::chrono::high_resolution_clock::now();
 	double totalMs = std::chrono::duration<double, std::milli>(tEnd - tStart).count();
 	char buf[256];
@@ -306,6 +313,7 @@ void ClearScene::Initialize() {
 		fputs(buf, fp);
 		fclose(fp);
 	}
+#endif
 }
 
 void ClearScene::Update() {
