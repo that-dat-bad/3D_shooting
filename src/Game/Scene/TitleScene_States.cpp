@@ -473,6 +473,20 @@ void TitleScene::UpdateSortieState(float dt) {
 		sceneID = SCENE::STAGE; // 出撃演出完了後にステージへシームレス移行（項目1）
 	}
 
+	// 出撃シーケンス中もマウスカーソルの自由な移動を維持
+	Input* input = Input::GetInstance();
+	if (input) {
+		Vector2 mouseScaled = input->GetVirtualMousePosition(kScreenWidth, kScreenHeight);
+		customCursorPos_ = mouseScaled;
+		if (cursorRippleTimer_ > 0.0f) {
+			cursorRippleTimer_ -= dt;
+		}
+		if (input->TriggerMouse(0)) {
+			cursorRippleTimer_ = 0.30f;
+			cursorRipplePos_ = mouseScaled;
+		}
+	}
+
 	// 背景カメラをゆっくり進める
 	UpdateLocationCamera(CurrentLocation(), dt, true);
 
@@ -536,5 +550,9 @@ void TitleScene::StartSortieSequence() {
 	engineTestTimer_ = kSortieDuration;
 	SetCursorVisible(false); // 出撃開始と同時にOSカーソルを消去
 	// 非同期処理による軽量化：出撃演出ムービーの裏でバックグラウンドスレッドでステージリソースを非同期プリロード！
-	AsyncPreloadManager::GetInstance()->StartStagePreloadAsync();
+	std::string currentPath = MissionManager::GetInstance().GetCurrentFilePath();
+	if (currentPath.empty()) {
+		currentPath = "Resources/missions/mission00.json";
+	}
+	AsyncPreloadManager::GetInstance()->StartStagePreloadAsync(currentPath);
 }

@@ -100,9 +100,9 @@ void StageScene::CheckPartDestructionEvents() {
 					ejectForce = Multiply(-6.0f, flightModel_.GetRightDirection());
 				}
 
-				Model* mainModel = ModelManager::GetInstance()->FindModel("Resources/models/m21_wg.gltf");
+				Model* mainModel = ModelManager::GetInstance()->FindModel("Resources/models/m21.gltf");
 				if (!mainModel) {
-					mainModel = ModelManager::GetInstance()->FindModel("Resources/models/m21.gltf");
+					mainModel = ModelManager::GetInstance()->FindModel("Resources/models/m21_wg.gltf");
 				}
 				static const std::unordered_map<DamagePart, std::string> kPartNodeNameMap = {
 					{ DamagePart::Fuse, "Fuse" },

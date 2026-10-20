@@ -11,7 +11,7 @@ MissionManager& MissionManager::GetInstance() {
 }
 
 MissionManager::MissionManager() {
-	currentFilePath_ = "Resources/missions/mission01.json";
+	currentFilePath_ = "Resources/missions/mission00.json";
 }
 
 bool MissionManager::Load(const std::string& filepath) {
@@ -83,7 +83,7 @@ std::vector<std::string> MissionManager::GetMissionList() {
 
 	// 1つもミッションがない場合は、デフォルトミッションを生成してリストに加える
 	if (missions.empty()) {
-		std::string defaultPath = (missionDir / "mission01.json").string();
+		std::string defaultPath = (missionDir / "mission00.json").string();
 		CreateDefaultMission(defaultPath);
 		missions.push_back(defaultPath);
 	}
@@ -151,9 +151,7 @@ const std::vector<MissionEntry>& MissionManager::GetMissionEntries() {
 
 void MissionManager::CreateDefaultMissionManifest(const std::string& manifestPath) {
 	missionEntries_ = {
-		{ "[01]", "Resources/missions/mission01.json", "COMBINED STRIKE", "OP: DAWN BREAK", "空対空・空対地 統合防衛任務", false },
-		{ "[02]", "Resources/missions/mission1.json", "AIRSPACE DEFENSE", "OP: IRON SHIELD", "敵要撃部隊 要撃スクランブル", false },
-		{ "[03]", "Resources/missions/demo_5sec.json", "RAPID TEST", "OP: QUICK BENCH", "5秒間超短距離即応テスト", false }
+		{ "[00]", "Resources/missions/mission00.json", "TUTORIAL", "mission 00", "TUTORIAL", false }
 	};
 	SaveMissionManifest(manifestPath);
 	isManifestLoaded_ = true;
@@ -161,11 +159,13 @@ void MissionManager::CreateDefaultMissionManifest(const std::string& manifestPat
 
 void MissionManager::CreateDefaultMission(const std::string& filepath) {
 	currentMission_ = MissionData();
-	currentMission_.name = "Mission 01: Combined Strike";
-	currentMission_.description = "Destroy all target drones and ground defense installations.";
+	currentMission_.name = "TUTORIAL";
+	currentMission_.aliasName = "mission 00";
+	currentMission_.subTitle = "TUTORIAL";
+	currentMission_.description = "no description";
 	currentMission_.playerHP = 100.0f;
 	currentMission_.playerPosition = { 0.0f, 100.0f, 0.0f };
-	currentMission_.timeLimit = 300.0f;
+	currentMission_.timeLimit = 20.0f;
 	
 	// 空中目標
 	currentMission_.enemies = {};

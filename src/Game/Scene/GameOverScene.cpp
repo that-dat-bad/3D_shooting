@@ -92,7 +92,7 @@ void GameOverScene::PrewarmAssets() {
 		win1.size = { 356.0f, 260.0f };
 		win1.normalPos = win1.pos;
 		win1.normalSize = win1.size;
-		win1.titleBarHeight = 26.0f;
+		win1.titleBarHeight = 34.0f;
 		win1.isOpen = true;
 		win1.isMinimized = false;
 		win1.animScale = 0.0f;
@@ -109,7 +109,7 @@ void GameOverScene::PrewarmAssets() {
 		win2.size = { 356.0f, 344.0f };
 		win2.normalPos = win2.pos;
 		win2.normalSize = win2.size;
-		win2.titleBarHeight = 26.0f;
+		win2.titleBarHeight = 34.0f;
 		win2.isOpen = true;
 		win2.isMinimized = false;
 		win2.animScale = 0.0f;

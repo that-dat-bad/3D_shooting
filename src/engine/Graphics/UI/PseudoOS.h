@@ -29,7 +29,7 @@ public:
 		Vector2 size = { 0.0f, 0.0f };
 		Vector2 normalPos = { 0.0f, 0.0f };
 		Vector2 normalSize = { 0.0f, 0.0f };
-		float titleBarHeight = 30.0f;
+		float titleBarHeight = 34.0f;
 		bool isOpen = true;
 		bool isMinimized = false;
 		bool isDragging = false;

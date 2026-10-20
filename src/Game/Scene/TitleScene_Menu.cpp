@@ -269,28 +269,17 @@ void TitleScene::InitializeMenuCard(SpriteCommon* spriteCommon) {
 	// 2. ターミナルウィンドウ・タイトルバー背景パネル
 	menuHeaderPanel_.Initialize(spriteCommon);
 	menuHeaderPanel_.SetPosition({ cardX, cardY });
-	menuHeaderPanel_.SetSize({ cardWidth, 32.0f });
+	menuHeaderPanel_.SetSize({ cardWidth, 34.0f });
 	menuHeaderPanel_.SetBackgroundColor({ 0.03f, 0.10f, 0.06f, 1.0f }); // 重厚なダークグリーンのタイトルバー
 
 	// 3. タイトルバーのステータスLEDインジケーターランプ
 	headerLampSprite_ = std::make_unique<Sprite>();
 	headerLampSprite_->Initialize(spriteCommon, "assets/textures/white1x1.png");
 	headerLampSprite_->SetAnchorPoint({ 0.0f, 0.0f });
-	headerLampSprite_->SetPosition({ cardX + 14.0f, cardY + 12.0f });
+	headerLampSprite_->SetPosition({ cardX + 14.0f, cardY + 13.0f });
 	headerLampSprite_->SetSize({ 8.0f, 8.0f });
 	headerLampSprite_->SetColor({ 0.15f, 1.0f, 0.35f, 0.95f });
 	headerLampSprite_->Update();
-
-	// 4. タイトルバー右側のシステムステータスバッジ（誤解を招く飾りボタン [_][口][X] を廃止し、洗練されたOSステータス枠へ刷新）
-	const float badgeX = cardX + cardWidth - 110.0f;
-	const float badgeY = cardY + 7.0f;
-	const float badgeW = 96.0f;
-	const float badgeH = 18.0f;
-	addBorderLine({ badgeX, badgeY }, { badgeW, badgeH }, { 0.04f, 0.14f, 0.08f, 0.90f });
-	addBorderLine({ badgeX, badgeY }, { badgeW, 1.0f }, { 0.22f, 0.75f, 0.42f, 0.85f });
-	addBorderLine({ badgeX, badgeY + badgeH - 1.0f }, { badgeW, 1.0f }, { 0.22f, 0.75f, 0.42f, 0.85f });
-	addBorderLine({ badgeX, badgeY }, { 1.0f, badgeH }, { 0.22f, 0.75f, 0.42f, 0.85f });
-	addBorderLine({ badgeX + badgeW - 1.0f, badgeY }, { 1.0f, badgeH }, { 0.22f, 0.75f, 0.42f, 0.85f });
 
 	// 5. ウィンドウ外周境界線 (太さ 2px)
 	const MyMath::Vector4 borderColor = { 0.18f, 0.82f, 0.45f, 0.85f };
@@ -412,7 +401,7 @@ void TitleScene::UpdateMenuWindowPosition(const Vector2& newPos) {
 	menuHeaderPanel_.Update();
 
 	if (headerLampSprite_) {
-		headerLampSprite_->SetPosition({ menuWindowPos_.x + 14.0f, menuWindowPos_.y + 12.0f });
+		headerLampSprite_->SetPosition({ menuWindowPos_.x + 14.0f, menuWindowPos_.y + 13.0f });
 		headerLampSprite_->Update();
 	}
 
@@ -580,13 +569,28 @@ void TitleScene::DrawMenuCard() {
 		}
 	}
 
-	// タイトルバー右側のシステムステータス表示 (SEC: LV5 [OK])
-	const float badgeX = cardX + cardWidth - (isMissionSelectModalOpen_ ? 142.0f : 110.0f);
-	const float badgeY = cardY + 7.0f;
+	// タイトルバー右側のステータスバッジ
+	const float badgeX = cardX + cardWidth - 145.0f;
+	const float badgeY = cardY + 8.0f;
 	bool secBlink = (std::fmod(animTimer_, 1.2f) < 0.6f);
 	Vector4 ledColor = secBlink ? Vector4{ 0.35f, 1.0f, 0.65f, 1.0f } : Vector4{ 0.15f, 0.70f, 0.35f, 0.75f };
-	DrawOSRect({ badgeX + 7.0f, badgeY + 6.0f }, { 6.0f, 6.0f }, ledColor);
-	tr->Print("HackGen", "SEC:LV5 [OK]", badgeX + 18.0f, badgeY + 3.0f, 10.5f, { 0.45f, 1.0f, 0.70f, 0.95f });
+	DrawOSRect({ badgeX + 7.0f, badgeY + 5.0f }, { 6.0f, 6.0f }, ledColor);
+	tr->Print("HackGen", "SEC:LV5 [OK]", badgeX + 18.0f, badgeY + 2.0f, 10.5f, { 0.45f, 1.0f, 0.70f, 0.95f });
+
+	// 右上の [X] 戻る/最小化ボタン (ミッション選択ウィンドウと完全に同一の仕様)
+	const float closeX = cardX + cardWidth - 32.0f;
+	const float closeY = cardY + 6.0f;
+	const float closeW = 24.0f;
+	const float closeH = 22.0f;
+	bool isCloseHover = !isMissionSelectModalOpen_ &&
+	                    (customCursorPos_.x >= closeX && customCursorPos_.x <= closeX + closeW &&
+	                     customCursorPos_.y >= closeY && customCursorPos_.y <= closeY + closeH);
+	if (isCloseHover) {
+		DrawOSRect({ closeX, closeY }, { closeW, closeH }, { 0.88f, 0.15f, 0.18f, 0.95f });
+	} else {
+		DrawOSPanel({ closeX, closeY }, { closeW, closeH }, { 0.05f, 0.15f, 0.08f, 0.80f }, { 0.20f, 0.75f, 0.40f, 0.70f }, 1.0f);
+	}
+	tr->Print("HackGen", "X", closeX + closeW * 0.5f, closeY + 4.0f, 12.0f, isCloseHover ? Vector4{ 1.0f, 1.0f, 1.0f, 1.0f } : Vector4{ 0.45f, 1.0f, 0.70f, 0.95f }, { 0.5f, 0.0f });
 
 	// 作戦指令ヘッダーラベル - タイトルバー直下の独立行（ロゴの上に綺麗に独立配置）
 	tr->Print("HackGenRegular", "/// CLASSIFIED OPERATION DIRECTIVE ///", cardX + cardWidth * 0.5f, cardY + 44.0f, 11.5f, { 0.35f, 0.95f, 0.60f, 0.90f }, { 0.5f, 0.0f });

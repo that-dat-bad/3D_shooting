@@ -39,19 +39,16 @@ void PseudoOS::Initialize(SpriteCommon* spriteCommon, Theme theme) {
 	}
 	spritePoolIdx_ = 0;
 
-	// 専用カーソルスプライトの初期化（24個：プール枯渇と完全分離）
-	if (cursorSprites_.empty()) {
-		cursorSprites_.clear();
-		for (int i = 0; i < 24; ++i) {
-			auto sp = std::make_unique<Sprite>();
-			sp->Initialize(spriteCommon, "assets/textures/white1x1.png");
-			sp->SetAnchorPoint({ 0.0f, 0.0f });
-			sp->SetPosition({ 0.0f, 0.0f });
-			sp->SetSize({ 1.0f, 1.0f });
-			sp->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
-			sp->Update();
-			cursorSprites_.push_back(std::move(sp));
-		}
+	// 専用カーソルスプライトの初期化（64個：プール枯渇と完全分離）
+	while (cursorSprites_.size() < 64) {
+		auto sp = std::make_unique<Sprite>();
+		sp->Initialize(spriteCommon, "assets/textures/white1x1.png");
+		sp->SetAnchorPoint({ 0.0f, 0.0f });
+		sp->SetPosition({ 0.0f, 0.0f });
+		sp->SetSize({ 1.0f, 1.0f });
+		sp->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
+		sp->Update();
+		cursorSprites_.push_back(std::move(sp));
 	}
 }
 
@@ -336,29 +333,17 @@ void PseudoOS::Update(float dt, const Vector2& mousePos, bool isLDown, bool isLT
 			if (!winPtr || !winPtr->isOpen || winPtr->isMinimized) continue;
 			Window& win = *winPtr;
 
-			// タイトルバー右上のボタン判定 [_] [口] [X]
-			float closeX = win.pos.x + win.size.x - 24.0f;
-			float maxmX  = closeX - 22.0f;
-			float miniX  = maxmX - 22.0f;
-			float btnY   = win.pos.y + 4.0f;
-			float btnW   = 20.0f;
-			float btnH   = win.titleBarHeight - 8.0f;
+			// タイトルバー右上のボタン判定 [X] (タスクバーへ最小化)
+			float closeW = 24.0f;
+			float closeH = 22.0f;
+			float closeX = win.pos.x + win.size.x - 32.0f;
+			float closeY = win.pos.y + 6.0f;
 
-			if (my >= btnY && my <= btnY + btnH) {
-				if (mx >= closeX && mx <= closeX + btnW) {
-					// [X] 閉じる
-					win.isOpen = false;
-					break;
-				} else if (mx >= maxmX && mx <= maxmX + btnW) {
-					// [口] 定位置リセット
-					win.pos = win.normalPos;
-					BringWindowToFront(win.id);
-					break;
-				} else if (mx >= miniX && mx <= miniX + btnW) {
-					// [_] 最小化
-					win.isMinimized = true;
-					break;
-				}
+			if (my >= closeY && my <= closeY + closeH && mx >= closeX && mx <= closeX + closeW) {
+				win.isMinimized = true;
+				cursorRippleTimer_ = 0.30f;
+				cursorRipplePos_ = { mx, my };
+				break;
 			}
 
 			// タイトルバードラッグ開始
@@ -445,26 +430,38 @@ void PseudoOS::DrawWindowFrame(Window& win) {
 	// 2. タイトルバー
 	float tbH = win.titleBarHeight * smoothS;
 	DrawRect(curPos, { curSize.x, tbH }, titleBarBg);
-	DrawRect({ curPos.x, curPos.y + tbH - 1.0f }, { curSize.x, 1.0f }, borderCol);
+	DrawRect({ curPos.x, curPos.y + tbH - 2.0f }, { curSize.x, 2.0f }, borderCol);
 
 	if (isActive) {
 		DrawRect(curPos, { curSize.x, 2.0f }, colHighlight_); // 上端ネオンアクセントライン
-		DrawRect({ curPos.x + 8.0f, curPos.y + 9.0f }, { 6.0f, 6.0f }, colLedActive_); // 高輝度LED
-		tr->Print("HackGen", "[FOCUS] " + win.title, curPos.x + 18.0f, curPos.y + 6.0f, 11.5f * smoothS, colHighlight_);
+		DrawRect({ curPos.x + 14.0f, curPos.y + 13.0f }, { 8.0f, 8.0f }, colLedActive_); // 高輝度LED
+		tr->Print("HackGen", "[FOCUS] " + win.title, curPos.x + 28.0f, curPos.y + 9.0f, 11.5f * smoothS, colHighlight_);
 	} else {
-		DrawRect({ curPos.x + 8.0f, curPos.y + 9.0f }, { 6.0f, 6.0f }, { colSecondary_.x * 0.5f, colSecondary_.y * 0.5f, colSecondary_.z * 0.5f, 0.45f });
-		tr->Print("HackGen", "[IDLE]  " + win.title, curPos.x + 18.0f, curPos.y + 6.0f, 11.5f * smoothS, colSecondary_);
+		DrawRect({ curPos.x + 14.0f, curPos.y + 13.0f }, { 8.0f, 8.0f }, { colSecondary_.x * 0.5f, colSecondary_.y * 0.5f, colSecondary_.z * 0.5f, 0.45f });
+		tr->Print("HackGen", "[IDLE]  " + win.title, curPos.x + 28.0f, curPos.y + 9.0f, 11.5f * smoothS, colSecondary_);
 	}
 
-	// 3. タイトルバー右上のボタン [_] [口] [X]
-	const float btnY = curPos.y + 5.0f;
-	const float closeX = curPos.x + curSize.x - 24.0f;
-	const float maxmX  = closeX - 22.0f;
-	const float miniX  = maxmX - 22.0f;
+	// 3. タイトルバー右側のステータスバッジ ＆ [X] ボタン (ミッション選択ウィンドウと同一仕様)
+	const float closeX = curPos.x + curSize.x - 32.0f;
+	const float closeY = curPos.y + 6.0f;
+	const float closeW = 24.0f;
+	const float closeH = 22.0f;
+	const float badgeX = curPos.x + curSize.x - 145.0f;
+	const float badgeY = curPos.y + 8.0f;
 
-	tr->Print("HackGen", "[_]", miniX, btnY + 1.0f, 10.5f, colSecondary_);
-	tr->Print("HackGen", "[口]", maxmX, btnY + 1.0f, 10.5f, colSecondary_);
-	tr->Print("HackGen", "[X]", closeX, btnY + 1.0f, 10.5f, { 1.0f, 0.35f, 0.30f, 0.95f });
+	bool secBlink = (std::fmod(animTimer_, 1.2f) < 0.6f);
+	Vector4 ledColor = secBlink ? colLedActive_ : Vector4{ colSecondary_.x * 0.7f, colSecondary_.y * 0.7f, colSecondary_.z * 0.7f, 0.75f };
+	DrawRect({ badgeX + 7.0f, badgeY + 5.0f }, { 6.0f, 6.0f }, ledColor);
+	tr->Print("HackGen", "SEC:LV5 [OK]", badgeX + 18.0f, badgeY + 2.0f, 10.5f, colHighlight_);
+
+	bool isCloseHover = (cursorPos_.x >= closeX && cursorPos_.x <= closeX + closeW &&
+	                     cursorPos_.y >= closeY && cursorPos_.y <= closeY + closeH);
+	if (isCloseHover) {
+		DrawRect({ closeX, closeY }, { closeW, closeH }, { 0.88f, 0.15f, 0.18f, 0.95f });
+	} else {
+		DrawPanel({ closeX, closeY }, { closeW, closeH }, { 0.05f, 0.15f, 0.08f, 0.80f }, { 0.20f, 0.75f, 0.40f, 0.70f }, 1.0f);
+	}
+	tr->Print("HackGen", "X", closeX + closeW * 0.5f, closeY + 4.0f, 12.0f, isCloseHover ? Vector4{ 1.0f, 1.0f, 1.0f, 1.0f } : colHighlight_, { 0.5f, 0.0f });
 
 	// 4. ウィンドウ個別コンテンツ描画
 	if (win.onDrawContent) {
@@ -609,8 +606,30 @@ void PseudoOS::DrawCustomCursor() {
 	auto drawCursorRect = [&](const Vector2& pos, const Vector2& size, const Vector4& color) {
 		if (curIdx >= cursorSprites_.size()) { return; }
 		auto& sp = cursorSprites_[curIdx++];
+		sp->SetBlendMode(BlendMode::kNormal);
 		sp->SetPosition(pos);
+		sp->SetAnchorPoint({ 0.0f, 0.0f });
 		sp->SetSize(size);
+		sp->SetRotation(0.0f);
+		sp->SetColor(color);
+		sp->Update();
+		sp->Draw();
+	};
+
+	auto drawCursorLine = [&](const Vector2& p1, const Vector2& p2, float thickness, const Vector4& color) {
+		if (curIdx >= cursorSprites_.size()) { return; }
+		float dx = p2.x - p1.x;
+		float dy = p2.y - p1.y;
+		float length = std::sqrt(dx * dx + dy * dy);
+		if (length < 0.001f) return;
+
+		float angle = std::atan2(dy, dx);
+		auto& sp = cursorSprites_[curIdx++];
+		sp->SetBlendMode(BlendMode::kNormal);
+		sp->SetPosition(p1);
+		sp->SetAnchorPoint({ 0.0f, 0.5f });
+		sp->SetSize({ length, thickness });
+		sp->SetRotation(angle);
 		sp->SetColor(color);
 		sp->Update();
 		sp->Draw();
@@ -628,35 +647,36 @@ void PseudoOS::DrawCustomCursor() {
 		drawCursorRect({ cursorRipplePos_.x + rRad - 1.5f, cursorRipplePos_.y - rRad }, { 1.5f, rRad * 2.0f }, ringCol);
 	}
 
-	// 2. カスタムサイバーカーソル（テーマカラー適応）
+	// 2. 三角形カスタムサイバーカーソル（テーマカラー適応）
+	// P0: (mx, my) 先端
+	// P1: (mx + 7.0f, my + 22.0f) 下端頂点
+	// P2: (mx + 22.0f, my + 7.0f) 右端頂点
 	const Vector4 kBlackEdge = { 0.0f, 0.0f, 0.0f, 0.95f };
 	const Vector4 kBody = colPrimary_;
-	const Vector4 kCore = colHighlight_;
+	const Vector4 kEdge = colHighlight_;
+	const Vector4 kCore = Vector4{ 1.0f, 1.0f, 1.0f, 1.0f };
 
-	// 黒縁
-	drawCursorRect({ mx, my }, { 2.0f, 18.0f }, kBlackEdge);
-	drawCursorRect({ mx + 1.0f, my + 1.0f }, { 13.0f, 2.0f }, kBlackEdge);
-	drawCursorRect({ mx + 2.0f, my + 2.0f }, { 12.0f, 12.0f }, kBlackEdge);
+	// 2.1 外側黒アウトライン
+	drawCursorLine({ mx - 0.5f, my - 0.5f }, { mx + 22.5f, my + 6.5f }, 3.5f, kBlackEdge);
+	drawCursorLine({ mx - 0.5f, my - 0.5f }, { mx + 6.5f, my + 22.5f }, 3.5f, kBlackEdge);
+	drawCursorLine({ mx + 6.5f, my + 22.5f }, { mx + 22.5f, my + 6.5f }, 3.5f, kBlackEdge);
 
-	// 本体
-	drawCursorRect({ mx + 1.0f, my + 1.0f }, { 2.0f, 15.0f }, kBody);
-	drawCursorRect({ mx + 2.0f, my + 2.0f }, { 10.0f, 2.0f }, kBody);
-	drawCursorRect({ mx + 3.0f, my + 3.0f }, { 8.0f, 8.0f }, kBody);
-	drawCursorRect({ mx + 1.0f, my + 1.0f }, { 2.0f, 4.0f }, kCore);
-
-	// 3. 先端照準レティクル
-	Vector4 reticleCol = { colPrimary_.x, colPrimary_.y, colPrimary_.z, 0.85f };
-	drawCursorRect({ mx - 7.0f, my }, { 5.0f, 1.0f }, reticleCol);
-	drawCursorRect({ mx + 5.0f, my }, { 5.0f, 1.0f }, reticleCol);
-	drawCursorRect({ mx, my - 7.0f }, { 1.0f, 5.0f }, reticleCol);
-	drawCursorRect({ mx, my + 5.0f }, { 1.0f, 5.0f }, reticleCol);
-
-	// 4. カーソル座標HUD
-	if (mx >= 0.0f && mx <= kScreenWidth && my >= 0.0f && my <= kScreenHeight) {
-		char locBuf[32];
-		snprintf(locBuf, sizeof(locBuf), "[%d,%d]", static_cast<int>(mx), static_cast<int>(my));
-		tr->Print("HackGen", locBuf, mx + 16.0f, my + 14.0f, 9.5f, colSecondary_);
+	// 2.2 ソリッド塗りつぶし（スキャンラインスライシング）
+	for (int y = 0; y <= 22; ++y) {
+		float fy = static_cast<float>(y);
+		float x1 = fy * (7.0f / 22.0f);
+		float x2 = (fy <= 7.0f) ? (fy * (22.0f / 7.0f)) : (22.0f - (fy - 7.0f) * (15.0f / 15.0f));
+		float w = (std::max)(1.0f, x2 - x1);
+		drawCursorRect({ mx + x1, my + fy }, { w, 1.2f }, kBody);
 	}
+
+	// 2.3 内側エッジライン
+	drawCursorLine({ mx, my }, { mx + 22.0f, my + 7.0f }, 1.5f, kEdge);
+	drawCursorLine({ mx, my }, { mx + 7.0f, my + 22.0f }, 1.5f, kEdge);
+	drawCursorLine({ mx + 7.0f, my + 22.0f }, { mx + 22.0f, my + 7.0f }, 1.5f, kEdge);
+
+	// 2.4 先端コア
+	drawCursorRect({ mx, my }, { 2.5f, 2.5f }, kCore);
 }
 
 void PseudoOS::PlayWindowOpenAnimation(float duration) {

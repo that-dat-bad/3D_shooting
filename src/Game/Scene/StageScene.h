@@ -239,6 +239,7 @@ private:
 		pauseCircleSpritePoolIndex_ = 0;
 	}
 	void DrawPauseSolidRect(const Vector2& pos, const Vector2& size, const MyMath::Vector4& color, BlendMode blend = BlendMode::kNormal);
+	void DrawPauseLine(const Vector2& p1, const Vector2& p2, float thickness, const MyMath::Vector4& color, BlendMode blend = BlendMode::kNormal);
 	void DrawPauseGlowOval(const Vector2& center, const Vector2& size, const MyMath::Vector4& color, BlendMode blend = BlendMode::kAdd);
 	void DrawPauseBorder(const Vector2& pos, const Vector2& size, const MyMath::Vector4& color, float thickness = 1.5f);
 	void DrawPausePanel(const Vector2& pos, const Vector2& size, const MyMath::Vector4& bgCol, const MyMath::Vector4& borderCol, float thickness = 1.5f);

@@ -24,12 +24,18 @@ void StageScene::UpdateFlightControls(float gameDeltaTime) {
 	}
 
 	// ============================
-	// プレイヤー入力 → FlightModel（ゲームオーバー中は操作遮断）
+	// プレイヤー入力 → FlightModel（ゲームオーバー中・出撃演出中は操作遮断）
 	// ============================
 	Input* input = Input::GetInstance();
 	float finalPitch = 0.0f;
 	float finalRoll = 0.0f;
 	float finalYaw = 0.0f;
+
+	if (sortieIntroTimer_ < sortieIntroDuration_) {
+		flightModel_.SetControlInput(0.0f, 0.0f, 0.0f);
+		flightModel_.SetThrottleInput(0.0f);
+		return;
+	}
 
 	if (!isGameOver_) {
 		// --- スロットル ---
@@ -359,6 +365,11 @@ void StageScene::UpdateFlightAndEffects(float gameDeltaTime) {
 // 戦闘・敵・ミッション・当たり判定更新
 // ============================================================
 void StageScene::UpdateCombatAndMission(float gameDeltaTime) {
+	// ブリーフィング中のSPACEキー入力待機中は戦闘処理・敵更新・目標評価を完全停止
+	if (combatBootSequence_.IsWaitingForSpace()) {
+		return;
+	}
+
 	if (gameDeltaTime > 0.0001f) {
 		gunpod_.Update(gameDeltaTime);
 		bulletManager_.Update(gameDeltaTime);
@@ -423,12 +434,18 @@ void StageScene::UpdateCamera(float gameDeltaTime) {
 	aircraftObject_->Update();
 
 	if (sortieIntroTimer_ < sortieIntroDuration_) {
-		sortieIntroTimer_ += gameDeltaTime;
 		combatBootSequence_.Update(gameDeltaTime);
-		float introProg = std::clamp(sortieIntroTimer_ / sortieIntroDuration_, 0.0f, 1.0f);
 
-		float boostSpeed = 22.0f + 28.0f * (1.0f - std::exp(-introProg * 2.2f));
-		flightModel_.SetVelocity(Multiply(boostSpeed, flightModel_.GetForwardDirection()));
+		if (combatBootSequence_.IsWaitingForSpace()) {
+			sortieIntroTimer_ = 0.0f;
+			flightModel_.SetVelocity({ 0.0f, 0.0f, 0.0f });
+		} else {
+			sortieIntroTimer_ = combatBootSequence_.GetTimer();
+			float introProg = std::clamp(sortieIntroTimer_ / sortieIntroDuration_, 0.0f, 1.0f);
+
+			float boostSpeed = 22.0f + 28.0f * (1.0f - std::exp(-introProg * 2.2f));
+			flightModel_.SetVelocity(Multiply(boostSpeed, flightModel_.GetForwardDirection()));
+		}
 
 		Vector3 forward = flightModel_.GetForwardDirection();
 		Vector3 right = flightModel_.GetRightDirection();

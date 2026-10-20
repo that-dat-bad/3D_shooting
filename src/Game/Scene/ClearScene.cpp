@@ -71,7 +71,7 @@ void ClearScene::PrewarmAssets() {
 		win1.size = { 346.0f, 300.0f };
 		win1.normalPos = win1.pos;
 		win1.normalSize = win1.size;
-		win1.titleBarHeight = 26.0f;
+		win1.titleBarHeight = 34.0f;
 		win1.isOpen = true;
 		win1.isMinimized = false;
 		win1.animScale = 0.0f;
@@ -88,7 +88,7 @@ void ClearScene::PrewarmAssets() {
 		win2.size = { 346.0f, 320.0f };
 		win2.normalPos = win2.pos;
 		win2.normalSize = win2.size;
-		win2.titleBarHeight = 26.0f;
+		win2.titleBarHeight = 34.0f;
 		win2.isOpen = true;
 		win2.isMinimized = false;
 		win2.animScale = 0.0f;
@@ -105,7 +105,7 @@ void ClearScene::PrewarmAssets() {
 		win3.size = { 338.0f, 632.0f };
 		win3.normalPos = win3.pos;
 		win3.normalSize = win3.size;
-		win3.titleBarHeight = 26.0f;
+		win3.titleBarHeight = 34.0f;
 		win3.isOpen = true;
 		win3.isMinimized = false;
 		win3.animScale = 0.0f;

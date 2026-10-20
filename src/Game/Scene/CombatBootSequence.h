@@ -70,6 +70,12 @@ public:
 	/// @brief 現在の演出タイマー取得
 	float GetTimer() const { return timer_; }
 
+	/// @brief ブリーフィング中、SPACEキー入力待ち状態か
+	bool IsWaitingForSpace() const { return isWaitingForSpace_; }
+
+	/// @brief カーソル位置設定（ブリーフィング時のボタンホバー判定用）
+	void SetCursorPos(const Vector2& pos) { cursorPos_ = pos; }
+
 	/// @brief 黒フェードの現在のアルファ値（0.0f〜1.0f）
 	float GetFadeAlpha() const { return fadeAlpha_; }
 
@@ -102,12 +108,24 @@ private:
 	std::unique_ptr<Sprite> rectSprite_;    ///< ライン・矩形描画用
 	std::unique_ptr<Sprite> ringSprite_;    ///< 円形リング描画用
 
+	// スプライトプール（複数Rect/Line同時描画時のCBV競合解消）
+	std::vector<std::unique_ptr<Sprite>> bootSpritePool_;
+	size_t bootSpritePoolIndex_ = 0;
+	Sprite* GetBootSprite();
+
+	std::vector<std::unique_ptr<Sprite>> bootCirclePool_;
+	size_t bootCirclePoolIndex_ = 0;
+	Sprite* GetBootCircleSprite();
+
 	// サウンドデータ
 	SoundData voiceData_{};
 	bool voicePlayed_ = false;
 
 	// タイマー管理
 	float timer_ = 0.0f;
+	float briefingTimer_ = 0.0f;                  ///< ブリーフィング中のアニメーションタイマー
+	bool isWaitingForSpace_ = false;              ///< SPACEキーでの出撃待機中フラグ
+	Vector2 cursorPos_ = { -999.0f, -999.0f };    ///< ブリーフィング中マウス座標
 	static constexpr float kDuration = 5.20f;      ///< 演出の総時間（秒: 作戦ブリーフィング＋戦闘起動＋操縦権移行）
 	static constexpr float kQuickDuration = 0.90f; ///< リトライ時高速演出の総時間（秒）
 	bool isQuickMode_ = false;                    ///< リトライ用高速ブートフラグ

@@ -8,7 +8,7 @@
 /// @brief 機体の全体・ビジュアル設定
 struct AircraftGeneralConfig {
 	std::string name = "MiG-21 Fishbed";
-	std::string modelPath = "Resources/models/m21_wg.gltf";
+	std::string modelPath = "Resources/models/m21.gltf";
 	float environmentCoefficient = 0.45f;
 	float specularIntensity = 1.35f;
 	float shininess = 48.0f;

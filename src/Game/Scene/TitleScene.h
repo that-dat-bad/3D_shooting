@@ -158,7 +158,7 @@ private:
 		Vector2 size = { 0.0f, 0.0f };
 		Vector2 normalPos = { 0.0f, 0.0f };   ///< 復元時の通常位置
 		Vector2 normalSize = { 0.0f, 0.0f };  ///< 復元時の通常サイズ
-		float titleBarHeight = 26.0f;
+		float titleBarHeight = 34.0f;
 		bool isOpen = true;
 		bool isMinimized = false;
 		bool isDragging = false;

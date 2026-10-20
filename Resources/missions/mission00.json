@@ -1,0 +1,28 @@
+{
+    "name": "TUTORIAL",
+    "aliasName": "mission 00",
+    "subTitle": "TUTORIAL",
+    "difficulty": "TUTORIAL",
+    "areaName": "TRAINING GROUNDS",
+    "description": "no description",
+    "playerHP": 100.0,
+    "playerPosition": {
+        "x": 0.0,
+        "y": 100.0,
+        "z": 0.0
+    },
+    "timeLimit": 20.0,
+    "enemies": [],
+    "groundEnemies": [],
+    "objectives": [
+        {
+            "name": "Tutorial",
+            "description": "no description",
+            "type": "DestroyAll",
+            "isPrimary": true,
+            "status": "Active"
+        }
+    ],
+    "triggers": [],
+    "waypointPaths": []
+}

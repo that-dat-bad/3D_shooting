@@ -123,7 +123,7 @@ void StageScene::InitializeAssets() {
 			DamagePart::Tail, DamagePart::Rudder, DamagePart::Elevator0, DamagePart::Elevator1
 		};
 		for (auto p : parts) {
-			aircraftVisualModel_.SetModelForPart(p, "Resources/models/m21_wg.gltf");
+			aircraftVisualModel_.SetModelForPart(p, "Resources/models/m21.gltf");
 		}
 	}
 
@@ -224,7 +224,7 @@ void StageScene::ResetGameplayState() {
 	// マウスエイムコントローラ
 	mouseAimController_.Initialize();
 	mouseAimEnabled_ = true;
-	Input::GetInstance()->LockCursor();
+	Input::GetInstance()->UnlockCursor();
 
 	// 武装・弾丸
 	gunpod_.Initialize(gunpodData);
@@ -234,7 +234,7 @@ void StageScene::ResetGameplayState() {
 	auto& missionManager = MissionManager::GetInstance();
 	std::string loadPath = missionManager.GetCurrentFilePath();
 	if (loadPath.empty()) {
-		loadPath = "Resources/missions/mission01.json";
+		loadPath = "Resources/missions/mission00.json";
 	}
 	if (!AsyncPreloadManager::GetInstance()->ApplyPreloadedMission(missionManager)) {
 		missionManager.Load(loadPath);
@@ -305,6 +305,16 @@ void StageScene::ResetGameplayState() {
 	combatBootSequence_.Start();
 	sortieIntroDuration_ = combatBootSequence_.GetCurrentDuration();
 	sortieIntroTimer_ = 0.0f;
+	if (combatBootSequence_.IsWaitingForSpace()) {
+		Input::GetInstance()->UnlockCursor();
+		const float screenW = static_cast<float>(WinApp::kClientWidth);
+		const float screenH = static_cast<float>(WinApp::kClientHeight);
+		customCursorPos_ = Input::GetInstance()->GetVirtualMousePosition(screenW, screenH);
+		combatBootSequence_.SetCursorPos(customCursorPos_);
+		cursorRippleTimer_ = 0.0f;
+	} else {
+		Input::GetInstance()->LockCursor();
+	}
 
 	// HUDリセット
 	hud_.SetWarningColorMode(false);
@@ -328,6 +338,24 @@ void StageScene::Update() {
 		return;
 	}
 
+	// ブリーフィング中（SPACE/クリック入力待機中）のマウス座標・波紋・アンロック更新
+	if (combatBootSequence_.IsWaitingForSpace()) {
+		if (input) {
+			input->UnlockCursor();
+			const float screenW = static_cast<float>(WinApp::kClientWidth);
+			const float screenH = static_cast<float>(WinApp::kClientHeight);
+			customCursorPos_ = input->GetVirtualMousePosition(screenW, screenH);
+			combatBootSequence_.SetCursorPos(customCursorPos_);
+			if (cursorRippleTimer_ > 0.0f) {
+				cursorRippleTimer_ -= kDeltaTime;
+			}
+			if (input->TriggerMouse(0)) {
+				cursorRippleTimer_ = 0.30f;
+				cursorRipplePos_ = customCursorPos_;
+			}
+		}
+	}
+
 	// ゲームプレイ中のみポーズ可能（出撃イントロ中・ゲームオーバー演出中・クリア演出中は作動させない）
 	if (IsGameplayActive()) {
 		if (input && (input->TriggerKey(DIK_ESCAPE) || input->TriggerKey(DIK_P))) {
@@ -336,12 +364,17 @@ void StageScene::Update() {
 		}
 	}
 
-	// ミッション制限時間の更新
-	if (!isGameOver_ && !isMissionCleared_) {
+	// ミッション制限時間の更新 (出撃演出・ブリーフィング完了後の実プレイ中のみ減算)
+	if (IsGameplayActive()) {
 		remainingTime_ -= kDeltaTime;
 		if (remainingTime_ <= 0.0f) {
 			remainingTime_ = 0.0f;
-			TriggerGameOver();
+			if (enemyManager_.GetTotalCount() == 0) {
+				// 敵が存在しない訓練・チュートリアルでは制限時間経過でミッション達成！
+				TriggerGameClear();
+			} else {
+				TriggerGameOver();
+			}
 		}
 
 		int minutes = static_cast<int>(remainingTime_) / 60;
@@ -394,16 +427,14 @@ void StageScene::Draw() {
 	// 部位破壊対応ビジュアルモデルの描画
 	// 【戦闘モード起動演出（自機専用スキャン波形マテリアライズ・パイプライン）】
 	if (!combatBootSequence_.IsFinished() && !combatBootSequence_.IsQuickMode()) {
-		float dur = combatBootSequence_.GetCurrentDuration();
-		float bootT = std::clamp(combatBootSequence_.GetTimer() / (std::max)(dur, 0.001f), 0.0f, 1.0f);
+		float timer = combatBootSequence_.GetTimer();
 
-		if (bootT < 0.12f) {
-			// 1. 【無（完全不可視・ステルス）フェーズ】
-			// 起動開始前（作戦音声第一声）は完全不可視
-		} else if (bootT < 0.85f) {
+		if (timer < 2.00f) {
+			// 1. 【作戦ブリーフィングフェーズ】起動開始前は待機（完全不可視）
+		} else if (timer < 4.50f) {
 			// 2. 【スキャン波形マテリアライズフェーズ（機体中心から広がる波紋に沿ってピクセル単位で構築）】
 			// 機体中心からスキャン波形が外側へ伝播：[無(不可視) -> ネオンワイヤー＆波形パルス -> 3D実写装甲]
-			float scanProg = std::clamp((bootT - 0.12f) / 0.73f, 0.0f, 1.0f);
+			float scanProg = std::clamp((timer - 2.00f) / 2.50f, 0.0f, 1.0f);
 
 			combatBootSequence_.BeginAircraftScanDraw(aircraftVisualModel_, scanProg);
 			aircraftVisualModel_.Draw();
@@ -456,6 +487,12 @@ void StageScene::DrawUI() {
 	// 3. AC6スタイル「メインシステム、戦闘モード起動...」ブートUI描画（最前面）
 	if (sortieIntroTimer_ < sortieIntroDuration_) {
 		combatBootSequence_.DrawBootUI();
+	}
+
+	// 3.5. ブリーフィング中のカスタムサイバーカーソル描画（最前面）
+	if (combatBootSequence_.IsWaitingForSpace() && !isPaused_) {
+		ResetPauseSpritePool();
+		DrawPauseCustomCursor();
 	}
 
 	// 4. ゲームオーバー / ステージクリア演出UI描画（最前面）
@@ -628,11 +665,27 @@ void StageScene::UpdatePauseMenu() {
 	const float winW = 500.0f;
 	const float winH = 430.0f;
 
-	// ウィンドウドラッグ処理
+	const float closeW = 24.0f;
+	const float closeH = 22.0f;
+	const float closeX = pauseWinPos_.x + winW - 32.0f;
+	const float closeY = pauseWinPos_.y + 6.0f;
+
+	// 右上 [X] ボタンクリックで再開 (RESUME)
+	if (isLTrig &&
+	    customCursorPos_.x >= closeX && customCursorPos_.x <= closeX + closeW &&
+	    customCursorPos_.y >= closeY && customCursorPos_.y <= closeY + closeH) {
+		cursorRippleTimer_ = 0.30f;
+		cursorRipplePos_ = customCursorPos_;
+		SetPaused(false);
+		return;
+	}
+
+	// ウィンドウドラッグ処理 (タイトルバーのドラッグ。[X]ボタン領域は除外)
 	if (isLDown) {
 		if (!pauseIsDragging_ && isLTrig) {
 			if (customCursorPos_.x >= pauseWinPos_.x && customCursorPos_.x <= pauseWinPos_.x + winW &&
-			    customCursorPos_.y >= pauseWinPos_.y && customCursorPos_.y <= pauseWinPos_.y + 32.0f) {
+			    customCursorPos_.y >= pauseWinPos_.y && customCursorPos_.y <= pauseWinPos_.y + 34.0f &&
+			    !(customCursorPos_.x >= closeX && customCursorPos_.y >= closeY && customCursorPos_.y <= closeY + closeH)) {
 				pauseIsDragging_ = true;
 				pauseDragOffset_ = { customCursorPos_.x - pauseWinPos_.x, customCursorPos_.y - pauseWinPos_.y };
 			}
@@ -709,6 +762,25 @@ void StageScene::DrawPauseSolidRect(const Vector2& pos, const Vector2& size, con
 	sp->Draw();
 }
 
+void StageScene::DrawPauseLine(const Vector2& p1, const Vector2& p2, float thickness, const MyMath::Vector4& color, BlendMode blend) {
+	Sprite* sp = GetPauseSprite();
+	if (!sp) return;
+	float dx = p2.x - p1.x;
+	float dy = p2.y - p1.y;
+	float length = std::sqrt(dx * dx + dy * dy);
+	if (length < 0.001f) return;
+
+	float angle = std::atan2(dy, dx);
+	sp->SetBlendMode(blend);
+	sp->SetPosition(p1);
+	sp->SetAnchorPoint({ 0.0f, 0.5f });
+	sp->SetSize({ length, thickness });
+	sp->SetRotation(angle);
+	sp->SetColor(color);
+	sp->Update();
+	sp->Draw();
+}
+
 Sprite* StageScene::GetPauseCircleSprite() {
 	if (pauseCircleSpritePoolIndex_ >= pauseCircleSpritePool_.size()) {
 		auto sp = std::make_unique<Sprite>();
@@ -774,28 +846,36 @@ void StageScene::DrawPauseCustomCursor() {
 		DrawPauseSolidRect({ cursorRipplePos_.x + rRad - 1.5f, cursorRipplePos_.y - rRad }, { 1.5f, rRad * 2.0f }, ringCol);
 	}
 
-	// 2. ターミナルの色に合わせた緑色のカスタムカーソル（鋭角タクティカル矢印ポインター）
+	// 2. 三角形カスタムカーソル (ユーザー指示: マウスカーソルを三角形へ)
+	// P0: (mx, my) 先端
+	// P1: (mx + 7.0f, my + 22.0f) 下端頂点
+	// P2: (mx + 22.0f, my + 7.0f) 右端頂点
 	const Vector4 kBlackEdge = { 0.0f, 0.0f, 0.0f, 0.95f };
-	const Vector4 kGreenBody = { 0.22f, 1.0f, 0.55f, 0.98f };
-	const Vector4 kGreenCore = { 0.85f, 1.0f, 0.90f, 1.00f };
+	const Vector4 kGreenBody = { 0.16f, 0.92f, 0.48f, 0.98f };
+	const Vector4 kGreenEdge = { 0.35f, 1.0f, 0.65f, 1.00f };
+	const Vector4 kGreenCore = { 0.88f, 1.0f, 0.92f, 1.00f };
 
-	// 黒シャドウ・縁
-	DrawPauseSolidRect({ mx, my }, { 2.0f, 18.0f }, kBlackEdge);
-	DrawPauseSolidRect({ mx + 1.0f, my + 1.0f }, { 13.0f, 2.0f }, kBlackEdge);
-	DrawPauseSolidRect({ mx + 2.0f, my + 2.0f }, { 12.0f, 12.0f }, kBlackEdge);
+	// 2.1 外側黒アウトライン
+	DrawPauseLine({ mx - 0.5f, my - 0.5f }, { mx + 22.5f, my + 6.5f }, 3.5f, kBlackEdge);
+	DrawPauseLine({ mx - 0.5f, my - 0.5f }, { mx + 6.5f, my + 22.5f }, 3.5f, kBlackEdge);
+	DrawPauseLine({ mx + 6.5f, my + 22.5f }, { mx + 22.5f, my + 6.5f }, 3.5f, kBlackEdge);
 
-	// 緑本体
-	DrawPauseSolidRect({ mx + 1.0f, my + 1.0f }, { 2.0f, 15.0f }, kGreenBody);
-	DrawPauseSolidRect({ mx + 2.0f, my + 2.0f }, { 10.0f, 2.0f }, kGreenBody);
-	DrawPauseSolidRect({ mx + 3.0f, my + 3.0f }, { 8.0f, 8.0f }, kGreenBody);
-	DrawPauseSolidRect({ mx + 1.0f, my + 1.0f }, { 2.0f, 4.0f }, kGreenCore);
+	// 2.2 ソリッド塗りつぶし（スキャンラインスライシング）
+	for (int y = 0; y <= 22; ++y) {
+		float fy = static_cast<float>(y);
+		float x1 = fy * (7.0f / 22.0f);
+		float x2 = (fy <= 7.0f) ? (fy * (22.0f / 7.0f)) : (22.0f - (fy - 7.0f) * (15.0f / 15.0f));
+		float w = (std::max)(1.0f, x2 - x1);
+		DrawPauseSolidRect({ mx + x1, my + fy }, { w, 1.2f }, kGreenBody);
+	}
 
-	// 3. 先端照準レティクル
-	Vector4 reticleCol = { 0.35f, 1.0f, 0.65f, 0.85f };
-	DrawPauseSolidRect({ mx - 4.0f, my }, { 3.0f, 1.0f }, reticleCol);
-	DrawPauseSolidRect({ mx + 2.0f, my }, { 3.0f, 1.0f }, reticleCol);
-	DrawPauseSolidRect({ mx, my - 4.0f }, { 1.0f, 3.0f }, reticleCol);
-	DrawPauseSolidRect({ mx, my + 2.0f }, { 1.0f, 3.0f }, reticleCol);
+	// 2.3 内側エッジライン
+	DrawPauseLine({ mx, my }, { mx + 22.0f, my + 7.0f }, 1.5f, kGreenEdge);
+	DrawPauseLine({ mx, my }, { mx + 7.0f, my + 22.0f }, 1.5f, kGreenEdge);
+	DrawPauseLine({ mx + 7.0f, my + 22.0f }, { mx + 22.0f, my + 7.0f }, 1.5f, kGreenEdge);
+
+	// 2.4 先端コア
+	DrawPauseSolidRect({ mx, my }, { 2.5f, 2.5f }, kGreenCore);
 }
 
 void StageScene::DrawPauseMenuUI() {
@@ -827,22 +907,36 @@ void StageScene::DrawPauseMenuUI() {
 	DrawPausePanel(curPos, curSize, { 0.0f, 0.0f, 0.0f, 1.0f }, borderCol, 2.0f);
 
 	// 3. タイトルバー
-	DrawPauseSolidRect(curPos, { curSize.x, 32.0f }, titleBarBg);
+	DrawPauseSolidRect(curPos, { curSize.x, 34.0f }, titleBarBg);
 	DrawPauseSolidRect(curPos, { curSize.x, 2.0f }, { 0.70f, 1.0f, 0.88f, 1.0f }); // 上端ネオンアクセントライン
-	DrawPauseSolidRect({ curPos.x, curPos.y + 30.0f }, { curSize.x, 2.0f }, { 0.20f, 0.85f, 0.50f, 0.80f }); // 下部区切り線
-	DrawPauseSolidRect({ curPos.x + 14.0f, curPos.y + 11.0f }, { 8.0f, 8.0f }, { 0.40f, 1.0f, 0.70f, 1.0f }); // 高輝度LED
-	tr->Print("HackGen", "[PAUSE] TERMINAL : DAWN_OS [v4.12]", curPos.x + 28.0f, curPos.y + 8.0f, 13.0f, { 0.80f, 1.0f, 0.92f, 1.0f });
+	DrawPauseSolidRect({ curPos.x, curPos.y + 32.0f }, { curSize.x, 2.0f }, { 0.20f, 0.85f, 0.50f, 0.80f }); // 下部区切り線
+	DrawPauseSolidRect({ curPos.x + 14.0f, curPos.y + 13.0f }, { 8.0f, 8.0f }, { 0.40f, 1.0f, 0.70f, 1.0f }); // 高輝度LED
+	tr->Print("HackGen", "[PAUSE] TERMINAL : DAWN_OS [v4.12]", curPos.x + 28.0f, curPos.y + 9.0f, 13.0f, { 0.80f, 1.0f, 0.92f, 1.0f });
 
 	// タイトルバー右側のステータスバッジ
-	const float badgeX = curPos.x + curSize.x - 110.0f;
-	const float badgeY = curPos.y + 7.0f;
+	const float badgeX = curPos.x + curSize.x - 145.0f;
+	const float badgeY = curPos.y + 8.0f;
 	bool secBlink = (std::fmod(pauseAnimTimer_, 1.2f) < 0.6f);
 	Vector4 ledColor = secBlink ? Vector4{ 0.35f, 1.0f, 0.65f, 1.0f } : Vector4{ 0.15f, 0.70f, 0.35f, 0.75f };
-	DrawPauseSolidRect({ badgeX + 7.0f, badgeY + 6.0f }, { 6.0f, 6.0f }, ledColor);
-	tr->Print("HackGen", "SEC:LV5 [OK]", badgeX + 18.0f, badgeY + 3.0f, 10.5f, { 0.45f, 1.0f, 0.70f, 0.95f });
+	DrawPauseSolidRect({ badgeX + 7.0f, badgeY + 5.0f }, { 6.0f, 6.0f }, ledColor);
+	tr->Print("HackGen", "SEC:LV5 [OK]", badgeX + 18.0f, badgeY + 2.0f, 10.5f, { 0.45f, 1.0f, 0.70f, 0.95f });
+
+	// 右上の [X] 戻る/閉じるボタン (ミッション選択ウィンドウと完全に同一の仕様)
+	const float closeX = curPos.x + curSize.x - 32.0f;
+	const float closeY = curPos.y + 6.0f;
+	const float closeW = 24.0f;
+	const float closeH = 22.0f;
+	bool isCloseHover = (customCursorPos_.x >= closeX && customCursorPos_.x <= closeX + closeW &&
+	                     customCursorPos_.y >= closeY && customCursorPos_.y <= closeY + closeH);
+	if (isCloseHover) {
+		DrawPauseSolidRect({ closeX, closeY }, { closeW, closeH }, { 0.88f, 0.15f, 0.18f, 0.95f });
+	} else {
+		DrawPausePanel({ closeX, closeY }, { closeW, closeH }, { 0.05f, 0.15f, 0.08f, 0.80f }, { 0.20f, 0.75f, 0.40f, 0.70f }, 1.0f);
+	}
+	tr->Print("HackGen", "X", closeX + closeW * 0.5f, closeY + 4.0f, 12.0f, isCloseHover ? Vector4{ 1.0f, 1.0f, 1.0f, 1.0f } : Vector4{ 0.45f, 1.0f, 0.70f, 0.95f }, { 0.5f, 0.0f });
 
 	// 4. 四隅のコーナーブラケット（太さ 2.5px）
-	DrawPauseCornerBrackets(curPos, curSize, 20.0f, 2.5f, cornerColor);
+	DrawPauseCornerBrackets(curPos, curSize, 22.0f, 2.5f, cornerColor);
 
 	// 5. サブヘッダー
 	tr->Print("HackGenRegular", "/// MISSION PAUSED : PILOT DIRECTIVE ///", curPos.x + curSize.x * 0.5f, curPos.y + 44.0f, 11.5f, { 0.35f, 0.95f, 0.60f, 0.90f }, { 0.5f, 0.0f });
