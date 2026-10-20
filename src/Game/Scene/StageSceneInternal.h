@@ -17,6 +17,7 @@
 #include "../Environment/TerrainSyncManager.h"
 #include "../../engine/Graphics/UI/UITextRegistry.h"
 #include "../../engine/Graphics/Text/TextRenderer.h"
+#include "../../engine/Graphics/Sprite/SpriteCommon.h"
 #include <cmath>
 #include <algorithm>
 #include <filesystem>

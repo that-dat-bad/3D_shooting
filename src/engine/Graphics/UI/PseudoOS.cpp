@@ -19,6 +19,7 @@ PseudoOS::~PseudoOS() {
 }
 
 void PseudoOS::Initialize(SpriteCommon* spriteCommon, Theme theme) {
+	spriteCommon_ = spriteCommon;
 	currentTheme_ = theme;
 	ApplyThemePalette();
 
@@ -142,7 +143,12 @@ bool PseudoOS::IsCursorInsideWindow(int windowId) const {
 }
 
 void PseudoOS::DrawRect(const Vector2& pos, const Vector2& size, const Vector4& color) {
-	if (spritePoolIdx_ >= spritePool_.size()) { return; }
+	if (spritePoolIdx_ >= spritePool_.size()) {
+		auto sp = std::make_unique<Sprite>();
+		sp->Initialize(spriteCommon_ ? spriteCommon_ : SpriteCommon::GetInstance(), "assets/textures/white1x1.png");
+		sp->SetAnchorPoint({ 0.0f, 0.0f });
+		spritePool_.push_back(std::move(sp));
+	}
 	auto& sp = spritePool_[spritePoolIdx_++];
 	sp->SetPosition(pos);
 	sp->SetSize(size);

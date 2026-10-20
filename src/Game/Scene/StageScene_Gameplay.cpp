@@ -55,13 +55,10 @@ void StageScene::UpdateFlightControls(float gameDeltaTime) {
 			}
 		}
 
-		// --- カーソルロック ON/OFF トグル (P キー) ---
+		// --- ポーズメニュー呼び出し (P キー) ---
 		if (input->TriggerKey(DIK_P)) {
-			if (input->IsCursorLocked()) {
-				input->UnlockCursor();
-			} else {
-				input->LockCursor();
-			}
+			SetPaused(true);
+			return;
 		}
 
 		// --- ナイトビジョン (NVD) ON/OFF トグル (N キー) ---
@@ -437,35 +434,40 @@ void StageScene::UpdateCamera(float gameDeltaTime) {
 		Vector3 right = flightModel_.GetRightDirection();
 		Vector3 up = flightModel_.GetUpDirection();
 
-		Vector3 camPos{};
-		Vector3 lookTarget{};
-
-		if (sortieIntroTimer_ < 2.30f) {
-			float sideT = sortieIntroTimer_ / 2.30f;
-			float forwardOffset = 6.0f - 2.0f * sideT;
-			Vector3 camOffset = Add(Add(Multiply(forwardOffset, forward), Multiply(13.0f, right)), Multiply(-0.6f, up));
-			camPos = Add(pos, camOffset);
-			lookTarget = Add(pos, Multiply(2.0f, forward));
+		if (combatBootSequence_.IsQuickMode()) {
+			// クイックリトライ・リスタート時は横からのドローン追従カメラではなく、即座に通常自機追従カメラ視点にする
+			playerCamera_.Update(gameDeltaTime, &flightModel_, &mouseAimController_, mouseAimEnabled_);
 		} else {
-			float orbitDuration = (std::max)(0.1f, sortieIntroDuration_ - 2.30f);
-			float orbitProg = std::clamp((sortieIntroTimer_ - 2.30f) / orbitDuration, 0.0f, 1.0f);
-			float smoothOrbit = orbitProg * orbitProg * (3.0f - 2.0f * orbitProg);
+			Vector3 camPos{};
+			Vector3 lookTarget{};
 
-			float angle = (3.14159265f * 0.50f) + smoothOrbit * (3.14159265f * 0.50f);
-			float dist = 14.0f + 8.0f * smoothOrbit;
-			float height = -0.6f + 8.6f * smoothOrbit;
+			if (sortieIntroTimer_ < 2.30f) {
+				float sideT = sortieIntroTimer_ / 2.30f;
+				float forwardOffset = 6.0f - 2.0f * sideT;
+				Vector3 camOffset = Add(Add(Multiply(forwardOffset, forward), Multiply(13.0f, right)), Multiply(-0.6f, up));
+				camPos = Add(pos, camOffset);
+				lookTarget = Add(pos, Multiply(2.0f, forward));
+			} else {
+				float orbitDuration = (std::max)(0.1f, sortieIntroDuration_ - 2.30f);
+				float orbitProg = std::clamp((sortieIntroTimer_ - 2.30f) / orbitDuration, 0.0f, 1.0f);
+				float smoothOrbit = orbitProg * orbitProg * (3.0f - 2.0f * orbitProg);
 
-			float localX = dist * std::sin(angle);
-			float localZ = -dist * std::cos(angle);
-			Vector3 camOffset = Add(Add(Multiply(localZ, forward), Multiply(localX, right)), Multiply(height, up));
-			camPos = Add(pos, camOffset);
+				float angle = (3.14159265f * 0.50f) + smoothOrbit * (3.14159265f * 0.50f);
+				float dist = 14.0f + 8.0f * smoothOrbit;
+				float height = -0.6f + 8.6f * smoothOrbit;
 
-			Vector3 endLookTarget = Add(pos, Add(Multiply(40.0f, forward), Multiply(4.8f, up)));
-			Vector3 startLookTarget = Add(pos, Multiply(2.0f, forward));
-			lookTarget = Lerp(startLookTarget, endLookTarget, smoothOrbit);
+				float localX = dist * std::sin(angle);
+				float localZ = -dist * std::cos(angle);
+				Vector3 camOffset = Add(Add(Multiply(localZ, forward), Multiply(localX, right)), Multiply(height, up));
+				camPos = Add(pos, camOffset);
+
+				Vector3 endLookTarget = Add(pos, Add(Multiply(40.0f, forward), Multiply(4.8f, up)));
+				Vector3 startLookTarget = Add(pos, Multiply(2.0f, forward));
+				lookTarget = Lerp(startLookTarget, endLookTarget, smoothOrbit);
+			}
+
+			playerCamera_.SnapTo(camPos, lookTarget);
 		}
-
-		playerCamera_.SnapTo(camPos, lookTarget);
 	} else if (endSequence_ == StageEndSequence::Clear_TacticalMapZoom) {
 		float zoomProg = std::clamp((endSeqTimer_ - 2.8f) / 1.5f, 0.0f, 1.0f);
 		float easeZoom = zoomProg * zoomProg;

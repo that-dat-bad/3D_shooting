@@ -149,6 +149,10 @@ void CombatBootSequence::EndAircraftScanDraw(AircraftVisualModel& visualModel) {
 }
 
 void CombatBootSequence::Start() {
+	if (!fadeSprite_ || !rectSprite_ || !ringSprite_) {
+		Initialize(spriteCommon_ ? spriteCommon_ : SpriteCommon::GetInstance(),
+		           dxCommon_ ? dxCommon_ : DirectXCommon::GetInstance());
+	}
 	timer_ = 0.0f;
 	fadeAlpha_ = 1.0f;
 	voicePlayed_ = false;

@@ -1,6 +1,7 @@
 #pragma once
 #include "IScene.h"
 #include <memory>
+#include "../../engine/base/Math/Vector2.h"
 #include "StageHUD.h"
 #include "../Environment/EnvironmentManager.h"
 #include "../../engine/Graphics/Model/Object3d.h"
@@ -210,5 +211,50 @@ private:
 	void UpdateDebugAndStatusUI(float gameDeltaTime);
 	void DrawVaporConeEffect(Camera* cam);
 	void DrawMuzzleFlashEffect(Camera* cam);
+
+	// ============================
+	// ポーズメニュー（タイトル画面完全同期・黒背景仕様）
+	// ============================
+	bool isPaused_ = false;
+	int pauseMenuIndex_ = 0;
+	float pauseAnimTimer_ = 0.0f;
+	Vector2 customCursorPos_ = { 640.0f, 360.0f };
+	float cursorRippleTimer_ = 0.0f;
+	Vector2 cursorRipplePos_ = { 0.0f, 0.0f };
+
+	// ポーズウィンドウ位置 & ドラッグ状態
+	Vector2 pauseWinPos_ = { 390.0f, 145.0f };
+	bool pauseIsDragging_ = false;
+	Vector2 pauseDragOffset_ = { 0.0f, 0.0f };
+
+	std::vector<std::unique_ptr<Sprite>> pauseSpritePool_;
+	size_t pauseSpritePoolIndex_ = 0;
+	std::vector<std::unique_ptr<Sprite>> pauseCircleSpritePool_;
+	size_t pauseCircleSpritePoolIndex_ = 0;
+
+	Sprite* GetPauseSprite();
+	Sprite* GetPauseCircleSprite();
+	void ResetPauseSpritePool() {
+		pauseSpritePoolIndex_ = 0;
+		pauseCircleSpritePoolIndex_ = 0;
+	}
+	void DrawPauseSolidRect(const Vector2& pos, const Vector2& size, const MyMath::Vector4& color, BlendMode blend = BlendMode::kNormal);
+	void DrawPauseGlowOval(const Vector2& center, const Vector2& size, const MyMath::Vector4& color, BlendMode blend = BlendMode::kAdd);
+	void DrawPauseBorder(const Vector2& pos, const Vector2& size, const MyMath::Vector4& color, float thickness = 1.5f);
+	void DrawPausePanel(const Vector2& pos, const Vector2& size, const MyMath::Vector4& bgCol, const MyMath::Vector4& borderCol, float thickness = 1.5f);
+	void DrawPauseCornerBrackets(const Vector2& pos, const Vector2& size, float bracketLen, float thickness, const MyMath::Vector4& color);
+	void DrawPauseCustomCursor();
+
+	bool IsGameplayActive() const;
+	void SetPaused(bool paused);
+	void UpdatePauseMenu();
+	void DrawPauseMenuUI();
+	void ExecutePauseAction(int actionIndex);
+
+	// ポーズからタイトル復帰時のCRTシャットダウン演出（プツッ暗転）
+	bool isPauseAborting_ = false;
+	float pauseAbortTimer_ = 0.0f;
+	static constexpr float kPauseAbortDuration = 0.38f;
+	void DrawPauseCRTShutdown(float progress);
 };
 

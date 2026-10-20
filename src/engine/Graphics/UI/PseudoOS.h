@@ -186,6 +186,7 @@ private:
 	void DrawCustomCursor();
 
 	// スプライトプール（512枚）
+	SpriteCommon* spriteCommon_ = nullptr;
 	std::vector<std::unique_ptr<Sprite>> spritePool_;
 	size_t spritePoolIdx_ = 0;
 

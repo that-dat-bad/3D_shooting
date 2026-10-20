@@ -61,12 +61,12 @@ void TitleScene::InitializeUI(SpriteCommon* spriteCommon, bool fromCache) {
 	startButton_.SetTextColor(btnNormalText);
 	startButton_.SetSelectedTextColor(btnSelText);
 	startButton_.SetOnClick([this]() {
-		// 全画面ミッション選択モーダルを展開（他のUIを完全ブロック）
+		// メインターミナルウィンドウをミッション選択画面に切り替え
 		isMissionSelectModalOpen_ = true;
-		missionSelectModalAnim_ = 0.0f;
+		missionSelectModalAnim_ = 1.0f;
 		if (!missionCards_.empty()) {
-			int idx = std::clamp(selectedMissionIdx_, 0, static_cast<int>(missionCards_.size()) - 1);
-			MissionManager::GetInstance().SetCurrentFilePath(missionCards_[idx].filePath);
+			selectedMissionIdx_ = std::clamp(selectedMissionIdx_, 0, static_cast<int>(missionCards_.size()) - 1);
+			MissionManager::GetInstance().SetCurrentFilePath(missionCards_[selectedMissionIdx_].filePath);
 		}
 	});
 
@@ -471,7 +471,7 @@ void TitleScene::UpdateMenuWindowPosition(const Vector2& newPos) {
 }
 
 void TitleScene::UpdateMenuConsoleVisuals() {
-	int selIdx = selectionManager_.GetSelectedIndex();
+	int selIdx = isMissionSelectModalOpen_ ? selectedMissionIdx_ : selectionManager_.GetSelectedIndex();
 	bool blink = (std::fmod(animTimer_, 0.36f) < 0.18f);
 
 	// ヘッダーランプの点滅更新
@@ -508,7 +508,7 @@ void TitleScene::UpdateMenuConsoleVisuals() {
 	// 各ボタン枠スプライトの色動的更新
 	for (size_t i = 0; i < buttonBorders_.size(); ++i) {
 		bool isSel = (static_cast<int>(i) == selIdx);
-		bool isLocked = (i == 1 || i == 2);
+		bool isLocked = !isMissionSelectModalOpen_ && (i == 1 || i == 2);
 		MyMath::Vector4 outlineCol;
 		MyMath::Vector4 bracketCol;
 		MyMath::Vector4 indicatorCol;
@@ -566,14 +566,22 @@ void TitleScene::DrawMenuCard() {
 	if (isActive) {
 		DrawOSRect({ cardX, cardY }, { cardWidth, 2.0f }, { 0.70f, 1.0f, 0.88f, 1.0f }); // 上端ネオンアクセントライン
 		DrawOSRect({ cardX + 14.0f, cardY + 11.0f }, { 8.0f, 8.0f }, { 0.40f, 1.0f, 0.70f, 1.0f }); // 高輝度LED
-		tr->Print("HackGen", "[FOCUS] TERMINAL : DAWN_OS [v4.12]", cardX + 28.0f, cardY + 9.0f, 13.0f, { 0.80f, 1.0f, 0.92f, 1.0f });
+		if (isMissionSelectModalOpen_) {
+			tr->Print("HackGen", "[FOCUS] TERMINAL : MISSION SELECT [v4.12]", cardX + 28.0f, cardY + 9.0f, 13.0f, { 0.80f, 1.0f, 0.92f, 1.0f });
+		} else {
+			tr->Print("HackGen", "[FOCUS] TERMINAL : DAWN_OS [v4.12]", cardX + 28.0f, cardY + 9.0f, 13.0f, { 0.80f, 1.0f, 0.92f, 1.0f });
+		}
 	} else {
 		DrawOSRect({ cardX + 14.0f, cardY + 11.0f }, { 8.0f, 8.0f }, { 0.12f, 0.30f, 0.16f, 0.45f }); // 消灯LED
-		tr->Print("HackGen", "[IDLE]  TERMINAL : DAWN_OS [v4.12]", cardX + 28.0f, cardY + 9.0f, 13.0f, { 0.22f, 0.50f, 0.30f, 0.65f });
+		if (isMissionSelectModalOpen_) {
+			tr->Print("HackGen", "[IDLE]  TERMINAL : MISSION SELECT [v4.12]", cardX + 28.0f, cardY + 9.0f, 13.0f, { 0.22f, 0.50f, 0.30f, 0.65f });
+		} else {
+			tr->Print("HackGen", "[IDLE]  TERMINAL : DAWN_OS [v4.12]", cardX + 28.0f, cardY + 9.0f, 13.0f, { 0.22f, 0.50f, 0.30f, 0.65f });
+		}
 	}
 
 	// タイトルバー右側のシステムステータス表示 (SEC: LV5 [OK])
-	const float badgeX = cardX + cardWidth - 110.0f;
+	const float badgeX = cardX + cardWidth - (isMissionSelectModalOpen_ ? 142.0f : 110.0f);
 	const float badgeY = cardY + 7.0f;
 	bool secBlink = (std::fmod(animTimer_, 1.2f) < 0.6f);
 	Vector4 ledColor = secBlink ? Vector4{ 0.35f, 1.0f, 0.65f, 1.0f } : Vector4{ 0.15f, 0.70f, 0.35f, 0.75f };
@@ -589,15 +597,22 @@ void TitleScene::DrawMenuCard() {
 	}
 
 	// サブタイトル
-	subtitleText_.Draw();
+	if (isMissionSelectModalOpen_) {
+		tr->Print("HackGen", "- TARGET OPERATION SELECTION -", cardX + cardWidth * 0.5f, cardY + 154.0f, 14.0f, { 0.35f, 0.95f, 0.60f, 0.95f }, { 0.5f, 0.0f });
+	} else {
+		subtitleText_.Draw();
+	}
 
 	// システム認証ステータス行（ディバイダーラインにインラインマウント）
 	// テキスト背面に完全不透明の黒ベタ矩形を敷くことで、背後の水平線を完璧にマスクして可読性を100%確保
 	const float authY = cardY + 172.0f;
 	const float authCenterX = cardX + cardWidth * 0.5f;
-	Vector2 authSize = tr->CalculateTextSize("HackGenRegular", "AUTH LEVEL 5 GRANTED // READY FOR MISSION INPUT", 11.0f);
+	const char* authStr = isMissionSelectModalOpen_
+		? "AUTH LEVEL 5 GRANTED // TARGET OPERATION INPUT"
+		: "AUTH LEVEL 5 GRANTED // READY FOR MISSION INPUT";
+	Vector2 authSize = tr->CalculateTextSize("HackGenRegular", authStr, 11.0f);
 	DrawOSRect({ authCenterX - (authSize.x * 0.5f + 8.0f), authY - 8.0f }, { authSize.x + 16.0f, 16.0f }, { 0.0f, 0.0f, 0.0f, 1.0f });
-	tr->Print("HackGenRegular", "AUTH LEVEL 5 GRANTED // READY FOR MISSION INPUT", authCenterX, authY, 11.0f, { 0.28f, 0.88f, 0.52f, 0.90f }, { 0.5f, 0.5f });
+	tr->Print("HackGenRegular", authStr, authCenterX, authY, 11.0f, { 0.28f, 0.88f, 0.52f, 0.90f }, { 0.5f, 0.5f });
 
 	if (state_ == TitleState::SortieSequence) {
 		// ============================================================
@@ -1308,6 +1323,8 @@ void TitleScene::DrawWindowClose() {
 }
 
 void TitleScene::DrawConsoleBoot() {
+	pseudoOS_.ResetSpritePool();
+
 	// 背景の完全漆黒コンソールスプライト（格納庫の透けを100%遮蔽）
 	if (consoleBgSprite_) {
 		consoleBgSprite_->Draw();
@@ -1316,29 +1333,52 @@ void TitleScene::DrawConsoleBoot() {
 	backgroundPanel_.Draw();
 
 	float textAlpha = 1.0f;
+	float exitT = 0.0f;
 	if (consoleExitTimer_ > 0.0f) {
-		textAlpha = (std::max)(0.0f, 1.0f - consoleExitTimer_ / kConsoleExitDuration);
+		exitT = std::clamp(consoleExitTimer_ / kConsoleExitDuration, 0.0f, 1.0f);
+		textAlpha = (std::max)(0.0f, 1.0f - exitT * 1.8f);
 	}
 
 	TextRenderer* tr = TextRenderer::GetInstance();
 	const float centerX = kScreenWidth * 0.5f;
 	const float centerY = kScreenHeight * 0.5f;
 
-	// 中央ターミナルパネル枠
-	const float panelW = 680.0f;
-	const float panelH = 210.0f;
-	const float panelX = centerX - panelW * 0.5f;
-	const float panelY = centerY - panelH * 0.5f;
+	// 中央ターミナルパネル枠（ロード完了時にサイバーブートログ領域がスッとスムーズに展開）
+	const float basePanelW = 680.0f;
+	const float basePanelH = 210.0f;
+	float panelW = basePanelW;
+	float panelH = basePanelH;
+
+	float bootExpand = 0.0f;
+	if (isLoadingComplete_) {
+		float expT = std::clamp(completeHoldTimer_ / 0.12f, 0.0f, 1.0f);
+		bootExpand = expT * (2.0f - expT);
+		panelH = basePanelH + 164.0f * bootExpand; // 210px -> 374px
+	}
+
+	float panelX = centerX - panelW * 0.5f;
+	float panelY = centerY - panelH * 0.5f;
 
 	// パネル背景とサイバー枠線
+	Vector4 panelBorderCol = { 0.20f, 0.70f, 0.90f, 0.85f * textAlpha };
+	if (consoleExitTimer_ > 0.0f) {
+		// モード切替時：サイバーパルス発光
+		panelBorderCol = { 0.35f + 0.50f * (1.0f - exitT), 0.90f, 0.98f, (1.0f - exitT * 0.3f) };
+	}
 	pseudoOS_.DrawPanel({ panelX, panelY }, { panelW, panelH },
-		{ 0.01f, 0.03f, 0.05f, 0.92f * textAlpha },
-		{ 0.20f, 0.70f, 0.90f, 0.85f * textAlpha }, 1.2f);
+		{ 0.01f, 0.03f, 0.05f, 0.94f * textAlpha },
+		panelBorderCol, 1.2f);
 
 	// ヘッダータイトル
-	tr->Print("HackGen", "DAWN_OS TACTICAL TERMINAL [v4.12.0] // SECURE SESSION",
-		centerX, panelY + 16.0f, 12.0f,
-		{ 0.45f, 0.85f, 0.95f, 0.90f * textAlpha }, { 0.5f, 0.0f });
+	if (consoleExitTimer_ > 0.0f) {
+		tr->Print("HackGen", ">> MODE SWITCH: TTY1 -> GUI_COMPOSITOR [1920x1080@60Hz] <<",
+			centerX, panelY + 16.0f, 12.0f,
+			{ 0.95f, 0.90f, 0.30f, 0.98f * (1.0f - exitT * 0.4f) }, { 0.5f, 0.0f });
+	} else {
+		tr->Print("HackGen", "DAWN_OS TACTICAL TERMINAL [v4.12.0] // SECURE SESSION",
+			centerX, panelY + 16.0f, 12.0f,
+			{ 0.45f, 0.85f, 0.95f, 0.90f * textAlpha }, { 0.5f, 0.0f });
+	}
 
 	pseudoOS_.DrawRect({ panelX + 16.0f, panelY + 36.0f }, { panelW - 32.0f, 1.0f },
 		{ 0.20f, 0.50f, 0.65f, 0.40f * textAlpha });
@@ -1391,8 +1431,72 @@ void TitleScene::DrawConsoleBoot() {
 			tr->Print("HackGen", "complete!", panelX + panelW - 28.0f, panelY + 95.0f, 20.0f, compCol, { 1.0f, 0.0f });
 
 			// 完了時ステータス
-			tr->Print("HackGen", ">> ACCESS GRANTED // RETURNING TO DESKTOP ROOT <<",
-				centerX, panelY + 152.0f, 15.0f, compCol, { 0.5f, 0.0f });
+			tr->Print("HackGen", ">> ACCESS GRANTED // INITIALIZING SYSTEM DAEMONS <<",
+				centerX, panelY + 144.0f, 14.0f, compCol, { 0.5f, 0.0f });
+
+			// 区切り線（ブートログ領域とのセパレーター）
+			if (bootExpand > 0.05f) {
+				pseudoOS_.DrawRect({ panelX + 16.0f, panelY + 164.0f }, { (panelW - 32.0f) * bootExpand, 1.0f },
+					{ 0.20f, 0.60f, 0.75f, 0.45f * textAlpha * bootExpand });
+
+				// 3. 高速ブートログストリーム（コンピュータ演出）
+				struct BootLogEntry {
+					float time;
+					const char* tag;
+					const char* msg;
+				};
+
+				static const BootLogEntry kNormalLogs[] = {
+					{ 0.04f, "[  OK  ]", "CORE: DAWN Kernel v4.12.0-TAC (SMP x86_64, 16 Cores Online)" },
+					{ 0.10f, "[  OK  ]", "VRAM: Direct3D 12.2 GPU Pipeline // Descriptor Heap Ready" },
+					{ 0.16f, "[  OK  ]", "LINK: Secure Optical Drone Carrier [bay4_cam01: 60FPS LOCKED]" },
+					{ 0.22f, "[  OK  ]", "BUS: MIL-STD-1553B Avionics Bus Synced // Telemetry Active" },
+					{ 0.28f, "[  OK  ]", "WM: Starting Tactical Multi-Window Compositor (DAWN_WM v4.12)" },
+					{ 0.34f, "[  OK  ]", "WORKSPACES: Spawning [01:MAIN_TERM, 02:CAM_FEED, 03:TELEMETRY]" },
+					{ 0.40f, ">>",      "LAUNCHING SECURE DESKTOP GUI ENVIRONMENT..." }
+				};
+
+				static const BootLogEntry kRebootLogs[] = {
+					{ 0.04f, "[  OK  ]", "RECOVERY: Restoring kernel state from crashdump // TTY1" },
+					{ 0.10f, "[  OK  ]", "REPAIR: Journal verified clean // Memory pages zeroed" },
+					{ 0.16f, "[  OK  ]", "VRAM: Rebinding D3D12 device & swapchain descriptors" },
+					{ 0.22f, "[  OK  ]", "NET: Optical drone carrier telemetry re-synchronized" },
+					{ 0.28f, "[  OK  ]", "WM: Re-launching DAWN_WM desktop compositor daemon" },
+					{ 0.34f, "[  OK  ]", "SESSION: Restoring operational mission workspaces" },
+					{ 0.40f, ">>",      "DESKTOP SESSION RESTORED // READY FOR COMMAND..." }
+				};
+
+				const BootLogEntry* logs = isRebootLog_ ? kRebootLogs : kNormalLogs;
+				const int numLogs = 7;
+				for (int i = 0; i < numLogs; ++i) {
+					if (completeHoldTimer_ >= logs[i].time) {
+						float lineY = panelY + 174.0f + i * 22.0f;
+						bool isPrompt = (i == numLogs - 1);
+						bool isLatest = (i == numLogs - 1) || (completeHoldTimer_ < logs[i + 1].time);
+
+						if (isPrompt) {
+							tr->Print("HackGen", logs[i].tag, panelX + 28.0f, lineY, 11.5f,
+								{ 1.0f, 0.90f, 0.30f, 1.0f * textAlpha });
+							std::string promptMsg = logs[i].msg;
+							if (isLatest && std::fmod(completeHoldTimer_, 0.16f) < 0.10f) {
+								promptMsg += " _";
+							}
+							tr->Print("HackGen", promptMsg.c_str(), panelX + 54.0f, lineY, 11.5f,
+								{ 0.40f, 1.0f, 0.70f, 0.98f * textAlpha });
+						} else {
+							tr->Print("HackGen", logs[i].tag, panelX + 28.0f, lineY, 10.5f,
+								{ 0.30f, 1.0f, 0.60f, 0.95f * textAlpha });
+							tr->Print("HackGen", logs[i].msg, panelX + 90.0f, lineY, 10.5f,
+								{ 0.60f, 0.88f, 0.98f, 0.88f * textAlpha });
+						}
+					}
+				}
+
+				// 右下のハードウェアテレメトリ
+				tr->Print("HackGen", "RAM: [64GB OK]  GPU: [D3D12 OK]  SYS: [ONLINE]",
+					panelX + panelW - 28.0f, panelY + panelH - 18.0f, 10.0f,
+					{ 0.30f, 0.75f, 0.50f, 0.65f * textAlpha }, { 1.0f, 0.0f });
+			}
 		} else {
 			char pctBuf[32];
 			snprintf(pctBuf, sizeof(pctBuf), "%3d %%", static_cast<int>(loadingProgress_ * 100.0f));
@@ -1413,9 +1517,59 @@ void TitleScene::DrawConsoleBoot() {
 	float scanY = std::fmod(consoleBootTimer_ * 120.0f, kScreenHeight);
 	pseudoOS_.DrawRect({ 0.0f, scanY }, { kScreenWidth, 1.0f }, { 0.20f, 0.70f, 0.90f, 0.15f * textAlpha });
 
-	// トランジション進行中：文字グリッチ演出
+	// ============================================================
+	// コンソールからデスクトップへのGUIモード切替・ワイヤーフレーム分岐演出
+	// ============================================================
 	if (consoleExitTimer_ > 0.0f) {
-		DrawTransitionGlitch();
+		// 1. 横断CRTラスタースキャンビーム（画面上端から下端へ一気に走査してデスクトップを展開）
+		float beamY = exitT * kScreenHeight;
+		pseudoOS_.DrawRect({ 0.0f, beamY - 1.0f }, { kScreenWidth, 3.0f },
+			{ 0.65f, 1.0f, 0.85f, (1.0f - exitT * 0.5f) * 0.90f });
+		pseudoOS_.DrawRect({ 0.0f, beamY - 8.0f }, { kScreenWidth, 16.0f },
+			{ 0.15f, 0.80f, 0.45f, (1.0f - exitT) * 0.30f });
+
+		// 2. ウィンドウ投影ワイヤーフレームの展開（中央ターミナルから3つのデスクトップウィンドウへ分岐）
+		float branchS = exitT * exitT * (3.0f - 2.0f * exitT); // スムーズステップ
+		Vector4 wfCol = { 0.25f, 0.95f, 0.55f, branchS * 0.80f };
+
+		// サブウィンドウ1 (CAM-01) への投影ワイヤーフレーム: 目標 { 18.0f, 44.0f, 356.0f, 260.0f }
+		Vector2 w1Pos = { panelX + (18.0f - panelX) * branchS, panelY + (44.0f - panelY) * branchS };
+		Vector2 w1Size = { panelW + (356.0f - panelW) * branchS, panelH + (260.0f - panelH) * branchS };
+		pseudoOS_.DrawBorder(w1Pos, w1Size, wfCol, 1.5f);
+		tr->Print("HackGen", "[VRAM: CAM_01 SINK ATTACHED]", w1Pos.x + 8.0f, w1Pos.y + 6.0f, 10.0f, wfCol);
+
+		// サブウィンドウ2 (SYS_DIAG) への投影ワイヤーフレーム: 目標 { 18.0f, 320.0f, 356.0f, 344.0f }
+		Vector2 w2Pos = { panelX + (18.0f - panelX) * branchS, panelY + (320.0f - panelY) * branchS };
+		Vector2 w2Size = { panelW + (356.0f - panelW) * branchS, panelH + (344.0f - panelH) * branchS };
+		pseudoOS_.DrawBorder(w2Pos, w2Size, wfCol, 1.5f);
+		tr->Print("HackGen", "[VRAM: TELEMETRY BUS LINKED]", w2Pos.x + 8.0f, w2Pos.y + 6.0f, 10.0f, wfCol);
+
+		// ウィンドウ間のデータバス接続ライン
+		float busX = w1Pos.x + w1Size.x;
+		float busW = (panelX > busX) ? (panelX - busX) : 0.0f;
+		if (busW > 2.0f) {
+			pseudoOS_.DrawRect({ busX, panelY + 40.0f }, { busW, 1.0f }, { 0.20f, 0.85f, 0.50f, branchS * 0.50f });
+			pseudoOS_.DrawRect({ busX, panelY + 120.0f }, { busW, 1.0f }, { 0.20f, 0.85f, 0.50f, branchS * 0.50f });
+		}
+
+		// 3. ランダムサイバーグリッチスライス
+		uint32_t seed = static_cast<uint32_t>(consoleExitTimer_ * 1000.0f) + 123;
+		for (size_t gi = 0; gi < glitchSprites_.size(); ++gi) {
+			seed = seed * 1664525u + 1013904223u;
+			float gy = (static_cast<float>(seed & 0xFFFF) / 65535.0f) * kScreenHeight;
+			seed = seed * 1664525u + 1013904223u;
+			float gh = 1.0f + (static_cast<float>(seed & 0xFFFF) / 65535.0f) * 10.0f;
+			seed = seed * 1664525u + 1013904223u;
+			float gx = (static_cast<float>(seed & 0xFFFF) / 65535.0f) * kScreenWidth * 0.6f;
+			seed = seed * 1664525u + 1013904223u;
+			float gw = 80.0f + (static_cast<float>(seed & 0xFFFF) / 65535.0f) * 320.0f;
+
+			glitchSprites_[gi]->SetPosition({ gx, gy });
+			glitchSprites_[gi]->SetSize({ gw, gh });
+			glitchSprites_[gi]->SetColor({ 0.35f, 1.0f, 0.65f, (1.0f - exitT) * 0.40f });
+			glitchSprites_[gi]->Update();
+			glitchSprites_[gi]->Draw();
+		}
 	}
 }
 

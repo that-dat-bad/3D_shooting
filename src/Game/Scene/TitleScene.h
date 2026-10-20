@@ -68,11 +68,11 @@ private:
 	Vector4 previousSortieColor_ = { 0.35f, 0.85f, 0.50f, 0.80f };
 
 	// ローディング演出用ステート（コマンドのやつ -> loading...[||||||||||]を表示）
-	static constexpr float kCommandTypingDuration = 0.45f; ///< コマンドタイピング演出時間
+	static constexpr float kCommandTypingDuration = 0.38f; ///< コマンドタイピング演出時間
 	float loadingProgress_ = 0.0f;       ///< 0.0f〜1.0f の読み込み進捗率
 	bool isLoadingComplete_ = false;     ///< 全アセット読み込み完了フラグ
 	float completeHoldTimer_ = 0.0f;     ///< complete 表示キープタイマー
-	static constexpr float kCompleteHoldDuration = 0.28f;
+	static constexpr float kCompleteHoldDuration = 0.52f; ///< 高速ブートログ表示時間（コンピュータ演出）
 	int prewarmPhase_ = 0;               ///< ローディング中のカメラ・ロケーション段階的ウォームアップフェーズ
 	bool isTitleCamerasPrewarmed_ = false; ///< タイトルの全カメラ・全3D背景モデルの読み込み・ウォームアップ完了
 	const char* loadingPhaseText_ = "INITIALIZING OPTICAL CAMERAS...";
@@ -80,9 +80,9 @@ private:
 	float reauthTimer_ = 0.0f;          ///< 項目10: 再認証演出タイマー
 	static constexpr float kReauthDuration = 1.40f;
 	float consoleExitTimer_ = 0.0f;     ///< コンソールからメニューへのスムーズな接続アニメーションタイマー
-	static constexpr float kConsoleExitDuration = 0.32f; ///< サイバーグリッチ遷移
+	static constexpr float kConsoleExitDuration = 0.38f; ///< サイバーグリッチ＆GUIモード切替遷移
 	float menuEnterTimer_ = 0.0f;       ///< メニュー展開トランジションタイマー
-	static constexpr float kMenuEnterDuration = 0.50f;   ///< OSデスクトップ順次立ち上がり（Staggered Launch）時間
+	static constexpr float kMenuEnterDuration = 0.55f;   ///< OSデスクトップ順次立ち上がり（Staggered Launch）時間
 	float sortieTimer_ = 0.0f;          ///< 出撃シーケンスタイマー（項目1, 2, 3）
 	static constexpr float kSortieDuration = 2.40f;      ///< 出撃シーケンスの総時間（負荷タメ・認証停滞の緩急付き）
 	std::unique_ptr<Sprite> sortieFlashSprite_;          ///< 出撃トランジション用ブラックアウト（黒フェード）

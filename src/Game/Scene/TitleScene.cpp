@@ -30,6 +30,7 @@ void TitleScene::Initialize() {
 	auto tStart = std::chrono::high_resolution_clock::now();
 	SetCursorVisible(false); // ドローン視点・コンソール画面ではOSカーソルを完全非表示（項目7）
 	sceneID = SCENE::TITLE;
+	pseudoOS_.ResetSpritePool();
 	selectionManager_.Clear();
 	lastMenuSelIdx_ = 0;
 	subWindowSwitchTimer_ = 0.0f;
@@ -47,6 +48,9 @@ void TitleScene::Initialize() {
 	prewarmPhase_ = 0;
 	isTitleCamerasPrewarmed_ = false;
 	loadingPhaseText_ = "INITIALIZING OPTICAL CAMERAS...";
+	isStartMenuOpen_ = false;
+	isMissionSelectModalOpen_ = false;
+	missionSelectModalAnim_ = 0.0f;
 
 	SpriteCommon* spriteCommon = SpriteCommon::GetInstance();
 	TextureManager* tm = TextureManager::GetInstance();
@@ -154,11 +158,13 @@ void TitleScene::Initialize() {
 		menuHeaderPanel_.Initialize(spriteCommon);
 		menuHeaderPanel_.SetPosition(menuWindowPos_);
 		menuHeaderPanel_.SetSize({ 520.0f, 34.0f });
-		menuHeaderPanel_.SetBackgroundColor({ 0.05f, 0.22f, 0.12f, 0.98f });
+		menuHeaderPanel_.SetBackgroundColor({ 0.03f, 0.10f, 0.06f, 1.0f });
 
 		isWindowDragging_ = false;
 		wasLButtonDown_ = false;
 		isStartMenuOpen_ = false;
+		isMissionSelectModalOpen_ = false;
+		missionSelectModalAnim_ = 0.0f;
 		ResetOSDesktopWindows();
 	} else {
 		// ============================================================
@@ -511,6 +517,8 @@ void TitleScene::Draw() {
 }
 
 void TitleScene::DrawUI() {
+	pseudoOS_.ResetSpritePool();
+
 	if (state_ == TitleState::DroneView) {
 		DrawOSD();
 		// 操作案内テキストの半透明ダーク帯を描画（項目9: 主翼や車輪との被りを100%防止）
@@ -547,6 +555,9 @@ void TitleScene::DrawUI() {
 void TitleScene::Finalize() {
 	SetCursorVisible(false); // ゲーム画面へ遷移するためOSカーソルを確実に非表示（項目9）
 	UITextRegistry::GetInstance()->Clear();
+	isStartMenuOpen_ = false;
+	isMissionSelectModalOpen_ = false;
+	missionSelectModalAnim_ = 0.0f;
 
 	// ------------------------------------------------------------
 	// 静的リソースキャッシュへの退避（リファクタリング最適化）

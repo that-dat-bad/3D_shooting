@@ -1,10 +1,7 @@
 #pragma once
-#include "IScene.h"
-#include "../../engine/Graphics/UI/UIPanel.h"
+#include "OSSceneBase.h"
 #include "../../engine/Graphics/UI/UIText.h"
 #include "../../engine/Graphics/UI/UIButton.h"
-#include "../../engine/Graphics/UI/UISelectionManager.h"
-#include "../../engine/Graphics/UI/PseudoOS.h"
 #include "../../engine/Graphics/UI/TypewriterEffect.h"
 #include "../../engine/Graphics/Sprite/Sprite.h"
 #include <vector>
@@ -12,10 +9,10 @@
 #include <memory>
 
 /// @brief ゲームオーバー専用シーン（疑似OS環境：ミリタリーOSカーネルパニック、16進数メモリダンプ、OS再起動）
-class GameOverScene : public IScene {
+class GameOverScene : public OSSceneBase {
 public:
 	GameOverScene();
-	~GameOverScene();
+	~GameOverScene() override;
 	void Initialize() override;
 	void Update() override;
 	void Draw() override;
@@ -24,21 +21,10 @@ public:
 	void Finalize() override;
 
 private:
-	bool isUIInitialized_ = false;
-
-	// 疑似OSデスクトップ環境（カーネルパニック仕様）
-	PseudoOS pseudoOS_;
-
-	UIPanel backgroundPanel_;
 	UIText gameOverText_;
 	
 	UIButton retryButton_;
 	UIButton titleButton_;
-
-	UISelectionManager selectionManager_;
-
-	float animTimer_ = 0.0f;
-	float fadeInAlpha_ = 0.0f;
 
 	// 項目3: コンソール風ログ展開アニメーション & 高速スクロール16進数メモリダンプ
 	std::vector<std::string> memoryDumpPool_;

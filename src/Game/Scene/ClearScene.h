@@ -1,19 +1,16 @@
 #pragma once
-#include "IScene.h"
+#include "OSSceneBase.h"
 #include <vector>
 #include <memory>
 #include "../../engine/Graphics/UI/UIElement.h"
 #include "../../engine/Graphics/UI/UIText.h"
 #include "../../engine/Graphics/UI/UIButton.h"
-#include "../../engine/Graphics/UI/UIPanel.h"
-#include "../../engine/Graphics/UI/UISelectionManager.h"
-#include "../../engine/Graphics/UI/PseudoOS.h"
 
 /// @brief クリアシーン。疑似OS環境によるミッション完了リザルト表示と次のアクション選択。
-class ClearScene : public IScene {
+class ClearScene : public OSSceneBase {
 public:
     ClearScene();
-    ~ClearScene();
+    ~ClearScene() override;
     void Initialize() override;
     void Update() override;
     void Draw() override;
@@ -22,13 +19,7 @@ public:
     void Finalize() override;
 
 private:
-    bool isUIInitialized_ = false;
-
-    // 疑似OSデスクトップ環境（タクティカルシアン仕様）
-    PseudoOS pseudoOS_;
-
     // --- UI要素 ---
-    UIPanel backgroundPanel_;          ///< 背景オーバーレイ
     UIText missionCompleteText_;       ///< 「MISSION COMPLETE」テキスト
     UIText enemiesDestroyedLabel_;     ///< 「ENEMIES DESTROYED」ラベル
     UIText enemiesDestroyedValue_;     ///< 撃破数の値
@@ -38,17 +29,6 @@ private:
     UIText hpRemainingValue_;          ///< 残りHP値
     UIButton replayButton_;            ///< リプレイボタン
     UIButton titleButton_;             ///< タイトルへ戻るボタン
-
-    // メニュー操作
-    UISelectionManager selectionManager_;
-
-    // アニメーション
-    float animTimer_ = 0.0f;
-    float fadeInAlpha_ = 0.0f;         ///< フェードインの進行度
-
-    // 項目14: 選択時のフィードバック演出（白反転フラッシュ＆波紋）
-    float btnClickFlashTimer_ = 0.0f;
-    int clickedButtonIdx_ = -1;        ///< 0: Replay, 1: Title
 
     // 項目15: VHSテープのリワインド（巻き戻し）演出
     bool isRewinding_ = false;

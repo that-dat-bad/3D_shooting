@@ -3,6 +3,9 @@
 using namespace TitleSceneInternal;
 
 void TitleScene::InitializeEntryState() {
+	isMissionSelectModalOpen_ = false;
+	missionSelectModalAnim_ = 0.0f;
+	isStartMenuOpen_ = false;
 	TitleEntryReason entryReason = GameResult::GetInstance().titleEntryReason;
 	if (entryReason == TitleEntryReason::RebootFromGameOver) {
 		// 項目8: ゲームオーバーからの復帰時、起動コンソール画面に繋がり、再びOSが立ち上がってタイトルメニューに戻る
@@ -235,6 +238,21 @@ void TitleScene::UpdateConsoleBootState(float dt) {
 
 		if (isLoadingComplete_) {
 			completeHoldTimer_ += dt;
+
+			Input* input = Input::GetInstance();
+			bool skipKey = input->TriggerKey(DIK_SPACE) || input->TriggerKey(DIK_RETURN)
+				|| ((::GetAsyncKeyState(VK_SPACE) & 0x8000) != 0) || ((::GetAsyncKeyState(VK_RETURN) & 0x8000) != 0);
+			bool skipClick = input->TriggerMouse(0) || ((::GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0 && !wasLButtonDown_);
+			wasLButtonDown_ = ((::GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0) || input->PushMouse(0);
+
+			if (skipKey || skipClick) {
+				if (completeHoldTimer_ < kCompleteHoldDuration) {
+					completeHoldTimer_ = kCompleteHoldDuration;
+				} else if (consoleExitTimer_ < kConsoleExitDuration) {
+					consoleExitTimer_ = kConsoleExitDuration;
+				}
+			}
+
 			// complete 表示が少しキープされたらメニューへスムーズに遷移
 			if (completeHoldTimer_ >= kCompleteHoldDuration) {
 				consoleExitTimer_ += dt;
@@ -271,12 +289,12 @@ void TitleScene::UpdateConsoleBootState(float dt) {
 		float exitRatio = consoleExitTimer_ / kConsoleExitDuration;
 		ActivePostEffect scanline;
 		scanline.type = PostEffectType::kScanLine;
-		scanline.intensity = 0.22f * exitRatio;
+		scanline.intensity = 0.28f * (1.0f - exitRatio * 0.4f);
 		postEffect->AddActiveEffect(scanline);
 
 		ActivePostEffect noise;
 		noise.type = PostEffectType::kRandom;
-		noise.intensity = 0.15f * exitRatio;
+		noise.intensity = 0.16f * (1.0f - exitRatio * 0.4f);
 		postEffect->AddActiveEffect(noise);
 	}
 }
@@ -329,8 +347,8 @@ void TitleScene::UpdateMenuState(float dt) {
 		lockedAlertTimer_ -= dt;
 	}
 
-	if (isMissionSelectModalOpen_ || missionSelectModalAnim_ > 0.001f) {
-		// 全画面ミッション選択モーダルの更新（展開・縮小アニメーション完了まで他のUI入力をブロック）
+	if (isMissionSelectModalOpen_) {
+		// メインターミナル内ミッション選択の更新
 		UpdateMissionSelectModal(dt, { mx, my }, isLButtonDown, isLButtonTrigger);
 	} else {
 		// フルOSデスクトップ環境の更新（タスクバー、マルチウィンドウドラッグ・最小化・フォーカス、デスクトップアイコン、カスタムカーソル）
@@ -509,6 +527,9 @@ void TitleScene::UpdateSortieState(float dt) {
 }
 
 void TitleScene::StartSortieSequence() {
+	isMissionSelectModalOpen_ = false;
+	missionSelectModalAnim_ = 0.0f;
+	isStartMenuOpen_ = false;
 	state_ = TitleState::SortieSequence;
 	sortieTimer_ = 0.0f;
 	isEngineTesting_ = true;

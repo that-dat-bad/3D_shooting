@@ -40,20 +40,13 @@ void ClearScene::PrewarmAssets() {
 		TextureManager::GetInstance()->LoadTexture("assets/textures/white1x1.png");
 
 		// ============================
-		// 背景オーバーレイ
+		// 疑似OS環境（タクティカルシアン仕様：TacticalCyan）および背景パネル初期化
 		// ============================
-		backgroundPanel_.Initialize(spriteCommon);
-		backgroundPanel_.SetPosition({ 0.0f, 0.0f });
-		backgroundPanel_.SetSize({ kScreenWidth, kScreenHeight });
-		backgroundPanel_.SetBackgroundColor({ 0.01f, 0.02f, 0.05f, 0.95f });
-
-		// ============================
-		// 疑似OS環境（タクティカルシアン仕様：TacticalCyan）
-		// ============================
-		pseudoOS_.Initialize(spriteCommon, PseudoOS::Theme::TacticalCyan);
-		pseudoOS_.SetOSName("DAWN_OS TACTICAL OPERATION DEBRIEF [v4.12.0]");
-		pseudoOS_.SetSecurityClearance("MISSION DIRECTIVE // STATUS: OBJECTIVE ACCOMPLISHED");
-		pseudoOS_.SetStartMenuTitle("DAWN_OS : MISSION DEBRIEF");
+		InitializeOS(spriteCommon, PseudoOS::Theme::TacticalCyan,
+			"DAWN_OS TACTICAL OPERATION DEBRIEF [v4.12.0]",
+			"MISSION DIRECTIVE // STATUS: OBJECTIVE ACCOMPLISHED",
+			"DAWN_OS : MISSION DEBRIEF",
+			{ 0.01f, 0.02f, 0.05f, 0.95f });
 
 		// スタートメニュー項目の登録
 		std::vector<PseudoOS::StartMenuItem> smItems = {

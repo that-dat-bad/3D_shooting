@@ -186,7 +186,7 @@
     <ClInclude Include="src\Game\Scene\GameOverSceneInternal.h" />
       <Filter>驛｢譎鞘ぎ・･郢晢ｽ｣驛｢謨問ぎ驛｢譎｢・ｽ・ｼ 驛｢譎・ｽｼ譁撰ｼ憺Δ・ｧ繝ｻ・､驛｢譎｢・ｽ・ｫ</Filter>
     </ClInclude>
-    <ClInclude Include="src\Game\Scene\Iscene.h">
+    <ClInclude Include="src\Game\Scene\OSSceneBase.h">`r`n      <Filter>ヘッダー ファイル</Filter>`r`n    </ClInclude>`r`n    <ClInclude Include="src\Game\Scene\Iscene.h">
       <Filter>驛｢譎鞘ぎ・･郢晢ｽ｣驛｢謨問ぎ驛｢譎｢・ｽ・ｼ 驛｢譎・ｽｼ譁撰ｼ憺Δ・ｧ繝ｻ・､驛｢譎｢・ｽ・ｫ</Filter>
     </ClInclude>
     <ClInclude Include="src\Game\Scene\SceneManager.h">
@@ -512,7 +512,7 @@
     <ClCompile Include="src\Game\Scene\GameOverScene_Windows.cpp" />
       <Filter>驛｢・ｧ繝ｻ・ｽ驛｢譎｢・ｽ・ｼ驛｢・ｧ繝ｻ・ｹ 驛｢譎・ｽｼ譁撰ｼ憺Δ・ｧ繝ｻ・､驛｢譎｢・ｽ・ｫ</Filter>
     </ClCompile>
-    <ClCompile Include="src\Game\Scene\IScene.cpp">
+    <ClCompile Include="src\Game\Scene\OSSceneBase.cpp">`r`n      <Filter>ソース ファイル</Filter>`r`n    </ClCompile>`r`n    <ClCompile Include="src\Game\Scene\IScene.cpp">
       <Filter>驛｢・ｧ繝ｻ・ｽ驛｢譎｢・ｽ・ｼ驛｢・ｧ繝ｻ・ｹ 驛｢譎・ｽｼ譁撰ｼ憺Δ・ｧ繝ｻ・､驛｢譎｢・ｽ・ｫ</Filter>
     </ClCompile>
     <ClCompile Include="src\Game\Scene\SceneManager.cpp">

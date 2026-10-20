@@ -44,20 +44,13 @@ void GameOverScene::PrewarmAssets() {
 		rebootBlackoutSprite_->Initialize(spriteCommon, "assets/textures/white1x1.png");
 
 		// ============================
-		// 背景オーバーレイ（深紅のミリタリーOSカーネルパニック）
+		// 疑似OS環境（カーネルパニック仕様：KernelPanicRed）および背景パネル初期化
 		// ============================
-		backgroundPanel_.Initialize(spriteCommon);
-		backgroundPanel_.SetPosition({ 0.0f, 0.0f });
-		backgroundPanel_.SetSize({ kScreenWidth, kScreenHeight });
-		backgroundPanel_.SetBackgroundColor({ 0.12f, 0.012f, 0.012f, 0.95f });
-
-		// ============================
-		// 疑似OS環境（カーネルパニック仕様：KernelPanicRed）
-		// ============================
-		pseudoOS_.Initialize(spriteCommon, PseudoOS::Theme::KernelPanicRed);
-		pseudoOS_.SetOSName("DAWN_OS CRITICAL EXCEPTION RECOVERY [v4.12.0]");
-		pseudoOS_.SetSecurityClearance("EXCEPTION 0xC0000005 // KERNEL PANIC TRACE");
-		pseudoOS_.SetStartMenuTitle("DAWN_OS : RECOVERY MENU");
+		InitializeOS(spriteCommon, PseudoOS::Theme::KernelPanicRed,
+			"DAWN_OS CRITICAL EXCEPTION RECOVERY [v4.12.0]",
+			"EXCEPTION 0xC0000005 // KERNEL PANIC TRACE",
+			"DAWN_OS : RECOVERY MENU",
+			{ 0.12f, 0.012f, 0.012f, 0.95f });
 
 		// スタートメニュー項目の登録
 		std::vector<PseudoOS::StartMenuItem> smItems = {
