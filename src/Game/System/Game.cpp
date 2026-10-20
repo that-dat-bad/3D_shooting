@@ -132,10 +132,10 @@ void Game::Update() {
 		UIEditorWindow::GetInstance()->Toggle();
 	}
 
-	// 終了リクエストの例 (Escキーで終了など)
-	if (Input::GetInstance()->TriggerKey(DIK_ESCAPE)) {
-		endRequest_ = true;
-	}
+	// Escキーによる強制終了は無効化（ゲーム内UI操作や誤操作でウィンドウが閉じないようにする）
+	// if (Input::GetInstance()->TriggerKey(DIK_ESCAPE)) {
+	// 	endRequest_ = true;
+	// }
 }
 
 void Game::Draw() {
