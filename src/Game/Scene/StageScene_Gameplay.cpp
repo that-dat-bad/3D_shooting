@@ -37,6 +37,12 @@ void StageScene::UpdateFlightControls(float gameDeltaTime) {
 		return;
 	}
 
+	// ゲームオーバー中・クリア演出中・終了シーケンス中は操作遮断（オートパイロットへ完全委譲）
+	if (isGameOver_ || isMissionCleared_ || endSequence_ != StageEndSequence::None) {
+		flightModel_.SetControlInput(0.0f, 0.0f, 0.0f);
+		return;
+	}
+
 	if (!isGameOver_) {
 		// --- スロットル ---
 		if (input->PushKey(DIK_W)) {
@@ -936,18 +942,20 @@ void StageScene::UpdatePostEffects(float deltaTime) {
 		environmentManager_.Update(nullptr, kDeltaTime);
 	}
 
-	// 3. Gフォースによるビネット
-	float blackout = flightModel_.GetBlackoutFactor();
-	float redout = flightModel_.GetRedoutFactor();
-	if (blackout > 0.0f || redout > 0.0f) {
-		ActivePostEffect vig;
-		vig.type = PostEffectType::kVignette;
-		vig.intensity = blackout * 5.0f;
-		vig.dirX = redout * 1.5f;
-		vig.colorR = 0.9f;
-		vig.colorG = 0.05f;
-		vig.colorB = 0.05f;
-		postEffect->AddActiveEffect(vig);
+	// 3. Gフォースによるビネット（ゲームクリア演出中・ゲームオーバー演出中は無効化）
+	if (!isMissionCleared_ && endSequence_ == StageEndSequence::None) {
+		float blackout = flightModel_.GetBlackoutFactor();
+		float redout = flightModel_.GetRedoutFactor();
+		if (blackout > 0.0f || redout > 0.0f) {
+			ActivePostEffect vig;
+			vig.type = PostEffectType::kVignette;
+			vig.intensity = blackout * 5.0f;
+			vig.dirX = redout * 1.5f;
+			vig.colorR = 0.9f;
+			vig.colorG = 0.05f;
+			vig.colorB = 0.05f;
+			postEffect->AddActiveEffect(vig);
+		}
 	}
 
 	// 4. 戦闘HUDの更新

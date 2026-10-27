@@ -34,6 +34,8 @@ namespace {
 // ============================================================
 void DamageModel::Initialize()
 {
+	isInvulnerable_ = false;
+
 	// --- パーツ定義テーブル（War Thunder A5M4データ準拠） ---
 	auto SetDef = [this](DamagePart part, float hp, ArmorMaterial mat, float dmgMult = 1.0f, bool canSep = false) {
 		int idx = static_cast<int>(part);
@@ -195,6 +197,10 @@ HitResult DamageModel::ProcessHit(DamagePart part, float rawDamage)
 	HitResult result;
 	result.hitPart = part;
 
+	if (isInvulnerable_) {
+		return result;
+	}
+
 	int idx = static_cast<int>(part);
 	if (idx < 0 || idx >= kPartCount) return result;
 
@@ -292,6 +298,10 @@ HitResult DamageModel::ProcessBulletHit(
 	const MyMath::Quaternion& aircraftOrientation,
 	float rawDamage)
 {
+	if (isInvulnerable_) {
+		return HitResult{};
+	}
+
 	DamagePart hitPart = TestHitPart(bulletWorldPos, aircraftPos, aircraftOrientation);
 	return ProcessHit(hitPart, rawDamage);
 }
@@ -460,6 +470,10 @@ void DamageModel::ProcessGroundCollision(
 	float dt,
 	float groundY)
 {
+	if (isInvulnerable_) {
+		return;
+	}
+
 	float speed = MyMath::Length(velocity);
 
 	// クォータニオンから機体のローカル3軸方向ベクトル（ワールド空間）を計算

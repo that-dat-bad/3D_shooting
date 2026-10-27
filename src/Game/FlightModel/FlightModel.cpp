@@ -34,6 +34,11 @@ FlightModel::FlightModel()
 	, isStalling_(false)
 	, blackoutFactor_(0.0f)
 	, redoutFactor_(0.0f)
+	, blackoutToleranceTimer_(0.0f)
+	, redoutToleranceTimer_(0.0f)
+	, isInvulnerable_(false)
+	, gEffectsEnabled_(true)
+	, isAutopilot_(false)
 	, targetThrottle_(0.0f)
 	, inputPitch_(0.0f)
 	, inputRoll_(0.0f)
@@ -63,6 +68,11 @@ void FlightModel::Initialize(const AirframeData& airframeData, const EngineData&
 	isStalling_ = false;
 	blackoutFactor_ = 0.0f;
 	redoutFactor_ = 0.0f;
+	blackoutToleranceTimer_ = 0.0f;
+	redoutToleranceTimer_ = 0.0f;
+	isInvulnerable_ = false;
+	gEffectsEnabled_ = true;
+	isAutopilot_ = false;
 
 	// 入力状態をリセット
 	targetThrottle_ = 0.0f;
@@ -96,6 +106,19 @@ void FlightModel::Update(float deltaTime)
 	// 4. ペイロードの更新
 	for (auto& payload : payloads_) {
 		payload->Update(deltaTime);
+	}
+
+	// 4.5. オートパイロット（クリア演出・自動操縦）モード時のバイパス
+	if (isAutopilot_) {
+		position_ = MyMath::Add(position_, MyMath::Multiply(deltaTime, velocity_));
+		currentG_ = 1.0f;
+		currentAoA_ = 0.0f;
+		isStalling_ = false;
+		blackoutFactor_ = 0.0f;
+		redoutFactor_ = 0.0f;
+		blackoutToleranceTimer_ = 0.0f;
+		redoutToleranceTimer_ = 0.0f;
+		return;
 	}
 
 	// 5. AoA計算（姿勢更新前に現在のAoAを知っておく）
@@ -516,6 +539,15 @@ void FlightModel::UpdateOrientation(float deltaTime)
 // ===========================================================
 void FlightModel::UpdateGEffects(float deltaTime)
 {
+	// G効果が無効化されている場合、またはオートパイロット時
+	if (!gEffectsEnabled_ || isAutopilot_) {
+		blackoutFactor_ = 0.0f;
+		redoutFactor_ = 0.0f;
+		blackoutToleranceTimer_ = 0.0f;
+		redoutToleranceTimer_ = 0.0f;
+		return;
+	}
+
 	// --- Gエフェクト進行の共通処理 ---
 	auto UpdateGEffect = [&](float currentG, float onsetG, float buildRate, float& toleranceTimer, float& factor) {
 		bool isTriggered = false;
@@ -551,6 +583,10 @@ void FlightModel::UpdateGEffects(float deltaTime)
 	UpdateGEffect(currentG_, kRedoutOnsetG, kGEffectBuildRate * 1.5f, redoutToleranceTimer_, redoutFactor_);
 
 	// --- 構造G超過ダメージ（翼に蓄積） ---
+	if (isInvulnerable_) {
+		return;
+	}
+
 	float posLimit = airframe_.GetPositiveGLimit();
 	float negLimit = airframe_.GetNegativeGLimit();
 

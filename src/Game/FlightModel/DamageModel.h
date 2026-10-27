@@ -123,6 +123,10 @@ public:
 	/// @return 被弾結果
 	HitResult ProcessHit(DamagePart part, float rawDamage);
 
+	/// @brief 無敵モードの設定（被弾・地面衝突ダメージを0にする）
+	void SetInvulnerable(bool inv) { isInvulnerable_ = inv; }
+	bool IsInvulnerable() const { return isInvulnerable_; }
+
 	/// @brief ワールド空間の弾丸位置から被弾パーツを判定してダメージを与える
 	/// @param bulletWorldPos 弾丸のワールド座標
 	/// @param aircraftPos 機体のワールド座標
@@ -250,4 +254,7 @@ private:
 
 	// サブコライダー群
 	std::vector<SubColliderDef> subColliders_;
+
+	// 無敵フラグ
+	bool isInvulnerable_ = false;
 };

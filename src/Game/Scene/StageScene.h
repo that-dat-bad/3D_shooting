@@ -101,7 +101,7 @@ private:
 		uint32_t GetCollisionAttribute() const override { return CollisionAttribute::kPlayer; }
 		uint32_t GetCollisionMask() const override { return CollisionMask::kPlayer; }
 		void OnCollision(ICollisionBody3D* other) override;
-		bool IsCollisionActive() const override { return !scene_->isMissionFailed_; }
+		bool IsCollisionActive() const override { return !scene_->isMissionFailed_ && !scene_->isMissionCleared_; }
 	};
 	PlayerCollisionBody playerBody_;
 
@@ -132,6 +132,12 @@ private:
 	};
 	StageEndSequence endSequence_ = StageEndSequence::None;
 	float endSeqTimer_ = 0.0f;
+
+	// クリア演出用パラメータ（飛行機離脱機動用）
+	MyMath::Quaternion clearStartOrientation_{ 0.0f, 0.0f, 0.0f, 1.0f };
+	MyMath::Vector3 clearStartForward_{ 0.0f, 0.0f, 1.0f };
+	MyMath::Vector3 clearHorizontalDir_{ 0.0f, 0.0f, 1.0f };
+	float clearStartSpeed_ = 100.0f;
 
 	void TriggerGameOver();
 	void TriggerGameClear();

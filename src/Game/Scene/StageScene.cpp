@@ -273,6 +273,10 @@ void StageScene::ResetGameplayState() {
 	missionElapsedTime_ = 0.0f;
 	isPaused_ = false;
 	isPauseAborting_ = false;
+	flightModel_.SetInvulnerable(false);
+	flightModel_.SetGEffectsEnabled(true);
+	flightModel_.ResetGEffects();
+	flightModel_.SetAutopilot(false);
 	pauseAbortTimer_ = 0.0f;
 	pauseMenuIndex_ = 0;
 	pauseAnimTimer_ = 0.0f;

@@ -1,6 +1,60 @@
 #include "StageSceneInternal.h"
+#include <cmath>
 
 using namespace MyMath;
+
+namespace {
+	// 直交正規基底 (Right, Up, Forward) からクォータニオンを計算
+	MyMath::Quaternion BasisToQuaternion(const MyMath::Vector3& r, const MyMath::Vector3& u, const MyMath::Vector3& f) {
+		float tr = r.x + u.y + f.z;
+		MyMath::Quaternion q{};
+		if (tr > 0.0f) {
+			float s = std::sqrt(tr + 1.0f) * 2.0f;
+			q.w = 0.25f * s;
+			q.x = (u.z - f.y) / s;
+			q.y = (f.x - r.z) / s;
+			q.z = (r.y - u.x) / s;
+		} else if ((r.x > u.y) && (r.x > f.z)) {
+			float s = std::sqrt(1.0f + r.x - u.y - f.z) * 2.0f;
+			q.w = (u.z - f.y) / s;
+			q.x = 0.25f * s;
+			q.y = (r.y + u.x) / s;
+			q.z = (f.x + r.z) / s;
+		} else if (u.y > f.z) {
+			float s = std::sqrt(1.0f + u.y - r.x - f.z) * 2.0f;
+			q.w = (f.x - r.z) / s;
+			q.x = (r.y + u.x) / s;
+			q.y = 0.25f * s;
+			q.z = (u.z + f.y) / s;
+		} else {
+			float s = std::sqrt(1.0f + f.z - r.x - u.y) * 2.0f;
+			q.w = (r.y - u.x) / s;
+			q.x = (f.x + r.z) / s;
+			q.y = (u.z + f.y) / s;
+			q.z = 0.25f * s;
+		}
+		float len = std::sqrt(q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w);
+		if (len > 0.0001f) {
+			float inv = 1.0f / len;
+			q.x *= inv; q.y *= inv; q.z *= inv; q.w *= inv;
+		}
+		return q;
+	}
+
+	// 目標の前方ベクトルと基準上方向からクォータニオンを生成
+	MyMath::Quaternion LookRotation(const MyMath::Vector3& forward, const MyMath::Vector3& desiredUp = { 0.0f, 1.0f, 0.0f }) {
+		MyMath::Vector3 f = MyMath::Normalize(forward);
+		MyMath::Vector3 upRef = desiredUp;
+		if (std::fabs(MyMath::Dot(f, upRef)) > 0.99f) {
+			upRef = { 0.0f, 0.0f, 1.0f };
+		}
+		// Right = desiredUp × forward
+		MyMath::Vector3 r = MyMath::Normalize(MyMath::Cross(upRef, f));
+		// Up = forward × Right
+		MyMath::Vector3 u = MyMath::Cross(f, r);
+		return BasisToQuaternion(r, u, f);
+	}
+}
 
 void StageScene::TriggerGameOver() {
 	if (isGameOver_ || isMissionCleared_) { return; }
@@ -32,6 +86,28 @@ void StageScene::TriggerGameClear() {
 	endSequence_ = StageEndSequence::Clear_HudShutdown;
 	endSeqTimer_ = 0.0f;
 
+	// 自機を完全無敵化（受けるダメージ0）
+	flightModel_.SetInvulnerable(true);
+
+	// G効果（ブラックアウト・レッドアウト）を即座に無効化＆リセット
+	flightModel_.SetGEffectsEnabled(false);
+	flightModel_.ResetGEffects();
+
+	// オートパイロット移行（物理シミュレーションを直接制御）
+	flightModel_.SetAutopilot(true);
+
+	// 離脱機動の初期状態を保持
+	clearStartOrientation_ = flightModel_.GetOrientation();
+	clearStartForward_ = flightModel_.GetForwardDirection();
+	clearStartSpeed_ = (std::max)(flightModel_.GetSpeed(), 120.0f);
+
+	Vector3 horiz = { clearStartForward_.x, 0.0f, clearStartForward_.z };
+	if (Length(horiz) > 0.001f) {
+		clearHorizontalDir_ = Normalize(horiz);
+	} else {
+		clearHorizontalDir_ = { 0.0f, 0.0f, 1.0f };
+	}
+
 	// 項目5: HUDの順次シャットダウン開始
 	hud_.StartShutdown();
 }
@@ -40,7 +116,7 @@ void StageScene::TriggerGameClear() {
 // PlayerCollisionBody のコールバック実装
 // ============================================================
 void StageScene::PlayerCollisionBody::OnCollision(ICollisionBody3D* other) {
-	if (!scene_ || scene_->isMissionFailed_) { return; }
+	if (!scene_ || scene_->isMissionFailed_ || scene_->isMissionCleared_) { return; }
 
 	// EnemyBullet との衝突 → サブコライダー被弾処理
 	if (other->GetCollisionAttribute() & CollisionAttribute::kEnemyBullet) {
@@ -245,8 +321,23 @@ void StageScene::UpdateEndSequence(float dt) {
 	}
 	// --- ステージクリア系 ---
 	else if (endSequence_ == StageEndSequence::Clear_HudShutdown) {
-		// 0.0s - 1.2s: 目標達成ファンファーレ & 発光
+		// 0.0s - 1.2s: 目標達成ファンファーレ & HUD順次OFFLINE消去
+		// 自機は機動姿勢を整え（水平レベリング）、アフターバーナー点火（加速開始）
 		timeScale_ = 1.0f;
+
+		// 翼のロールを水平に戻す目標姿勢（水平巡航姿勢）
+		Quaternion qLevel = LookRotation(clearHorizontalDir_, { 0.0f, 1.0f, 0.0f });
+
+		// 最初の0.8秒でクリア突入時の姿勢から水平姿勢へ滑らかに復帰
+		float levelT = std::clamp(endSeqTimer_ / 0.8f, 0.0f, 1.0f);
+		float smoothT = levelT * levelT * (3.0f - 2.0f * levelT);
+		Quaternion currentOri = Slerp(clearStartOrientation_, qLevel, smoothT);
+		flightModel_.SetOrientation(currentOri);
+
+		// 速度：クリア開始速度から巡航加速（約180m/sへ）
+		float speed = clearStartSpeed_ + smoothT * (180.0f - clearStartSpeed_);
+		Vector3 curFwd = flightModel_.GetForwardDirection();
+		flightModel_.SetVelocity(Multiply(speed, curFwd));
 
 		ActivePostEffect bloom;
 		bloom.type = PostEffectType::kBloom;
@@ -259,33 +350,60 @@ void StageScene::UpdateEndSequence(float dt) {
 			endSequence_ = StageEndSequence::Clear_AutopilotReturn;
 		}
 	} else if (endSequence_ == StageEndSequence::Clear_AutopilotReturn) {
-		// 1.2s - 2.5s: オートパイロット帰還時の超音速ワープ急加速演出（指摘2: ラジアルブラー画面全体シェーダー）
+		// 1.2s - 2.5s: オートパイロット帰還時の超音速ズームクライム急上昇・急加速離脱機動
 		timeScale_ = 1.0f;
+
+		// 水平巡航姿勢と、目標上昇姿勢（ピッチ角 約38度ピッチアップ）
+		Quaternion qLevel = LookRotation(clearHorizontalDir_, { 0.0f, 1.0f, 0.0f });
+
+		// ピッチアップ上昇角: 約38度（約0.663ラジアン）
+		constexpr float kClimbAngle = 38.0f * (3.14159265f / 180.0f);
+		Vector3 climbForward = Normalize(Add(
+			Multiply(std::cos(kClimbAngle), clearHorizontalDir_),
+			{ 0.0f, std::sin(kClimbAngle), 0.0f }
+		));
+		Quaternion qClimb = LookRotation(climbForward, { 0.0f, 1.0f, 0.0f });
+
+		// 1.3秒間かけて滑らかに機首を持ち上げ（ピッチアップ）、進行方向と機体姿勢を完全に一致させる
 		float climbT = std::clamp((endSeqTimer_ - 1.2f) / 1.3f, 0.0f, 1.0f);
-		float speed = 120.0f + climbT * 600.0f; // 圧倒的最高速
+		float smoothClimb = climbT * climbT * (3.0f - 2.0f * climbT);
+		Quaternion currentOri = Slerp(qLevel, qClimb, smoothClimb);
+		flightModel_.SetOrientation(currentOri);
+
+		// 速度：機首を上げながらアフターバーナー全開で超音速（約660m/s = マッハ2）へ急加速！
+		float speed = 180.0f + smoothClimb * 480.0f;
 		Vector3 curFwd = flightModel_.GetForwardDirection();
-		Vector3 climbDir = Normalize(Add(curFwd, { 0.0f, 0.65f * climbT, 0.0f }));
-		flightModel_.SetVelocity(Multiply(speed, climbDir));
+		flightModel_.SetVelocity(Multiply(speed, curFwd));
 
 		// 1. ラジアルブラー（スピード感・ワープ感の画面全体演出）
 		ActivePostEffect blur;
 		blur.type = PostEffectType::kRadialBlur;
 		blur.kernelSize = 8;
-		blur.intensity = climbT * 0.08f;
+		blur.intensity = smoothClimb * 0.08f;
 		postEffect->AddActiveEffect(blur);
 
 		// 2. 色収差（光速突入の色ズレ）
 		ActivePostEffect ca;
 		ca.type = PostEffectType::kChromaticAberration;
-		ca.intensity = climbT * 0.04f;
+		ca.intensity = smoothClimb * 0.04f;
 		postEffect->AddActiveEffect(ca);
 
 		if (endSeqTimer_ >= 2.5f) {
 			endSequence_ = StageEndSequence::Clear_TacticalMapZoom;
 		}
 	} else if (endSequence_ == StageEndSequence::Clear_TacticalMapZoom) {
-		// 2.5s - 3.8s: 戦術マップ表示（走査線 + ビネット）＆ ターミナル転送接続（指摘3, 4）
+		// 2.5s - 3.8s: 戦術マップ表示（走査線 + ビネット）＆ ターミナル転送接続
 		timeScale_ = 1.0f;
+
+		// 機体は最高速のまま空へ離脱を継続
+		constexpr float kClimbAngle = 38.0f * (3.14159265f / 180.0f);
+		Vector3 climbForward = Normalize(Add(
+			Multiply(std::cos(kClimbAngle), clearHorizontalDir_),
+			{ 0.0f, std::sin(kClimbAngle), 0.0f }
+		));
+		Quaternion qClimb = LookRotation(climbForward, { 0.0f, 1.0f, 0.0f });
+		flightModel_.SetOrientation(qClimb);
+		flightModel_.SetVelocity(Multiply(660.0f, flightModel_.GetForwardDirection()));
 
 		ActivePostEffect scan;
 		scan.type = PostEffectType::kScanLine;

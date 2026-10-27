@@ -71,6 +71,19 @@ public:
 	DamageModel& GetDamageModel() { return airframe_.GetDamageModel(); }
 	const DamageModel& GetDamageModel() const { return airframe_.GetDamageModel(); }
 
+	// 無敵モード制御（被弾・地面衝突・構造Gダメージを0にする）
+	void SetInvulnerable(bool inv) { isInvulnerable_ = inv; airframe_.GetDamageModel().SetInvulnerable(inv); }
+	bool IsInvulnerable() const { return isInvulnerable_; }
+
+	// G効果（ブラックアウト・レッドアウト）の制御
+	void SetGEffectsEnabled(bool enabled) { gEffectsEnabled_ = enabled; if (!enabled) { ResetGEffects(); } }
+	bool IsGEffectsEnabled() const { return gEffectsEnabled_; }
+	void ResetGEffects() { blackoutFactor_ = 0.0f; redoutFactor_ = 0.0f; blackoutToleranceTimer_ = 0.0f; redoutToleranceTimer_ = 0.0f; }
+
+	// オートパイロット（クリア演出・自動操縦）モード
+	void SetAutopilot(bool autopilot) { isAutopilot_ = autopilot; }
+	bool IsAutopilot() const { return isAutopilot_; }
+
 	/// @brief 弾丸のワールド位置からサブコライダー被弾処理を実行
 	HitResult ProcessBulletHit(const MyMath::Vector3& bulletWorldPos, float rawDamage) {
 		return airframe_.GetDamageModel().ProcessBulletHit(bulletWorldPos, position_, orientation_, rawDamage);
@@ -116,6 +129,9 @@ private:
 	float redoutFactor_;      // レッドアウト度合い (-G)
 	float blackoutToleranceTimer_ = 0.0f; // ブラックアウトまでの猶予タイマー
 	float redoutToleranceTimer_ = 0.0f;   // レッドアウトまでの猶予タイマー
+	bool  isInvulnerable_ = false;       // 無敵フラグ
+	bool  gEffectsEnabled_ = true;       // G効果有効フラグ
+	bool  isAutopilot_ = false;          // オートパイロット演出フラグ
 
 	// プレイヤーからの入力状態
 	float targetThrottle_;  // 目標スロットル
