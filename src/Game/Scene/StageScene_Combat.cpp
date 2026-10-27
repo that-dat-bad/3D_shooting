@@ -62,9 +62,10 @@ void StageScene::TriggerGameOver() {
 	isMissionFailed_ = true;
 	gameOverTimer_ = 0.0f;
 	playerHP_ = 0.0f;
-	timeScale_ = 0.35f; // 被弾スローモーション
+	timeScale_ = 1.0f; // Ace Combat演出中は完全停止させず、燃え落ちる機体をフルスピードで追う
 	endSequence_ = StageEndSequence::GameOver_Critical;
 	endSeqTimer_ = 0.0f;
+	gameOverBurnTimer_ = 0.0f;
 
 	// 被弾・墜落ゲームオーバーを設定
 	auto& res = GameResult::GetInstance();
@@ -73,15 +74,58 @@ void StageScene::TriggerGameOver() {
 	// 非同期処理による軽量化：ゲームオーバー演出中にバックグラウンドで次ステージデータを非同期プリロード！
 	AsyncPreloadManager::GetInstance()->StartStagePreloadAsync();
 
-	// 項目4: テーマカラー赤反転
+	// テーマカラー赤反転
 	hud_.SetWarningColorMode(true);
 
+	// 初撃爆破エフェクト（火球・閃光・破片飛散）
 	EffectManager::GetInstance()->EmitDestroyEffect(flightModel_.GetPosition());
+
+	// ベイルアウト時：キャノピー吹き飛ばし＆射出座席の火花演出
+	if (isBailout_) {
+		ParticleParameters ejectParams;
+		Vector3 upDir = flightModel_.GetUpDirection();
+		ejectParams.minVelocity = Add(flightModel_.GetVelocity(), Multiply(15.0f, upDir));
+		ejectParams.maxVelocity = Add(flightModel_.GetVelocity(), Multiply(25.0f, upDir));
+		ejectParams.minColor = { 1.0f, 0.85f, 0.40f, 1.0f };
+		ejectParams.maxColor = { 1.0f, 0.95f, 0.70f, 1.0f };
+		ejectParams.minLifeTime = 0.8f;
+		ejectParams.maxLifeTime = 1.4f;
+		ejectParams.minScale = 0.2f;
+		ejectParams.maxScale = 0.6f;
+		ejectParams.endScale = 0.0f;
+		ejectParams.fadeOut = true;
+		ejectParams.isStretched = true;
+		ejectParams.stretchFactor = 0.08f;
+		ParticleManager::GetInstance()->Emit("ExplosionSpark", Add(flightModel_.GetPosition(), Multiply(1.5f, upDir)), ejectParams, 15);
+	}
 
 	// カメラシェイクによる被弾・撃墜の強烈な物理的衝撃（指摘1）
 	if (CameraManager::GetInstance()->GetActiveCamera()) {
 		CameraManager::GetInstance()->GetActiveCamera()->Shake(1.2f, 4.0f);
 	}
+
+	// 機体を制御不能・オートパイロットバイパス状態へ
+	flightModel_.SetAutopilot(true);
+	flightModel_.SetInvulnerable(true);
+	flightModel_.SetGEffectsEnabled(false);
+	flightModel_.ResetGEffects();
+
+	// 墜落弾道速度の初期化（前進モーメンタムを維持）
+	Vector3 curVel = flightModel_.GetVelocity();
+	float curSpeed = Length(curVel);
+	Vector3 forward = flightModel_.GetForwardDirection();
+	if (curSpeed < 40.0f) {
+		gameOverVelocity_ = Add(Multiply(70.0f, forward), { 0.0f, -10.0f, 0.0f });
+	} else {
+		gameOverVelocity_ = curVel;
+	}
+
+	// エースコンバット風の制御不能きりもみ回転（タンブル角速度）
+	float rollDir = ((rand() % 2) == 0) ? 1.0f : -1.0f;
+	float yawDir = ((rand() % 2) == 0) ? 1.0f : -1.0f;
+	gameOverTumbleRate_.x = -1.1f - (rand() % 60) * 0.01f; // 機首下げピッチ (-1.1〜-1.7 rad/s)
+	gameOverTumbleRate_.y = yawDir * (0.8f + (rand() % 50) * 0.01f); // ヨー旋回 (±0.8〜±1.3 rad/s)
+	gameOverTumbleRate_.z = rollDir * (4.2f + (rand() % 120) * 0.01f); // 激しい高速ロール (±4.2〜±5.4 rad/s)
 }
 
 void StageScene::TriggerTimeOver() {
@@ -272,94 +316,273 @@ void StageScene::UpdateEndSequence(float dt) {
 	PostEffect* postEffect = PostEffect::GetInstance();
 	postEffect->ClearActiveEffects();
 
-	// --- ゲームオーバー系（被弾・撃墜のシステム破壊演出をシェーダーで画面全体に展開：指摘1, 5）---
-	if (endSequence_ == StageEndSequence::GameOver_Critical) {
-		// 0.0s - 0.25s: 撃墜瞬間の被弾スローモーション & 激しい画面破壊シェーダー
-		timeScale_ = 0.20f;
+	// --- ゲームオーバー系（エースコンバット風：機体炎上きりもみ落下 & 連続火炎・黒煙・火花放出 & 通信シグナル段階的途絶）---
+	if (endSequence_ == StageEndSequence::GameOver_Critical ||
+		endSequence_ == StageEndSequence::GameOver_SignalLost ||
+		endSequence_ == StageEndSequence::GameOver_CrtShutdown) {
 
-		// 1. 赤色警告ティントストロボ点滅
-		ActivePostEffect tint;
-		tint.type = PostEffectType::kColorTint;
-		tint.colorR = 1.0f;
-		tint.colorG = (std::fmod(endSeqTimer_, 0.08f) < 0.04f) ? 0.15f : 0.40f;
-		tint.colorB = 0.10f;
-		postEffect->AddActiveEffect(tint);
+		timeScale_ = 1.0f; // 物理更新と炎・煙の動きを止めずに実時間でシミュレーション
 
-		// 2. 衝撃レンズ歪み
-		ActivePostEffect dist;
-		dist.type = PostEffectType::kLensDistortion;
-		dist.intensity = 0.25f;
-		postEffect->AddActiveEffect(dist);
+		// 1. 落下重力と空気抵抗による弾道計算（緩やかに機首を下げながらきりもみ落下）
+		gameOverVelocity_.y -= 9.81f * 1.5f * dt;
+		gameOverVelocity_.x *= (1.0f - 0.15f * dt);
+		gameOverVelocity_.z *= (1.0f - 0.15f * dt);
 
-		// 3. 激しい色収差 (RGB分離)
-		ActivePostEffect ca;
-		ca.type = PostEffectType::kChromaticAberration;
-		ca.intensity = 0.08f;
-		postEffect->AddActiveEffect(ca);
-
-		// 4. ランダム破壊ノイズ
-		ActivePostEffect noise;
-		noise.type = PostEffectType::kRandom;
-		noise.intensity = 0.35f;
-		postEffect->AddActiveEffect(noise);
-
-		if (endSeqTimer_ >= 0.25f) {
-			endSequence_ = StageEndSequence::GameOver_SignalLost;
+		Vector3 curPos = flightModel_.GetPosition();
+		Vector3 newPos = Add(curPos, Multiply(dt, gameOverVelocity_));
+		if (newPos.y < -5.0f) {
+			newPos.y = -5.0f;
+			gameOverVelocity_.y = 0.0f;
 		}
-	} else if (endSequence_ == StageEndSequence::GameOver_SignalLost) {
-		// 0.25s - 0.70s: 致命的通信途絶・フリーズ & 激しい走査線同期乱れ & SIGNAL LOST
-		timeScale_ = 0.0f;
+		flightModel_.SetPosition(newPos);
+		flightModel_.SetVelocity(gameOverVelocity_);
 
-		// 1. 走査線の乱れ
-		ActivePostEffect scan;
-		scan.type = PostEffectType::kScanLine;
-		scan.kernelSize = 0;
-		scan.intensity = 0.45f;
-		scan.dirX = 250.0f;
-		scan.dirY = -30.0f;
-		postEffect->AddActiveEffect(scan);
+		// 2. きりもみ回転（タンブル）クォータニオン更新
+		Vector3 right = flightModel_.GetRightDirection();
+		Vector3 up = flightModel_.GetUpDirection();
+		Vector3 forward = flightModel_.GetForwardDirection();
 
-		// 2. デジタルグリッチノイズ
-		ActivePostEffect noise;
-		noise.type = PostEffectType::kRandom;
-		noise.intensity = 0.45f;
-		postEffect->AddActiveEffect(noise);
+		float pitchAngle = gameOverTumbleRate_.x * dt;
+		float yawAngle   = gameOverTumbleRate_.y * dt;
+		float rollAngle  = gameOverTumbleRate_.z * dt;
 
-		// 3. 色収差
-		ActivePostEffect ca;
-		ca.type = PostEffectType::kChromaticAberration;
-		ca.intensity = 0.06f;
-		postEffect->AddActiveEffect(ca);
+		auto makeRot = [](const Vector3& axis, float angle) -> Quaternion {
+			float half = angle * 0.5f;
+			float s = std::sin(half);
+			float c = std::cos(half);
+			return { axis.x * s, axis.y * s, axis.z * s, c };
+		};
+		auto qMul = [](const Quaternion& a, const Quaternion& b) -> Quaternion {
+			return {
+				a.w * b.x + a.x * b.w + a.y * b.z - a.z * b.y,
+				a.w * b.y - a.x * b.z + a.y * b.w + a.z * b.x,
+				a.w * b.z + a.x * b.y - a.y * b.x + a.z * b.w,
+				a.w * b.w - a.x * b.x - a.y * b.y - a.z * b.z
+			};
+		};
 
-		// 4. 赤暗化ビネット
-		ActivePostEffect vig;
-		vig.type = PostEffectType::kVignette;
-		vig.intensity = 1.4f;
-		postEffect->AddActiveEffect(vig);
+		Quaternion qP = makeRot(right, pitchAngle);
+		Quaternion qY = makeRot(up, yawAngle);
+		Quaternion qR = makeRot(forward, rollAngle);
+		Quaternion comb = qMul(qR, qMul(qY, qP));
+		flightModel_.SetOrientation(qMul(comb, flightModel_.GetOrientation()));
 
-		if (endSeqTimer_ >= 0.70f) {
-			endSequence_ = StageEndSequence::GameOver_CrtShutdown;
+		// 3. 機体からの激しい火炎・濃密黒煙・火花トレイルの連続放出（煙出しながら激しく燃える）
+		gameOverBurnTimer_ += dt;
+		if (gameOverBurnTimer_ >= 0.020f) {
+			gameOverBurnTimer_ = 0.0f;
+			ParticleManager* pm = ParticleManager::GetInstance();
+			Vector3 planePos = flightModel_.GetPosition();
+			Vector3 planeFwd = flightModel_.GetForwardDirection();
+			Vector3 planeRight = flightModel_.GetRightDirection();
+
+			// 炎の発生点: エンジン排気部および被弾した主翼付け根
+			Vector3 firePos1 = Add(planePos, Multiply(-3.5f, planeFwd));
+			Vector3 firePos2 = Add(Add(planePos, Multiply(-1.2f, planeFwd)), Multiply(1.8f, planeRight));
+
+			// 機体後流への気流オフセット
+			Vector3 slipstream = Multiply(-0.06f, planeFwd);
+
+			// ========================================================
+			// A. 激しく燃え盛る火炎 (ExplosionFire - flame_particle.png)
+			//    煙に負けず後方へ大きく広がる高輝度燃焼炎
+			// ========================================================
+			ParticleParameters fireParams;
+			fireParams.minVelocity = Add(slipstream, { -0.04f, -0.01f, -0.04f });
+			fireParams.maxVelocity = Add(slipstream, {  0.04f,  0.06f,  0.04f });
+			fireParams.minColor = { 1.0f, 0.40f, 0.06f, 0.95f };
+			fireParams.maxColor = { 1.0f, 0.95f, 0.35f, 1.0f }; // 高温発光コア
+			fireParams.minLifeTime = 0.40f;
+			fireParams.maxLifeTime = 0.75f;
+			fireParams.minScale = 4.5f;
+			fireParams.maxScale = 7.5f;
+			fireParams.endScale = 14.0f; // 炎が後方で大きく膨張しながら燃え盛る
+			fireParams.fadeOut = true;
+			fireParams.scaleEasing = 0.4f;
+			fireParams.minRotation = 0.0f;
+			fireParams.maxRotation = 6.283f;
+			fireParams.minRotationSpeed = -4.0f;
+			fireParams.maxRotationSpeed = 4.0f;
+			pm->Emit("ExplosionFire", firePos1, fireParams, 4);
+			pm->Emit("ExplosionFire", firePos2, fireParams, 3);
+			pm->Emit("ExplosionFire", planePos, fireParams, 2);
+
+			// ========================================================
+			// B. 内部着火煙（炎から黒煙への過渡熱光レイヤー）
+			// ========================================================
+			ParticleParameters glowingSmoke;
+			glowingSmoke.minVelocity = { -0.035f, 0.02f, -0.035f };
+			glowingSmoke.maxVelocity = {  0.035f, 0.05f,  0.035f };
+			glowingSmoke.minColor = { 0.50f, 0.18f, 0.05f, 0.75f };
+			glowingSmoke.maxColor = { 0.75f, 0.30f, 0.08f, 0.90f };
+			glowingSmoke.minLifeTime = 0.6f;
+			glowingSmoke.maxLifeTime = 1.0f;
+			glowingSmoke.minScale = 5.0f;
+			glowingSmoke.maxScale = 8.0f;
+			glowingSmoke.endScale = 18.0f;
+			glowingSmoke.fadeOut = true;
+			glowingSmoke.scaleEasing = 0.45f;
+			glowingSmoke.minRotation = 0.0f;
+			glowingSmoke.maxRotation = 6.283f;
+			glowingSmoke.minRotationSpeed = -1.2f;
+			glowingSmoke.maxRotationSpeed = 1.2f;
+			pm->Emit("ExplosionSmoke", firePos1, glowingSmoke, 3);
+			pm->Emit("ExplosionSmoke", firePos2, glowingSmoke, 2);
+
+			// ========================================================
+			// C. 濃密黒煙トレイル (ExplosionSmoke - smoke_particle.png)
+			//    空中に滞留し、3D立体陰影を保ちながら巨大に膨張する黒煙雲
+			// ========================================================
+			ParticleParameters smokeParams;
+			smokeParams.minVelocity = { -0.03f, 0.02f, -0.03f };
+			smokeParams.maxVelocity = {  0.03f, 0.05f,  0.03f };
+			smokeParams.minColor = { 0.06f, 0.06f, 0.07f, 0.85f };
+			smokeParams.maxColor = { 0.14f, 0.14f, 0.16f, 0.95f };
+			smokeParams.minLifeTime = 1.8f;
+			smokeParams.maxLifeTime = 2.8f; // 航跡煙を生成
+			smokeParams.minScale = 4.5f;
+			smokeParams.maxScale = 7.5f;
+			smokeParams.endScale = 22.0f; // 後方で巨大な黒煙の帯に膨張
+			smokeParams.fadeOut = true;
+			smokeParams.scaleEasing = 0.40f;
+			smokeParams.minRotation = 0.0f;
+			smokeParams.maxRotation = 6.283f;
+			smokeParams.minRotationSpeed = -0.5f;
+			smokeParams.maxRotationSpeed = 0.5f;
+			pm->Emit("ExplosionSmoke", firePos1, smokeParams, 3);
+			pm->Emit("ExplosionSmoke", firePos2, smokeParams, 2);
+
+			// ========================================================
+			// D. 飛散する火の粉・燃焼スパーク (ExplosionSpark)
+			// ========================================================
+			ParticleParameters sparkParams;
+			Vector3 sparkBaseVel = Multiply(2.0f, slipstream);
+			sparkParams.minVelocity = Add(sparkBaseVel, { -0.12f, -0.06f, -0.12f });
+			sparkParams.maxVelocity = Add(sparkBaseVel, {  0.12f,  0.12f,  0.12f });
+			sparkParams.minColor = { 1.0f, 0.65f, 0.15f, 1.0f };
+			sparkParams.maxColor = { 1.0f, 0.95f, 0.40f, 1.0f };
+			sparkParams.minLifeTime = 0.35f;
+			sparkParams.maxLifeTime = 0.75f;
+			sparkParams.minScale = 0.15f;
+			sparkParams.maxScale = 0.45f;
+			sparkParams.endScale = 0.0f;
+			sparkParams.fadeOut = true;
+			sparkParams.isStretched = true;
+			sparkParams.stretchFactor = 0.08f;
+			pm->Emit("ExplosionSpark", firePos1, sparkParams, 5);
+			pm->Emit("ExplosionSpark", firePos2, sparkParams, 3);
+
+			// 炎の動的ライト（明滅）
+			PointLight* pLight = Object3dCommon::GetInstance()->GetPointLightData();
+			if (pLight) {
+				pLight->position = firePos1;
+				pLight->color = { 1.0f, 0.55f, 0.12f, 1.0f };
+				pLight->intensity = 60.0f + 25.0f * std::sin(endSeqTimer_ * 30.0f);
+				pLight->radius = 120.0f;
+				pLight->decay = 2.0f;
+			}
 		}
-	} else if (endSequence_ == StageEndSequence::GameOver_CrtShutdown) {
-		// 0.70s - 0.95s: ブラウン管テレビの電源遮断演出（水平収束・プツッ消滅）
-		timeScale_ = 0.0f;
 
-		ActivePostEffect dist;
-		dist.type = PostEffectType::kLensDistortion;
-		dist.intensity = 0.35f;
-		postEffect->AddActiveEffect(dist);
+		// 4. シグナル途絶段階（フェーズ制御）
+		if (endSequence_ == StageEndSequence::GameOver_Critical) {
+			// Phase 1 (0.0s - 1.4s): 激しい炎上・黒煙噴出 & 警告表示 & ノイズが徐々に混入
+			// 最初 (0.0s - 0.35s) はノイズ完全ゼロで機体炎上を鮮明に捉える
+			// 0.35s - 1.4s から徐々にノイズと走査線が入り始める (0.00 -> 0.20)
+			if (endSeqTimer_ >= 0.35f) {
+				float p = (endSeqTimer_ - 0.35f) / 1.05f; // 0.0 -> 1.0
+				float easeNoise = p * p; // 二次曲線で穏やかに立ち上がり
 
-		ActivePostEffect scan;
-		scan.type = PostEffectType::kScanLine;
-		scan.intensity = 0.5f;
-		scan.dirX = 800.0f;
-		scan.dirY = 5.0f;
-		postEffect->AddActiveEffect(scan);
+				ActivePostEffect noise;
+				noise.type = PostEffectType::kRandom;
+				noise.intensity = easeNoise * 0.20f;
+				postEffect->AddActiveEffect(noise);
 
-		if (endSeqTimer_ >= 0.95f) {
-			postEffect->ClearActiveEffects();
-			sceneID = SCENE::GAMEOVER;
-			return;
+				ActivePostEffect scan;
+				scan.type = PostEffectType::kScanLine;
+				scan.intensity = easeNoise * 0.20f;
+				scan.dirX = 600.0f;
+				scan.dirY = -8.0f;
+				postEffect->AddActiveEffect(scan);
+
+				ActivePostEffect ca;
+				ca.type = PostEffectType::kChromaticAberration;
+				ca.intensity = easeNoise * 0.025f;
+				postEffect->AddActiveEffect(ca);
+			}
+
+			if (endSeqTimer_ >= 1.4f) {
+				endSequence_ = StageEndSequence::GameOver_SignalLost;
+			}
+		} else if (endSequence_ == StageEndSequence::GameOver_SignalLost) {
+			// Phase 2 (1.4s - 2.2s): ノイズが本格的に激化し、通信完全途絶（SIGNAL LOST）へ
+			float degradeT = std::clamp((endSeqTimer_ - 1.4f) / 0.80f, 0.0f, 1.0f);
+			// smoothstepでノイズを劇的かつ滑らかに増幅
+			float easeT = degradeT * degradeT * (3.0f - 2.0f * degradeT);
+
+			ActivePostEffect scan;
+			scan.type = PostEffectType::kScanLine;
+			scan.intensity = 0.20f + 0.45f * easeT;
+			scan.dirX = 500.0f - 260.0f * easeT;
+			scan.dirY = -20.0f - 35.0f * easeT;
+			postEffect->AddActiveEffect(scan);
+
+			ActivePostEffect noise;
+			noise.type = PostEffectType::kRandom;
+			noise.intensity = 0.20f + 0.65f * easeT; // 0.20から0.85へと本格的な砂嵐へ
+			postEffect->AddActiveEffect(noise);
+
+			ActivePostEffect ca;
+			ca.type = PostEffectType::kChromaticAberration;
+			ca.intensity = 0.025f + 0.08f * easeT;
+			postEffect->AddActiveEffect(ca);
+
+			ActivePostEffect vig;
+			vig.type = PostEffectType::kVignette;
+			vig.intensity = 0.4f + 1.2f * easeT;
+			postEffect->AddActiveEffect(vig);
+
+			ActivePostEffect dist;
+			dist.type = PostEffectType::kLensDistortion;
+			dist.intensity = 0.08f + 0.25f * easeT;
+			postEffect->AddActiveEffect(dist);
+
+			if (endSeqTimer_ >= 2.2f) {
+				endSequence_ = StageEndSequence::GameOver_CrtShutdown;
+			}
+		} else if (endSequence_ == StageEndSequence::GameOver_CrtShutdown) {
+			// Phase 3 (2.2s - 2.55s): 最大砂嵐ノイズが激しく鳴り響く最中にブラウン管プツッ切断（ノイズしながら切る: 0.35秒）
+			ActivePostEffect noise;
+			noise.type = PostEffectType::kRandom;
+			noise.intensity = 0.85f; // 最大砂嵐ノイズを完全維持！ノイズを途切れさせない
+			postEffect->AddActiveEffect(noise);
+
+			ActivePostEffect scan;
+			scan.type = PostEffectType::kScanLine;
+			scan.intensity = 0.60f;
+			scan.dirX = 240.0f;
+			scan.dirY = -45.0f;
+			postEffect->AddActiveEffect(scan);
+
+			ActivePostEffect ca;
+			ca.type = PostEffectType::kChromaticAberration;
+			ca.intensity = 0.08f;
+			postEffect->AddActiveEffect(ca);
+
+			ActivePostEffect vig;
+			vig.type = PostEffectType::kVignette;
+			vig.intensity = 1.2f;
+			postEffect->AddActiveEffect(vig);
+
+			ActivePostEffect dist;
+			dist.type = PostEffectType::kLensDistortion;
+			dist.intensity = 0.35f;
+			postEffect->AddActiveEffect(dist);
+
+			if (endSeqTimer_ >= 2.55f) {
+				postEffect->ClearActiveEffects();
+				sceneID = SCENE::GAMEOVER;
+				return;
+			}
 		}
 	}
 	// --- 時間切れ離脱系（爆発なし・作戦離脱） ---
@@ -579,172 +802,255 @@ void StageScene::DrawEndSequenceUI() {
 	};
 
 	// ------------------------------------------------------------
-	// 項目4: 被弾・撃墜時のテーマカラー反転 & CRITICAL DAMAGE 激しい点滅
+	// 項目4: 被弾・撃墜時のテーマカラー反転 & 警告バナー & 初期シグナル表示
 	// ------------------------------------------------------------
 	if (endSequence_ == StageEndSequence::GameOver_Critical) {
-		// 0.08s 周期の激しい赤色警告フラッシュ
-		float blinkPhase = std::fmod(endSeqTimer_, 0.10f);
-		bool isBlinkOn = (blinkPhase < 0.06f);
+		float blinkPhase = std::fmod(endSeqTimer_, 0.12f);
+		bool isBlinkOn = (blinkPhase < 0.07f);
+
+		float jitterX = 0.0f;
+		if (endSeqTimer_ >= 0.35f) {
+			float p = (endSeqTimer_ - 0.35f) / 1.05f;
+			jitterX = std::sin(endSeqTimer_ * 90.0f) * (2.5f * p);
+		}
 
 		if (isBlinkOn) {
-			float bannerW = 680.0f;
-			float bannerH = 70.0f;
-			float bannerX = (screenW - bannerW) * 0.5f;
-			float bannerY = 120.0f;
+			float bannerW = 740.0f;
+			float bannerH = 74.0f;
+			float bannerX = (screenW - bannerW) * 0.5f + jitterX;
+			float bannerY = 110.0f;
 
 			// 赤色半透明バナー背景
-			DrawSolidRect({ bannerX, bannerY }, { bannerW, bannerH }, { 0.50f, 0.02f, 0.02f, 0.85f });
+			DrawSolidRect({ bannerX, bannerY }, { bannerW, bannerH }, { 0.45f, 0.02f, 0.02f, 0.85f });
 			DrawSolidRect({ bannerX, bannerY }, { bannerW, 2.0f }, { 1.0f, 0.25f, 0.20f, 0.95f });
 			DrawSolidRect({ bannerX, bannerY + bannerH - 2.0f }, { bannerW, 2.0f }, { 1.0f, 0.25f, 0.20f, 0.95f });
 
+			const char* mainTitle = isBailout_ ? "[ EMERGENCY BAILOUT // 脱出シーケンス ]" : "! CRITICAL DAMAGE // 操縦不能 !";
+			const char* subTitle = isBailout_
+				? "PILOT EJECTED // CANOPY JETTISONED // TELEMETRY CUT"
+				: "AIRFRAME COMPROMISED // HYDRAULICS OFFLINE // EJECT RECOMMENDED";
+
 			TextRenderer::GetInstance()->Print(
 				"HackGen",
-				"! CRITICAL DAMAGE !",
-				screenW * 0.5f,
+				mainTitle,
+				screenW * 0.5f + jitterX,
 				bannerY + 10.0f,
-				34.0f,
-				{ 1.0f, 0.35f, 0.30f, 1.0f },
+				32.0f,
+				{ 1.0f, 0.40f, 0.35f, 1.0f },
 				{ 0.5f, 0.0f }
 			);
 
 			TextRenderer::GetInstance()->Print(
 				"HackGen",
-				"HULL INTEGRITY COMPROMISED // EJECTION RECOMMENDED",
-				screenW * 0.5f,
-				bannerY + 44.0f,
+				subTitle,
+				screenW * 0.5f + jitterX,
+				bannerY + 46.0f,
 				14.0f,
 				{ 1.0f, 0.85f, 0.85f, 0.90f },
 				{ 0.5f, 0.0f }
 			);
 		}
+
+		// 画面下部：シグナル健全度（0.35秒までは100%、その後徐々に40%へ低下）
+		int sigPct = 100;
+		if (endSeqTimer_ >= 0.35f) {
+			float p = (endSeqTimer_ - 0.35f) / 1.05f;
+			sigPct = std::clamp(static_cast<int>(100.0f - p * 60.0f), 0, 100);
+		}
+		char sigBuf[64];
+		if (sigPct >= 90) {
+			snprintf(sigBuf, sizeof(sigBuf), "CARRIER SIGNAL: %d%% [||||||||||] TELEMETRY ACTIVE", sigPct);
+		} else {
+			snprintf(sigBuf, sizeof(sigBuf), "CARRIER SIGNAL: %d%% [||||||||  ] LINK INTEGRITY DEGRADING", sigPct);
+		}
+		TextRenderer::GetInstance()->Print(
+			"HackGen",
+			sigBuf,
+			screenW * 0.5f + jitterX,
+			screenH - 70.0f,
+			15.0f,
+			{ 1.0f, 0.70f, 0.30f, 0.85f },
+			{ 0.5f, 0.0f }
+		);
 	}
 
 	// ------------------------------------------------------------
-	// 項目1: 通信途絶（シグナルロスト）フリーズ & 軽量グリッチ帯 & テキスト
+	// 項目1: 通信途絶（シグナル急減衰）& 砂嵐激化 & SIGNAL LOST & ノイズ中のブラウン管プツッ暗転
 	// ------------------------------------------------------------
-	else if (endSequence_ == StageEndSequence::GameOver_SignalLost) {
-		// 画面水平ジッター（致命的エラーによる同期ズレ）
-		float jitterX = std::sin(endSeqTimer_ * 110.0f) * 8.0f;
-		if (std::fmod(endSeqTimer_, 0.08f) < 0.03f) {
-			jitterX += ((std::rand() % 20) - 10) * 1.5f;
+	else if (endSequence_ == StageEndSequence::GameOver_SignalLost || endSequence_ == StageEndSequence::GameOver_CrtShutdown) {
+		float degradeT = (endSequence_ == StageEndSequence::GameOver_CrtShutdown)
+			? 1.0f
+			: std::clamp((endSeqTimer_ - 1.4f) / 0.80f, 0.0f, 1.0f);
+		int sigPct = (endSequence_ == StageEndSequence::GameOver_CrtShutdown)
+			? 0
+			: (std::max)(0, static_cast<int>(40.0f * (1.0f - degradeT / 0.45f)));
+		float cardAlpha = std::clamp(degradeT / 0.20f, 0.0f, 1.0f);
+
+		// 画面水平ジッター（致命的エラー・同期外れによる激しい横揺れ）
+		float jitterX = std::sin(endSeqTimer_ * 110.0f) * (3.0f + 18.0f * degradeT);
+		if (std::fmod(endSeqTimer_, 0.09f) < (0.02f + 0.04f * degradeT)) {
+			jitterX += ((std::rand() % 24) - 12) * degradeT;
 		}
 
-		// 赤黒ノイズベール
-		DrawSolidRect({ 0.0f, 0.0f }, { screenW, screenH }, { 0.20f, 0.02f, 0.02f, 0.40f });
+		// 赤黒ノイズベール（シグナル低下に伴い濃縮）
+		DrawSolidRect({ 0.0f, 0.0f }, { screenW, screenH }, { 0.12f, 0.01f, 0.01f, (0.05f + 0.40f * degradeT) * cardAlpha });
 
-		// 走査線インターレースグリッチ（数本が激しく上下を走る）
+		// 走査線インターレースグリッチ（数本が上下を高速に走る）
 		float glitchOffset1 = std::fmod(endSeqTimer_ * 950.0f, screenH);
-		DrawSolidRect({ 0.0f, glitchOffset1 }, { screenW, 20.0f }, { 0.95f, 0.95f, 1.0f, 0.25f }, BlendMode::kAdd);
+		DrawSolidRect({ 0.0f, glitchOffset1 }, { screenW, 22.0f }, { 0.95f, 0.95f, 1.0f, (0.08f + 0.32f * degradeT) }, BlendMode::kAdd);
 		float glitchOffset2 = std::fmod(endSeqTimer_ * 1400.0f + 240.0f, screenH);
-		DrawSolidRect({ 0.0f, glitchOffset2 }, { screenW, 40.0f }, { 1.0f, 0.15f, 0.15f, 0.35f }, BlendMode::kAdd);
+		DrawSolidRect({ 0.0f, glitchOffset2 }, { screenW, 44.0f }, { 1.0f, 0.15f, 0.15f, (0.10f + 0.35f * degradeT) }, BlendMode::kAdd);
 		float glitchOffset3 = std::fmod(endSeqTimer_ * 600.0f + 480.0f, screenH);
-		DrawSolidRect({ 0.0f, glitchOffset3 }, { screenW, 8.0f }, { 0.2f, 0.8f, 1.0f, 0.30f }, BlendMode::kAdd);
+		DrawSolidRect({ 0.0f, glitchOffset3 }, { screenW, 10.0f }, { 0.2f, 0.8f, 1.0f, (0.08f + 0.25f * degradeT) }, BlendMode::kAdd);
 
 		// 中央警告カード（ジッター振動）
-		float cardW = 760.0f;
-		float cardH = 155.0f;
+		float cardW = 780.0f;
+		float cardH = 165.0f;
 		float cardX = (screenW - cardW) * 0.5f + jitterX;
 		float cardY = (screenH - cardH) * 0.5f;
 
 		// カード背景と赤枠
-		DrawSolidRect({ cardX, cardY }, { cardW, cardH }, { 0.08f, 0.01f, 0.01f, 0.94f });
-		DrawHollowBorder({ cardX, cardY }, { cardW, cardH }, { 1.0f, 0.25f, 0.20f, 0.95f }, 2.5f);
-		DrawSolidRect({ cardX, cardY }, { cardW, 4.0f }, { 1.0f, 0.40f, 0.40f, 1.0f });
+		DrawSolidRect({ cardX, cardY }, { cardW, cardH }, { 0.08f, 0.01f, 0.01f, 0.94f * cardAlpha });
+		DrawHollowBorder({ cardX, cardY }, { cardW, cardH }, { 1.0f, 0.25f, 0.20f, 0.95f * cardAlpha }, 2.5f);
+		DrawSolidRect({ cardX, cardY }, { cardW, 4.0f }, { 1.0f, 0.40f, 0.40f, 1.0f * cardAlpha });
 
-		// 点滅＆RGB色ズレする「SIGNAL LOST」
-		float signalPulse = 0.7f + 0.3f * std::sin(endSeqTimer_ * 30.0f);
-		
-		// グリッチ文字化（周期的に一瞬化ける）
-		const char* signalLostTitle = (std::fmod(endSeqTimer_, 0.12f) < 0.03f) ? "S!GN#L L0ST // ERR" : "SIGNAL LOST";
+		if (sigPct > 0) {
+			// シグナル減衰中
+			float pulse = (0.7f + 0.3f * std::sin(endSeqTimer_ * 25.0f)) * cardAlpha;
+			TextRenderer::GetInstance()->Print(
+				"HackGen",
+				"// TELEMETRY LINK CRITICAL // (通信減衰中)",
+				screenW * 0.5f + jitterX,
+				cardY + 18.0f,
+				34.0f,
+				{ 1.0f, 0.65f, 0.20f, pulse },
+				{ 0.5f, 0.0f }
+			);
 
-		// RGBスプリット（シアン影＋赤影で致命的画面乱れ感を演出）
-		TextRenderer::GetInstance()->Print(
-			"HackGen",
-			signalLostTitle,
-			screenW * 0.5f + jitterX + 3.0f,
-			cardY + 20.0f,
-			46.0f,
-			{ 0.10f, 0.85f, 1.0f, signalPulse * 0.6f },
-			{ 0.5f, 0.0f }
-		);
-		TextRenderer::GetInstance()->Print(
-			"HackGen",
-			signalLostTitle,
-			screenW * 0.5f + jitterX - 3.0f,
-			cardY + 20.0f,
-			46.0f,
-			{ 1.0f, 0.15f, 0.15f, signalPulse * 0.8f },
-			{ 0.5f, 0.0f }
-		);
-		TextRenderer::GetInstance()->Print(
-			"HackGen",
-			signalLostTitle,
-			screenW * 0.5f + jitterX,
-			cardY + 20.0f,
-			46.0f,
-			{ 1.0f, 0.95f, 0.95f, signalPulse },
-			{ 0.5f, 0.0f }
-		);
+			// シグナルバー表示
+			int barTotal = 16;
+			int barFilled = (sigPct * barTotal) / 100;
+			std::string barStr = "[" + std::string(barFilled, '#') + std::string(barTotal - barFilled, '.') + "]";
+			char buf[128];
+			snprintf(buf, sizeof(buf), "SIGNAL STRENGTH: %s %d%%", barStr.c_str(), sigPct);
+			TextRenderer::GetInstance()->Print(
+				"HackGen",
+				buf,
+				screenW * 0.5f + jitterX,
+				cardY + 68.0f,
+				22.0f,
+				{ 1.0f, 0.85f, 0.85f, 0.95f * cardAlpha },
+				{ 0.5f, 0.0f }
+			);
 
-		// 「TELEMETRY DISCONNECTED (遠隔測定切断)」
-		TextRenderer::GetInstance()->Print(
-			"HackGen",
-			"TELEMETRY DISCONNECTED (遠隔測定切断)",
-			screenW * 0.5f + jitterX,
-			cardY + 76.0f,
-			22.0f,
-			{ 1.0f, 0.85f, 0.85f, 0.95f },
-			{ 0.5f, 0.0f }
-		);
-
-		TextRenderer::GetInstance()->Print(
-			"HackGen",
-			"CARRIER FREQUENCY TERMINATED // SYSTEM FAULT 0x000000FA",
-			screenW * 0.5f + jitterX,
-			cardY + 110.0f,
-			14.0f,
-			{ 0.95f, 0.40f, 0.40f, 0.85f },
-			{ 0.5f, 0.0f }
-		);
-	}
-
-	// ------------------------------------------------------------
-	// 項目2: システム強制シャットダウン（ブラウン管テレビのプツッ暗転: 0.25秒で鋭く閉鎖）
-	// ------------------------------------------------------------
-	else if (endSequence_ == StageEndSequence::GameOver_CrtShutdown) {
-		float crtT = std::clamp((endSeqTimer_ - 0.70f) / 0.25f, 0.0f, 1.0f);
-		float centerY = screenH * 0.5f;
-		float centerX = screenW * 0.5f;
-
-		if (crtT < 0.60f) {
-			// Phase 1 (0.00〜0.60): 上下から黒マスクが中央水平線に向かって急激に収束！
-			float p = crtT / 0.60f;
-			float collapse = 1.0f - std::pow(1.0f - p, 3.0f);
-			float halfH = (screenH * 0.5f) * (1.0f - collapse);
-			if (halfH < 2.0f) halfH = 2.0f;
-
-			DrawSolidRect({ 0.0f, 0.0f }, { screenW, centerY - halfH }, { 0.0f, 0.0f, 0.0f, 1.0f });
-			DrawSolidRect({ 0.0f, centerY + halfH }, { screenW, screenH - (centerY + halfH) }, { 0.0f, 0.0f, 0.0f, 1.0f });
-
-			// 中央水平発光線
-			float lineAlpha = 0.9f + 0.1f * std::sin(endSeqTimer_ * 60.0f);
-			DrawSolidRect({ 0.0f, centerY - 2.0f }, { screenW, 4.0f }, { 0.90f, 0.95f, 1.0f, lineAlpha }, BlendMode::kAdd);
-		} else if (crtT < 0.88f) {
-			// Phase 2 (0.60〜0.88): 水平線が左右から急速に収縮！
-			float p = (crtT - 0.60f) / 0.28f;
-			float shrink = 1.0f - p;
-			float halfW = (screenW * 0.5f) * shrink;
-
-			DrawSolidRect({ 0.0f, 0.0f }, { screenW, screenH }, { 0.0f, 0.0f, 0.0f, 1.0f });
-			DrawSolidRect({ centerX - halfW, centerY - 2.5f }, { halfW * 2.0f, 5.0f }, { 1.0f, 1.0f, 1.0f, 1.0f }, BlendMode::kAdd);
+			char lossBuf[128];
+			float lossPct = 100.0f - sigPct * 2.0f;
+			if (lossPct < 0.0f) lossPct = 0.0f;
+			if (lossPct > 99.9f) lossPct = 99.9f;
+			snprintf(lossBuf, sizeof(lossBuf), "PACKET LOSS: %.1f%% // RF CARRIER DRIFTING // RETRY LINK...", lossPct);
+			TextRenderer::GetInstance()->Print(
+				"HackGen",
+				lossBuf,
+				screenW * 0.5f + jitterX,
+				cardY + 112.0f,
+				14.0f,
+				{ 0.95f, 0.45f, 0.40f, 0.90f * cardAlpha },
+				{ 0.5f, 0.0f }
+			);
 		} else {
-			// Phase 3 (0.88〜1.00): 「プツッ」と極小の光点が光って暗転完了（即時次シーンへ）
-			float p = (crtT - 0.88f) / 0.12f;
-			DrawSolidRect({ 0.0f, 0.0f }, { screenW, screenH }, { 0.0f, 0.0f, 0.0f, 1.0f });
+			// 完全途絶 (SIGNAL LOST) - 燃え落ちる機体からの通信が途絶した決定打の瞬間！
+			float signalPulse = (0.7f + 0.3f * std::sin(endSeqTimer_ * 30.0f)) * cardAlpha;
+			const char* signalLostTitle = (std::fmod(endSeqTimer_, 0.12f) < 0.03f) ? "S!GN#L L0ST // ERR" : "// SIGNAL LOST // (通信途絶)";
 
-			if (p < 0.50f) {
-				float popAlpha = 1.0f - (p / 0.50f);
-				DrawSolidRect({ centerX - 4.0f, centerY - 4.0f }, { 8.0f, 8.0f }, { 1.0f, 1.0f, 1.0f, popAlpha }, BlendMode::kAdd);
+			// RGBスプリット（シアン影＋赤影）
+			TextRenderer::GetInstance()->Print(
+				"HackGen",
+				signalLostTitle,
+				screenW * 0.5f + jitterX + 4.0f,
+				cardY + 20.0f,
+				44.0f,
+				{ 0.10f, 0.85f, 1.0f, signalPulse * 0.6f },
+				{ 0.5f, 0.0f }
+			);
+			TextRenderer::GetInstance()->Print(
+				"HackGen",
+				signalLostTitle,
+				screenW * 0.5f + jitterX - 4.0f,
+				cardY + 20.0f,
+				44.0f,
+				{ 1.0f, 0.15f, 0.15f, signalPulse * 0.8f },
+				{ 0.5f, 0.0f }
+			);
+			TextRenderer::GetInstance()->Print(
+				"HackGen",
+				signalLostTitle,
+				screenW * 0.5f + jitterX,
+				cardY + 20.0f,
+				44.0f,
+				{ 1.0f, 0.95f, 0.95f, signalPulse },
+				{ 0.5f, 0.0f }
+			);
+
+			TextRenderer::GetInstance()->Print(
+				"HackGen",
+				"NO CARRIER DETECTED // CONNECTION DROPPED",
+				screenW * 0.5f + jitterX,
+				cardY + 76.0f,
+				22.0f,
+				{ 1.0f, 0.85f, 0.85f, 0.95f * cardAlpha },
+				{ 0.5f, 0.0f }
+			);
+
+			TextRenderer::GetInstance()->Print(
+				"HackGen",
+				"CARRIER FREQUENCY TERMINATED // SYSTEM FAULT 0x000000FA",
+				screenW * 0.5f + jitterX,
+				cardY + 114.0f,
+				14.0f,
+				{ 0.95f, 0.40f, 0.40f, 0.85f * cardAlpha },
+				{ 0.5f, 0.0f }
+			);
+		}
+
+		// ------------------------------------------------------------
+		// 項目2: ノイズが激しく鳴り響く最中にブラウン管プツッ暗転（0.35秒で収束）
+		//        ノイズを途切れさせず、ノイズとSIGNAL LOSTの真上から遮断マスクが閉じる！
+		// ------------------------------------------------------------
+		if (endSequence_ == StageEndSequence::GameOver_CrtShutdown) {
+			float crtT = std::clamp((endSeqTimer_ - 2.2f) / 0.35f, 0.0f, 1.0f);
+			float centerY = screenH * 0.5f;
+			float centerX = screenW * 0.5f;
+
+			if (crtT < 0.55f) {
+				// Phase 1 (0.00〜0.55): ノイズとSIGNAL LOST画面の上下から黒幕が中央へ急速収束！
+				float p = crtT / 0.55f;
+				float collapse = 1.0f - std::pow(1.0f - p, 3.0f);
+				float halfH = (screenH * 0.5f) * (1.0f - collapse);
+				if (halfH < 2.0f) halfH = 2.0f;
+
+				DrawSolidRect({ 0.0f, 0.0f }, { screenW, centerY - halfH }, { 0.0f, 0.0f, 0.0f, 1.0f });
+				DrawSolidRect({ 0.0f, centerY + halfH }, { screenW, screenH - (centerY + halfH) }, { 0.0f, 0.0f, 0.0f, 1.0f });
+
+				// 水平高輝度ビーム（砂嵐を圧縮した閃光線）
+				float lineAlpha = 0.95f + 0.05f * std::sin(endSeqTimer_ * 90.0f);
+				DrawSolidRect({ 0.0f, centerY - 3.0f }, { screenW, 6.0f }, { 0.95f, 0.98f, 1.0f, lineAlpha }, BlendMode::kAdd);
+			} else if (crtT < 0.85f) {
+				// Phase 2 (0.55〜0.85): 水平線が左右から中心へ急激に収縮！
+				float p = (crtT - 0.55f) / 0.30f;
+				float shrink = 1.0f - p;
+				float halfW = (screenW * 0.5f) * shrink;
+
+				DrawSolidRect({ 0.0f, 0.0f }, { screenW, screenH }, { 0.0f, 0.0f, 0.0f, 1.0f });
+				DrawSolidRect({ centerX - halfW, centerY - 3.0f }, { halfW * 2.0f, 6.0f }, { 1.0f, 1.0f, 1.0f, 1.0f }, BlendMode::kAdd);
+			} else {
+				// Phase 3 (0.85〜1.00): 「プツッ」と極小の白光点が閃光して即暗転完了（次シーンへ）
+				float p = (crtT - 0.85f) / 0.15f;
+				DrawSolidRect({ 0.0f, 0.0f }, { screenW, screenH }, { 0.0f, 0.0f, 0.0f, 1.0f });
+
+				if (p < 0.60f) {
+					float popAlpha = 1.0f - (p / 0.60f);
+					DrawSolidRect({ centerX - 5.0f, centerY - 5.0f }, { 10.0f, 10.0f }, { 1.0f, 1.0f, 1.0f, popAlpha }, BlendMode::kAdd);
+				}
 			}
 		}
 	}

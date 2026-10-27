@@ -174,9 +174,9 @@ void StageScene::InitializeAssets() {
 	ParticleManager::GetInstance()->CreateParticleGroup("Casing", "assets/textures/white1x1.png");
 	ParticleManager::GetInstance()->CreateParticleGroup("ExplosionSpark", "assets/textures/circle.png");
 	ParticleManager::GetInstance()->SetBlendMode("ExplosionSpark", BlendMode::kAdd);
-	ParticleManager::GetInstance()->CreateParticleGroup("ExplosionFire", "assets/textures/circle2.png");
+	ParticleManager::GetInstance()->CreateParticleGroup("ExplosionFire", "assets/textures/flame_particle.png");
 	ParticleManager::GetInstance()->SetBlendMode("ExplosionFire", BlendMode::kAdd);
-	ParticleManager::GetInstance()->CreateParticleGroup("ExplosionSmoke", "assets/textures/circle2.png");
+	ParticleManager::GetInstance()->CreateParticleGroup("ExplosionSmoke", "assets/textures/smoke_particle.png");
 	ParticleManager::GetInstance()->SetBlendMode("ExplosionSmoke", BlendMode::kNormal);
 
 	GPUParticleManager::GetInstance()->SetTexture(TextureManager::GetInstance()->GetTextureIndexByFilePath("assets/textures/circle.png"));
@@ -285,6 +285,10 @@ void StageScene::ResetGameplayState() {
 	GameResult::GetInstance().gameOverReason = GameOverReason::Destroyed;
 	gameOverTimer_ = 0.0f;
 	timeScale_ = 1.0f;
+	isBailout_ = false;
+	gameOverBurnTimer_ = 0.0f;
+	gameOverVelocity_ = { 0.0f, 0.0f, 0.0f };
+	gameOverTumbleRate_ = { 0.0f, 0.0f, 0.0f };
 	muzzleFlashTimer_ = 0.0f;
 	totalTime_ = 0.0f;
 	missionElapsedTime_ = 0.0f;
@@ -385,6 +389,7 @@ void StageScene::Update() {
 		}
 		// ベイルアウト（脱出）入力（Jキーで被撃墜と同じゲームオーバー演出）
 		if (input && input->TriggerKey(DIK_J)) {
+			isBailout_ = true;
 			TriggerGameOver();
 			return;
 		}

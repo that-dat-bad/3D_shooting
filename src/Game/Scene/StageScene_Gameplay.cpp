@@ -80,6 +80,7 @@ void StageScene::UpdateFlightControls(float gameDeltaTime) {
 
 		// --- ベイルアウト / 緊急脱出 (J キー: 被撃墜と同じゲームオーバー演出) ---
 		if (input->TriggerKey(DIK_J)) {
+			isBailout_ = true;
 			TriggerGameOver();
 			return;
 		}
@@ -502,6 +503,27 @@ void StageScene::UpdateCamera(float gameDeltaTime) {
 		Vector3 mapCamPos = { pos.x, pos.y + 25.0f + 1600.0f * easeZoom, pos.z };
 		Vector3 mapLookTarget = { pos.x, pos.y, pos.z + 0.1f };
 		playerCamera_.SnapTo(mapCamPos, mapLookTarget);
+	} else if (isGameOver_ && endSequence_ != StageEndSequence::TimeOver_Abort && endSequence_ != StageEndSequence::TimeOver_Withdraw) {
+		// エースコンバット風 撃墜・炎上追尾カメラ (Death Chase Camera)
+		Vector3 velDir = gameOverVelocity_;
+		Vector3 horizDir = { velDir.x, 0.0f, velDir.z };
+		if (Length(horizDir) > 0.1f) {
+			horizDir = Normalize(horizDir);
+		} else {
+			horizDir = { 0.0f, 0.0f, 1.0f };
+		}
+		Vector3 horizRight = { horizDir.z, 0.0f, -horizDir.x };
+
+		// 時間経過とともに燃え落ちる機体が遠ざかる演出（追尾距離が28mから40mへ徐々に拡大）
+		float pullProg = std::clamp(endSeqTimer_ / 2.2f, 0.0f, 1.0f);
+		float camDist = 28.0f + 12.0f * pullProg;
+		float camHeight = 6.5f + 2.5f * (1.0f - pullProg);
+		float camSide = 5.5f + 1.5f * std::sin(endSeqTimer_ * 1.6f);
+
+		Vector3 targetCamPos = Add(Add(pos, Multiply(-camDist, horizDir)), Add(Multiply(camSide, horizRight), { 0.0f, camHeight, 0.0f }));
+		Vector3 lookTarget = Add(pos, Multiply(0.5f, flightModel_.GetForwardDirection()));
+
+		playerCamera_.SnapTo(targetCamPos, lookTarget);
 	} else {
 		playerCamera_.Update(gameDeltaTime, &flightModel_, &mouseAimController_, mouseAimEnabled_);
 	}
@@ -827,6 +849,11 @@ void StageScene::UpdateDebugAndStatusUI(float gameDeltaTime) {
 // ポストエフェクト & 戦闘HUD更新
 // ============================================================
 void StageScene::UpdatePostEffects(float deltaTime) {
+	// ゲームオーバー演出やクリア演出のポストエフェクトは UpdateEndSequence で一元管理するためここでは干渉しない
+	if (isGameOver_ || endSequence_ != StageEndSequence::None) {
+		return;
+	}
+
 	PostEffect* postEffect = PostEffect::GetInstance();
 	postEffect->ClearActiveEffects();
 
@@ -936,20 +963,6 @@ void StageScene::UpdatePostEffects(float deltaTime) {
 		vig.type = PostEffectType::kVignette;
 		vig.intensity = bootVignette;
 		postEffect->AddActiveEffect(vig);
-	} else if (isGameOver_) {
-		if (endSequence_ == StageEndSequence::GameOver_Critical) {
-			ActivePostEffect ab;
-			ab.type = PostEffectType::kChromaticAberration;
-			ab.intensity = 0.025f;
-			postEffect->AddActiveEffect(ab);
-		} else if (endSequence_ == StageEndSequence::GameOver_SignalLost) {
-			ActivePostEffect scan;
-			scan.type = PostEffectType::kScanLine;
-			scan.intensity = 0.25f;
-			scan.dirX = 640.0f;
-			scan.dirY = 4.0f;
-			postEffect->AddActiveEffect(scan);
-		}
 	}
 
 	// 2. 環境の更新

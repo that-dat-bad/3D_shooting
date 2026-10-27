@@ -158,6 +158,12 @@ private:
 	static constexpr float kGameOverDuration = 1.10f;
 	float timeScale_ = 1.0f;
 
+	// エースコンバット風 撃墜・ベイルアウト演出用パラメータ
+	MyMath::Vector3 gameOverVelocity_{ 0.0f, 0.0f, 0.0f };
+	MyMath::Vector3 gameOverTumbleRate_{ 0.0f, 0.0f, 0.0f };
+	float gameOverBurnTimer_ = 0.0f;
+	bool isBailout_ = false;
+
 	// ミッション制限時間（MissionData.timeLimitから設定）
 	float remainingTime_ = 300.0f;
 	float missionElapsedTime_ = 0.0f;  ///< ミッション経過時間（トリガー評価用）

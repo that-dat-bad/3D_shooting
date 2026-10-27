@@ -41,7 +41,13 @@ PixelShaderOutput main(VertexShaderOutput input)
     // ノイズを -0.5 ~ +0.5 に正規化し、強度(intensity)を乗算して加算する
     float32_t3 noiseFactor = (noise - 0.5f) * gParams.intensity;
     
-    output.color.rgb = baseColor.rgb + noiseFactor;
+    // intensity <= 0.15 の時は従来の微小粒子ノイズ
+    // intensity > 0.15 からは信号減衰が進み、ベース画像が徐々にアナログ砂嵐（スノーノイズ）へ埋没していく
+    float snowBlend = saturate((gParams.intensity - 0.15f) / 0.60f); // 0.15〜0.75で 0.0 -> 1.0
+    float3 snowColor = float3(noise, noise, noise);
+    float3 fadedBase = lerp(baseColor.rgb, snowColor, snowBlend * 0.90f);
+    
+    output.color.rgb = saturate(fadedBase + noiseFactor);
     output.color.a = baseColor.a;
     
     return output;
