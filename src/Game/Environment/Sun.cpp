@@ -32,9 +32,9 @@ void Sun::UpdateBloom(Camera* camera) {
 		float factor = (sunDot - 0.8f) / 0.2f; // 0.8 〜 1.0 -> 0.0 〜 1.0
 		ActivePostEffect sunBloom;
 		sunBloom.type = PostEffectType::kBloom;
-		sunBloom.intensity = 4.0f;
-		sunBloom.dirX = factor * 2.5f; // 正対するほど強く光があふれる
-		sunBloom.dirY = 0.7f;
+		sunBloom.intensity = 3.0f;
+		sunBloom.dirX = factor * 1.5f; // 正対するほど自然に光があふれる
+		sunBloom.dirY = 0.92f;         // 太陽円盤自体の超高輝度部のみにブルームを絞る
 		postEffect->AddActiveEffect(sunBloom);
 	}
 }

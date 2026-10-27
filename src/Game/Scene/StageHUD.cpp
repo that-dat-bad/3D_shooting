@@ -48,6 +48,7 @@ void StageHUD::Draw() {
 
 	DrawTimer();
 	DrawAmmo();
+	DrawBailoutGuide();
 	DrawReticles();
 }
 
@@ -359,6 +360,88 @@ void StageHUD::DrawAmmo() {
 		float divX = gaugeX + (gaugeW * 0.25f * i);
 		DrawLine({ divX, gaugeY }, { divX, gaugeY + gaugeH }, 1.0f, { 0.03f, 0.06f, 0.10f, 0.90f * alpha });
 	}
+}
+
+void StageHUD::DrawBailoutGuide() {
+	// HUD順次展開（0.50s〜0.90s で左からスライドイン＋フェードイン）
+	if (deployTimer_ < 0.50f) return;
+
+	// ステージクリア時のHUD順次シャットダウン（0.30s〜0.70sで消去）
+	float shutdownAlpha = 1.0f;
+	if (isShuttingDown_) {
+		if (shutdownTimer_ >= 0.70f) {
+			return;
+		} else if (shutdownTimer_ >= 0.30f) {
+			shutdownAlpha = 1.0f - (shutdownTimer_ - 0.30f) / 0.40f;
+		}
+	}
+
+	float deployT = std::clamp((deployTimer_ - 0.50f) / 0.40f, 0.0f, 1.0f);
+	float alpha = deployT * shutdownAlpha;
+	float slideX = -35.0f * (1.0f - deployT);
+
+	float panelW = 210.0f;
+	float panelH = 50.0f;
+	float panelX = 24.0f + slideX;
+	float panelY = hudData_.screenHeight - panelH - 24.0f;
+
+	Vector4 bgColor = { 0.01f, 0.05f, 0.03f, 0.88f * alpha };
+	Vector4 borderColor = { 0.22f, 0.85f, 0.50f, 0.85f * alpha };
+	Vector4 keyBg = { 0.08f, 0.28f, 0.16f, 0.95f * alpha };
+	Vector4 keyText = { 1.0f, 1.0f, 1.0f, 0.98f * alpha };
+	Vector4 titleColor = { 0.35f, 1.0f, 0.65f, 0.95f * alpha };
+	Vector4 subColor = { 0.75f, 0.90f, 0.80f, 0.85f * alpha };
+
+	if (isWarningMode_) {
+		float pulse = 0.6f + 0.4f * std::sin(animTimer_ * 18.0f);
+		borderColor = { 1.0f, 0.35f, 0.10f, pulse * alpha };
+		bgColor = { 0.22f, 0.02f, 0.02f, 0.90f * alpha };
+		keyBg = { 0.65f, 0.15f, 0.10f, pulse * alpha };
+		titleColor = { 1.0f, 0.30f, 0.20f, pulse * alpha };
+		subColor = { 1.0f, 0.70f, 0.60f, pulse * alpha };
+	}
+
+	DrawBorderedPanel({ panelX, panelY }, { panelW, panelH }, bgColor, borderColor, 1.5f);
+
+	// [J] キータグのボックス
+	float keyW = 32.0f;
+	float keyH = 30.0f;
+	float keyX = panelX + 12.0f;
+	float keyY = panelY + 10.0f;
+	DrawRect({ keyX, keyY }, { keyW, keyH }, keyBg);
+	DrawRect({ keyX, keyY }, { keyW, 1.0f }, borderColor);
+	DrawRect({ keyX, keyY + keyH - 1.0f }, { keyW, 1.0f }, borderColor);
+	DrawRect({ keyX, keyY }, { 1.0f, keyH }, borderColor);
+	DrawRect({ keyX + keyW - 1.0f, keyY }, { 1.0f, keyH }, borderColor);
+
+	TextRenderer::GetInstance()->Print(
+		"HackGen",
+		"J",
+		keyX + keyW * 0.5f,
+		keyY + 3.0f,
+		20.0f,
+		keyText,
+		{ 0.5f, 0.0f }
+	);
+
+	// BAIL OUT / 緊急脱出
+	TextRenderer::GetInstance()->Print(
+		"HackGen",
+		"BAIL OUT",
+		panelX + 54.0f,
+		panelY + 8.0f,
+		15.0f,
+		titleColor
+	);
+
+	TextRenderer::GetInstance()->Print(
+		"HackGen",
+		"緊急脱出 (EJECT)",
+		panelX + 54.0f,
+		panelY + 27.0f,
+		12.0f,
+		subColor
+	);
 }
 
 void StageHUD::DrawLeadGuidanceLine(const Vector2& noseScreen, const Vector2& aimScreen, float alpha) {

@@ -7,6 +7,11 @@ enum class TitleEntryReason {
 	ReturnFromClear       ///< クリアからの復帰（WindowClose → 再認証セキュリティ演出）
 };
 
+enum class GameOverReason {
+	Destroyed,   ///< 撃墜・爆発
+	TimeOver     ///< 時間切れ・作戦離脱
+};
+
 /// @brief ゲームのクリア結果データ。シーン間でstatic共有する。
 struct GameResult {
 	int enemiesDestroyed = 0;		///< 撃破した敵の数
@@ -15,6 +20,7 @@ struct GameResult {
 	float playerMaxHP = 100.0f;		///< 最大HP
 	bool missionCleared = false;	///< ミッションクリアしたか
 	bool isRetry = false;           ///< リトライ出撃か（trueなら起動シーケンスを高速短縮）
+	GameOverReason gameOverReason = GameOverReason::Destroyed; ///< 失敗要因
 	TitleEntryReason titleEntryReason = TitleEntryReason::InitialBoot; ///< タイトル画面への突入理由
 
 	/// @brief 結果をリセットする
@@ -25,6 +31,7 @@ struct GameResult {
 		playerMaxHP = 100.0f;
 		missionCleared = false;
 		isRetry = false;
+		gameOverReason = GameOverReason::Destroyed;
 		titleEntryReason = TitleEntryReason::InitialBoot;
 	}
 

@@ -102,7 +102,14 @@ PixelShaderOutput main(PixelInput input)
         // 金属的な反射色を計算（ベースカラーを80%染める）
         float32_t3 specColor = lerp(float32_t3(1.0f, 1.0f, 1.0f), texColor.rgb, 0.8f) * gMaterial.specularIntensity;
 
-        float32_t3 totalDiffuse = float32_t3(0.0f, 0.0f, 0.0f);
+        // アンビエントライト（天空光と地面反射光による半球ライティング）
+        // 暗部が真っ黒にならず、かつ機体全体が白飛び・まぶしくならないよう適正な照度(0.16)に抑制
+        float hemi = N.y * 0.5f + 0.5f;
+        float32_t3 skyAmbient = float32_t3(0.30f, 0.35f, 0.42f);
+        float32_t3 groundAmbient = float32_t3(0.18f, 0.16f, 0.14f);
+        float32_t3 ambientLight = lerp(groundAmbient, skyAmbient, hemi) * 0.16f;
+
+        float32_t3 totalDiffuse = gMaterial.color.rgb * texColor.rgb * ambientLight;
         float32_t3 totalSpecular = float32_t3(0.0f, 0.0f, 0.0f);
 
         // --- Directional Light Calculation ---
@@ -119,7 +126,8 @@ PixelShaderOutput main(PixelInput input)
                 dirCos = dirCos * dirCos;
             }
 
-            float32_t3 dirDiffuse = gMaterial.color.rgb * texColor.rgb * gDirectionalLight.color.rgb * dirCos * gDirectionalLight.intensity;
+            // 直接光とアンビエント光の合計が自然な照度(最大1.0程度)に収まる適正バランス
+            float32_t3 dirDiffuse = gMaterial.color.rgb * texColor.rgb * gDirectionalLight.color.rgb * (dirCos * 0.84f) * gDirectionalLight.intensity;
             float32_t3 dirSpecular = float32_t3(0.0f, 0.0f, 0.0f);
 
             if (gLightingSettings.specularModel > 0)
@@ -153,7 +161,7 @@ PixelShaderOutput main(PixelInput input)
             float pointLightDistance = length(gPointLight.position - input.worldPosition);
             
             // Attenuation
-            float pointLightFactor = pow(saturate(1.0f - pointLightDistance / gPointLight.radius), gPointLight.decay);
+            float pointLightFactor = pow(saturate(1.0f - pointLightDistance / max(gPointLight.radius, 0.01f)), max(gPointLight.decay, 0.0f));
             
             float pointNdotL = dot(N, pointLightL);
             float pointCos = saturate(pointNdotL);
@@ -193,13 +201,14 @@ PixelShaderOutput main(PixelInput input)
         }
 
         // --- Spot Light Calculation ---
-        if (gLightingSettings.lightType & 4)
+        if ((gLightingSettings.lightType & 4) && gSpotLight.distance > 0.1f && gSpotLight.decay >= 0.0f)
         {
              float32_t3 spotDir = normalize(gSpotLight.direction);
              float32_t3 L = normalize(gSpotLight.position - input.worldPosition);
              float distance = length(gSpotLight.position - input.worldPosition);
               
-             float distAttenuation = pow(saturate(1.0f - distance / gSpotLight.distance), gSpotLight.decay);
+             float distRatio = saturate(1.0f - distance / max(gSpotLight.distance, 0.01f));
+             float distAttenuation = pow(distRatio, max(gSpotLight.decay, 0.0f));
               
              float32_t3 directionOnSurface = normalize(input.worldPosition - gSpotLight.position);
              float cosAngle = dot(directionOnSurface, spotDir);
@@ -214,42 +223,44 @@ PixelShaderOutput main(PixelInput input)
              }
               
              float totalData = distAttenuation * falloffFactor * gSpotLight.intensity;
-             
-             float NdotL = dot(N, L);
-             float cos = saturate(NdotL);
-              
-             if (gLightingSettings.shadingModel == 1)
+             if (totalData > 0.0001f && !isnan(totalData) && !isinf(totalData))
              {
-                 cos = NdotL * 0.5f + 0.5f;
-                 cos = cos * cos;
-             }
- 
-             float32_t3 spotDiffuse = gMaterial.color.rgb * texColor.rgb * gSpotLight.color.rgb * cos * totalData;
-             float32_t3 spotSpecular = float32_t3(0.0f, 0.0f, 0.0f);
- 
-             if (gLightingSettings.specularModel > 0)
-             {
-                  if (NdotL > 0.0f || gLightingSettings.shadingModel == 1) 
-                  {
-                      float specularPow = 0.0f;
-                      if (gLightingSettings.specularModel == 1) // Phong
+                 float NdotL = dot(N, L);
+                 float cos = saturate(NdotL);
+                  
+                 if (gLightingSettings.shadingModel == 1)
+                 {
+                     cos = NdotL * 0.5f + 0.5f;
+                     cos = cos * cos;
+                 }
+     
+                 float32_t3 spotDiffuse = gMaterial.color.rgb * texColor.rgb * gSpotLight.color.rgb * cos * totalData;
+                 float32_t3 spotSpecular = float32_t3(0.0f, 0.0f, 0.0f);
+     
+                 if (gLightingSettings.specularModel > 0)
+                 {
+                      if (NdotL > 0.0f || gLightingSettings.shadingModel == 1) 
                       {
-                          float32_t3 incident = -L;
-                          float32_t3 reflectLight = reflect(incident, N);
-                          float RdotE = dot(reflectLight, toEye);
-                          specularPow = pow(saturate(RdotE), gMaterial.shininess);
+                          float specularPow = 0.0f;
+                          if (gLightingSettings.specularModel == 1) // Phong
+                          {
+                              float32_t3 incident = -L;
+                              float32_t3 reflectLight = reflect(incident, N);
+                              float RdotE = dot(reflectLight, toEye);
+                              specularPow = pow(saturate(RdotE), gMaterial.shininess);
+                          }
+                          else if (gLightingSettings.specularModel == 2) // Blinn-Phong
+                          {
+                              float32_t3 halfVector = normalize(L + toEye);
+                              float NDotH = dot(N, halfVector);
+                              specularPow = pow(saturate(NDotH), gMaterial.shininess);
+                          }
+                           spotSpecular = gSpotLight.color.rgb * totalData * specularPow * specColor;
                       }
-                      else if (gLightingSettings.specularModel == 2) // Blinn-Phong
-                      {
-                          float32_t3 halfVector = normalize(L + toEye);
-                          float NDotH = dot(N, halfVector);
-                          specularPow = pow(saturate(NDotH), gMaterial.shininess);
-                      }
-                       spotSpecular = gSpotLight.color.rgb * totalData * specularPow * specColor;
-                  }
+                 }
+                 totalDiffuse += spotDiffuse;
+                 totalSpecular += spotSpecular;
              }
-             totalDiffuse += spotDiffuse;
-             totalSpecular += spotSpecular;
         }
 
         // 環境マップ (Environment Mapping) の計算
@@ -259,9 +270,13 @@ PixelShaderOutput main(PixelInput input)
             float32_t3 reflectVector = reflect(-toEye, N); // 視線からサーフェスへのベクトルの反射
             float32_t3 baseEnv = gEnvTexture.Sample(gSampler, reflectVector).rgb;
             
+            // 高輝度空テクスチャの白飛び・まぶしさを抑制
+            baseEnv = min(baseEnv, 1.2f);
+            
             // 環境反射光もベースカラーで染める (70% tint)
             float32_t3 envTint = lerp(float32_t3(1.0f, 1.0f, 1.0f), texColor.rgb, 0.7f);
-            envColor = baseEnv * envTint * gMaterial.environmentCoefficient * gMaterial.specularIntensity;
+            // specularIntensityの重複掛けを排除し、サテン金属の落ち着いた適正反射に調整
+            envColor = baseEnv * envTint * gMaterial.environmentCoefficient * 0.35f;
 
             // 暗い場所（影）で光って見える現象をごまかすハック
             // 主光源（平行光源）の当たり具合を利用して、光が当たりにくい面の反射を暗くする
@@ -281,8 +296,14 @@ PixelShaderOutput main(PixelInput input)
         // 自発光（メッシュ自体の発光）
         float32_t3 emissive = gMaterial.emissiveColor * gMaterial.emissiveIntensity * gLightingSettings.emissiveIntensityScale;
 
-        // Combine
-        output.color.rgb = totalDiffuse + totalSpecular + envColor + emissive;
+        // Combine & NaN Guard
+        float32_t3 finalRgb = totalDiffuse + totalSpecular + envColor + emissive;
+        if (any(isnan(finalRgb)) || any(isinf(finalRgb)))
+        {
+            finalRgb = gMaterial.color.rgb * texColor.rgb * 0.35f;
+        }
+
+        output.color.rgb = finalRgb;
         output.color.a = gMaterial.color.a * texColor.a;
     }
     else

@@ -2,12 +2,15 @@
 #include "../../engine/Graphics/Model/Object3dCommon.h"
 #include "../../engine/Graphics/Model/ModelManager.h"
 #include "../../engine/Graphics/Camera/CameraManager.h"
+#include "../../engine/Graphics/System/DirectXCommon.h"
+#include "../../engine/Graphics/System/BlendMode.h"
 #include "../../engine/io/json.hpp"
 #include "../System/BenchmarkConfig.h"
 #include <fstream>
 #include <filesystem>
 #include <chrono>
 #include <cmath>
+#include <dxcapi.h>
 
 #ifdef USE_IMGUI
 #include "../../../external/imgui/imgui.h"
@@ -20,10 +23,61 @@ TerrainChunkManager* TerrainChunkManager::GetInstance() {
 	return &instance;
 }
 
+void TerrainChunkManager::CreateTerrainPipeline() {
+	if (terrainPipelineState_ || !object3dCommon_) return;
+
+	DirectXCommon* dxCommon = object3dCommon_->GetDirectXCommon();
+	if (!dxCommon) return;
+
+	D3D12_INPUT_ELEMENT_DESC inputElementDescs[5] = {};
+	inputElementDescs[0] = { "POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 };
+	inputElementDescs[1] = { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 16, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 };
+	inputElementDescs[2] = { "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 };
+	inputElementDescs[3] = { "WEIGHT", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 48, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 };
+	inputElementDescs[4] = { "BLENDINDICES", 0, DXGI_FORMAT_R32G32B32A32_SINT, 0, 64, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 };
+
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc{};
+	psoDesc.pRootSignature = object3dCommon_->GetRootSignature();
+	psoDesc.InputLayout = { inputElementDescs, _countof(inputElementDescs) };
+
+	Microsoft::WRL::ComPtr<IDxcBlob> vsBlob = dxCommon->CompileShader(L"./assets/shaders/Object3D.VS.hlsl", L"vs_6_0");
+	Microsoft::WRL::ComPtr<IDxcBlob> psBlob = dxCommon->CompileShader(L"./assets/shaders/Terrain.PS.hlsl", L"ps_6_0");
+	if (!vsBlob || !psBlob) return;
+
+	psoDesc.VS = { vsBlob->GetBufferPointer(), vsBlob->GetBufferSize() };
+	psoDesc.PS = { psBlob->GetBufferPointer(), psBlob->GetBufferSize() };
+
+	D3D12_RASTERIZER_DESC rasterizerDesc{};
+	rasterizerDesc.CullMode = D3D12_CULL_MODE_BACK;
+	rasterizerDesc.FillMode = D3D12_FILL_MODE_SOLID;
+	psoDesc.RasterizerState = rasterizerDesc;
+
+	D3D12_DEPTH_STENCIL_DESC depthStencilDesc{};
+	depthStencilDesc.DepthEnable = true;
+	depthStencilDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+	depthStencilDesc.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
+	psoDesc.DepthStencilState = depthStencilDesc;
+	psoDesc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
+
+	psoDesc.NumRenderTargets = 1;
+	psoDesc.RTVFormats[0] = dxCommon->GetRTVFormat();
+	psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+	psoDesc.SampleDesc.Count = 1;
+	psoDesc.SampleMask = D3D12_DEFAULT_SAMPLE_MASK;
+	psoDesc.BlendState = GetBlendDesc(BlendMode::kNormal);
+
+	HRESULT hr = dxCommon->GetDevice()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&terrainPipelineState_));
+	if (FAILED(hr)) {
+		terrainPipelineState_.Reset();
+	}
+}
+
 void TerrainChunkManager::Initialize(Object3dCommon* object3dCommon, Camera* camera, const std::string& terrainPath) {
 	object3dCommon_ = object3dCommon;
 	camera_ = camera;
 	isLoaded_ = false;
+
+	CreateTerrainPipeline();
 
 	if (terrainPath.ends_with(".obj")) {
 		mode_ = TerrainMode::SingleMesh;
@@ -83,6 +137,9 @@ void TerrainChunkManager::LoadSingleMesh(const std::string& objPath) {
 		singleMeshObject_->Initialize(object3dCommon_);
 		singleMeshObject_->SetCamera(camera_);
 		singleMeshObject_->SetModel(objPath);
+		if (terrainPipelineState_) {
+			singleMeshObject_->SetCustomPipelineState(terrainPipelineState_.Get());
+		}
 		singleMeshObject_->SetScale({ 1.0f, 1.0f, 1.0f });
 		singleMeshObject_->SetRotate({ 0.0f, 0.0f, 0.0f });
 		singleMeshObject_->SetTranslate({ 0.0f, 0.0f, 0.0f });
@@ -350,6 +407,9 @@ bool TerrainChunkManager::LoadPackage(const std::string& packagePath) {
 			lodMesh.object3d->Initialize(object3dCommon_);
 			lodMesh.object3d->SetCamera(camera_);
 			lodMesh.object3d->SetModel(modelKey);
+			if (terrainPipelineState_) {
+				lodMesh.object3d->SetCustomPipelineState(terrainPipelineState_.Get());
+			}
 			lodMesh.object3d->SetScale({ 1.0f, 1.0f, 1.0f });
 			lodMesh.object3d->SetRotate({ 0.0f, 0.0f, 0.0f });
 			lodMesh.object3d->SetTranslate({ 0.0f, 0.0f, 0.0f });
@@ -364,6 +424,9 @@ bool TerrainChunkManager::LoadPackage(const std::string& packagePath) {
 			chunk.object3d->Initialize(object3dCommon_);
 			chunk.object3d->SetCamera(camera_);
 			chunk.object3d->SetModel(chunk.fullPath);
+			if (terrainPipelineState_) {
+				chunk.object3d->SetCustomPipelineState(terrainPipelineState_.Get());
+			}
 			chunk.object3d->SetScale({ 1.0f, 1.0f, 1.0f });
 			chunk.object3d->SetRotate({ 0.0f, 0.0f, 0.0f });
 			chunk.object3d->SetTranslate({ 0.0f, 0.0f, 0.0f });
@@ -509,6 +572,9 @@ void TerrainChunkManager::LoadChunked(const std::string& jsonPath) {
 			chunk.object3d->Initialize(object3dCommon_);
 			chunk.object3d->SetCamera(camera_);
 			chunk.object3d->SetModel(chunk.fullPath);
+			if (terrainPipelineState_) {
+				chunk.object3d->SetCustomPipelineState(terrainPipelineState_.Get());
+			}
 			chunk.object3d->SetScale({ 1.0f, 1.0f, 1.0f });
 			chunk.object3d->SetRotate({ 0.0f, 0.0f, 0.0f });
 			chunk.object3d->SetTranslate({ 0.0f, 0.0f, 0.0f });
@@ -524,6 +590,9 @@ void TerrainChunkManager::LoadChunked(const std::string& jsonPath) {
 			lodMesh.object3d->Initialize(object3dCommon_);
 			lodMesh.object3d->SetCamera(camera_);
 			lodMesh.object3d->SetModel(chunk.fullPath);
+			if (terrainPipelineState_) {
+				lodMesh.object3d->SetCustomPipelineState(terrainPipelineState_.Get());
+			}
 			lodMesh.object3d->SetScale({ 1.0f, 1.0f, 1.0f });
 			lodMesh.object3d->SetRotate({ 0.0f, 0.0f, 0.0f });
 			lodMesh.object3d->SetTranslate({ 0.0f, 0.0f, 0.0f });

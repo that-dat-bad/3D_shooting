@@ -47,9 +47,9 @@ void AircraftVisualModel::SetModelForPart(DamagePart part, Model* model, const s
 	node.object->SetModel(model);
 	node.object->SetTargetNodeNames(targetNodeNames);
 	if (node.object->GetModel()) {
-		node.object->GetModel()->SetShininess(64.0f);
-		node.object->GetModel()->SetSpecularIntensity(2.2f);
-		node.object->GetModel()->SetEnvironmentCoefficient(0.50f); // 重厚な金属・環境光反射
+		node.object->GetModel()->SetShininess(32.0f);
+		node.object->GetModel()->SetSpecularIntensity(0.50f);
+		node.object->GetModel()->SetEnvironmentCoefficient(0.15f); // 落ち着いたミリタリー機体金属感（過度な白飛び・まぶしさを防止）
 	}
 }
 
@@ -263,9 +263,9 @@ void AircraftVisualModel::SetupCanopyMaterial() {
 				if (isCanopy) {
 					// 航空機用キャノピーガラス：自然なディープスモーク、滑らかなハイライト、適正な環境反射（項目4）
 					model->SetMaterialColor(static_cast<uint32_t>(m), { 0.08f, 0.12f, 0.16f, 0.60f });
-					model->SetMaterialShininess(static_cast<uint32_t>(m), 28.0f);
-					model->SetMaterialSpecularIntensity(static_cast<uint32_t>(m), 0.55f);
-					model->SetMaterialEnvironmentCoefficient(static_cast<uint32_t>(m), 0.35f);
+					model->SetMaterialShininess(static_cast<uint32_t>(m), 24.0f);
+					model->SetMaterialSpecularIntensity(static_cast<uint32_t>(m), 0.35f);
+					model->SetMaterialEnvironmentCoefficient(static_cast<uint32_t>(m), 0.20f);
 				}
 			}
 		}

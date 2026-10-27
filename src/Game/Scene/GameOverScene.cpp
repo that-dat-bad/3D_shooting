@@ -162,6 +162,7 @@ void GameOverScene::PrewarmAssets() {
 				isRetrying_ = true;
 				retryGlitchTimer_ = 0.0f;
 				GameResult::GetInstance().isRetry = true;
+				GameResult::GetInstance().gameOverReason = GameOverReason::Destroyed;
 				AsyncPreloadManager::GetInstance()->StartStagePreloadAsync();
 			}
 		});
@@ -221,10 +222,36 @@ void GameOverScene::Initialize() {
 	retryGlitchTimer_ = 0.0f;
 	btnClickFlashTimer_ = 0.0f;
 	clickedButtonIdx_ = -1;
-	headerTypewriter_.SetText("MISSION FAILED // SYSTEM DOWN", 0.030f);
+	if (GameResult::GetInstance().gameOverReason == GameOverReason::TimeOver) {
+		headerTypewriter_.SetText("TIME OVER // MISSION ABORTED", 0.030f);
+	} else {
+		headerTypewriter_.SetText("MISSION FAILED // SYSTEM DOWN", 0.030f);
+	}
 	headerTypewriter_.SetCursorBlinkRate(12.0f);
 
 	PrewarmAssets();
+
+	if (GameResult::GetInstance().gameOverReason == GameOverReason::TimeOver) {
+		memoryDumpPool_.clear();
+		const char* const kTimeOverTemplates[] = {
+			"OPERATION_TIME_LIMIT_EXPIRED: 00:00.00",
+			"COMMAND_DIRECTIVE: TACTICAL_ABORT_AUTHORIZED",
+			"AUTOPILOT_RTB: EVASIVE_VECTOR_ENGAGED",
+			"AIRFRAME_STATUS: NOMINAL (ZERO_HULL_DAMAGE)",
+			"FUEL_RESERVE: BINGO_FUEL_ALERT (RETURN_TO_BASE)",
+			"MISSION_OBJECTIVE: INCOMPLETE (TIME_OVER)",
+			"TELEMETRY_LINK: RE-ESTABLISHED WITH CARRIER",
+			"TACTICAL_DEBRIEF: SORTIE_ABORTED_SAFE_RETURN",
+			"STANDBY_FOR_NEXT_OPERATION_REATTEMPT"
+		};
+		for (int repeat = 0; repeat < 2; ++repeat) {
+			for (const auto* line : kTimeOverTemplates) {
+				char buf[96];
+				snprintf(buf, sizeof(buf), "[0x%08X] %s", 0x10000000 + static_cast<int>(memoryDumpPool_.size()) * 0x40, line);
+				memoryDumpPool_.push_back(buf);
+			}
+		}
+	}
 
 	// ウィンドウ位置リセット＆展開アニメーション開始
 	pseudoOS_.ResetWindowPositions();

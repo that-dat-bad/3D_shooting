@@ -3,13 +3,13 @@
 #include <algorithm>
 
 void EnvironmentManager::Initialize() {
-	timeOfDay_ = 12.0f; // 昼間（12時）から開始
+	timeOfDay_ = 14.8f; // 午後の斜光（14:48頃）: 太陽仰角約42度で山岳の陰影と機体の美しさを両立
 	sun_.Initialize();
 }
 
 void EnvironmentManager::Update(Camera* camera, float deltaTime) {
-	// 時間の進行 (仮の昼夜サイクル: リアル時間1秒につきゲーム内0.01時間進む)
-	timeOfDay_ += deltaTime * 0.01f;
+	// 時間の進行（ミッション中は安定した日照を保ちつつ緩やかに進行）
+	timeOfDay_ += deltaTime * 0.0005f;
 	if (timeOfDay_ > 24.0f) {
 		timeOfDay_ = 0.0f;
 	}
@@ -27,8 +27,8 @@ void EnvironmentManager::Update(Camera* camera, float deltaTime) {
 
 	// 太陽の高さ（地平線より上か下か）に応じて明るさと色を調整
 	float sunHeight = -dir.y;
-	if (sunHeight > 0.0f) {
-		sun_.SetIntensity(std::clamp(sunHeight * 1.2f, 0.4f, 1.0f)); // 昼間はしっかり照らす
+	if (sunHeight > 0.05f) {
+		sun_.SetIntensity(std::clamp(sunHeight * 1.2f, 0.45f, 1.0f)); // 昼間はしっかり照らす
 
 		if (sunHeight < 0.3f) {
 			float lerpFactor = sunHeight / 0.3f;
@@ -37,8 +37,9 @@ void EnvironmentManager::Update(Camera* camera, float deltaTime) {
 			sun_.SetColor({ 1.0f, 0.95f, 0.85f, 1.0f });
 		}
 	} else {
-		// 夜間
-		sun_.SetIntensity(0.0f);
+		// 夜間でも完全な真っ黒にはせず、月光・夜間環境光としての最低限の照度を確保
+		sun_.SetIntensity(0.25f);
+		sun_.SetColor({ 0.45f, 0.55f, 0.75f, 1.0f });
 	}
 
 	// 太陽光設定の適用

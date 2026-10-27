@@ -66,6 +66,10 @@ void StageScene::TriggerGameOver() {
 	endSequence_ = StageEndSequence::GameOver_Critical;
 	endSeqTimer_ = 0.0f;
 
+	// 被弾・墜落ゲームオーバーを設定
+	auto& res = GameResult::GetInstance();
+	res.gameOverReason = GameOverReason::Destroyed;
+
 	// 非同期処理による軽量化：ゲームオーバー演出中にバックグラウンドで次ステージデータを非同期プリロード！
 	AsyncPreloadManager::GetInstance()->StartStagePreloadAsync();
 
@@ -78,6 +82,45 @@ void StageScene::TriggerGameOver() {
 	if (CameraManager::GetInstance()->GetActiveCamera()) {
 		CameraManager::GetInstance()->GetActiveCamera()->Shake(1.2f, 4.0f);
 	}
+}
+
+void StageScene::TriggerTimeOver() {
+	if (isGameOver_ || isMissionCleared_) { return; }
+	isGameOver_ = true;
+	isMissionFailed_ = true;
+	gameOverTimer_ = 0.0f;
+	timeScale_ = 1.0f;
+	endSequence_ = StageEndSequence::TimeOver_Abort;
+	endSeqTimer_ = 0.0f;
+
+	// ゲームオーバーリザルトに時間切れ離脱要因を記録
+	auto& res = GameResult::GetInstance();
+	res.gameOverReason = GameOverReason::TimeOver;
+
+	// 非同期プリロード開始
+	AsyncPreloadManager::GetInstance()->StartStagePreloadAsync();
+
+	// 爆発・破壊はさせず、無敵化＆G効果無効化＆オートパイロット離脱に移行
+	flightModel_.SetInvulnerable(true);
+	flightModel_.SetGEffectsEnabled(false);
+	flightModel_.ResetGEffects();
+	flightModel_.SetAutopilot(true);
+
+	// 離脱初期ベクトルを保持
+	clearStartOrientation_ = flightModel_.GetOrientation();
+	clearStartForward_ = flightModel_.GetForwardDirection();
+	clearStartSpeed_ = (std::max)(flightModel_.GetSpeed(), 120.0f);
+
+	Vector3 horiz = { clearStartForward_.x, 0.0f, clearStartForward_.z };
+	if (Length(horiz) > 0.001f) {
+		clearHorizontalDir_ = Normalize(horiz);
+	} else {
+		clearHorizontalDir_ = { 0.0f, 0.0f, 1.0f };
+	}
+
+	// HUDを警告色モードにしつつオフラインシャットダウン開始
+	hud_.SetWarningColorMode(true);
+	hud_.StartShutdown();
 }
 
 void StageScene::TriggerGameClear() {
@@ -314,6 +357,79 @@ void StageScene::UpdateEndSequence(float dt) {
 		postEffect->AddActiveEffect(scan);
 
 		if (endSeqTimer_ >= 0.95f) {
+			postEffect->ClearActiveEffects();
+			sceneID = SCENE::GAMEOVER;
+			return;
+		}
+	}
+	// --- 時間切れ離脱系（爆発なし・作戦離脱） ---
+	else if (endSequence_ == StageEndSequence::TimeOver_Abort) {
+		// 0.0s - 1.4s: 作戦時間切れ警報 ＆ 自機水平レベリング・離脱加速開始
+		timeScale_ = 1.0f;
+
+		// 翼のロールを水平に戻す目標姿勢
+		Quaternion qLevel = LookRotation(clearHorizontalDir_, { 0.0f, 1.0f, 0.0f });
+		float levelT = std::clamp(endSeqTimer_ / 0.9f, 0.0f, 1.0f);
+		float smoothT = levelT * levelT * (3.0f - 2.0f * levelT);
+		Quaternion currentOri = Slerp(clearStartOrientation_, qLevel, smoothT);
+		flightModel_.SetOrientation(currentOri);
+
+		// 巡航速度へ加速
+		float speed = clearStartSpeed_ + smoothT * (180.0f - clearStartSpeed_);
+		flightModel_.SetVelocity(Multiply(speed, flightModel_.GetForwardDirection()));
+
+		// 走査線と警告ビネット（アンバー調）
+		ActivePostEffect scan;
+		scan.type = PostEffectType::kScanLine;
+		scan.intensity = 0.20f;
+		scan.dirX = 650.0f;
+		scan.dirY = -2.0f;
+		postEffect->AddActiveEffect(scan);
+
+		ActivePostEffect vig;
+		vig.type = PostEffectType::kVignette;
+		vig.intensity = 0.65f + 0.25f * std::sin(endSeqTimer_ * 6.28f);
+		postEffect->AddActiveEffect(vig);
+
+		if (endSeqTimer_ >= 1.4f) {
+			endSequence_ = StageEndSequence::TimeOver_Withdraw;
+		}
+	} else if (endSequence_ == StageEndSequence::TimeOver_Withdraw) {
+		// 1.4s - 3.4s: 機首を緩やかに上げてアフターバーナー離脱 ＆ 暗転フェード
+		timeScale_ = 1.0f;
+
+		Quaternion qLevel = LookRotation(clearHorizontalDir_, { 0.0f, 1.0f, 0.0f });
+		constexpr float kClimbAngle = 26.0f * (3.14159265f / 180.0f);
+		Vector3 climbForward = Normalize(Add(
+			Multiply(std::cos(kClimbAngle), clearHorizontalDir_),
+			{ 0.0f, std::sin(kClimbAngle), 0.0f }
+		));
+		Quaternion qClimb = LookRotation(climbForward, { 0.0f, 1.0f, 0.0f });
+
+		float climbT = std::clamp((endSeqTimer_ - 1.4f) / 1.2f, 0.0f, 1.0f);
+		float smoothClimb = climbT * climbT * (3.0f - 2.0f * climbT);
+		Quaternion currentOri = Slerp(qLevel, qClimb, smoothClimb);
+		flightModel_.SetOrientation(currentOri);
+
+		// 急加速して戦域外へ離脱
+		float speed = 180.0f + smoothClimb * 420.0f;
+		flightModel_.SetVelocity(Multiply(speed, flightModel_.GetForwardDirection()));
+
+		// 加速のラジアルブラー
+		ActivePostEffect blur;
+		blur.type = PostEffectType::kRadialBlur;
+		blur.kernelSize = 6;
+		blur.intensity = smoothClimb * 0.06f;
+		postEffect->AddActiveEffect(blur);
+
+		// 離脱完了に向けたフェード暗転
+		float fadeT = std::clamp((endSeqTimer_ - 2.5f) / 0.9f, 0.0f, 1.0f);
+		ActivePostEffect vig;
+		vig.type = PostEffectType::kVignette;
+		vig.intensity = 0.70f + fadeT * 3.5f;
+		postEffect->AddActiveEffect(vig);
+
+		if (endSeqTimer_ >= 3.4f) {
 			postEffect->ClearActiveEffects();
 			sceneID = SCENE::GAMEOVER;
 			return;
@@ -632,7 +748,63 @@ void StageScene::DrawEndSequenceUI() {
 			}
 		}
 	}
+	// ------------------------------------------------------------
+	// 時間切れ離脱演出: TIME OVER & ミッションから離脱します.....
+	// ------------------------------------------------------------
+	else if (endSequence_ == StageEndSequence::TimeOver_Abort || endSequence_ == StageEndSequence::TimeOver_Withdraw) {
+		float fadeAlpha = std::clamp(endSeqTimer_ / 0.30f, 0.0f, 1.0f);
 
+		// 点滅ドット計算 (1〜5個)
+		int dotCount = 1 + static_cast<int>(endSeqTimer_ * 3.5f) % 5;
+		std::string dots = std::string(dotCount, '.');
+
+		// 画面上部〜中央の警告バナー
+		float cardW = 760.0f;
+		float cardH = 150.0f;
+		float cardX = (screenW - cardW) * 0.5f;
+		float cardY = 140.0f;
+
+		// 半透明ダークアンバー背景
+		DrawSolidRect({ cardX, cardY }, { cardW, cardH }, { 0.04f, 0.02f, 0.01f, 0.90f * fadeAlpha });
+		DrawHollowBorder({ cardX, cardY }, { cardW, cardH }, { 1.0f, 0.70f, 0.15f, 0.95f * fadeAlpha }, 2.0f);
+		DrawSolidRect({ cardX, cardY }, { cardW, 4.0f }, { 1.0f, 0.85f, 0.30f, 1.0f * fadeAlpha });
+		DrawSolidRect({ cardX, cardY + cardH - 2.0f }, { cardW, 2.0f }, { 1.0f, 0.70f, 0.15f, 0.75f * fadeAlpha });
+
+		// 大見出し「Time Over」
+		float blink = (std::fmod(endSeqTimer_, 0.5f) < 0.38f) ? 1.0f : 0.65f;
+		TextRenderer::GetInstance()->Print(
+			"HackGen",
+			"Time Over",
+			screenW * 0.5f,
+			cardY + 16.0f,
+			42.0f,
+			{ 1.0f, 0.75f, 0.18f, fadeAlpha * blink },
+			{ 0.5f, 0.0f }
+		);
+
+		// サブメッセージ「ミッションから離脱します.....」
+		std::string msgStr = "ミッションから離脱します" + dots;
+		TextRenderer::GetInstance()->Print(
+			"HackGen",
+			msgStr.c_str(),
+			screenW * 0.5f,
+			cardY + 70.0f,
+			22.0f,
+			{ 1.0f, 1.0f, 1.0f, fadeAlpha },
+			{ 0.5f, 0.0f }
+		);
+
+		// ステータスフッター
+		TextRenderer::GetInstance()->Print(
+			"HackGen",
+			"[ OPERATION TIME EXPIRED // AUTOPILOT RTB ENGAGED ]",
+			screenW * 0.5f,
+			cardY + 114.0f,
+			13.0f,
+			{ 1.0f, 0.75f, 0.30f, 0.85f * fadeAlpha },
+			{ 0.5f, 0.0f }
+		);
+	}
 	// ------------------------------------------------------------
 	// ステージクリア時の巨大ファンファーレUI（大きく「OPERATION CLEARED」演出）
 	// ------------------------------------------------------------

@@ -120,7 +120,7 @@ void StageScene::InitializeAssets() {
 	// 1つのモデルファイルからノード名に基づいて自動セットアップ
 	aircraftVisualModel_.SetupFromSingleModel(generalConfig.modelPath);
 	aircraftVisualModel_.SetupCanopyMaterial();
-	aircraftVisualModel_.SetMaterialProperties(48.0f, 1.35f, 0.45f);
+	aircraftVisualModel_.SetMaterialProperties(32.0f, 0.50f, 0.15f);
 
 	if (!aircraftVisualModel_.IsPartVisible(DamagePart::Fuse)) {
 		std::vector<DamagePart> parts = {
@@ -282,6 +282,7 @@ void StageScene::ResetGameplayState() {
 	isMissionCleared_ = false;
 	isMissionFailed_ = false;
 	isGameOver_ = false;
+	GameResult::GetInstance().gameOverReason = GameOverReason::Destroyed;
 	gameOverTimer_ = 0.0f;
 	timeScale_ = 1.0f;
 	muzzleFlashTimer_ = 0.0f;
@@ -382,6 +383,11 @@ void StageScene::Update() {
 			SetPaused(true);
 			return;
 		}
+		// ベイルアウト（脱出）入力（Jキーで被撃墜と同じゲームオーバー演出）
+		if (input && input->TriggerKey(DIK_J)) {
+			TriggerGameOver();
+			return;
+		}
 	}
 
 	// ミッション制限時間の更新 (出撃演出・ブリーフィング完了後の実プレイ中のみ減算)
@@ -389,12 +395,8 @@ void StageScene::Update() {
 		remainingTime_ -= kDeltaTime;
 		if (remainingTime_ <= 0.0f) {
 			remainingTime_ = 0.0f;
-			if (enemyManager_.GetTotalCount() == 0) {
-				// 敵が存在しない訓練・チュートリアルでは制限時間経過でミッション達成！
-				TriggerGameClear();
-			} else {
-				TriggerGameOver();
-			}
+			// 制限時間切れ時は爆発させず作戦離脱シーケンスを開始
+			TriggerTimeOver();
 		}
 
 		int minutes = static_cast<int>(remainingTime_) / 60;
@@ -448,6 +450,7 @@ void StageScene::Draw() {
 
 	// 3Dオブジェクト描画（Object3dパイプライン）
 	Object3dCommon::GetInstance()->SetupCommonState();
+	Object3dCommon::GetInstance()->SetLightType(1); // 自機・通常3Dモデル描画時は平行光源(Directional Light)を保証
 
 	// 部位破壊対応ビジュアルモデルの描画
 	// 【戦闘モード起動演出（自機専用スキャン波形マテリアライズ・パイプライン）】
@@ -480,7 +483,36 @@ void StageScene::Draw() {
 
 	// 地面描画（40km x 40km チャンク地形パイプライン）
 	if (terrainChunkManager_ && terrainChunkManager_->IsLoaded()) {
+		// 自機の地面投影シャドウ情報を SpotLight (b5) 経由で地形シェーダーへ渡す
+		SpotLight* shadowLight = Object3dCommon::GetInstance()->GetSpotLightData();
+		if (shadowLight) {
+			if (!isGameOver_) {
+				shadowLight->color = { 1.0f, 4.2f, 7.5f, 1200.0f }; // active, wingspan, length, maxAlt
+				shadowLight->position = flightModel_.GetPosition();
+				shadowLight->intensity = 0.88f;
+				shadowLight->direction = flightModel_.GetForwardDirection();
+				Vector3 right = flightModel_.GetRightDirection();
+				shadowLight->distance = right.x;
+				shadowLight->decay = right.y;
+				shadowLight->cosAngle = right.z;
+			} else {
+				shadowLight->color.x = 0.0f; // 撃墜・爆発後はシャドウ非表示
+			}
+		}
+
 		terrainChunkManager_->Draw();
+
+		// 地形描画後は SpotLight 定数バッファを安全なデフォルト値へ即時リセット
+		if (shadowLight) {
+			shadowLight->color = { 0.0f, 0.0f, 0.0f, 0.0f };
+			shadowLight->distance = 100.0f;
+			shadowLight->decay = 1.0f;
+			shadowLight->intensity = 0.0f;
+			shadowLight->direction = { 0.0f, -1.0f, 0.0f };
+			shadowLight->cosAngle = 0.0f;
+			shadowLight->cosFalloffStart = 0.0f;
+		}
+		Object3dCommon::GetInstance()->SetLightType(1);
 	} else {
 		DrawGround();
 	}

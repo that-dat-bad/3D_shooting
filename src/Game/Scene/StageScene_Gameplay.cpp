@@ -78,6 +78,12 @@ void StageScene::UpdateFlightControls(float gameDeltaTime) {
 			isNvdActive_ = !isNvdActive_;
 		}
 
+		// --- ベイルアウト / 緊急脱出 (J キー: 被撃墜と同じゲームオーバー演出) ---
+		if (input->TriggerKey(DIK_J)) {
+			TriggerGameOver();
+			return;
+		}
+
 		// --- WASD 手動操縦入力 ---
 		float manualPitch = 0.0f;
 		float manualRoll = 0.0f;
@@ -868,10 +874,12 @@ void StageScene::UpdatePostEffects(float deltaTime) {
 		dist.intensity = 0.18f;
 		postEffect->AddActiveEffect(dist);
 	} else if (!isGameOver_) {
-		float bootBloom = 2.0f;
+		float bootBloom = 1.0f;
 		float bootScan = 0.030f;
 		float bootAberration = 0.004f;
 		float bootVignette = 0.40f;
+		float bloomStrength = 0.50f;  // 通常戦闘飛行時の適正ブルーム強度
+		float bloomThreshold = 0.90f; // 機体ボディが白飛び・まぶしく発光しない適正なしきい値
 
 		if (sortieIntroTimer_ < sortieIntroDuration_) {
 			bootVignette = 0.55f;
@@ -880,28 +888,35 @@ void StageScene::UpdatePostEffects(float deltaTime) {
 				bootBloom = 0.0f;
 				bootScan = 0.0f;
 				bootAberration = 0.0f;
+				bloomStrength = 0.0f;
 			} else if (sortieIntroTimer_ < 1.35f) {
 				float t = (sortieIntroTimer_ - 0.85f) / 0.50f;
 				bootScan = 0.08f * (1.0f - t * 0.4f);
 				bootAberration = 0.012f * (1.0f - t * 0.5f);
-				bootBloom = 2.4f;
+				bootBloom = 2.0f;
+				bloomStrength = 1.0f;
+				bloomThreshold = 0.75f;
 			} else if (sortieIntroTimer_ < 3.40f) {
-				bootBloom = 2.2f;
+				bootBloom = 1.8f;
 				bootScan = 0.040f;
 				bootAberration = 0.006f;
+				bloomStrength = 0.90f;
+				bloomThreshold = 0.75f;
 			} else if (sortieIntroTimer_ >= 4.55f && sortieIntroTimer_ <= 4.80f) {
 				float flashT = (sortieIntroTimer_ - 4.55f) / 0.25f;
 				float pulse = std::sin(flashT * 3.14159f);
-				bootBloom = 2.2f + 1.2f * pulse;
-				bootAberration = 0.015f * pulse;
+				bootBloom = 1.8f + 0.8f * pulse;
+				bootAberration = 0.012f * pulse;
+				bloomStrength = 0.90f;
+				bloomThreshold = 0.75f;
 			}
 		}
 
 		ActivePostEffect bloom;
 		bloom.type = PostEffectType::kBloom;
 		bloom.intensity = bootBloom;
-		bloom.dirX = 1.15f;
-		bloom.dirY = 0.70f;
+		bloom.dirX = bloomStrength;
+		bloom.dirY = bloomThreshold;
 		postEffect->AddActiveEffect(bloom);
 
 		ActivePostEffect scan;

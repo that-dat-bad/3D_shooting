@@ -123,10 +123,13 @@ private:
 	// ============================
 	enum class StageEndSequence {
 		None,
-		// ゲームオーバー演出
+		// ゲームオーバー演出（被弾撃墜）
 		GameOver_Critical,      ///< 項目4: HUD赤反転、CRITICAL DAMAGE 点滅
 		GameOver_SignalLost,    ///< 項目1: 3Dフリーズ、強烈ノイズ/砂嵐、SIGNAL LOST 表示
 		GameOver_CrtShutdown,   ///< 項目2: ブラウン管電源切断演出（中央水平線収束・プツッ消滅）
+		// 時間切れ離脱演出（爆発せず自機が戦域から離脱）
+		TimeOver_Abort,         ///< 離脱指示・水平復帰・「Time Over / ミッションから離脱します.....」
+		TimeOver_Withdraw,      ///< 急上昇加速離脱・戦域脱出フェード
 		// ステージクリア演出
 		Clear_HudShutdown,      ///< 項目5: HUD順次OFFLINE消去、MISSION ACCOMPLISHED タイピング
 		Clear_AutopilotReturn,  ///< 項目6: オートパイロット移行、自機急上昇・急加速離脱
@@ -135,13 +138,14 @@ private:
 	StageEndSequence endSequence_ = StageEndSequence::None;
 	float endSeqTimer_ = 0.0f;
 
-	// クリア演出用パラメータ（飛行機離脱機動用）
+	// クリア・離脱演出用パラメータ（飛行機離脱機動用）
 	MyMath::Quaternion clearStartOrientation_{ 0.0f, 0.0f, 0.0f, 1.0f };
 	MyMath::Vector3 clearStartForward_{ 0.0f, 0.0f, 1.0f };
 	MyMath::Vector3 clearHorizontalDir_{ 0.0f, 0.0f, 1.0f };
 	float clearStartSpeed_ = 100.0f;
 
 	void TriggerGameOver();
+	void TriggerTimeOver();
 	void TriggerGameClear();
 	void UpdateEndSequence(float dt);
 	void DrawEndSequenceUI();

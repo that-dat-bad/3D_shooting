@@ -11,8 +11,13 @@ void GameOverScene::DrawCrashRecoveryWindow(const PseudoOS::Window& win) {
 	gameOverText_.Draw();
 	cy += 48.0f;
 
-	tr->Print("HackGen", "*** CRITICAL KERNEL PANIC: EXCEPTION_STAGE_FAILURE (0xC0000005) ***",
-		cx, cy, 14.0f, { 1.0f, 0.75f, 0.35f, 0.95f }, { 0.5f, 0.0f });
+	if (GameResult::GetInstance().gameOverReason == GameOverReason::TimeOver) {
+		tr->Print("HackGen", "*** OPERATION TIMEOUT: EXCEPTION_TIME_EXPIRED (0x00000042) ***",
+			cx, cy, 14.0f, { 1.0f, 0.75f, 0.35f, 0.95f }, { 0.5f, 0.0f });
+	} else {
+		tr->Print("HackGen", "*** CRITICAL KERNEL PANIC: EXCEPTION_STAGE_FAILURE (0xC0000005) ***",
+			cx, cy, 14.0f, { 1.0f, 0.75f, 0.35f, 0.95f }, { 0.5f, 0.0f });
+	}
 	cy += 24.0f;
 
 	// 2. メモリダンプ表示枠（深紅のターミナル枠）

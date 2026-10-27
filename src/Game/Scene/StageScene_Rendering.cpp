@@ -67,6 +67,21 @@ void StageScene::DrawGround() {
 			lineCol, camera
 		);
 	}
+
+	// 自機の地面投影シャドウ（平坦地面時）
+	if (!isGameOver_ && aircraftPos.y > 0.0f && aircraftPos.y < 800.0f) {
+		float altFade = std::clamp(1.0f - aircraftPos.y / 800.0f, 0.0f, 1.0f);
+		float shadowScale = 14.0f + aircraftPos.y * 0.02f;
+		uint32_t softShadowTex = TextureManager::GetInstance()->GetTextureIndexByFilePath("assets/textures/circle2.png");
+		Vector3 aircraftRot = PlayerCamera::QuaternionToEuler(flightModel_.GetOrientation());
+		PrimitiveModel::GetInstance()->DrawPlane(
+			{ shadowScale * 0.65f, 1.0f, shadowScale },
+			{ 0.0f, aircraftRot.y, 0.0f },
+			{ aircraftPos.x, 0.25f, aircraftPos.z },
+			{ 0.0f, 0.0f, 0.0f, 0.55f * altFade },
+			softShadowTex, camera
+		);
+	}
 }
 
 // ============================================================

@@ -2,6 +2,8 @@
 #include <vector>
 #include <string>
 #include <memory>
+#include <d3d12.h>
+#include <wrl.h>
 #include "../../engine/Graphics/Model/Object3d.h"
 #include "../../engine/base/Math/MyMath.h"
 
@@ -121,4 +123,7 @@ private:
 	float drawDistance_ = 10000.0f; // デフォルト10kmカリング距離
 	int renderedChunkCount_ = 0;
 	double lastLoadTimeMs_ = 0.0;
+
+	void CreateTerrainPipeline();
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> terrainPipelineState_;
 };

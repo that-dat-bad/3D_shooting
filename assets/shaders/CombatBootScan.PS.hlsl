@@ -90,12 +90,14 @@ PixelShaderOutput main(PixelInput input)
         discard;
     }
 
-    // 基本ライティング計算（Half-Lambert + Specular）
+    // 基本ライティング計算（Half-Lambert + 半球アンビエント）
     float32_t3 N = normalize(input.normal);
     float32_t3 L = normalize(-gDirectionalLight.direction);
     float NdotL = dot(N, L);
     float cosFactor = saturate(NdotL * 0.5f + 0.5f); // Half-Lambert
-    float32_t3 diffuse = gMaterial.color.rgb * texColor.rgb * gDirectionalLight.color.rgb * cosFactor * gDirectionalLight.intensity;
+    float hemi = N.y * 0.5f + 0.5f;
+    float32_t3 ambient = lerp(float32_t3(0.18f, 0.16f, 0.14f), float32_t3(0.30f, 0.35f, 0.42f), hemi) * 0.16f;
+    float32_t3 diffuse = gMaterial.color.rgb * texColor.rgb * (gDirectionalLight.color.rgb * (cosFactor * 0.84f) * gDirectionalLight.intensity + ambient);
 
     // 2. 【スキャン波形＆ネオンワイヤーフレーム構築フェーズ】
     // 重心座標からエッジまでの最短距離をスクリーンスペースでシャープに計算
@@ -126,6 +128,10 @@ PixelShaderOutput main(PixelInput input)
     // 波面先端ではワイヤーフレーム＆透過ホログラムがメインで実体は薄く、
     // 波が通り過ぎるにつれて実体装甲（テクスチャ＋ライティング）が徐々に現れて完全実写へ！
     float32_t3 finalColor = diffuse * solidFactor + neonGlow * wireFactor;
+    if (any(isnan(finalColor)) || any(isinf(finalColor)))
+    {
+        finalColor = gMaterial.color.rgb * texColor.rgb * 0.35f;
+    }
     float finalAlpha = lerp(edge * 0.95f + waveFrontPeak * 0.85f, 1.0f, solidFactor) * gMaterial.color.a * texColor.a;
 
     output.color = float32_t4(finalColor, saturate(finalAlpha));
