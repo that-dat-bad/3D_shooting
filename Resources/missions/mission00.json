@@ -2,16 +2,15 @@
     "name": "TUTORIAL",
     "aliasName": "mission 00",
     "subTitle": "FLIGHT TRAINING",
-    "difficulty": "TUTORIAL",
     "areaName": "GRAND CANYON & MOUNTAINS (40km x 40km)",
-    "description": "Fly over the 40km x 40km chunked terrain. Explore the 500m-deep canyon, bridges, and surrounding mountain ranges.",
+    "description": "[default description]",
     "playerHP": 100.0,
     "playerPosition": {
         "x": 0.0,
         "y": 150.0,
         "z": 0.0
     },
-    "timeLimit": 300.0,
+    "timeLimit": 5.0,
     "enemies": [],
     "groundEnemies": [],
     "objectives": [

@@ -732,7 +732,7 @@ void CombatBootSequence::DrawBootUI() {
 		contentY += 22.0f;
 
 		std::string opTitle = mission.name.empty() ? "OPERATION COMBINED STRIKE" : mission.name;
-		std::string opSubTitle = mission.subTitle.empty() ? "" : (" // " + mission.subTitle);
+		std::string opSubTitle = (mission.subTitle.empty() || mission.subTitle == mission.name) ? "" : (" // " + mission.subTitle);
 		printBriefText("HackGen", opTitle + opSubTitle, px + 36.0f, contentY, 28.0f, { 0.95f, 1.0f, 0.98f, 1.0f });
 		contentY += 38.0f;
 
@@ -778,27 +778,34 @@ void CombatBootSequence::DrawBootUI() {
 		printBriefText("HackGen", "[ TACTICAL CONDITIONS & INTEL ]", colLeftX, curY, 15.5f, { 0.45f, 1.0f, 0.70f, 0.95f });
 		curY += 24.0f;
 
-		char airBuf[64];
-		snprintf(airBuf, sizeof(airBuf), "HOSTILE AIRBORNE : %zu UNITS", mission.enemies.size());
-		printBriefText("HackGen", airBuf, colLeftX + 8.0f, curY, 14.0f, { 0.95f, 0.40f, 0.35f, 0.95f });
-		curY += 21.0f;
+		if (mission.enemies.empty() && mission.groundEnemies.empty()) {
+			printBriefText("HackGen", "HOSTILE UNITS    : NONE (RECONNAISSANCE ONLY)", colLeftX + 8.0f, curY, 14.0f, { 0.35f, 0.85f, 0.55f, 0.90f });
+			curY += 21.0f;
+		} else {
+			char airBuf[64];
+			snprintf(airBuf, sizeof(airBuf), "HOSTILE AIRBORNE : %zu UNITS", mission.enemies.size());
+			printBriefText("HackGen", airBuf, colLeftX + 8.0f, curY, 14.0f, { 0.95f, 0.40f, 0.35f, 0.95f });
+			curY += 21.0f;
 
-		char gndBuf[64];
-		snprintf(gndBuf, sizeof(gndBuf), "HOSTILE GROUND   : %zu SITES", mission.groundEnemies.size());
-		printBriefText("HackGen", gndBuf, colLeftX + 8.0f, curY, 14.0f, { 0.95f, 0.70f, 0.30f, 0.95f });
-		curY += 21.0f;
+			char gndBuf[64];
+			snprintf(gndBuf, sizeof(gndBuf), "HOSTILE GROUND   : %zu SITES", mission.groundEnemies.size());
+			printBriefText("HackGen", gndBuf, colLeftX + 8.0f, curY, 14.0f, { 0.95f, 0.70f, 0.30f, 0.95f });
+			curY += 21.0f;
+		}
 
 		char areaBuf[128];
 		snprintf(areaBuf, sizeof(areaBuf), "COMBAT AIRSPACE  : %s", mission.areaName.c_str());
 		printBriefText("HackGen", areaBuf, colLeftX + 8.0f, curY, 14.0f, { 0.35f, 0.85f, 0.55f, 0.90f });
 		curY += 21.0f;
 
-		char diffBuf[128];
-		snprintf(diffBuf, sizeof(diffBuf), "MISSION THREAT   : %s", mission.difficulty.c_str());
-		printBriefText("HackGen", diffBuf, colLeftX + 8.0f, curY, 14.0f, { 1.0f, 0.85f, 0.30f, 0.95f });
-		curY += 22.0f;
-
-		printBriefText("HackGen", "// AVIONICS : FCS RADAR ONLINE  // IFF : SYNCED", colLeftX + 8.0f, curY, 13.0f, { 0.35f, 0.80f, 0.50f, 0.80f });
+		char timeBuf[64];
+		if (mission.timeLimit > 0.0f) {
+			int tSec = static_cast<int>(mission.timeLimit);
+			snprintf(timeBuf, sizeof(timeBuf), "TIME LIMIT       : %02d:%02d", tSec / 60, tSec % 60);
+		} else {
+			snprintf(timeBuf, sizeof(timeBuf), "TIME LIMIT       : UNLIMITED");
+		}
+		printBriefText("HackGen", timeBuf, colLeftX + 8.0f, curY, 14.0f, { 0.45f, 1.0f, 0.70f, 0.95f });
 
 		// ====================================================================
 		// 右カラム: 作戦空域タクティカルマップ (四角い枠のみ)

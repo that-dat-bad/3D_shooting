@@ -1834,9 +1834,8 @@ void TitleScene::DrawMissionSelectModal() {
 		DrawOSRect({ listX + 12.0f, cy + 38.0f }, { cardW - 24.0f, 1.0f }, isSel ? Vector4{ 0.25f, 0.75f, 0.45f, 0.60f } : Vector4{ 0.15f, 0.45f, 0.25f, 0.45f });
 
 		std::string areaStr = card.data.areaName.empty() ? "SECTOR 04" : card.data.areaName;
-		std::string diffStr = card.data.difficulty.empty() ? "NORMAL" : card.data.difficulty;
 		char meta1[128];
-		snprintf(meta1, sizeof(meta1), "AIRSPACE: %s  |  DIFF: %s", areaStr.c_str(), diffStr.c_str());
+		snprintf(meta1, sizeof(meta1), "AIRSPACE: %s", areaStr.c_str());
 		tr->Print("HackGen", meta1, listX + 16.0f, cy + 46.0f, 11.0f, isSel ? Vector4{ 0.45f, 0.95f, 0.65f, 0.95f } : Vector4{ 0.25f, 0.70f, 0.40f, 0.75f });
 
 		char timeStr[64];
@@ -1879,15 +1878,15 @@ void TitleScene::DrawMissionSelectModal() {
 		tr->Print("HackGen", protoHeader, dx, dy, 14.0f, { 0.35f, 0.85f, 0.55f, 0.85f });
 		dy += 22.0f;
 
-		// 大見出し: 作戦名
+		// 大見出し: 作戦名（subTitle が空、または name と同一の場合は重複表示しない）
 		std::string nameAndSub = curCard.data.name;
-		if (!curCard.data.subTitle.empty()) {
+		if (!curCard.data.subTitle.empty() && curCard.data.subTitle != curCard.data.name) {
 			nameAndSub += " // " + curCard.data.subTitle;
 		}
 		tr->Print("HackGen", nameAndSub, dx, dy, 26.0f, { 0.92f, 1.0f, 0.96f, 1.0f });
 		dy += 34.0f;
 
-		// 空域・難易度・制限時間
+		// 空域・制限時間（難易度は存在しないため除外）
 		char timeStr[64];
 		if (curCard.data.timeLimit > 0.0f) {
 			int tSec = static_cast<int>(curCard.data.timeLimit);
@@ -1896,7 +1895,7 @@ void TitleScene::DrawMissionSelectModal() {
 			snprintf(timeStr, sizeof(timeStr), "UNLIMITED");
 		}
 		char metaBuf[160];
-		snprintf(metaBuf, sizeof(metaBuf), "AIRSPACE: %s  |  DIFFICULTY: %s  |  TIME LIMIT: %s", curCard.data.areaName.c_str(), curCard.data.difficulty.c_str(), timeStr);
+		snprintf(metaBuf, sizeof(metaBuf), "AIRSPACE: %s  |  TIME LIMIT: %s", curCard.data.areaName.c_str(), timeStr);
 		tr->Print("HackGen", metaBuf, dx, dy, 14.5f, { 0.45f, 1.0f, 0.70f, 0.95f });
 		dy += 24.0f;
 
@@ -1931,15 +1930,15 @@ void TitleScene::DrawMissionSelectModal() {
 		dy += objBoxH + 14.0f;
 
 		// 脅威分析
-		tr->Print("HackGen", "[ THREAT INTEL & COMBAT ENVIRONMENT ]", dx, dy, 15.5f, { 0.45f, 1.0f, 0.70f, 0.98f });
+		tr->Print("HackGen", "[ THREAT INTEL ]", dx, dy, 15.5f, { 0.45f, 1.0f, 0.70f, 0.98f });
 		dy += 20.0f;
 		char threatBuf[128];
-		snprintf(threatBuf, sizeof(threatBuf), "// DETECTED HOSTILES : %zu AIRBORNE FIGHTERS / %zu FORTIFIED SITES", curCard.data.enemies.size(), curCard.data.groundEnemies.size());
+		if (curCard.data.enemies.empty() && curCard.data.groundEnemies.empty()) {
+			snprintf(threatBuf, sizeof(threatBuf), "// DETECTED HOSTILES : NONE (RECONNAISSANCE ONLY)");
+		} else {
+			snprintf(threatBuf, sizeof(threatBuf), "// DETECTED HOSTILES : %zu AIRBORNE FIGHTERS / %zu FORTIFIED SITES", curCard.data.enemies.size(), curCard.data.groundEnemies.size());
+		}
 		tr->Print("HackGen", threatBuf, dx + 6.0f, dy, 14.0f, { 0.95f, 0.65f, 0.35f, 0.95f });
-		dy += 20.0f;
-		tr->Print("HackGen", "// AVIONICS: ALL WEAPON SYSTEMS ONLINE // FCS COMBAT ALGORITHM ARMED", dx + 6.0f, dy, 14.0f, { 0.35f, 0.85f, 0.55f, 0.85f });
-		dy += 20.0f;
-		tr->Print("HackGen", "// WEATHER : CLEAR VISIBILITY // WIND 280@12KT // G-LIMITER OFF", dx + 6.0f, dy, 13.5f, { 0.30f, 0.70f, 0.45f, 0.80f });
 	}
 
 	// =========================================================================

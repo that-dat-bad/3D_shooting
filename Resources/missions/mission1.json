@@ -2,7 +2,6 @@
     "name": "AIRSPACE DEFENSE",
     "aliasName": "OP: IRON SHIELD",
     "subTitle": "敵要撃部隊 要撃スクランブル",
-    "difficulty": "HARD [★★★★☆]",
     "areaName": "SECTOR 04 : MOUNTAIN VALLEY",
     "description": "峡谷地帯を低空侵入する敵先鋭飛行部隊の迎撃作戦。狭隘な地形での高G機動戦が予想される。友軍基地への到達前に敵機をすべて撃墜せよ。",
     "playerHP": 100.0,
