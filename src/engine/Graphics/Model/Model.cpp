@@ -18,6 +18,10 @@
 #include <Windows.h>
 #include <filesystem>
 #include <functional>
+#include <unordered_map>
+#include <algorithm>
+#include <cstring>
+#include <cmath>
 
 
 
@@ -101,27 +105,31 @@ void Model::InitializeFromModelData(ModelCommon* modelCommon, ModelData modelDat
 	std::memcpy(vertexData_, modelData_.vertices.data(), sizeof(VertexData) * modelData_.vertices.size());
 	vertexBuffer_->Unmap(0, nullptr);
 
-	if (srvManager && srvManager->CanAllocate()) {
-		rawVertexSrvIndex_ = srvManager->Allocate();
-		srvManager->CreateSRVforStructuredBuffer(rawVertexSrvIndex_, vertexBuffer_.Get(), static_cast<UINT>(modelData_.vertices.size()), sizeof(VertexData));
+	// ボーンを持たない静的メッシュ（地形チャンク等）では CS スキニング用リソースは不要なので生成しない
+	// （UAVバッファ・パラメータCB・SRV/UAVディスクリプタの生成コストとVRAMを節約）
+	if (!modelData_.bones.empty()) {
+		if (srvManager && srvManager->CanAllocate()) {
+			rawVertexSrvIndex_ = srvManager->Allocate();
+			srvManager->CreateSRVforStructuredBuffer(rawVertexSrvIndex_, vertexBuffer_.Get(), static_cast<UINT>(modelData_.vertices.size()), sizeof(VertexData));
+		}
+
+		// CSスキニング用バッファとUAVの初期化
+		skinnedVertexBuffer_ = dxCommon->CreateUAVBufferResource(sizeof(VertexData) * modelData_.vertices.size());
+		skinnedVertexBufferView_.BufferLocation = skinnedVertexBuffer_->GetGPUVirtualAddress();
+		skinnedVertexBufferView_.SizeInBytes = UINT(sizeof(VertexData) * modelData_.vertices.size());
+		skinnedVertexBufferView_.StrideInBytes = sizeof(VertexData);
+
+		if (srvManager && srvManager->CanAllocate()) {
+			skinnedVertexUavIndex_ = srvManager->Allocate();
+			srvManager->CreateUAVforStructuredBuffer(skinnedVertexUavIndex_, skinnedVertexBuffer_.Get(), static_cast<UINT>(modelData_.vertices.size()), sizeof(VertexData));
+		}
+
+		skinningParamsResource_ = dxCommon->CreateBufferResource(sizeof(SkinningParams));
+		SkinningParams* params = nullptr;
+		skinningParamsResource_->Map(0, nullptr, reinterpret_cast<void**>(&params));
+		params->numVertices = static_cast<uint32_t>(modelData_.vertices.size());
+		skinningParamsResource_->Unmap(0, nullptr);
 	}
-
-	// CSスキニング用バッファとUAVの初期化
-	skinnedVertexBuffer_ = dxCommon->CreateUAVBufferResource(sizeof(VertexData) * modelData_.vertices.size());
-	skinnedVertexBufferView_.BufferLocation = skinnedVertexBuffer_->GetGPUVirtualAddress();
-	skinnedVertexBufferView_.SizeInBytes = UINT(sizeof(VertexData) * modelData_.vertices.size());
-	skinnedVertexBufferView_.StrideInBytes = sizeof(VertexData);
-
-	if (srvManager && srvManager->CanAllocate()) {
-		skinnedVertexUavIndex_ = srvManager->Allocate();
-		srvManager->CreateUAVforStructuredBuffer(skinnedVertexUavIndex_, skinnedVertexBuffer_.Get(), static_cast<UINT>(modelData_.vertices.size()), sizeof(VertexData));
-	}
-
-	skinningParamsResource_ = dxCommon->CreateBufferResource(sizeof(SkinningParams));
-	SkinningParams* params = nullptr;
-	skinningParamsResource_->Map(0, nullptr, reinterpret_cast<void**>(&params));
-	params->numVertices = static_cast<uint32_t>(modelData_.vertices.size());
-	skinningParamsResource_->Unmap(0, nullptr);
 
 	// インデックスバッファの初期化
 	indexBuffer_ = dxCommon->CreateBufferResource(sizeof(uint32_t) * modelData_.indices.size());
@@ -660,6 +668,332 @@ Model::ModelData Model::LoadModelFile(const std::string& directoryPath, const st
 
 
 
+
+	return modelData;
+}
+
+// ============================================================================
+// 軽量OBJローダー（Assimp非経由）
+// - 地形チャンクのような「テクスチャ少・ボーン無し・大量ファイル」の静的メッシュ向け
+// - Assimp 経路 (FlipWindingOrder | FlipUVs | Triangulate | JoinIdenticalVertices + X反転) と同じ頂点規約で出力
+// ============================================================================
+namespace {
+	// 空白スキップ
+	inline const char* SkipSpaces(const char* p, const char* end) {
+		while (p < end && (*p == ' ' || *p == '\t')) { ++p; }
+		return p;
+	}
+	// 行末までスキップ（改行文字の次へ）
+	inline const char* SkipLine(const char* p, const char* end) {
+		while (p < end && *p != '\n') { ++p; }
+		return (p < end) ? p + 1 : end;
+	}
+	// 高速 float パース（Debugビルドでも strtof より大幅に速い）
+	inline const char* ParseFloat(const char* p, const char* end, float& out) {
+		p = SkipSpaces(p, end);
+		bool neg = false;
+		if (p < end && (*p == '-' || *p == '+')) { neg = (*p == '-'); ++p; }
+		double value = 0.0;
+		while (p < end && *p >= '0' && *p <= '9') { value = value * 10.0 + (*p - '0'); ++p; }
+		if (p < end && *p == '.') {
+			++p;
+			double scale = 0.1;
+			while (p < end && *p >= '0' && *p <= '9') { value += (*p - '0') * scale; scale *= 0.1; ++p; }
+		}
+		if (p < end && (*p == 'e' || *p == 'E')) {
+			++p;
+			bool expNeg = false;
+			if (p < end && (*p == '-' || *p == '+')) { expNeg = (*p == '-'); ++p; }
+			int e = 0;
+			while (p < end && *p >= '0' && *p <= '9') { e = e * 10 + (*p - '0'); ++p; }
+			value *= std::pow(10.0, expNeg ? -e : e);
+		}
+		out = static_cast<float>(neg ? -value : value);
+		return p;
+	}
+	inline const char* ParseInt(const char* p, const char* end, int& out) {
+		bool neg = false;
+		if (p < end && (*p == '-' || *p == '+')) { neg = (*p == '-'); ++p; }
+		int v = 0;
+		while (p < end && *p >= '0' && *p <= '9') { v = v * 10 + (*p - '0'); ++p; }
+		out = neg ? -v : v;
+		return p;
+	}
+	// 行の残り（トークン）を取得（前後空白・CR除去）
+	inline std::string ReadRestOfLine(const char* p, const char* end) {
+		p = SkipSpaces(p, end);
+		const char* s = p;
+		while (p < end && *p != '\n' && *p != '\r') { ++p; }
+		const char* e = p;
+		while (e > s && (e[-1] == ' ' || e[-1] == '\t')) { --e; }
+		return std::string(s, e);
+	}
+	inline bool ReadWholeFile(const std::string& path, std::string& out) {
+		std::ifstream ifs(path, std::ios::binary | std::ios::ate);
+		if (!ifs) { return false; }
+		std::streamsize size = ifs.tellg();
+		if (size <= 0) { return false; }
+		out.resize(static_cast<size_t>(size));
+		ifs.seekg(0);
+		ifs.read(out.data(), size);
+		return true;
+	}
+
+	struct ObjVertexKey {
+		int v, vt, vn;
+		bool operator==(const ObjVertexKey& o) const { return v == o.v && vt == o.vt && vn == o.vn; }
+	};
+	struct ObjVertexKeyHash {
+		size_t operator()(const ObjVertexKey& k) const {
+			uint64_t h = static_cast<uint32_t>(k.v);
+			h = h * 0x9E3779B97F4A7C15ull ^ static_cast<uint32_t>(k.vt);
+			h = h * 0x9E3779B97F4A7C15ull ^ static_cast<uint32_t>(k.vn);
+			return static_cast<size_t>(h ^ (h >> 29));
+		}
+	};
+
+	// .mtl の読み込み（Kd / d / Ns / Ke / map_Kd のみ対応）
+	void ParseMtlFile(const std::string& mtlPath, const std::string& baseDir,
+		std::unordered_map<std::string, Model::MaterialData>& outMaterials) {
+		std::string buf;
+		if (!ReadWholeFile(mtlPath, buf)) { return; }
+		const char* p = buf.data();
+		const char* end = p + buf.size();
+		Model::MaterialData* cur = nullptr;
+		while (p < end) {
+			p = SkipSpaces(p, end);
+			if (p >= end) { break; }
+			if (std::strncmp(p, "newmtl", 6) == 0 && (p + 6 < end) && (p[6] == ' ' || p[6] == '\t')) {
+				std::string name = ReadRestOfLine(p + 6, end);
+				cur = &outMaterials[name];
+			} else if (cur && p + 2 < end && p[0] == 'K' && p[1] == 'd' && (p[2] == ' ' || p[2] == '\t')) {
+				const char* q = p + 2;
+				q = ParseFloat(q, end, cur->baseColor.x);
+				q = ParseFloat(q, end, cur->baseColor.y);
+				q = ParseFloat(q, end, cur->baseColor.z);
+			} else if (cur && p + 1 < end && p[0] == 'd' && (p[1] == ' ' || p[1] == '\t')) {
+				ParseFloat(p + 1, end, cur->baseColor.w);
+			} else if (cur && p + 2 < end && p[0] == 'N' && p[1] == 's' && (p[2] == ' ' || p[2] == '\t')) {
+				float ns = 0.0f;
+				ParseFloat(p + 2, end, ns);
+				cur->shininess = (std::min)((std::max)(ns, 1.0f), 256.0f);
+			} else if (cur && p + 2 < end && p[0] == 'K' && p[1] == 'e' && (p[2] == ' ' || p[2] == '\t')) {
+				const char* q = p + 2;
+				q = ParseFloat(q, end, cur->emissiveColor.x);
+				q = ParseFloat(q, end, cur->emissiveColor.y);
+				q = ParseFloat(q, end, cur->emissiveColor.z);
+				cur->emissiveIntensity = 1.0f; // Assimp 経路と同じ扱い
+			} else if (cur && std::strncmp(p, "map_Kd", 6) == 0) {
+				std::string tex = ReadRestOfLine(p + 6, end);
+				if (!tex.empty()) {
+					std::string texPath = baseDir.empty() ? tex : (baseDir + "/" + tex);
+					if (!std::filesystem::exists(texPath)) {
+						std::string fallback = "assets/textures/" + std::filesystem::path(tex).filename().string();
+						if (std::filesystem::exists(fallback)) { texPath = fallback; }
+					}
+					cur->textureFilePath = texPath;
+				}
+			}
+			p = SkipLine(p, end);
+		}
+	}
+}
+
+Model::ModelData Model::LoadObjFileFast(const std::string& filePath) {
+	ModelData modelData;
+
+	std::string buf;
+	if (!ReadWholeFile(filePath, buf)) {
+		return modelData;
+	}
+	std::string baseDirectory = std::filesystem::path(filePath).parent_path().string();
+	std::replace(baseDirectory.begin(), baseDirectory.end(), '\\', '/');
+
+	// 生データ（OBJは1始まりインデックス）
+	std::vector<Vector3> positions;
+	std::vector<Vector2> texcoords;
+	std::vector<Vector3> normals;
+	// 概算で予約（1行 ~30byte 程度）
+	positions.reserve(buf.size() / 64);
+	normals.reserve(buf.size() / 64);
+
+	// マテリアル
+	std::unordered_map<std::string, MaterialData> mtlLibrary;
+	std::unordered_map<std::string, uint32_t> materialIndexByName;
+	std::vector<std::string> materialNames;
+	uint32_t currentMaterial = 0;
+	auto getMaterialIndex = [&](const std::string& name) -> uint32_t {
+		auto it = materialIndexByName.find(name);
+		if (it != materialIndexByName.end()) { return it->second; }
+		uint32_t idx = static_cast<uint32_t>(materialNames.size());
+		materialNames.push_back(name);
+		materialIndexByName.emplace(name, idx);
+		return idx;
+	};
+	bool hasAnyMaterial = false;
+
+	// オブジェクト（o）ごと → マテリアルごとの三角形インデックス
+	struct ObjGroup {
+		std::string name;
+		std::map<uint32_t, std::vector<uint32_t>> trisByMaterial;
+	};
+	std::vector<ObjGroup> groups;
+	groups.push_back({ "default", {} });
+
+	std::unordered_map<ObjVertexKey, uint32_t, ObjVertexKeyHash> vertexCache;
+	vertexCache.reserve(buf.size() / 64);
+	modelData.vertices.reserve(buf.size() / 64);
+
+	auto resolveIndex = [](int idx, size_t count) -> int {
+		// 負数は末尾からの相対指定
+		if (idx < 0) { return static_cast<int>(count) + idx; }
+		return idx - 1;
+	};
+
+	auto emitVertex = [&](const ObjVertexKey& key) -> uint32_t {
+		auto it = vertexCache.find(key);
+		if (it != vertexCache.end()) { return it->second; }
+
+		VertexData vertex{};
+		const Vector3& pos = positions[key.v];
+		// Assimp 経路と同じ: X反転
+		vertex.position = { -pos.x, pos.y, pos.z, 1.0f };
+		if (key.vt >= 0 && key.vt < static_cast<int>(texcoords.size())) {
+			// aiProcess_FlipUVs 相当
+			vertex.texcoord = { texcoords[key.vt].x, 1.0f - texcoords[key.vt].y };
+		} else {
+			vertex.texcoord = { 0.0f, 0.0f };
+		}
+		if (key.vn >= 0 && key.vn < static_cast<int>(normals.size())) {
+			Vector3 n = normals[key.vn];
+			float len = std::sqrt(n.x * n.x + n.y * n.y + n.z * n.z);
+			if (len > 0.0f) { n.x /= len; n.y /= len; n.z /= len; }
+			vertex.normal = { -n.x, n.y, n.z };
+		} else {
+			vertex.normal = { 0.0f, 1.0f, 0.0f };
+		}
+		vertex.weight = { 1.0f, 0.0f, 0.0f, 0.0f };
+		vertex.indices[0] = vertex.indices[1] = vertex.indices[2] = vertex.indices[3] = 0;
+
+		uint32_t newIndex = static_cast<uint32_t>(modelData.vertices.size());
+		modelData.vertices.push_back(vertex);
+		vertexCache.emplace(key, newIndex);
+		return newIndex;
+	};
+
+	const char* p = buf.data();
+	const char* end = p + buf.size();
+	uint32_t faceVerts[64];
+
+	while (p < end) {
+		p = SkipSpaces(p, end);
+		if (p >= end) { break; }
+		const char c0 = *p;
+		const char c1 = (p + 1 < end) ? p[1] : '\0';
+
+		if (c0 == 'v' && (c1 == ' ' || c1 == '\t')) {
+			Vector3 v{};
+			const char* q = p + 1;
+			q = ParseFloat(q, end, v.x);
+			q = ParseFloat(q, end, v.y);
+			q = ParseFloat(q, end, v.z);
+			positions.push_back(v);
+		} else if (c0 == 'v' && c1 == 'n') {
+			Vector3 n{};
+			const char* q = p + 2;
+			q = ParseFloat(q, end, n.x);
+			q = ParseFloat(q, end, n.y);
+			q = ParseFloat(q, end, n.z);
+			normals.push_back(n);
+		} else if (c0 == 'v' && c1 == 't') {
+			Vector2 t{};
+			const char* q = p + 2;
+			q = ParseFloat(q, end, t.x);
+			q = ParseFloat(q, end, t.y);
+			texcoords.push_back(t);
+		} else if (c0 == 'f' && (c1 == ' ' || c1 == '\t')) {
+			const char* q = p + 1;
+			uint32_t count = 0;
+			while (true) {
+				q = SkipSpaces(q, end);
+				if (q >= end || *q == '\r' || *q == '\n') { break; }
+				int vi = 0, ti = 0, ni = 0;
+				bool hasT = false, hasN = false;
+				q = ParseInt(q, end, vi);
+				if (q < end && *q == '/') {
+					++q;
+					if (q < end && *q != '/') { q = ParseInt(q, end, ti); hasT = true; }
+					if (q < end && *q == '/') { ++q; q = ParseInt(q, end, ni); hasN = true; }
+				}
+				// 不正トークンで無限ループしないよう、数字以外は読み飛ばす
+				while (q < end && *q != ' ' && *q != '\t' && *q != '\r' && *q != '\n') { ++q; }
+
+				ObjVertexKey key;
+				key.v = resolveIndex(vi, positions.size());
+				key.vt = hasT ? resolveIndex(ti, texcoords.size()) : -1;
+				key.vn = hasN ? resolveIndex(ni, normals.size()) : -1;
+				if (key.v < 0 || key.v >= static_cast<int>(positions.size())) { continue; }
+				if (count < 64) { faceVerts[count++] = emitVertex(key); }
+			}
+			if (count >= 3) {
+				auto& tris = groups.back().trisByMaterial[currentMaterial];
+				// 扇形三角形分割 (0,i,i+1) + FlipWindingOrder 相当で逆順に格納
+				for (uint32_t i = 1; i + 1 < count; ++i) {
+					tris.push_back(faceVerts[i + 1]);
+					tris.push_back(faceVerts[i]);
+					tris.push_back(faceVerts[0]);
+				}
+			}
+		} else if (c0 == 'o' && (c1 == ' ' || c1 == '\t')) {
+			groups.push_back({ ReadRestOfLine(p + 1, end), {} });
+		} else if (std::strncmp(p, "usemtl", 6) == 0) {
+			currentMaterial = getMaterialIndex(ReadRestOfLine(p + 6, end));
+			hasAnyMaterial = true;
+		} else if (std::strncmp(p, "mtllib", 6) == 0) {
+			std::string mtlName = ReadRestOfLine(p + 6, end);
+			std::string mtlPath = baseDirectory.empty() ? mtlName : (baseDirectory + "/" + mtlName);
+			ParseMtlFile(mtlPath, baseDirectory, mtlLibrary);
+		}
+		p = SkipLine(p, end);
+	}
+
+	if (modelData.vertices.empty()) {
+		return modelData;
+	}
+
+	// マテリアル配列の構築（usemtl 出現順）
+	if (!hasAnyMaterial) {
+		modelData.materials.push_back(MaterialData());
+	} else {
+		for (const auto& name : materialNames) {
+			auto it = mtlLibrary.find(name);
+			modelData.materials.push_back(it != mtlLibrary.end() ? it->second : MaterialData());
+		}
+	}
+
+	// ノード構築: root の子として o ごとのノード、各ノードにマテリアルごとの MeshInfo
+	modelData.rootNode.name = std::filesystem::path(filePath).filename().string();
+	size_t totalIndices = 0;
+	for (const auto& g : groups) {
+		for (const auto& [mat, tris] : g.trisByMaterial) { totalIndices += tris.size(); }
+	}
+	modelData.indices.reserve(totalIndices);
+
+	for (auto& g : groups) {
+		if (g.trisByMaterial.empty()) { continue; }
+		Node child;
+		child.name = g.name;
+		for (auto& [mat, tris] : g.trisByMaterial) {
+			if (tris.empty()) { continue; }
+			MeshInfo info;
+			info.indexOffset = static_cast<uint32_t>(modelData.indices.size());
+			info.indexCount = static_cast<uint32_t>(tris.size());
+			info.materialIndex = mat;
+			modelData.indices.insert(modelData.indices.end(), tris.begin(), tris.end());
+			child.meshes.push_back(info);
+		}
+		modelData.rootNode.children.push_back(std::move(child));
+	}
 
 	return modelData;
 }

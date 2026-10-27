@@ -1,0 +1,1904 @@
+{
+    "chunks": [
+        {
+            "grid_x": 0,
+            "grid_y": 0,
+            "world_cx": -5,
+            "world_cy": -5,
+            "min_x": -20000.0,
+            "max_x": -16000.0,
+            "min_y": -20000.0,
+            "max_y": -16000.0,
+            "center": [
+                -18000.0,
+                -18000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk0-0_LOD0.obj"
+            ],
+            "file": "chunk0-0_LOD0.obj"
+        },
+        {
+            "grid_x": 1,
+            "grid_y": 5,
+            "world_cx": -4,
+            "world_cy": 0,
+            "min_x": -16000.0,
+            "max_x": -12000.0,
+            "min_y": 0.0,
+            "max_y": 4000.0,
+            "center": [
+                -14000.0,
+                2000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk1-5_LOD0.obj"
+            ],
+            "file": "chunk1-5_LOD0.obj"
+        },
+        {
+            "grid_x": 4,
+            "grid_y": 4,
+            "world_cx": -1,
+            "world_cy": -1,
+            "min_x": -4000.0,
+            "max_x": 0.0,
+            "min_y": -4000.0,
+            "max_y": 0.0,
+            "center": [
+                -2000.0,
+                -2000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk4-4_LOD0.obj"
+            ],
+            "file": "chunk4-4_LOD0.obj"
+        },
+        {
+            "grid_x": 5,
+            "grid_y": 9,
+            "world_cx": 0,
+            "world_cy": 4,
+            "min_x": 0.0,
+            "max_x": 4000.0,
+            "min_y": 16000.0,
+            "max_y": 20000.0,
+            "center": [
+                2000.0,
+                18000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk5-9_LOD0.obj"
+            ],
+            "file": "chunk5-9_LOD0.obj"
+        },
+        {
+            "grid_x": 7,
+            "grid_y": 3,
+            "world_cx": 2,
+            "world_cy": -2,
+            "min_x": 8000.0,
+            "max_x": 12000.0,
+            "min_y": -8000.0,
+            "max_y": -4000.0,
+            "center": [
+                10000.0,
+                -6000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk7-3_LOD0.obj"
+            ],
+            "file": "chunk7-3_LOD0.obj"
+        },
+        {
+            "grid_x": 8,
+            "grid_y": 8,
+            "world_cx": 3,
+            "world_cy": 3,
+            "min_x": 12000.0,
+            "max_x": 16000.0,
+            "min_y": 12000.0,
+            "max_y": 16000.0,
+            "center": [
+                14000.0,
+                14000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk8-8_LOD0.obj"
+            ],
+            "file": "chunk8-8_LOD0.obj"
+        },
+        {
+            "grid_x": 0,
+            "grid_y": 1,
+            "world_cx": -5,
+            "world_cy": -4,
+            "min_x": -20000.0,
+            "max_x": -16000.0,
+            "min_y": -16000.0,
+            "max_y": -12000.0,
+            "center": [
+                -18000.0,
+                -14000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk0-1_LOD0.obj"
+            ],
+            "file": "chunk0-1_LOD0.obj"
+        },
+        {
+            "grid_x": 1,
+            "grid_y": 6,
+            "world_cx": -4,
+            "world_cy": 1,
+            "min_x": -16000.0,
+            "max_x": -12000.0,
+            "min_y": 4000.0,
+            "max_y": 8000.0,
+            "center": [
+                -14000.0,
+                6000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk1-6_LOD0.obj"
+            ],
+            "file": "chunk1-6_LOD0.obj"
+        },
+        {
+            "grid_x": 3,
+            "grid_y": 0,
+            "world_cx": -2,
+            "world_cy": -5,
+            "min_x": -8000.0,
+            "max_x": -4000.0,
+            "min_y": -20000.0,
+            "max_y": -16000.0,
+            "center": [
+                -6000.0,
+                -18000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk3-0_LOD0.obj"
+            ],
+            "file": "chunk3-0_LOD0.obj"
+        },
+        {
+            "grid_x": 4,
+            "grid_y": 5,
+            "world_cx": -1,
+            "world_cy": 0,
+            "min_x": -4000.0,
+            "max_x": 0.0,
+            "min_y": 0.0,
+            "max_y": 4000.0,
+            "center": [
+                -2000.0,
+                2000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk4-5_LOD0.obj"
+            ],
+            "file": "chunk4-5_LOD0.obj"
+        },
+        {
+            "grid_x": 7,
+            "grid_y": 4,
+            "world_cx": 2,
+            "world_cy": -1,
+            "min_x": 8000.0,
+            "max_x": 12000.0,
+            "min_y": -4000.0,
+            "max_y": 0.0,
+            "center": [
+                10000.0,
+                -2000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk7-4_LOD0.obj"
+            ],
+            "file": "chunk7-4_LOD0.obj"
+        },
+        {
+            "grid_x": 8,
+            "grid_y": 9,
+            "world_cx": 3,
+            "world_cy": 4,
+            "min_x": 12000.0,
+            "max_x": 16000.0,
+            "min_y": 16000.0,
+            "max_y": 20000.0,
+            "center": [
+                14000.0,
+                18000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk8-9_LOD0.obj"
+            ],
+            "file": "chunk8-9_LOD0.obj"
+        },
+        {
+            "grid_x": 0,
+            "grid_y": 2,
+            "world_cx": -5,
+            "world_cy": -3,
+            "min_x": -20000.0,
+            "max_x": -16000.0,
+            "min_y": -12000.0,
+            "max_y": -8000.0,
+            "center": [
+                -18000.0,
+                -10000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk0-2_LOD0.obj"
+            ],
+            "file": "chunk0-2_LOD0.obj"
+        },
+        {
+            "grid_x": 1,
+            "grid_y": 7,
+            "world_cx": -4,
+            "world_cy": 2,
+            "min_x": -16000.0,
+            "max_x": -12000.0,
+            "min_y": 8000.0,
+            "max_y": 12000.0,
+            "center": [
+                -14000.0,
+                10000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk1-7_LOD0.obj"
+            ],
+            "file": "chunk1-7_LOD0.obj"
+        },
+        {
+            "grid_x": 3,
+            "grid_y": 1,
+            "world_cx": -2,
+            "world_cy": -4,
+            "min_x": -8000.0,
+            "max_x": -4000.0,
+            "min_y": -16000.0,
+            "max_y": -12000.0,
+            "center": [
+                -6000.0,
+                -14000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk3-1_LOD0.obj"
+            ],
+            "file": "chunk3-1_LOD0.obj"
+        },
+        {
+            "grid_x": 4,
+            "grid_y": 6,
+            "world_cx": -1,
+            "world_cy": 1,
+            "min_x": -4000.0,
+            "max_x": 0.0,
+            "min_y": 4000.0,
+            "max_y": 8000.0,
+            "center": [
+                -2000.0,
+                6000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk4-6_LOD0.obj"
+            ],
+            "file": "chunk4-6_LOD0.obj"
+        },
+        {
+            "grid_x": 6,
+            "grid_y": 0,
+            "world_cx": 1,
+            "world_cy": -5,
+            "min_x": 4000.0,
+            "max_x": 8000.0,
+            "min_y": -20000.0,
+            "max_y": -16000.0,
+            "center": [
+                6000.0,
+                -18000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk6-0_LOD0.obj"
+            ],
+            "file": "chunk6-0_LOD0.obj"
+        },
+        {
+            "grid_x": 7,
+            "grid_y": 5,
+            "world_cx": 2,
+            "world_cy": 0,
+            "min_x": 8000.0,
+            "max_x": 12000.0,
+            "min_y": 0.0,
+            "max_y": 4000.0,
+            "center": [
+                10000.0,
+                2000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk7-5_LOD0.obj"
+            ],
+            "file": "chunk7-5_LOD0.obj"
+        },
+        {
+            "grid_x": 0,
+            "grid_y": 3,
+            "world_cx": -5,
+            "world_cy": -2,
+            "min_x": -20000.0,
+            "max_x": -16000.0,
+            "min_y": -8000.0,
+            "max_y": -4000.0,
+            "center": [
+                -18000.0,
+                -6000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk0-3_LOD0.obj"
+            ],
+            "file": "chunk0-3_LOD0.obj"
+        },
+        {
+            "grid_x": 1,
+            "grid_y": 8,
+            "world_cx": -4,
+            "world_cy": 3,
+            "min_x": -16000.0,
+            "max_x": -12000.0,
+            "min_y": 12000.0,
+            "max_y": 16000.0,
+            "center": [
+                -14000.0,
+                14000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk1-8_LOD0.obj"
+            ],
+            "file": "chunk1-8_LOD0.obj"
+        },
+        {
+            "grid_x": 3,
+            "grid_y": 2,
+            "world_cx": -2,
+            "world_cy": -3,
+            "min_x": -8000.0,
+            "max_x": -4000.0,
+            "min_y": -12000.0,
+            "max_y": -8000.0,
+            "center": [
+                -6000.0,
+                -10000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk3-2_LOD0.obj"
+            ],
+            "file": "chunk3-2_LOD0.obj"
+        },
+        {
+            "grid_x": 4,
+            "grid_y": 7,
+            "world_cx": -1,
+            "world_cy": 2,
+            "min_x": -4000.0,
+            "max_x": 0.0,
+            "min_y": 8000.0,
+            "max_y": 12000.0,
+            "center": [
+                -2000.0,
+                10000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk4-7_LOD0.obj"
+            ],
+            "file": "chunk4-7_LOD0.obj"
+        },
+        {
+            "grid_x": 6,
+            "grid_y": 1,
+            "world_cx": 1,
+            "world_cy": -4,
+            "min_x": 4000.0,
+            "max_x": 8000.0,
+            "min_y": -16000.0,
+            "max_y": -12000.0,
+            "center": [
+                6000.0,
+                -14000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk6-1_LOD0.obj"
+            ],
+            "file": "chunk6-1_LOD0.obj"
+        },
+        {
+            "grid_x": 7,
+            "grid_y": 6,
+            "world_cx": 2,
+            "world_cy": 1,
+            "min_x": 8000.0,
+            "max_x": 12000.0,
+            "min_y": 4000.0,
+            "max_y": 8000.0,
+            "center": [
+                10000.0,
+                6000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk7-6_LOD0.obj"
+            ],
+            "file": "chunk7-6_LOD0.obj"
+        },
+        {
+            "grid_x": 9,
+            "grid_y": 0,
+            "world_cx": 4,
+            "world_cy": -5,
+            "min_x": 16000.0,
+            "max_x": 20000.0,
+            "min_y": -20000.0,
+            "max_y": -16000.0,
+            "center": [
+                18000.0,
+                -18000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk9-0_LOD0.obj"
+            ],
+            "file": "chunk9-0_LOD0.obj"
+        },
+        {
+            "grid_x": 0,
+            "grid_y": 4,
+            "world_cx": -5,
+            "world_cy": -1,
+            "min_x": -20000.0,
+            "max_x": -16000.0,
+            "min_y": -4000.0,
+            "max_y": 0.0,
+            "center": [
+                -18000.0,
+                -2000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk0-4_LOD0.obj"
+            ],
+            "file": "chunk0-4_LOD0.obj"
+        },
+        {
+            "grid_x": 1,
+            "grid_y": 9,
+            "world_cx": -4,
+            "world_cy": 4,
+            "min_x": -16000.0,
+            "max_x": -12000.0,
+            "min_y": 16000.0,
+            "max_y": 20000.0,
+            "center": [
+                -14000.0,
+                18000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk1-9_LOD0.obj"
+            ],
+            "file": "chunk1-9_LOD0.obj"
+        },
+        {
+            "grid_x": 3,
+            "grid_y": 3,
+            "world_cx": -2,
+            "world_cy": -2,
+            "min_x": -8000.0,
+            "max_x": -4000.0,
+            "min_y": -8000.0,
+            "max_y": -4000.0,
+            "center": [
+                -6000.0,
+                -6000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk3-3_LOD0.obj"
+            ],
+            "file": "chunk3-3_LOD0.obj"
+        },
+        {
+            "grid_x": 4,
+            "grid_y": 8,
+            "world_cx": -1,
+            "world_cy": 3,
+            "min_x": -4000.0,
+            "max_x": 0.0,
+            "min_y": 12000.0,
+            "max_y": 16000.0,
+            "center": [
+                -2000.0,
+                14000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk4-8_LOD0.obj"
+            ],
+            "file": "chunk4-8_LOD0.obj"
+        },
+        {
+            "grid_x": 6,
+            "grid_y": 2,
+            "world_cx": 1,
+            "world_cy": -3,
+            "min_x": 4000.0,
+            "max_x": 8000.0,
+            "min_y": -12000.0,
+            "max_y": -8000.0,
+            "center": [
+                6000.0,
+                -10000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk6-2_LOD0.obj"
+            ],
+            "file": "chunk6-2_LOD0.obj"
+        },
+        {
+            "grid_x": 7,
+            "grid_y": 7,
+            "world_cx": 2,
+            "world_cy": 2,
+            "min_x": 8000.0,
+            "max_x": 12000.0,
+            "min_y": 8000.0,
+            "max_y": 12000.0,
+            "center": [
+                10000.0,
+                10000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk7-7_LOD0.obj"
+            ],
+            "file": "chunk7-7_LOD0.obj"
+        },
+        {
+            "grid_x": 9,
+            "grid_y": 1,
+            "world_cx": 4,
+            "world_cy": -4,
+            "min_x": 16000.0,
+            "max_x": 20000.0,
+            "min_y": -16000.0,
+            "max_y": -12000.0,
+            "center": [
+                18000.0,
+                -14000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk9-1_LOD0.obj"
+            ],
+            "file": "chunk9-1_LOD0.obj"
+        },
+        {
+            "grid_x": 0,
+            "grid_y": 5,
+            "world_cx": -5,
+            "world_cy": 0,
+            "min_x": -20000.0,
+            "max_x": -16000.0,
+            "min_y": 0.0,
+            "max_y": 4000.0,
+            "center": [
+                -18000.0,
+                2000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk0-5_LOD0.obj"
+            ],
+            "file": "chunk0-5_LOD0.obj"
+        },
+        {
+            "grid_x": 3,
+            "grid_y": 4,
+            "world_cx": -2,
+            "world_cy": -1,
+            "min_x": -8000.0,
+            "max_x": -4000.0,
+            "min_y": -4000.0,
+            "max_y": 0.0,
+            "center": [
+                -6000.0,
+                -2000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk3-4_LOD0.obj"
+            ],
+            "file": "chunk3-4_LOD0.obj"
+        },
+        {
+            "grid_x": 4,
+            "grid_y": 9,
+            "world_cx": -1,
+            "world_cy": 4,
+            "min_x": -4000.0,
+            "max_x": 0.0,
+            "min_y": 16000.0,
+            "max_y": 20000.0,
+            "center": [
+                -2000.0,
+                18000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk4-9_LOD0.obj"
+            ],
+            "file": "chunk4-9_LOD0.obj"
+        },
+        {
+            "grid_x": 6,
+            "grid_y": 3,
+            "world_cx": 1,
+            "world_cy": -2,
+            "min_x": 4000.0,
+            "max_x": 8000.0,
+            "min_y": -8000.0,
+            "max_y": -4000.0,
+            "center": [
+                6000.0,
+                -6000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk6-3_LOD0.obj"
+            ],
+            "file": "chunk6-3_LOD0.obj"
+        },
+        {
+            "grid_x": 7,
+            "grid_y": 8,
+            "world_cx": 2,
+            "world_cy": 3,
+            "min_x": 8000.0,
+            "max_x": 12000.0,
+            "min_y": 12000.0,
+            "max_y": 16000.0,
+            "center": [
+                10000.0,
+                14000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk7-8_LOD0.obj"
+            ],
+            "file": "chunk7-8_LOD0.obj"
+        },
+        {
+            "grid_x": 9,
+            "grid_y": 2,
+            "world_cx": 4,
+            "world_cy": -3,
+            "min_x": 16000.0,
+            "max_x": 20000.0,
+            "min_y": -12000.0,
+            "max_y": -8000.0,
+            "center": [
+                18000.0,
+                -10000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk9-2_LOD0.obj"
+            ],
+            "file": "chunk9-2_LOD0.obj"
+        },
+        {
+            "grid_x": 0,
+            "grid_y": 6,
+            "world_cx": -5,
+            "world_cy": 1,
+            "min_x": -20000.0,
+            "max_x": -16000.0,
+            "min_y": 4000.0,
+            "max_y": 8000.0,
+            "center": [
+                -18000.0,
+                6000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk0-6_LOD0.obj"
+            ],
+            "file": "chunk0-6_LOD0.obj"
+        },
+        {
+            "grid_x": 2,
+            "grid_y": 0,
+            "world_cx": -3,
+            "world_cy": -5,
+            "min_x": -12000.0,
+            "max_x": -8000.0,
+            "min_y": -20000.0,
+            "max_y": -16000.0,
+            "center": [
+                -10000.0,
+                -18000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk2-0_LOD0.obj"
+            ],
+            "file": "chunk2-0_LOD0.obj"
+        },
+        {
+            "grid_x": 3,
+            "grid_y": 5,
+            "world_cx": -2,
+            "world_cy": 0,
+            "min_x": -8000.0,
+            "max_x": -4000.0,
+            "min_y": 0.0,
+            "max_y": 4000.0,
+            "center": [
+                -6000.0,
+                2000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk3-5_LOD0.obj"
+            ],
+            "file": "chunk3-5_LOD0.obj"
+        },
+        {
+            "grid_x": 6,
+            "grid_y": 4,
+            "world_cx": 1,
+            "world_cy": -1,
+            "min_x": 4000.0,
+            "max_x": 8000.0,
+            "min_y": -4000.0,
+            "max_y": 0.0,
+            "center": [
+                6000.0,
+                -2000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk6-4_LOD0.obj"
+            ],
+            "file": "chunk6-4_LOD0.obj"
+        },
+        {
+            "grid_x": 7,
+            "grid_y": 9,
+            "world_cx": 2,
+            "world_cy": 4,
+            "min_x": 8000.0,
+            "max_x": 12000.0,
+            "min_y": 16000.0,
+            "max_y": 20000.0,
+            "center": [
+                10000.0,
+                18000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk7-9_LOD0.obj"
+            ],
+            "file": "chunk7-9_LOD0.obj"
+        },
+        {
+            "grid_x": 9,
+            "grid_y": 3,
+            "world_cx": 4,
+            "world_cy": -2,
+            "min_x": 16000.0,
+            "max_x": 20000.0,
+            "min_y": -8000.0,
+            "max_y": -4000.0,
+            "center": [
+                18000.0,
+                -6000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk9-3_LOD0.obj"
+            ],
+            "file": "chunk9-3_LOD0.obj"
+        },
+        {
+            "grid_x": 0,
+            "grid_y": 7,
+            "world_cx": -5,
+            "world_cy": 2,
+            "min_x": -20000.0,
+            "max_x": -16000.0,
+            "min_y": 8000.0,
+            "max_y": 12000.0,
+            "center": [
+                -18000.0,
+                10000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk0-7_LOD0.obj"
+            ],
+            "file": "chunk0-7_LOD0.obj"
+        },
+        {
+            "grid_x": 2,
+            "grid_y": 1,
+            "world_cx": -3,
+            "world_cy": -4,
+            "min_x": -12000.0,
+            "max_x": -8000.0,
+            "min_y": -16000.0,
+            "max_y": -12000.0,
+            "center": [
+                -10000.0,
+                -14000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk2-1_LOD0.obj"
+            ],
+            "file": "chunk2-1_LOD0.obj"
+        },
+        {
+            "grid_x": 3,
+            "grid_y": 6,
+            "world_cx": -2,
+            "world_cy": 1,
+            "min_x": -8000.0,
+            "max_x": -4000.0,
+            "min_y": 4000.0,
+            "max_y": 8000.0,
+            "center": [
+                -6000.0,
+                6000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk3-6_LOD0.obj"
+            ],
+            "file": "chunk3-6_LOD0.obj"
+        },
+        {
+            "grid_x": 5,
+            "grid_y": 0,
+            "world_cx": 0,
+            "world_cy": -5,
+            "min_x": 0.0,
+            "max_x": 4000.0,
+            "min_y": -20000.0,
+            "max_y": -16000.0,
+            "center": [
+                2000.0,
+                -18000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk5-0_LOD0.obj"
+            ],
+            "file": "chunk5-0_LOD0.obj"
+        },
+        {
+            "grid_x": 6,
+            "grid_y": 5,
+            "world_cx": 1,
+            "world_cy": 0,
+            "min_x": 4000.0,
+            "max_x": 8000.0,
+            "min_y": 0.0,
+            "max_y": 4000.0,
+            "center": [
+                6000.0,
+                2000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk6-5_LOD0.obj"
+            ],
+            "file": "chunk6-5_LOD0.obj"
+        },
+        {
+            "grid_x": 9,
+            "grid_y": 4,
+            "world_cx": 4,
+            "world_cy": -1,
+            "min_x": 16000.0,
+            "max_x": 20000.0,
+            "min_y": -4000.0,
+            "max_y": 0.0,
+            "center": [
+                18000.0,
+                -2000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk9-4_LOD0.obj"
+            ],
+            "file": "chunk9-4_LOD0.obj"
+        },
+        {
+            "grid_x": 0,
+            "grid_y": 8,
+            "world_cx": -5,
+            "world_cy": 3,
+            "min_x": -20000.0,
+            "max_x": -16000.0,
+            "min_y": 12000.0,
+            "max_y": 16000.0,
+            "center": [
+                -18000.0,
+                14000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk0-8_LOD0.obj"
+            ],
+            "file": "chunk0-8_LOD0.obj"
+        },
+        {
+            "grid_x": 2,
+            "grid_y": 2,
+            "world_cx": -3,
+            "world_cy": -3,
+            "min_x": -12000.0,
+            "max_x": -8000.0,
+            "min_y": -12000.0,
+            "max_y": -8000.0,
+            "center": [
+                -10000.0,
+                -10000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk2-2_LOD0.obj"
+            ],
+            "file": "chunk2-2_LOD0.obj"
+        },
+        {
+            "grid_x": 3,
+            "grid_y": 7,
+            "world_cx": -2,
+            "world_cy": 2,
+            "min_x": -8000.0,
+            "max_x": -4000.0,
+            "min_y": 8000.0,
+            "max_y": 12000.0,
+            "center": [
+                -6000.0,
+                10000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk3-7_LOD0.obj"
+            ],
+            "file": "chunk3-7_LOD0.obj"
+        },
+        {
+            "grid_x": 5,
+            "grid_y": 1,
+            "world_cx": 0,
+            "world_cy": -4,
+            "min_x": 0.0,
+            "max_x": 4000.0,
+            "min_y": -16000.0,
+            "max_y": -12000.0,
+            "center": [
+                2000.0,
+                -14000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk5-1_LOD0.obj"
+            ],
+            "file": "chunk5-1_LOD0.obj"
+        },
+        {
+            "grid_x": 6,
+            "grid_y": 6,
+            "world_cx": 1,
+            "world_cy": 1,
+            "min_x": 4000.0,
+            "max_x": 8000.0,
+            "min_y": 4000.0,
+            "max_y": 8000.0,
+            "center": [
+                6000.0,
+                6000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk6-6_LOD0.obj"
+            ],
+            "file": "chunk6-6_LOD0.obj"
+        },
+        {
+            "grid_x": 8,
+            "grid_y": 0,
+            "world_cx": 3,
+            "world_cy": -5,
+            "min_x": 12000.0,
+            "max_x": 16000.0,
+            "min_y": -20000.0,
+            "max_y": -16000.0,
+            "center": [
+                14000.0,
+                -18000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk8-0_LOD0.obj"
+            ],
+            "file": "chunk8-0_LOD0.obj"
+        },
+        {
+            "grid_x": 9,
+            "grid_y": 5,
+            "world_cx": 4,
+            "world_cy": 0,
+            "min_x": 16000.0,
+            "max_x": 20000.0,
+            "min_y": 0.0,
+            "max_y": 4000.0,
+            "center": [
+                18000.0,
+                2000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk9-5_LOD0.obj"
+            ],
+            "file": "chunk9-5_LOD0.obj"
+        },
+        {
+            "grid_x": 0,
+            "grid_y": 9,
+            "world_cx": -5,
+            "world_cy": 4,
+            "min_x": -20000.0,
+            "max_x": -16000.0,
+            "min_y": 16000.0,
+            "max_y": 20000.0,
+            "center": [
+                -18000.0,
+                18000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk0-9_LOD0.obj"
+            ],
+            "file": "chunk0-9_LOD0.obj"
+        },
+        {
+            "grid_x": 2,
+            "grid_y": 3,
+            "world_cx": -3,
+            "world_cy": -2,
+            "min_x": -12000.0,
+            "max_x": -8000.0,
+            "min_y": -8000.0,
+            "max_y": -4000.0,
+            "center": [
+                -10000.0,
+                -6000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk2-3_LOD0.obj"
+            ],
+            "file": "chunk2-3_LOD0.obj"
+        },
+        {
+            "grid_x": 3,
+            "grid_y": 8,
+            "world_cx": -2,
+            "world_cy": 3,
+            "min_x": -8000.0,
+            "max_x": -4000.0,
+            "min_y": 12000.0,
+            "max_y": 16000.0,
+            "center": [
+                -6000.0,
+                14000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk3-8_LOD0.obj"
+            ],
+            "file": "chunk3-8_LOD0.obj"
+        },
+        {
+            "grid_x": 5,
+            "grid_y": 2,
+            "world_cx": 0,
+            "world_cy": -3,
+            "min_x": 0.0,
+            "max_x": 4000.0,
+            "min_y": -12000.0,
+            "max_y": -8000.0,
+            "center": [
+                2000.0,
+                -10000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk5-2_LOD0.obj"
+            ],
+            "file": "chunk5-2_LOD0.obj"
+        },
+        {
+            "grid_x": 6,
+            "grid_y": 7,
+            "world_cx": 1,
+            "world_cy": 2,
+            "min_x": 4000.0,
+            "max_x": 8000.0,
+            "min_y": 8000.0,
+            "max_y": 12000.0,
+            "center": [
+                6000.0,
+                10000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk6-7_LOD0.obj"
+            ],
+            "file": "chunk6-7_LOD0.obj"
+        },
+        {
+            "grid_x": 8,
+            "grid_y": 1,
+            "world_cx": 3,
+            "world_cy": -4,
+            "min_x": 12000.0,
+            "max_x": 16000.0,
+            "min_y": -16000.0,
+            "max_y": -12000.0,
+            "center": [
+                14000.0,
+                -14000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk8-1_LOD0.obj"
+            ],
+            "file": "chunk8-1_LOD0.obj"
+        },
+        {
+            "grid_x": 9,
+            "grid_y": 6,
+            "world_cx": 4,
+            "world_cy": 1,
+            "min_x": 16000.0,
+            "max_x": 20000.0,
+            "min_y": 4000.0,
+            "max_y": 8000.0,
+            "center": [
+                18000.0,
+                6000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk9-6_LOD0.obj"
+            ],
+            "file": "chunk9-6_LOD0.obj"
+        },
+        {
+            "grid_x": 2,
+            "grid_y": 4,
+            "world_cx": -3,
+            "world_cy": -1,
+            "min_x": -12000.0,
+            "max_x": -8000.0,
+            "min_y": -4000.0,
+            "max_y": 0.0,
+            "center": [
+                -10000.0,
+                -2000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk2-4_LOD0.obj"
+            ],
+            "file": "chunk2-4_LOD0.obj"
+        },
+        {
+            "grid_x": 3,
+            "grid_y": 9,
+            "world_cx": -2,
+            "world_cy": 4,
+            "min_x": -8000.0,
+            "max_x": -4000.0,
+            "min_y": 16000.0,
+            "max_y": 20000.0,
+            "center": [
+                -6000.0,
+                18000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk3-9_LOD0.obj"
+            ],
+            "file": "chunk3-9_LOD0.obj"
+        },
+        {
+            "grid_x": 5,
+            "grid_y": 3,
+            "world_cx": 0,
+            "world_cy": -2,
+            "min_x": 0.0,
+            "max_x": 4000.0,
+            "min_y": -8000.0,
+            "max_y": -4000.0,
+            "center": [
+                2000.0,
+                -6000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk5-3_LOD0.obj"
+            ],
+            "file": "chunk5-3_LOD0.obj"
+        },
+        {
+            "grid_x": 6,
+            "grid_y": 8,
+            "world_cx": 1,
+            "world_cy": 3,
+            "min_x": 4000.0,
+            "max_x": 8000.0,
+            "min_y": 12000.0,
+            "max_y": 16000.0,
+            "center": [
+                6000.0,
+                14000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk6-8_LOD0.obj"
+            ],
+            "file": "chunk6-8_LOD0.obj"
+        },
+        {
+            "grid_x": 8,
+            "grid_y": 2,
+            "world_cx": 3,
+            "world_cy": -3,
+            "min_x": 12000.0,
+            "max_x": 16000.0,
+            "min_y": -12000.0,
+            "max_y": -8000.0,
+            "center": [
+                14000.0,
+                -10000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk8-2_LOD0.obj"
+            ],
+            "file": "chunk8-2_LOD0.obj"
+        },
+        {
+            "grid_x": 9,
+            "grid_y": 7,
+            "world_cx": 4,
+            "world_cy": 2,
+            "min_x": 16000.0,
+            "max_x": 20000.0,
+            "min_y": 8000.0,
+            "max_y": 12000.0,
+            "center": [
+                18000.0,
+                10000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk9-7_LOD0.obj"
+            ],
+            "file": "chunk9-7_LOD0.obj"
+        },
+        {
+            "grid_x": 1,
+            "grid_y": 0,
+            "world_cx": -4,
+            "world_cy": -5,
+            "min_x": -16000.0,
+            "max_x": -12000.0,
+            "min_y": -20000.0,
+            "max_y": -16000.0,
+            "center": [
+                -14000.0,
+                -18000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk1-0_LOD0.obj"
+            ],
+            "file": "chunk1-0_LOD0.obj"
+        },
+        {
+            "grid_x": 2,
+            "grid_y": 5,
+            "world_cx": -3,
+            "world_cy": 0,
+            "min_x": -12000.0,
+            "max_x": -8000.0,
+            "min_y": 0.0,
+            "max_y": 4000.0,
+            "center": [
+                -10000.0,
+                2000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk2-5_LOD0.obj"
+            ],
+            "file": "chunk2-5_LOD0.obj"
+        },
+        {
+            "grid_x": 5,
+            "grid_y": 4,
+            "world_cx": 0,
+            "world_cy": -1,
+            "min_x": 0.0,
+            "max_x": 4000.0,
+            "min_y": -4000.0,
+            "max_y": 0.0,
+            "center": [
+                2000.0,
+                -2000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk5-4_LOD0.obj"
+            ],
+            "file": "chunk5-4_LOD0.obj"
+        },
+        {
+            "grid_x": 6,
+            "grid_y": 9,
+            "world_cx": 1,
+            "world_cy": 4,
+            "min_x": 4000.0,
+            "max_x": 8000.0,
+            "min_y": 16000.0,
+            "max_y": 20000.0,
+            "center": [
+                6000.0,
+                18000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk6-9_LOD0.obj"
+            ],
+            "file": "chunk6-9_LOD0.obj"
+        },
+        {
+            "grid_x": 8,
+            "grid_y": 3,
+            "world_cx": 3,
+            "world_cy": -2,
+            "min_x": 12000.0,
+            "max_x": 16000.0,
+            "min_y": -8000.0,
+            "max_y": -4000.0,
+            "center": [
+                14000.0,
+                -6000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk8-3_LOD0.obj"
+            ],
+            "file": "chunk8-3_LOD0.obj"
+        },
+        {
+            "grid_x": 9,
+            "grid_y": 8,
+            "world_cx": 4,
+            "world_cy": 3,
+            "min_x": 16000.0,
+            "max_x": 20000.0,
+            "min_y": 12000.0,
+            "max_y": 16000.0,
+            "center": [
+                18000.0,
+                14000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk9-8_LOD0.obj"
+            ],
+            "file": "chunk9-8_LOD0.obj"
+        },
+        {
+            "grid_x": 1,
+            "grid_y": 1,
+            "world_cx": -4,
+            "world_cy": -4,
+            "min_x": -16000.0,
+            "max_x": -12000.0,
+            "min_y": -16000.0,
+            "max_y": -12000.0,
+            "center": [
+                -14000.0,
+                -14000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk1-1_LOD0.obj"
+            ],
+            "file": "chunk1-1_LOD0.obj"
+        },
+        {
+            "grid_x": 2,
+            "grid_y": 6,
+            "world_cx": -3,
+            "world_cy": 1,
+            "min_x": -12000.0,
+            "max_x": -8000.0,
+            "min_y": 4000.0,
+            "max_y": 8000.0,
+            "center": [
+                -10000.0,
+                6000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk2-6_LOD0.obj"
+            ],
+            "file": "chunk2-6_LOD0.obj"
+        },
+        {
+            "grid_x": 4,
+            "grid_y": 0,
+            "world_cx": -1,
+            "world_cy": -5,
+            "min_x": -4000.0,
+            "max_x": 0.0,
+            "min_y": -20000.0,
+            "max_y": -16000.0,
+            "center": [
+                -2000.0,
+                -18000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk4-0_LOD0.obj"
+            ],
+            "file": "chunk4-0_LOD0.obj"
+        },
+        {
+            "grid_x": 5,
+            "grid_y": 5,
+            "world_cx": 0,
+            "world_cy": 0,
+            "min_x": 0.0,
+            "max_x": 4000.0,
+            "min_y": 0.0,
+            "max_y": 4000.0,
+            "center": [
+                2000.0,
+                2000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk5-5_LOD0.obj"
+            ],
+            "file": "chunk5-5_LOD0.obj"
+        },
+        {
+            "grid_x": 8,
+            "grid_y": 4,
+            "world_cx": 3,
+            "world_cy": -1,
+            "min_x": 12000.0,
+            "max_x": 16000.0,
+            "min_y": -4000.0,
+            "max_y": 0.0,
+            "center": [
+                14000.0,
+                -2000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk8-4_LOD0.obj"
+            ],
+            "file": "chunk8-4_LOD0.obj"
+        },
+        {
+            "grid_x": 9,
+            "grid_y": 9,
+            "world_cx": 4,
+            "world_cy": 4,
+            "min_x": 16000.0,
+            "max_x": 20000.0,
+            "min_y": 16000.0,
+            "max_y": 20000.0,
+            "center": [
+                18000.0,
+                18000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk9-9_LOD0.obj"
+            ],
+            "file": "chunk9-9_LOD0.obj"
+        },
+        {
+            "grid_x": 1,
+            "grid_y": 2,
+            "world_cx": -4,
+            "world_cy": -3,
+            "min_x": -16000.0,
+            "max_x": -12000.0,
+            "min_y": -12000.0,
+            "max_y": -8000.0,
+            "center": [
+                -14000.0,
+                -10000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk1-2_LOD0.obj"
+            ],
+            "file": "chunk1-2_LOD0.obj"
+        },
+        {
+            "grid_x": 2,
+            "grid_y": 7,
+            "world_cx": -3,
+            "world_cy": 2,
+            "min_x": -12000.0,
+            "max_x": -8000.0,
+            "min_y": 8000.0,
+            "max_y": 12000.0,
+            "center": [
+                -10000.0,
+                10000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk2-7_LOD0.obj"
+            ],
+            "file": "chunk2-7_LOD0.obj"
+        },
+        {
+            "grid_x": 4,
+            "grid_y": 1,
+            "world_cx": -1,
+            "world_cy": -4,
+            "min_x": -4000.0,
+            "max_x": 0.0,
+            "min_y": -16000.0,
+            "max_y": -12000.0,
+            "center": [
+                -2000.0,
+                -14000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk4-1_LOD0.obj"
+            ],
+            "file": "chunk4-1_LOD0.obj"
+        },
+        {
+            "grid_x": 5,
+            "grid_y": 6,
+            "world_cx": 0,
+            "world_cy": 1,
+            "min_x": 0.0,
+            "max_x": 4000.0,
+            "min_y": 4000.0,
+            "max_y": 8000.0,
+            "center": [
+                2000.0,
+                6000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk5-6_LOD0.obj"
+            ],
+            "file": "chunk5-6_LOD0.obj"
+        },
+        {
+            "grid_x": 7,
+            "grid_y": 0,
+            "world_cx": 2,
+            "world_cy": -5,
+            "min_x": 8000.0,
+            "max_x": 12000.0,
+            "min_y": -20000.0,
+            "max_y": -16000.0,
+            "center": [
+                10000.0,
+                -18000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk7-0_LOD0.obj"
+            ],
+            "file": "chunk7-0_LOD0.obj"
+        },
+        {
+            "grid_x": 8,
+            "grid_y": 5,
+            "world_cx": 3,
+            "world_cy": 0,
+            "min_x": 12000.0,
+            "max_x": 16000.0,
+            "min_y": 0.0,
+            "max_y": 4000.0,
+            "center": [
+                14000.0,
+                2000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk8-5_LOD0.obj"
+            ],
+            "file": "chunk8-5_LOD0.obj"
+        },
+        {
+            "grid_x": 1,
+            "grid_y": 3,
+            "world_cx": -4,
+            "world_cy": -2,
+            "min_x": -16000.0,
+            "max_x": -12000.0,
+            "min_y": -8000.0,
+            "max_y": -4000.0,
+            "center": [
+                -14000.0,
+                -6000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk1-3_LOD0.obj"
+            ],
+            "file": "chunk1-3_LOD0.obj"
+        },
+        {
+            "grid_x": 2,
+            "grid_y": 8,
+            "world_cx": -3,
+            "world_cy": 3,
+            "min_x": -12000.0,
+            "max_x": -8000.0,
+            "min_y": 12000.0,
+            "max_y": 16000.0,
+            "center": [
+                -10000.0,
+                14000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk2-8_LOD0.obj"
+            ],
+            "file": "chunk2-8_LOD0.obj"
+        },
+        {
+            "grid_x": 4,
+            "grid_y": 2,
+            "world_cx": -1,
+            "world_cy": -3,
+            "min_x": -4000.0,
+            "max_x": 0.0,
+            "min_y": -12000.0,
+            "max_y": -8000.0,
+            "center": [
+                -2000.0,
+                -10000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk4-2_LOD0.obj"
+            ],
+            "file": "chunk4-2_LOD0.obj"
+        },
+        {
+            "grid_x": 5,
+            "grid_y": 7,
+            "world_cx": 0,
+            "world_cy": 2,
+            "min_x": 0.0,
+            "max_x": 4000.0,
+            "min_y": 8000.0,
+            "max_y": 12000.0,
+            "center": [
+                2000.0,
+                10000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk5-7_LOD0.obj"
+            ],
+            "file": "chunk5-7_LOD0.obj"
+        },
+        {
+            "grid_x": 7,
+            "grid_y": 1,
+            "world_cx": 2,
+            "world_cy": -4,
+            "min_x": 8000.0,
+            "max_x": 12000.0,
+            "min_y": -16000.0,
+            "max_y": -12000.0,
+            "center": [
+                10000.0,
+                -14000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk7-1_LOD0.obj"
+            ],
+            "file": "chunk7-1_LOD0.obj"
+        },
+        {
+            "grid_x": 8,
+            "grid_y": 6,
+            "world_cx": 3,
+            "world_cy": 1,
+            "min_x": 12000.0,
+            "max_x": 16000.0,
+            "min_y": 4000.0,
+            "max_y": 8000.0,
+            "center": [
+                14000.0,
+                6000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk8-6_LOD0.obj"
+            ],
+            "file": "chunk8-6_LOD0.obj"
+        },
+        {
+            "grid_x": 1,
+            "grid_y": 4,
+            "world_cx": -4,
+            "world_cy": -1,
+            "min_x": -16000.0,
+            "max_x": -12000.0,
+            "min_y": -4000.0,
+            "max_y": 0.0,
+            "center": [
+                -14000.0,
+                -2000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk1-4_LOD0.obj"
+            ],
+            "file": "chunk1-4_LOD0.obj"
+        },
+        {
+            "grid_x": 2,
+            "grid_y": 9,
+            "world_cx": -3,
+            "world_cy": 4,
+            "min_x": -12000.0,
+            "max_x": -8000.0,
+            "min_y": 16000.0,
+            "max_y": 20000.0,
+            "center": [
+                -10000.0,
+                18000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk2-9_LOD0.obj"
+            ],
+            "file": "chunk2-9_LOD0.obj"
+        },
+        {
+            "grid_x": 4,
+            "grid_y": 3,
+            "world_cx": -1,
+            "world_cy": -2,
+            "min_x": -4000.0,
+            "max_x": 0.0,
+            "min_y": -8000.0,
+            "max_y": -4000.0,
+            "center": [
+                -2000.0,
+                -6000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk4-3_LOD0.obj"
+            ],
+            "file": "chunk4-3_LOD0.obj"
+        },
+        {
+            "grid_x": 5,
+            "grid_y": 8,
+            "world_cx": 0,
+            "world_cy": 3,
+            "min_x": 0.0,
+            "max_x": 4000.0,
+            "min_y": 12000.0,
+            "max_y": 16000.0,
+            "center": [
+                2000.0,
+                14000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk5-8_LOD0.obj"
+            ],
+            "file": "chunk5-8_LOD0.obj"
+        },
+        {
+            "grid_x": 7,
+            "grid_y": 2,
+            "world_cx": 2,
+            "world_cy": -3,
+            "min_x": 8000.0,
+            "max_x": 12000.0,
+            "min_y": -12000.0,
+            "max_y": -8000.0,
+            "center": [
+                10000.0,
+                -10000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk7-2_LOD0.obj"
+            ],
+            "file": "chunk7-2_LOD0.obj"
+        },
+        {
+            "grid_x": 8,
+            "grid_y": 7,
+            "world_cx": 3,
+            "world_cy": 2,
+            "min_x": 12000.0,
+            "max_x": 16000.0,
+            "min_y": 8000.0,
+            "max_y": 12000.0,
+            "center": [
+                14000.0,
+                10000.0,
+                0.0
+            ],
+            "lod_files": [
+                "chunk8-7_LOD0.obj"
+            ],
+            "file": "chunk8-7_LOD0.obj"
+        }
+    ]
+}

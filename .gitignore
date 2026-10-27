@@ -366,3 +366,4 @@ FodyWeavers.xsd
 .aider*
 assets/shaders/compiled/
 /.github/upgrades/scenarios/cppbuildtoolsupgrade
+/benchmark_log.txt

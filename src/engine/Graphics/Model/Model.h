@@ -134,6 +134,11 @@ public:
 	};
 
 	static ModelData LoadModelFile(const std::string& directoryPath, const std::string& filename);
+	/// <summary>
+	/// Assimp を経由しない軽量OBJローダー（静的メッシュ専用：ボーン・アニメーション非対応）
+	/// 地形チャンクなど大量の単純OBJを高速に読み込むためのもの
+	/// </summary>
+	static ModelData LoadObjFileFast(const std::string& filePath);
 	static Animation LoadAnimationFile(const std::string& directoryPath, const std::string& filename, const std::string& animationName);
 	static std::vector<std::string> LoadAnimationNames(const std::string& directoryPath, const std::string& filename, const std::string& animationName = "");
 	ModelData GetModelData() const { return modelData_; }

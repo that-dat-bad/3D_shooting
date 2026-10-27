@@ -82,7 +82,13 @@ void StageScene::InitializeAssets() {
 		aircraftCfgPath = "Resources/aircraft/mig21.cfg";
 	}
 	if (!AsyncPreloadManager::GetInstance()->ApplyPreloadedAircraftConfig(aircraftConfig_)) {
+		auto t0 = std::chrono::high_resolution_clock::now();
 		aircraftConfig_.LoadFromCfg(aircraftCfgPath);
+		auto t1 = std::chrono::high_resolution_clock::now();
+		double ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
+		char buf[256];
+		sprintf_s(buf, "[Benchmark:StageScene] AircraftConfig SYNCHRONOUS LOAD -> Blocking time: %.2f ms", ms);
+		Benchmark::Log(buf);
 	}
 	const auto& generalConfig = aircraftConfig_.GetGeneral();
 
@@ -175,6 +181,10 @@ void StageScene::InitializeAssets() {
 
 	GPUParticleManager::GetInstance()->SetTexture(TextureManager::GetInstance()->GetTextureIndexByFilePath("assets/textures/circle.png"));
 
+	// 地形チャンクマネージャー初期化（4000mチャンク分割 40km x 40km）
+	terrainChunkManager_ = TerrainChunkManager::GetInstance();
+	terrainChunkManager_->Initialize(Object3dCommon::GetInstance(), CameraManager::GetInstance()->GetActiveCamera(), "Resources/terrains/demo/chunks_info.json");
+
 	// 初回のみテクスチャアップロードを確定
 	DirectXCommon::GetInstance()->FlushTextureUploads();
 }
@@ -211,9 +221,9 @@ void StageScene::ResetGameplayState() {
 	// 自機パーツをすべて可視状態に復元
 	aircraftVisualModel_.ResetAllPartsVisible();
 
-#ifdef _DEBUG
+	// Blender MCP リアルタイム同期の初期化＆自動開始
 	TerrainSyncManager::GetInstance()->Initialize("localhost", 8765);
-#endif
+	TerrainSyncManager::GetInstance()->StartSync();
 
 	// カメラ初期位置
 	Vector3 initPos = flightModel_.GetPosition();
@@ -237,7 +247,13 @@ void StageScene::ResetGameplayState() {
 		loadPath = "Resources/missions/mission00.json";
 	}
 	if (!AsyncPreloadManager::GetInstance()->ApplyPreloadedMission(missionManager)) {
+		auto t0 = std::chrono::high_resolution_clock::now();
 		missionManager.Load(loadPath);
+		auto t1 = std::chrono::high_resolution_clock::now();
+		double ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
+		char buf[256];
+		sprintf_s(buf, "[Benchmark:StageScene] MissionData SYNCHRONOUS LOAD -> Blocking time: %.2f ms", ms);
+		Benchmark::Log(buf);
 	}
 
 	const auto& mission = missionManager.GetCurrentMission();
@@ -414,6 +430,11 @@ void StageScene::Update() {
 	UpdateCamera(gameDeltaTime);
 	UpdateDebugAndStatusUI(gameDeltaTime);
 	UpdatePostEffects(gameDeltaTime);
+
+	// 地形チャンクの更新（距離カリング）
+	if (terrainChunkManager_) {
+		terrainChunkManager_->Update(flightModel_.GetPosition());
+	}
 }
 
 void StageScene::Draw() {
@@ -457,8 +478,12 @@ void StageScene::Draw() {
 	Camera* cam = CameraManager::GetInstance()->GetActiveCamera();
 	enemyManager_.Draw(cam);
 
-	// 地面描画（PrimitiveModelパイプライン）
-	DrawGround();
+	// 地面描画（40km x 40km チャンク地形パイプライン）
+	if (terrainChunkManager_ && terrainChunkManager_->IsLoaded()) {
+		terrainChunkManager_->Draw();
+	} else {
+		DrawGround();
+	}
 
 	// 弾丸描画
 	bulletManager_.Draw(cam);

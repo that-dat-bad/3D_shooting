@@ -1,5 +1,7 @@
 #include "TextRenderer.h"
 #include "FontManager.h"
+#include "../../Game/System/BenchmarkConfig.h"
+#include <chrono>
 
 TextRenderer* TextRenderer::GetInstance() {
     static TextRenderer instance;
@@ -17,18 +19,35 @@ void TextRenderer::Finalize() {
 
 void TextRenderer::PrewarmPool(size_t count) {
     if (!spriteCommon_) { return; }
+#if BENCHMARK_DISABLE_PREWARM
+    Benchmark::Log("[Benchmark:TextRenderer] PrewarmPool DISABLED -> Skipping pre-allocation. (Dynamic allocations will occur during rendering)");
+    return;
+#else
+    auto start = std::chrono::high_resolution_clock::now();
+    size_t prevCount = spritePool_.size();
     while (spritePool_.size() < count) {
         auto sprite = std::make_unique<Sprite>();
         sprite->Initialize(spriteCommon_, "");
         spritePool_.push_back(std::move(sprite));
     }
+    auto end = std::chrono::high_resolution_clock::now();
+    double timeMs = std::chrono::duration<double, std::milli>(end - start).count();
+    char buf[256];
+    sprintf_s(buf, "[Benchmark:TextRenderer] PrewarmPool ENABLED -> Pre-allocated %zu sprites (total %zu) in %.2f ms (Zero-Allocation ready)", count > prevCount ? count - prevCount : size_t(0), spritePool_.size(), timeMs);
+    Benchmark::Log(buf);
+#endif
 }
 
 Sprite* TextRenderer::GetNextSprite() {
     if (usedSpriteCount_ >= spritePool_.size()) {
+        auto start = std::chrono::high_resolution_clock::now();
         auto sprite = std::make_unique<Sprite>();
         sprite->Initialize(spriteCommon_, "");
         spritePool_.push_back(std::move(sprite));
+        auto end = std::chrono::high_resolution_clock::now();
+
+        dynamicAllocCount_++;
+        dynamicAllocTimeMs_ += std::chrono::duration<double, std::milli>(end - start).count();
     }
     return spritePool_[usedSpriteCount_++].get();
 }
@@ -158,6 +177,16 @@ void TextRenderer::Flush() {
 
 void TextRenderer::Draw() {
     Flush();
+
+    // ベンチマークログ出力
+    if (dynamicAllocCount_ > 0) {
+        char buf[256];
+        sprintf_s(buf, "[Benchmark:TextRenderer] Dynamic Allocations: %u sprites (Hitch / D3D12 Spike: %.2f ms)", dynamicAllocCount_, dynamicAllocTimeMs_);
+        Benchmark::Log(buf);
+        dynamicAllocCount_ = 0;
+        dynamicAllocTimeMs_ = 0.0;
+    }
+
     usedSpriteCount_ = 0; // 次のフレーム用にリセット
     flushedSpriteCount_ = 0;
 }

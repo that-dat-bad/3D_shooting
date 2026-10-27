@@ -44,6 +44,8 @@ private:
     std::vector<std::unique_ptr<Sprite>> spritePool_;
     uint32_t usedSpriteCount_ = 0;
     uint32_t flushedSpriteCount_ = 0; ///< このフレームで Flush 済みのスプライト数
+    uint32_t dynamicAllocCount_ = 0;   ///< このフレームで動的生成されたスプライト数
+    double dynamicAllocTimeMs_ = 0.0;  ///< 動的バッファ確保にかかった累計時間(ms)
 
     Sprite* GetNextSprite();
 };

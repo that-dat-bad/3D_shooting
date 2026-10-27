@@ -10,7 +10,7 @@ class DirectXCommon;
 class SrvManager {
 public:
 	/// <summary>最大SRV数(最大テクスチャ枚数)</summary>
-	static const uint32_t kMaxSRVCount_ = 512;
+	static const uint32_t kMaxSRVCount_ = 2048;
 
 	/// <summary>初期化処理</summary>
 	void Initialize(DirectXCommon* dxCommon);

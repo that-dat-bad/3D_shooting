@@ -5,6 +5,10 @@
 #include <filesystem>
 #include <future>
 #include <vector>
+#include <thread>
+#include <atomic>
+#include <chrono>
+#include <algorithm>
 
 std::unique_ptr<ModelManager> ModelManager::instance_ = nullptr;
 
@@ -53,7 +57,7 @@ void ModelManager::LoadModel(const std::string& filePath)
 	models_.insert(std::make_pair(filePath, std::move(model)));
 }
 
-void ModelManager::LoadModelsParallel(const std::vector<std::string>& filePaths)
+void ModelManager::LoadModelsParallel(const std::vector<std::string>& filePaths, bool useFastObjLoader)
 {
 	std::vector<std::string> toLoad;
 	for (const auto& path : filePaths) {
@@ -65,30 +69,59 @@ void ModelManager::LoadModelsParallel(const std::vector<std::string>& filePaths)
 		return;
 	}
 
-	// 1. 全コアを活用した複数スレッド並列ファイルパース（Assimp）
-	std::vector<std::future<std::pair<std::string, Model::ModelData>>> futures;
-	futures.reserve(toLoad.size());
+	// 1. 固定数ワーカーによる並列パース（Assimp）
+	//    ファイルごとに std::async を立てると（例: 100チャンク=100スレッド）
+	//    コア数を大幅に超えてコンテキストスイッチ・ヒープ競合が多発し、逆に遅くなるため
+	//    (論理コア数 - 1) 本のワーカーがジョブを取り合う形式にする
+	auto parseStart = std::chrono::high_resolution_clock::now();
 
-	for (const auto& path : toLoad) {
-		futures.push_back(std::async(std::launch::async, [path]() {
-			std::string fullPath;
-			if (std::filesystem::exists(path)) {
-				fullPath = path;
-			} else {
-				fullPath = "assets/" + path;
+	const size_t jobCount = toLoad.size();
+	std::vector<Model::ModelData> results(jobCount);
+	std::atomic<size_t> nextJob{ 0 };
+
+	unsigned int hw = std::thread::hardware_concurrency();
+	if (hw == 0) { hw = 4; }
+	const size_t workerCount = (std::min)(jobCount, static_cast<size_t>((std::max)(1u, hw - 1)));
+
+	auto worker = [&]() {
+		for (;;) {
+			size_t i = nextJob.fetch_add(1, std::memory_order_relaxed);
+			if (i >= jobCount) { break; }
+			const std::string& path = toLoad[i];
+			std::string fullPath = std::filesystem::exists(path) ? path : ("assets/" + path);
+			results[i] = {};
+			if (useFastObjLoader && fullPath.ends_with(".obj")) {
+				results[i] = Model::LoadObjFileFast(fullPath);
 			}
-			Model::ModelData data = Model::LoadModelFile("", fullPath);
-			return std::make_pair(path, std::move(data));
-		}));
+			// 軽量ローダー非対応 or 失敗時は Assimp にフォールバック
+			if (results[i].vertices.empty()) {
+				results[i] = Model::LoadModelFile("", fullPath);
+			}
+		}
+	};
+
+	std::vector<std::thread> threads;
+	threads.reserve(workerCount);
+	for (size_t t = 0; t < workerCount; ++t) {
+		threads.emplace_back(worker);
+	}
+	for (auto& th : threads) {
+		th.join();
 	}
 
-	// 2. パース完了順にGPUリソース生成と登録
-	for (auto& fut : futures) {
-		auto [path, modelData] = fut.get();
+	auto parseEnd = std::chrono::high_resolution_clock::now();
+
+	// 2. GPUリソース生成と登録（メインスレッド）
+	for (size_t i = 0; i < jobCount; ++i) {
 		auto model = std::make_unique<Model>();
-		model->InitializeFromModelData(modelCommon_.get(), std::move(modelData));
-		models_.insert(std::make_pair(path, std::move(model)));
+		model->InitializeFromModelData(modelCommon_.get(), std::move(results[i]));
+		models_.insert(std::make_pair(toLoad[i], std::move(model)));
 	}
+
+	auto gpuEnd = std::chrono::high_resolution_clock::now();
+	lastParallelParseMs_ = std::chrono::duration<double, std::milli>(parseEnd - parseStart).count();
+	lastParallelGpuInitMs_ = std::chrono::duration<double, std::milli>(gpuEnd - parseEnd).count();
+	lastParallelWorkerCount_ = static_cast<uint32_t>(workerCount);
 }
 
 Model* ModelManager::FindModel(const std::string& filePath)

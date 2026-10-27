@@ -291,9 +291,8 @@ void StageScene::UpdateFlightAndEffects(float gameDeltaTime) {
 	// 破片オブジェクト群の物理シミュレーション更新
 	DebrisManager::GetInstance()->Update(gameDeltaTime);
 
-#ifdef _DEBUG
+	// Blender MCP リアルタイム同期の更新
 	TerrainSyncManager::GetInstance()->Update();
-#endif
 
 	// --- 翼端ボルテックスエフェクトの発生 ---
 	float currentG = flightModel_.GetCurrentG();
@@ -812,6 +811,9 @@ void StageScene::UpdateDebugAndStatusUI(float gameDeltaTime) {
 	ImGui::End();
 
 	DrawAircraftTuningEditor();
+	if (terrainChunkManager_) {
+		terrainChunkManager_->DrawImGui();
+	}
 #endif
 }
 

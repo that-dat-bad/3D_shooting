@@ -36,7 +36,13 @@ public:
 	/// <summary>
 	/// 複数スレッドを活用したモデルの並列読み込み（全CPUコアでAssimpパースを同時実行）
 	/// </summary>
-	void LoadModelsParallel(const std::vector<std::string>& filePaths);
+	/// <param name="useFastObjLoader">true: .obj を Assimp ではなく軽量ローダーで読む（静的メッシュ専用）</param>
+	void LoadModelsParallel(const std::vector<std::string>& filePaths, bool useFastObjLoader = false);
+
+	/// <summary>直近の LoadModelsParallel の内訳（ms）</summary>
+	double GetLastParallelParseMs() const { return lastParallelParseMs_; }
+	double GetLastParallelGpuInitMs() const { return lastParallelGpuInitMs_; }
+	uint32_t GetLastParallelWorkerCount() const { return lastParallelWorkerCount_; }
 
 	Model::Animation LoadAnimation(const std::string& filePath);
 	std::vector<std::string> LoadAnimationNames(const std::string& filePath);
@@ -55,5 +61,10 @@ private:
 
 	//モデルデータ
 	std::map<std::string, std::unique_ptr<Model>> models_;
+
+	// 並列ロード計測
+	double lastParallelParseMs_ = 0.0;
+	double lastParallelGpuInitMs_ = 0.0;
+	uint32_t lastParallelWorkerCount_ = 0;
 };
 

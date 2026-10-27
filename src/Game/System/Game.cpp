@@ -9,6 +9,7 @@
 #include "../../engine/Graphics/Model/ModelManager.h"
 #include "../Scene/SceneFactory.h"
 #include "../Scene/TitleScene.h"
+#include "HitchDetector.h"
 
 
 
@@ -127,6 +128,9 @@ void Game::Update() {
 	// Win32 ネイティブ UIエディタの更新
 	UIEditorWindow::GetInstance()->Update();
 
+	// ヒッチ＆フレームタイム監視パネル
+	HitchDetector::GetInstance()->DrawImGui();
+
 	// F1キーでエディタウィンドウの表示/非表示切り替え
 	if (Input::GetInstance()->TriggerKey(DIK_F1)) {
 		UIEditorWindow::GetInstance()->Toggle();
@@ -171,6 +175,9 @@ void Game::Run() {
 		if (winApp->ProcessMessage()) {
 			break;
 		}
+
+		// ヒッチ監視（フレーム開始時刻・DeltaTimeの計測とログ出力）
+		HitchDetector::GetInstance()->OnBeginFrame();
 
 		// ゲーム更新
 		Update();

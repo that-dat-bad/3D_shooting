@@ -25,6 +25,8 @@
 #include "../System/MissionManager.h"
 #include "../System/MissionMapView.h"
 
+class TerrainChunkManager;
+
 /// @brief ゲーム本編のステージシーン
 class StageScene : public IScene {
 public:
@@ -186,6 +188,9 @@ private:
 
 	// 環境管理（太陽・昼夜サイクルなど）
 	EnvironmentManager environmentManager_;
+
+	// 地形チャンク管理（4000mチャンク分割 40km x 40km）
+	TerrainChunkManager* terrainChunkManager_ = nullptr;
 
 	// ============================
 	// ポストエフェクト統合制御
