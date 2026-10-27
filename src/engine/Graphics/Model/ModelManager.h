@@ -52,6 +52,10 @@ public:
 	/// <param name="filePath"></param>
 	/// <returns></returns>
 	Model* FindModel(const std::string& filePath);
+	ModelCommon* GetModelCommon() const { return modelCommon_.get(); }
+	void RegisterModel(const std::string& key, std::unique_ptr<Model> model) {
+		models_[key] = std::move(model);
+	}
 	~ModelManager();
 private:
 	static std::unique_ptr<ModelManager> instance_;

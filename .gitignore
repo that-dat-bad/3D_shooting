@@ -367,3 +367,4 @@ FodyWeavers.xsd
 assets/shaders/compiled/
 /.github/upgrades/scenarios/cppbuildtoolsupgrade
 /benchmark_log.txt
+*.terrain

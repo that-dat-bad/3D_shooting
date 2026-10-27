@@ -14,7 +14,15 @@ enum class TerrainMode {
 	Chunked     // 4000mチャンク分割版 (Resources/terrains/demo/chunks_info.json)
 };
 
-/// @brief 個別チャンクのメタデータと3Dオブジェクト
+/// @brief チャンク内の個別LODメッシュ（将来のLOD段階拡張用）
+struct TerrainLodMesh {
+	uint32_t lodLevel = 0;       // 0 = 最高精細(LOD0), 1, 2...
+	float switchDistance = 0.0f; // 切り替え推奨距離（将来用、0なら自動）
+	std::string fullPath;        // ModelManagerキー
+	std::unique_ptr<Object3d> object3d;
+};
+
+/// @brief 個別チャンクのメタデータと3Dオブジェクト（LOD拡張性対応）
 struct TerrainChunk {
 	int gridX = 0;
 	int gridY = 0;
@@ -27,7 +35,14 @@ struct TerrainChunk {
 	Vector3 center = { 0.0f, 0.0f, 0.0f };
 	std::string fileName;
 	std::string fullPath;
+
+	// LODメッシュ配列（将来の多段階LOD用）
+	std::vector<TerrainLodMesh> lodMeshes;
+	int currentLodIndex = 0;
+
+	// 後方互換用（LOD0のオブジェクトを直接参照）
 	std::unique_ptr<Object3d> object3d;
+
 	bool isLoaded = false;
 	bool isVisible = false;
 	float distanceToViewer = 0.0f;
@@ -88,6 +103,8 @@ private:
 
 	void LoadSingleMesh(const std::string& objPath);
 	void LoadChunked(const std::string& jsonPath);
+	bool LoadPackage(const std::string& packagePath);
+	bool SavePackage(const std::string& packagePath);
 
 	TerrainMode mode_ = TerrainMode::Chunked;
 	std::string singleMeshPath_ = "Resources/terrains/demo.obj";
