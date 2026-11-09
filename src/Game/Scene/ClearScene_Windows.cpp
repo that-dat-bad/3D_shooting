@@ -2,6 +2,86 @@
 
 void ClearScene::DrawDebriefWindow(const PseudoOS::Window& win) {
 	TextRenderer* tr = TextRenderer::GetInstance();
+	const GameResult& result = GameResult::GetInstance();
+	if (result.isHalcyonDaysTutorial) {
+		using namespace HalcyonClearDefaults;
+		const float cx = win.pos.x + win.size.x * kCenterRatio;
+		float cy = win.pos.y + win.titleBarHeight + kContentTopOffset;
+
+		missionCompleteText_.Draw();
+		cy += kHeaderAdvanceY;
+
+		const float frameW = win.size.x - kPanelDoubleMarginX;
+		pseudoOS_.DrawPanel(
+			{ win.pos.x + kPanelMarginX, cy },
+			{ frameW, kPanelHeight },
+			kPanelBgColor,
+			kPanelBorderColor,
+			kPanelBorderThickness);
+
+		const float termX = win.pos.x + kTerminalPadX;
+		float lineY = cy + kTerminalStartOffsetY;
+
+		tr->Print(kFontName, kHeaderSysLine, termX, lineY, kSysHeaderFontSize, kSysHeaderColor);
+		lineY += kLineStepTight;
+
+		tr->Print(kFontName, kDividerLine, termX, lineY, kDividerFontSize, kDividerColor);
+		lineY += kLineStepRecord;
+
+		const int minutes = static_cast<int>(result.clearTimeSeconds) / kSecondsPerMinute;
+		const int seconds = static_cast<int>(result.clearTimeSeconds) % kSecondsPerMinute;
+		char flightRecBuf[kRecordBufferSize];
+		snprintf(flightRecBuf, sizeof(flightRecBuf), kFlightRecordFormat, minutes, seconds);
+
+		tr->Print(kFontName, flightRecBuf, termX, lineY, kRecordFontSize, kRecordTextColor);
+		lineY += kLineStepRecord;
+
+		tr->Print(kFontName, kHostileContactsLine, termX, lineY, kRecordFontSize, kRecordTextColor);
+		lineY += kLineStepRecord;
+
+		tr->Print(kFontName, kTargetAnalysisLine, termX, lineY, kRecordFontSize, kRecordTextColor);
+		lineY += kLineStepRecord + kSectionGap;
+
+		tr->Print(kFontName, kIntelLine1, termX, lineY, kIntelFontSize, kIntelTextColor);
+		lineY += kIntelLineStep;
+
+		tr->Print(kFontName, kIntelLine2, termX, lineY, kIntelFontSize, kIntelTextColor);
+		lineY += kIntelLineStep + kSectionGap;
+
+		const bool promptBlinkOn = (std::fmod(animTimer_, kPromptBlinkPeriod) < kPromptBlinkOnWindow);
+		const Vector4 promptCol = promptBlinkOn ? kPromptOnColor : kPromptDimColor;
+		tr->Print(kFontName, kPressReturnLine, cx, lineY, kPromptFontSize, promptCol, kTopCenterAnchor);
+
+		cy += kPanelHeight + kAfterPanelGap;
+
+		const float pulseRatio = kPulseBase + kPulseAmp * std::sin(animTimer_ * kPulseFreq);
+		const Vector4 gaugeCol = {
+			kSysHeaderColor.x * pulseRatio,
+			kSysHeaderColor.y * pulseRatio,
+			kSysHeaderColor.z * pulseRatio,
+			kSysHeaderColor.w
+		};
+		tr->Print(
+			kFontName,
+			"MISSION OBJECTIVE COMPLETION RATE : 100% [VERIFIED]",
+			win.pos.x + kGaugePadX,
+			cy,
+			kGaugeLabelSize,
+			kGaugeLabelColor);
+		cy += kGaugeLabelStep;
+		pseudoOS_.DrawGauge(
+			{ win.pos.x + kGaugePadX, cy },
+			{ win.size.x - kGaugeMarginW, kGaugeHeight },
+			kFullGaugeRatio,
+			gaugeCol,
+			kGaugeBorderColor);
+		cy += kGaugeBottomStep;
+
+		replayButton_.Draw();
+		titleButton_.Draw();
+		return;
+	}
+
 	float cx = win.pos.x + win.size.x * 0.5f;
 	float cy = win.pos.y + win.titleBarHeight + 14.0f;
 
@@ -72,9 +152,10 @@ void ClearScene::DrawFlightLogWindow(const PseudoOS::Window& win) {
 	float startX = win.pos.x + 16.0f;
 	float cy = win.pos.y + win.titleBarHeight + 12.0f;
 
-	tr->Print("HackGen", "SORTIE THEATER : SECTOR 04 [TUNNEL & MOUNTAIN]", startX, cy, 11.5f, { 0.45f, 0.90f, 1.0f, 0.98f });
+	const bool isTutorial = GameResult::GetInstance().isHalcyonDaysTutorial;
+	tr->Print("HackGen", isTutorial ? HalcyonClearDefaults::kTutorialTheaterLine : "SORTIE THEATER : SECTOR 04 [TUNNEL & MOUNTAIN]", startX, cy, 11.5f, { 0.45f, 0.90f, 1.0f, 0.98f });
 	cy += 18.0f;
-	tr->Print("HackGen", "FLIGHT AIRFRAME: MiG-21Bis TACTICAL JET", startX, cy, 11.0f, { 0.35f, 0.80f, 0.90f, 0.90f });
+	tr->Print("HackGen", isTutorial ? HalcyonClearDefaults::kTutorialAirframeLine : "FLIGHT AIRFRAME: MiG-21Bis TACTICAL JET", startX, cy, 11.0f, { 0.35f, 0.80f, 0.90f, 0.90f });
 	cy += 18.0f;
 
 	// 点滅データインテグリティLED
@@ -135,12 +216,20 @@ void ClearScene::DrawIntelAssessmentWindow(const PseudoOS::Window& win) {
 	cy += 20.0f;
 
 	// 戦果ステータス
-	const char* const intelStatus[] = {
+	const bool isTutorial = GameResult::GetInstance().isHalcyonDaysTutorial;
+	const char* const defaultIntelStatus[] = {
 		"ENEMY FIGHTERS : [INTERCEPTORS NEUTRALIZED]",
 		"RADAR JAMMING  : [AIRSPACE RESTORED]",
 		"SAM INSTALL    : [DESTROYED / MISSION ACCORD]",
 		"FORWARD BASE   : [TACTICAL RETREAT TRIGGERED]"
 	};
+	const char* const tutorialIntelStatus[] = {
+		HalcyonClearDefaults::kTutorialIntel1,
+		HalcyonClearDefaults::kTutorialIntel2,
+		HalcyonClearDefaults::kTutorialIntel3,
+		HalcyonClearDefaults::kTutorialIntel4
+	};
+	const char* const* intelStatus = isTutorial ? tutorialIntelStatus : defaultIntelStatus;
 	for (int i = 0; i < 4; ++i) {
 		tr->Print("HackGen", intelStatus[i], startX, cy, 10.5f, { 0.35f, 0.85f, 0.65f, 0.90f });
 		cy += 16.0f;
@@ -217,8 +306,9 @@ void ClearScene::DrawTheaterReconWindow(const PseudoOS::Window& win) {
 
 	bool tgtBlink = (std::fmod(animTimer_, 0.7f) < 0.45f);
 	Vector4 tgtCol = tgtBlink ? Vector4{ 1.0f, 0.30f, 0.25f, 0.95f } : Vector4{ 0.50f, 0.15f, 0.10f, 0.60f };
-	tr->Print("HackGen", "[X] BOGEY-01 (K.I.A.)", scx - 70.0f, scy - 35.0f, 10.0f, tgtCol);
-	tr->Print("HackGen", "[X] BOGEY-02 (K.I.A.)", scx + 10.0f, scy + 25.0f, 10.0f, tgtCol);
+	const bool isTutorial = GameResult::GetInstance().isHalcyonDaysTutorial;
+	tr->Print("HackGen", isTutorial ? HalcyonClearDefaults::kTutorialBogeyLine1 : "[X] BOGEY-01 (K.I.A.)", scx - 70.0f, scy - 35.0f, 10.0f, tgtCol);
+	tr->Print("HackGen", isTutorial ? HalcyonClearDefaults::kTutorialBogeyLine2 : "[X] BOGEY-02 (K.I.A.)", scx + 10.0f, scy + 25.0f, 10.0f, tgtCol);
 	tr->Print("HackGen", ">> AIRSPACE SANITIZED // ALL HOSTILES DOWN", startX + 8.0f, cy + mapH - 18.0f, 10.0f, { 0.35f, 1.0f, 0.70f, 0.95f });
 	cy += mapH + 16.0f;
 

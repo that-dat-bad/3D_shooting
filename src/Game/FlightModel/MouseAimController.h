@@ -50,8 +50,8 @@ struct PIDController {
 
 
 /// <summary>
-/// War Thunder風 マウスエイム・コントローラー
-/// マウス入力 → ワールド空間の目標方向を回転 → PID制御で操舵入力を生成。
+/// War Thunder準拠 マウスエイム・コントローラー
+/// ワールド水平基準の球面座標(方位角・仰角±89°)で目標方向を更新し、PID制御で操舵入力を生成。
 /// </summary>
 class MouseAimController {
 public:
@@ -61,7 +61,7 @@ public:
 	/// <summary>初期化</summary>
 	void Initialize();
 
-	/// マウスの相対移動量でワールド空間の目標方向を回転（カメラのローカル軸を使用）
+	/// マウスの相対移動量でワールド空間の目標方向を回転
 	void UpdateTargetDirection(long deltaX, long deltaY, const MyMath::Vector3& camRight, const MyMath::Vector3& camUp);
 
 	/// 目標方向を指定の前方ベクトルにリセット
@@ -102,6 +102,10 @@ private:
 
 	// マウス感度
 	float sensitivity_ = 0.05f; // reduced mouse sensitivity
+
+	// ワールド水平基準の方位角・仰角（War Thunder準拠：360°方位角＋±89°仰角）
+	float targetYaw_ = 0.0f;
+	float targetPitch_ = 0.0f;
 
 	// ワールド空間の目標方向（単位ベクトル）
 	MyMath::Vector3 targetDirection_ = { 0.0f, 0.0f, 1.0f };

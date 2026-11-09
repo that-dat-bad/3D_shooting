@@ -7,9 +7,16 @@
 
 using namespace MyMath;
 
+namespace StageHUDTimerDefaults {
+	inline constexpr float kDefaultElapsedSeconds = 0.0f;
+	inline constexpr int kSecondsPerMinute = 60;
+}
+
 /// @brief StageSceneのHUD表示用データ構造体
 struct StageHUDData {
 	float remainingTime = 300.0f;
+	float elapsedTime = StageHUDTimerDefaults::kDefaultElapsedSeconds;
+	bool isElapsedTimerMode = false;
 	int currentAmmo = 500;
 	int maxAmmo = 500;
 	bool isFiring = false;
@@ -53,6 +60,16 @@ public:
 	void StartShutdown() { isShuttingDown_ = true; shutdownTimer_ = 0.0f; }
 	void ResetShutdown() { isShuttingDown_ = false; shutdownTimer_ = 0.0f; }
 	bool IsShutdownComplete() const { return isShuttingDown_ && shutdownTimer_ >= 1.2f; }
+
+	/// @brief War Thunder準拠：視野内は厳密透視投影、視野外およびカメラ後方(cW<=0)は画面安全枠上へ連続クランプ投影
+	static void ProjectToScreenClamped(
+		const Vector3& worldPos,
+		const Matrix4x4& vpMat,
+		float screenW,
+		float screenH,
+		float marginPx,
+		Vector2& outScreen,
+		bool& outIsClamped);
 
 private:
 	float deployTimer_ = 0.0f;    ///< HUD順次展開タイマー

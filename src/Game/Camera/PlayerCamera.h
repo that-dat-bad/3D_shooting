@@ -6,7 +6,10 @@
 #include "../FlightModel/MouseAimController.h"
 
 /// <summary>
-/// 自機を追従するカメラの制御クラス（三人称視点、フリービュー対応）
+/// 自機を追従するカメラの制御クラス（War Thunder準拠 固定ブーム球面追従仕様）
+/// カメラ光軸(Zc)とブーム軸を単一の正規直交基底(Xc, Yc, Zc)に統合し、
+/// 一定距離D・一定高さH・一定FOVで自機を常にビュー空間(0, -H, +D)へ完全固定することで、
+/// 激しい上下左右のマウス操作でも前後揺れ(カメラ酔い)や境界壁への張り付きを一切起こさない。
 /// </summary>
 class PlayerCamera {
 public:
@@ -24,7 +27,7 @@ public:
     float* GetCameraHeightPtr() { return &cameraHeight_; }
     float* GetCameraPosLagPtr() { return &cameraPosLag_; }
     float* GetCameraLookLagPtr() { return &cameraLookLag_; }
-    
+
     float GetCachedCameraYaw() const { return cachedCameraYaw_; }
     float GetCachedCameraPitch() const { return cachedCameraPitch_; }
 
@@ -34,23 +37,34 @@ private:
     MyMath::Vector3 cameraCurrentPos_{};
     MyMath::Vector3 cameraLookTarget_{};
 
-    float cameraDistance_ = 22.0f;
-    float cameraHeight_ = 8.0f;
-    float cameraPosLag_ = 5.0f;
-    float cameraLookLag_ = 10.0f;
+    // War Thunder準拠：単一カメラ基底 (camForward_ = Zc, camUp_ = Yc) と角速度状態
+    MyMath::Vector3 camForward_ = { 0.0f, 0.0f, 1.0f };
+    MyMath::Vector3 camUp_ = { 0.0f, 1.0f, 0.0f };
+    MyMath::Vector3 camAngVel_ = { 0.0f, 0.0f, 0.0f };
+    MyMath::Vector3 transitionPosOffset_ = { 0.0f, 0.0f, 0.0f };
+
+    float cameraDistance_ = 30.0f;
+    float cameraHeight_ = 3.2f;
+    float cameraPosLag_ = 3.5f;
+    float cameraLookLag_ = 5.5f;
+
+    float currentDist_ = 30.0f;
+    float currentHeight_ = 3.2f;
     float currentFov_ = 0.45f;
     bool isZoomed_ = false;
+    bool needsTransitionSync_ = false;
 
     bool freeViewActive_ = false;
     float freeViewYaw_ = 0.0f;
     float freeViewPitch_ = 0.0f;
     float freeViewYawVelocity_ = 0.0f;
     float freeViewPitchVelocity_ = 0.0f;
-    float freeViewDistance_ = 25.0f;
+    float freeViewDistance_ = 30.0f;
     MyMath::Vector3 freeViewLookOffset_ = { 0.0f, 0.0f, 0.0f };
 
     float cachedCameraYaw_ = 0.0f;
     float cachedCameraPitch_ = 0.0f;
 
     MyMath::Vector3 LookAtRotation(const MyMath::Vector3& from, const MyMath::Vector3& to) const;
+    static MyMath::Vector3 BasisToEuler(const MyMath::Vector3& right, const MyMath::Vector3& up, const MyMath::Vector3& forward);
 };

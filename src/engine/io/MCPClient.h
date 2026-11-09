@@ -22,7 +22,10 @@ public:
 	/// @brief 定期ポーリングの開始
 	/// @param intervalMs ポーリング間隔（ミリ秒）
 	/// @param callback データ受信時のコールバック
-	void StartPolling(int intervalMs, std::function<void(const nlohmann::json&)> callback);
+	void StartPolling(
+		int intervalMs,
+		std::function<void(const nlohmann::json&)> callback,
+		const std::string& endpointPath = "/terrain/params");
 
 	/// @brief ポーリングの停止
 	void StopPolling();
@@ -71,6 +74,7 @@ private:
 
 	std::thread pollingThread_;
 	int pollingIntervalMs_ = 1000;
+	std::string pollingEndpoint_ = "/terrain/params";
 	std::function<void(const nlohmann::json&)> pollingCallback_;
 
 	std::atomic<int> failureCount_{ 0 };

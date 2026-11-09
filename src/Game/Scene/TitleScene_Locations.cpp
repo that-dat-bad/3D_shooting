@@ -340,9 +340,9 @@ void TitleScene::UpdateLocationCamera(const LocationData& loc, float dt, bool me
 		float currentH = c.height + std::sin(animTimer_ * 1.1f) * c.heightSway;
 
 		// 機体およびノズルのワールド位置
-		// m21.gltf のローカルノズル位置は Z = +14.95m。aircraftRotation (0, π, 0) によりワールドでは Z = -14.95m
+		// m21.gltf のローカルノズル位置は Z = +7.60m。aircraftRotation (0, π, 0) によりワールドでは Z = -7.60m
 		MyMath::Vector3 acPos = MyMath::Add(loc.origin, loc.aircraftOffset);
-		float nozzleOffsetZ = afterburner_ ? afterburner_->GetSingleNozzleOffset().z : 14.95f;
+		float nozzleOffsetZ = afterburner_ ? afterburner_->GetSingleNozzleOffset().z : 7.60f;
 		float nozzleOffsetY = afterburner_ ? afterburner_->GetSingleNozzleOffset().y : 0.011f;
 		float nozzleOffsetX = afterburner_ ? afterburner_->GetSingleNozzleOffset().x : 0.0f;
 		// 機体が 180度回転 (aircraftRotation.y = π) しているため、ローカル+Zはワールド-Z

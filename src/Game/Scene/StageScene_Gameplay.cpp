@@ -287,6 +287,14 @@ void StageScene::UpdateFlightAndEffects(float gameDeltaTime) {
 	environmentManager_.Update(CameraManager::GetInstance()->GetActiveCamera(), gameDeltaTime);
 
 	// 飛行モデルの更新
+	if (terrainChunkManager_ && terrainChunkManager_->IsLoaded()) {
+		const Vector3 curPos = flightModel_.GetPosition();
+		const float terrainGroundY = terrainChunkManager_->GetTerrainHeightAt(
+			curPos.x,
+			curPos.z,
+			HalcyonDefaults::kZero);
+		flightModel_.SetGroundElevation(terrainGroundY);
+	}
 	flightModel_.Update(gameDeltaTime);
 
 	// 部位破壊イベントのチェックと破片放出
@@ -376,6 +384,56 @@ void StageScene::UpdateFlightAndEffects(float gameDeltaTime) {
 // ============================================================
 // 戦闘・敵・ミッション・当たり判定更新
 // ============================================================
+void StageScene::ApplyMissionLiveSyncUpdate() {
+	MissionData liveData{};
+	std::string livePath;
+	bool restartRequested = false;
+	if (!MissionSyncManager::GetInstance()->ConsumePendingUpdate(liveData, livePath, restartRequested)) {
+		return;
+	}
+
+	auto& missionManager = MissionManager::GetInstance();
+	missionManager.ApplyLiveMissionData(liveData, livePath);
+
+	if (restartRequested) {
+		GameResult::GetInstance().isRetry = true;
+		Restart();
+		return;
+	}
+
+	if (combatBootSequence_.IsWaitingForSpace()) {
+		flightModel_.SetPosition(liveData.playerPosition);
+		const float yawRad = liveData.playerYawDeg * StageRadioDefaults::kDegToRad;
+		const float halfYaw = yawRad * StageRadioDefaults::kHalfAngleFactor;
+		flightModel_.SetOrientation({
+			StageRadioDefaults::kZeroTimeLimit,
+			std::sin(halfYaw),
+			StageRadioDefaults::kZeroTimeLimit,
+			std::cos(halfYaw)
+		});
+		mouseAimController_.ResetToDirection(flightModel_.GetForwardDirection());
+	}
+
+	if (tutorialDirector_.IsTutorialActive()) {
+		tutorialDirector_.ApplyLiveLayout(liveData, terrainChunkManager_);
+	} else {
+		static const std::vector<EnemySpawnData> kEmptyAir = {};
+		static const std::vector<GroundEnemySpawnData> kEmptyGround = {};
+		enemyManager_.SetWaypointPaths(liveData.waypointPaths);
+		enemyManager_.Initialize(
+			enableEnemies_ ? liveData.enemies : kEmptyAir,
+			aircraftConfig_.GetAirframe(),
+			aircraftConfig_.GetEngine(),
+			aircraftConfig_.GetGunpod(),
+			&flightModel_,
+			&bulletManager_,
+			enableEnemies_ ? liveData.groundEnemies : kEmptyGround
+		);
+		missionManager.BindEnemyManager(&enemyManager_);
+		missionManager.ResetRuntimeState();
+	}
+}
+
 void StageScene::UpdateCombatAndMission(float gameDeltaTime) {
 	// ブリーフィング中のSPACEキー入力待機中は戦闘処理・敵更新・目標評価を完全停止
 	if (combatBootSequence_.IsWaitingForSpace()) {
@@ -395,7 +453,7 @@ void StageScene::UpdateCombatAndMission(float gameDeltaTime) {
 		flightModel_.GetPosition(),
 		playerHP_,
 		enemyManager_.GetDestroyedCount(),
-		enemyManager_.GetAliveEnemies().empty(),
+		enemyManager_.IsAllDestroyed(),
 		totalTime_
 	);
 	missionManager.EvaluateTriggers(
@@ -405,6 +463,34 @@ void StageScene::UpdateCombatAndMission(float gameDeltaTime) {
 		totalTime_
 	);
 	missionManager.UpdateMessages(gameDeltaTime);
+	if (enableEnemies_) {
+		const std::vector<EnemySpawnData> pendingAir = missionManager.PopPendingEnemySpawns();
+		if (!pendingAir.empty()) {
+			enemyManager_.SpawnAirEnemies(pendingAir);
+		}
+		const std::vector<GroundEnemySpawnData> pendingGround = missionManager.PopPendingGroundEnemySpawns();
+		if (!pendingGround.empty()) {
+			enemyManager_.SpawnGroundEnemies(pendingGround);
+		}
+	} else {
+		(void)missionManager.PopPendingEnemySpawns();
+		(void)missionManager.PopPendingGroundEnemySpawns();
+	}
+	if (tutorialDirector_.IsTutorialActive()) {
+		TutorialUpdateContext tutCtx{};
+		tutCtx.deltaTime = gameDeltaTime;
+		tutCtx.missionElapsedTime = missionElapsedTime_;
+		tutCtx.playerThrottle = throttle_;
+		tutCtx.isGameplayActive = IsGameplayActive();
+		tutCtx.playerFlight = &flightModel_;
+		tutCtx.mouseAim = &mouseAimController_;
+		tutCtx.playerGunpod = &gunpod_;
+		tutCtx.bulletManager = &bulletManager_;
+		tutCtx.radio = &radioCommunicator_;
+		tutCtx.terrain = terrainChunkManager_;
+		tutorialDirector_.Update(tutCtx);
+	}
+	UpdateRadioCommunications(gameDeltaTime);
 
 	// 衝突判定
 	if (!isGameOver_) {
@@ -424,7 +510,17 @@ void StageScene::UpdateCombatAndMission(float gameDeltaTime) {
 	}
 
 	// クリア判定
-	if (!isMissionCleared_ && !isMissionFailed_ && enemyManager_.IsAllDestroyed()) {
+	if (!isMissionCleared_ && !isMissionFailed_ && !tutorialDirector_.IsTutorialActive()) {
+		const auto& activeMission = missionManager.GetCurrentMission();
+		if (missionManager.IsTriggerMissionFail() || missionManager.IsAnyPrimaryObjectiveFailed()) {
+			TriggerGameOver();
+		} else if (missionManager.IsTriggerMissionComplete() || missionManager.AreAllPrimaryObjectivesCompleted()) {
+			TriggerGameClear();
+		} else if (activeMission.objectives.empty() && enemyManager_.IsAllDestroyed()) {
+			TriggerGameClear();
+		}
+	}
+	if (false) {
 		TriggerGameClear();
 	}
 
@@ -437,6 +533,69 @@ void StageScene::UpdateCombatAndMission(float gameDeltaTime) {
 // ============================================================
 // カメラ・スカイボックス更新
 // ============================================================
+void StageScene::UpdateRadioCommunications(float gameDeltaTime) {
+	auto& missionManager = MissionManager::GetInstance();
+	std::vector<RadioMessage> pendingRadio = missionManager.PopPendingRadioMessages();
+	for (const auto& msg : pendingRadio) {
+		radioCommunicator_.Enqueue(msg);
+	}
+
+	if (sortieIntroTimer_ < sortieIntroDuration_ ||
+	    isGameOver_ ||
+	    isMissionCleared_ ||
+	    endSequence_ != StageEndSequence::None) {
+		return;
+	}
+
+	if (tutorialDirector_.IsTutorialActive()) {
+		radioCommunicator_.Update(gameDeltaTime);
+		return;
+	}
+
+	if (!hasSentSortieRadio_) {
+		hasSentSortieRadio_ = true;
+		if (!radioCommunicator_.IsActive()) {
+			radioCommunicator_.Enqueue(
+				StageRadioDefaults::kAwacsName,
+				StageRadioDefaults::kSortieDialogue,
+				RadioFaction::Awacs);
+		}
+	}
+
+	const int destroyedCount = enemyManager_.GetDestroyedCount();
+	if (destroyedCount > lastRadioKillCount_) {
+		lastRadioKillCount_ = destroyedCount;
+		if (!enemyManager_.IsAllDestroyed()) {
+			const bool isWingmanLine =
+				((destroyedCount % StageRadioDefaults::kAlternateModulo) == StageRadioDefaults::kEvenRemainder);
+			if (isWingmanLine) {
+				radioCommunicator_.Enqueue(
+					StageRadioDefaults::kWingmanName,
+					StageRadioDefaults::kKillWingmanDialogue,
+					RadioFaction::Ally);
+			} else {
+				radioCommunicator_.Enqueue(
+					StageRadioDefaults::kAwacsName,
+					StageRadioDefaults::kKillAwacsDialogue,
+					RadioFaction::Awacs);
+			}
+		}
+	}
+
+	if (!hasSentDamageWarningRadio_ && playerMaxHP_ > RadioDefaults::kZero) {
+		const float hpRatio = playerHP_ / playerMaxHP_;
+		if (hpRatio > RadioDefaults::kZero && hpRatio <= StageRadioDefaults::kCriticalHpRatioThreshold) {
+			hasSentDamageWarningRadio_ = true;
+			radioCommunicator_.Interrupt(
+				StageRadioDefaults::kAwacsName,
+				StageRadioDefaults::kCriticalDamageDialogue,
+				RadioFaction::Awacs);
+		}
+	}
+
+	radioCommunicator_.Update(gameDeltaTime);
+}
+
 void StageScene::UpdateCamera(float gameDeltaTime) {
 	Vector3 pos = flightModel_.GetPosition();
 	Vector3 euler = PlayerCamera::QuaternionToEuler(flightModel_.GetOrientation());
@@ -482,15 +641,15 @@ void StageScene::UpdateCamera(float gameDeltaTime) {
 				float smoothOrbit = orbitProg * orbitProg * (3.0f - 2.0f * orbitProg);
 
 				float angle = (3.14159265f * 0.50f) + smoothOrbit * (3.14159265f * 0.50f);
-				float dist = 14.0f + 8.0f * smoothOrbit;
-				float height = -0.6f + 8.6f * smoothOrbit;
+				float dist = 14.0f + 16.0f * smoothOrbit;
+				float height = -0.6f + 3.8f * smoothOrbit;
 
 				float localX = dist * std::sin(angle);
 				float localZ = -dist * std::cos(angle);
 				Vector3 camOffset = Add(Add(Multiply(localZ, forward), Multiply(localX, right)), Multiply(height, up));
 				camPos = Add(pos, camOffset);
 
-				Vector3 endLookTarget = Add(pos, Add(Multiply(40.0f, forward), Multiply(4.8f, up)));
+				Vector3 endLookTarget = Add(pos, Add(Multiply(90.0f, forward), Multiply(3.2f, up)));
 				Vector3 startLookTarget = Add(pos, Multiply(2.0f, forward));
 				lookTarget = Lerp(startLookTarget, endLookTarget, smoothOrbit);
 			}
@@ -527,6 +686,9 @@ void StageScene::UpdateCamera(float gameDeltaTime) {
 	} else {
 		playerCamera_.Update(gameDeltaTime, &flightModel_, &mouseAimController_, mouseAimEnabled_);
 	}
+
+	// 最新フレームのカメラViewProjection行列を自機3DモデルのWVP定数バッファへ即時反映（HUDレティクルとの1フレーム遅延を解消）
+	aircraftVisualModel_.Update(flightModel_.GetWorldMatrix(), 0.0f);
 
 	if (skybox_) {
 		skybox_->Update();
@@ -696,7 +858,12 @@ void StageScene::UpdateDebugAndStatusUI(float gameDeltaTime) {
 			Vector3 targetDir = mouseAimController_.GetTargetDirection();
 			Vector3 aimWorldPos = Add(aircraftPos, Multiply(500.0f, targetDir));
 			float cx, cy;
-			if (projectToScreen(aimWorldPos, cx, cy)) {
+			Vector2 clampedAimPt{};
+			bool isAimClamped = false;
+			StageHUD::ProjectToScreenClamped(aimWorldPos, vpMat, screenW, screenH, 38.0f, clampedAimPt, isAimClamped);
+			cx = clampedAimPt.x;
+			cy = clampedAimPt.y;
+			{
 				float crossSize = 15.0f;
 				float dotRadius = 3.0f;
 				ImU32 reticleColor = IM_COL32(0, 255, 100, 220);
@@ -713,7 +880,7 @@ void StageScene::UpdateDebugAndStatusUI(float gameDeltaTime) {
 				Vector3 forward = flightModel_.GetForwardDirection();
 				Vector3 noseWorldPos = Add(aircraftPos, Multiply(500.0f, forward));
 				float nx, ny;
-				if (projectToScreen(noseWorldPos, nx, ny)) {
+				if (projectToScreen(noseWorldPos, nx, ny) && nx >= -48.0f && nx <= screenW + 48.0f && ny >= -48.0f && ny <= screenH + 48.0f) {
 					float noseSize = 8.0f;
 					ImU32 noseColor = IM_COL32(255, 255, 255, 200);
 					drawList->AddLine(ImVec2(nx - noseSize, ny - noseSize), ImVec2(nx + noseSize, ny + noseSize), noseColor, 2.0f);
@@ -828,6 +995,64 @@ void StageScene::UpdateDebugAndStatusUI(float gameDeltaTime) {
 			ground->GetHealth(), ground->GetMaxHealth(), dist, ground->IsTargetInSight() ? "YES" : "NO");
 		ImGui::Text("   Pos: (%.1f, %.1f, %.1f)", ground->GetPosition().x, ground->GetPosition().y, ground->GetPosition().z);
 		groundIndex++;
+	}
+
+	ImGui::Separator();
+	if (ImGui::CollapsingHeader("Radio Communicator (Ace Combat Style)")) {
+		static char testSpeaker[StageRadioDefaults::kImGuiSpeakerBufferSize] = "Joker 2 Coster";
+		static char testDialogue[StageRadioDefaults::kImGuiDialogueBufferSize] = "今はやめだ";
+		static int testFactionIndex = static_cast<int>(RadioFaction::Ally);
+		static float testHoldSeconds = RadioDefaults::kDefaultHoldSeconds;
+
+		const char* factionLabels[] = { "Ally", "Awacs", "Enemy", "System" };
+		constexpr int kFactionLabelCount = static_cast<int>(std::size(factionLabels));
+
+		ImGui::InputText("Speaker", testSpeaker, sizeof(testSpeaker));
+		ImGui::Combo("Faction", &testFactionIndex, factionLabels, kFactionLabelCount);
+		ImGui::InputTextMultiline("Dialogue << >>", testDialogue, sizeof(testDialogue));
+		ImGui::SliderFloat(
+			"Hold (sec)",
+			&testHoldSeconds,
+			StageRadioDefaults::kImGuiMinHoldSeconds,
+			StageRadioDefaults::kImGuiMaxHoldSeconds);
+
+		const RadioFaction selectedFaction = static_cast<RadioFaction>(testFactionIndex);
+		if (ImGui::Button("Enqueue Radio")) {
+			radioCommunicator_.Enqueue(testSpeaker, testDialogue, selectedFaction, testHoldSeconds);
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Interrupt Radio")) {
+			radioCommunicator_.Interrupt(testSpeaker, testDialogue, selectedFaction, testHoldSeconds);
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Skip")) {
+			radioCommunicator_.SkipCurrent();
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Clear")) {
+			radioCommunicator_.Clear();
+		}
+
+		if (ImGui::Button("Preset: AWACS")) {
+			radioCommunicator_.Enqueue(
+				StageRadioDefaults::kAwacsName,
+				StageRadioDefaults::kSortieDialogue,
+				RadioFaction::Awacs);
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Preset: Wingman")) {
+			radioCommunicator_.Enqueue(
+				StageRadioDefaults::kWingmanName,
+				StageRadioDefaults::kKillWingmanDialogue,
+				RadioFaction::Ally);
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Preset: Enemy Ace")) {
+			radioCommunicator_.Enqueue(
+				StageRadioDefaults::kEnemyAceName,
+				StageRadioDefaults::kPresetEnemyDialogue,
+				RadioFaction::Enemy);
+		}
 	}
 
 	if (isMissionCleared_) {
@@ -992,6 +1217,9 @@ void StageScene::UpdatePostEffects(float deltaTime) {
 	Camera* cam = CameraManager::GetInstance()->GetActiveCamera();
 	StageHUDData hudData{};
 	hudData.remainingTime = remainingTime_;
+	hudData.elapsedTime = missionElapsedTime_;
+	hudData.isElapsedTimerMode =
+		(MissionManager::GetInstance().GetCurrentMission().timeLimit <= StageRadioDefaults::kZeroTimeLimit);
 	hudData.currentAmmo = gunpod_.GetCurrentAmmo();
 	hudData.maxAmmo = gunpod_.GetMaxAmmo();
 	hudData.isFiring = isFiringThisFrame_;

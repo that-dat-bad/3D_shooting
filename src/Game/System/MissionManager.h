@@ -9,13 +9,36 @@
 #include "MissionTrigger.h"
 #include "Waypoint.h"
 
+namespace MissionSchemaDefaults {
+	inline constexpr int kJsonDumpIndent = 4;
+	inline constexpr int kZeroIndex = 0;
+	inline constexpr float kZero = 0.0f;
+	inline constexpr float kDefaultPlayerHp = 100.0f;
+	inline constexpr float kDefaultPlayerYawDeg = 0.0f;
+	inline constexpr float kDefaultTimeLimitSeconds = 300.0f;
+	inline constexpr float kDefaultMessageDuration = 3.0f;
+	inline constexpr MyMath::Vector3 kDefaultPlayerStartPos = { 0.0f, 100.0f, 0.0f };
+
+	// ZADANIE 00 (Obuchenie) 3D空間レイアウト既定座標（Blenderから編集・上書き可能）
+	inline constexpr MyMath::Vector3 kDefaultCoraxStartPos = { 244.0f, -278.0f, 935.0f };
+	inline constexpr MyMath::Vector3 kDefaultOutpost01Pos = { 338.0f, -455.0f, 1950.0f };
+	inline constexpr MyMath::Vector3 kDefaultOutpost02Pos = { 78.0f, -468.0f, 2920.0f };
+	inline constexpr MyMath::Vector3 kDefaultOutpost03Pos = { 172.0f, -478.0f, 3880.0f };
+	inline constexpr MyMath::Vector3 kDefaultOutpostPos = { -52.0f, -510.1f, 4950.0f };
+	inline constexpr MyMath::Vector3 kDefaultDroneSpawnPos = { -220.0f, -328.0f, 5200.0f };
+	inline constexpr MyMath::Vector3 kDefaultWesternDiveStart = { -65.0f, -35.0f, 5600.0f };
+	inline constexpr MyMath::Vector3 kDefaultWesternDiveMid = { -310.0f, -295.0f, 5520.0f };
+	inline constexpr MyMath::Vector3 kDefaultWesternPullUp = { -420.0f, -310.0f, 5880.0f };
+	inline constexpr MyMath::Vector3 kDefaultExitBoundaryPos = { -640.0f, -325.0f, 7400.0f };
+}
+
 /// @brief ミッション一覧（マニフェスト）エントリデータ（各ミッションの件名・別名・ファイルパス等のメタデータ一元管理）
 struct MissionEntry {
-	std::string id = "[01]";                           ///< ミッションID（例: "[01]", "[02]"）
+	std::string id = "[01]";                           ///< ミッションID（例: "[00]", "[01]"）
 	std::string filePath = "";                        ///< ミッションJSONファイルパス
-	std::string title = "";                           ///< 作戦件名・主要タイトル（例: "COMBINED STRIKE"）
-	std::string aliasName = "";                       ///< 作戦別名・コードネーム（例: "OP: DAWN BREAK"）
-	std::string subTitle = "";                        ///< 日本語件名・サブタイトル（例: "空対空・空対地 統合防衛任務"）
+	std::string title = "";                           ///< 作戦件名・主要タイトル（例: "Obuchenie"）
+	std::string aliasName = "";                       ///< 作戦別名・コードネーム（例: "ZADANIE 00"）
+	std::string subTitle = "";                        ///< 日本語件名・サブタイトル
 	bool isLocked = false;                            ///< 解放フラグ
 };
 
@@ -39,28 +62,6 @@ inline void from_json(const nlohmann::json& j, MissionEntry& e) {
 	if (j.contains("isLocked")) j.at("isLocked").get_to(e.isLocked);
 }
 
-/// @brief ミッションの構成データ
-struct MissionData {
-	std::string name = "Default Mission";
-	std::string aliasName = "";                  ///< 作戦別名・コードネーム（例: "OP: DAWN BREAK"）
-	std::string subTitle = "";                   ///< サブタイトル（例: "空対空・空対地 統合防衛任務"）
-	std::string difficulty = "NORMAL";           ///< 難易度表示（例: "NORMAL", "HARD", "EXPERT"）
-	std::string areaName = "SECTOR 07";          ///< 作戦空域名称（例: "SECTOR 07 : BORDER LINE"）
-	std::string description = "Destroy all enemy aircraft and ground targets.";
-	float playerHP = 100.0f;
-	MyMath::Vector3 playerPosition = { 0.0f, 100.0f, 0.0f };
-	std::vector<EnemySpawnData> enemies;
-	std::vector<GroundEnemySpawnData> groundEnemies;
-
-	// --- Phase 1: ミッション目標 & トリガーシステム ---
-	float timeLimit = 300.0f;                    ///< ミッション制限時間 (秒, 0 = 無制限)
-	std::vector<MissionObjective> objectives;    ///< ミッション目標リスト
-	std::vector<MissionTrigger> triggers;        ///< トリガーリスト
-
-	// --- Phase 2: ウェイポイント ---
-	std::vector<WaypointPath> waypointPaths;
-};
-
 // nlohmann/json 相互変換用の定義
 #ifndef MYMATH_VECTOR3_JSON_DEFINED
 #define MYMATH_VECTOR3_JSON_DEFINED
@@ -75,6 +76,90 @@ namespace MyMath {
 	}
 }
 #endif
+
+/// @brief ZADANIE 00（チュートリアル導入任務）の非会話・3D空間オブジェクト配置データ（Blender Mission Editor 対応）
+struct TutorialSpatialLayout {
+	bool useCustomLayout = false;
+	MyMath::Vector3 coraxStartPos = MissionSchemaDefaults::kDefaultCoraxStartPos;
+	MyMath::Vector3 outpostPosition = MissionSchemaDefaults::kDefaultOutpostPos;
+	std::vector<MyMath::Vector3> outpostPositions = {
+		MissionSchemaDefaults::kDefaultOutpost01Pos,
+		MissionSchemaDefaults::kDefaultOutpost02Pos,
+		MissionSchemaDefaults::kDefaultOutpost03Pos,
+		MissionSchemaDefaults::kDefaultOutpostPos
+	};
+	MyMath::Vector3 droneSpawnPosition = MissionSchemaDefaults::kDefaultDroneSpawnPos;
+	MyMath::Vector3 westernDiveStart = MissionSchemaDefaults::kDefaultWesternDiveStart;
+	MyMath::Vector3 westernDiveMid = MissionSchemaDefaults::kDefaultWesternDiveMid;
+	MyMath::Vector3 westernPullUp = MissionSchemaDefaults::kDefaultWesternPullUp;
+	MyMath::Vector3 exitBoundaryPosition = MissionSchemaDefaults::kDefaultExitBoundaryPos;
+};
+
+inline void to_json(nlohmann::json& j, const TutorialSpatialLayout& t) {
+	j = nlohmann::json{
+		{"useCustomLayout", t.useCustomLayout},
+		{"coraxStartPos", t.coraxStartPos},
+		{"outpostPosition", t.outpostPosition},
+		{"outpostPositions", t.outpostPositions},
+		{"droneSpawnPosition", t.droneSpawnPosition},
+		{"westernDiveStart", t.westernDiveStart},
+		{"westernDiveMid", t.westernDiveMid},
+		{"westernPullUp", t.westernPullUp},
+		{"exitBoundaryPosition", t.exitBoundaryPosition}
+	};
+}
+
+inline void from_json(const nlohmann::json& j, TutorialSpatialLayout& t) {
+	if (j.contains("useCustomLayout")) j.at("useCustomLayout").get_to(t.useCustomLayout);
+	if (j.contains("coraxStartPos")) j.at("coraxStartPos").get_to(t.coraxStartPos);
+	if (j.contains("outpostPosition")) j.at("outpostPosition").get_to(t.outpostPosition);
+	if (j.contains("outpostPositions")) {
+		j.at("outpostPositions").get_to(t.outpostPositions);
+	}
+	if (!t.outpostPositions.empty()) {
+		if (!j.contains("outpostPosition")) {
+			t.outpostPosition = t.outpostPositions.back();
+		}
+	} else {
+		t.outpostPositions = {
+			MissionSchemaDefaults::kDefaultOutpost01Pos,
+			MissionSchemaDefaults::kDefaultOutpost02Pos,
+			MissionSchemaDefaults::kDefaultOutpost03Pos,
+			t.outpostPosition
+		};
+	}
+	if (j.contains("droneSpawnPosition")) j.at("droneSpawnPosition").get_to(t.droneSpawnPosition);
+	if (j.contains("westernDiveStart")) j.at("westernDiveStart").get_to(t.westernDiveStart);
+	if (j.contains("westernDiveMid")) j.at("westernDiveMid").get_to(t.westernDiveMid);
+	if (j.contains("westernPullUp")) j.at("westernPullUp").get_to(t.westernPullUp);
+	if (j.contains("exitBoundaryPosition")) j.at("exitBoundaryPosition").get_to(t.exitBoundaryPosition);
+}
+
+/// @brief ミッションの構成データ
+struct MissionData {
+	std::string name = "Default Mission";
+	std::string aliasName = "";                  ///< 作戦別名・コードネーム（例: "ZADANIE 00"）
+	std::string subTitle = "";                   ///< サブタイトル（例: "オブチェーニエ：訓練・教程 — 極夜の異変 —"）
+	std::string difficulty = "NORMAL";           ///< 難易度表示（例: "NORMAL", "HARD", "EXPERT"）
+	std::string areaName = "SECTOR 07";          ///< 作戦空域名称
+	std::string description = "Destroy all enemy aircraft and ground targets.";
+	float playerHP = MissionSchemaDefaults::kDefaultPlayerHp;
+	MyMath::Vector3 playerPosition = MissionSchemaDefaults::kDefaultPlayerStartPos;
+	float playerYawDeg = MissionSchemaDefaults::kDefaultPlayerYawDeg; ///< 初期方位角（度, 0=+Z北向き, 時計回り）
+	std::vector<EnemySpawnData> enemies;
+	std::vector<GroundEnemySpawnData> groundEnemies;
+
+	// --- Phase 1: ミッション目標 & トリガーシステム ---
+	float timeLimit = MissionSchemaDefaults::kDefaultTimeLimitSeconds; ///< ミッション制限時間 (秒, 0 = 無制限)
+	std::vector<MissionObjective> objectives;                          ///< ミッション目標リスト
+	std::vector<MissionTrigger> triggers;                              ///< トリガーリスト
+
+	// --- Phase 2: ウェイポイント ---
+	std::vector<WaypointPath> waypointPaths;
+
+	// --- ZADANIE 00 3D空間配置オーバーライド ---
+	TutorialSpatialLayout tutorialLayout{};
+};
 
 inline void to_json(nlohmann::json& j, const EnemySpawnData& e) {
 	std::string aiStr = "ChaseAttack";
@@ -187,6 +272,7 @@ inline void to_json(nlohmann::json& j, const MissionData& m) {
 		{"description", m.description},
 		{"playerHP", m.playerHP},
 		{"playerPosition", m.playerPosition},
+		{"playerYawDeg", m.playerYawDeg},
 		{"enemies", m.enemies},
 		{"groundEnemies", m.groundEnemies},
 		{"timeLimit", m.timeLimit},
@@ -194,6 +280,9 @@ inline void to_json(nlohmann::json& j, const MissionData& m) {
 		{"triggers", m.triggers},
 		{"waypointPaths", m.waypointPaths}
 	};
+	if (m.tutorialLayout.useCustomLayout) {
+		j["tutorialLayout"] = m.tutorialLayout;
+	}
 }
 
 inline void from_json(const nlohmann::json& j, MissionData& m) {
@@ -205,18 +294,20 @@ inline void from_json(const nlohmann::json& j, MissionData& m) {
 	if (j.contains("description")) j.at("description").get_to(m.description);
 	if (j.contains("playerHP")) j.at("playerHP").get_to(m.playerHP);
 	if (j.contains("playerPosition")) j.at("playerPosition").get_to(m.playerPosition);
+	if (j.contains("playerYawDeg")) j.at("playerYawDeg").get_to(m.playerYawDeg);
 	if (j.contains("enemies")) j.at("enemies").get_to(m.enemies);
 	if (j.contains("groundEnemies")) j.at("groundEnemies").get_to(m.groundEnemies);
 	if (j.contains("timeLimit")) j.at("timeLimit").get_to(m.timeLimit);
 	if (j.contains("objectives")) j.at("objectives").get_to(m.objectives);
 	if (j.contains("triggers")) j.at("triggers").get_to(m.triggers);
 	if (j.contains("waypointPaths")) j.at("waypointPaths").get_to(m.waypointPaths);
+	if (j.contains("tutorialLayout")) j.at("tutorialLayout").get_to(m.tutorialLayout);
 }
 
 /// @brief ランタイム中に表示するメッセージ情報
 struct RuntimeMessage {
 	std::string text;
-	float remainingTime = 3.0f;
+	float remainingTime = MissionSchemaDefaults::kDefaultMessageDuration;
 };
 
 /// @brief ミッションの管理とJSONシリアライズ・デシリアライズを担当するクラス
@@ -231,13 +322,16 @@ public:
 	/// @brief 現在のミッションを指定したJSONファイルに保存
 	bool Save(const std::string& filepath);
 
+	/// @brief Blender Live Sync 等から受信したミッションデータを即時適用
+	void ApplyLiveMissionData(const MissionData& liveData, const std::string& liveFilePath = "");
+
 	/// @brief フォルダ内のミッションファイル一覧を取得
 	std::vector<std::string> GetMissionList();
 
 	/// @brief デフォルトのミッションデータを構築して保存
 	void CreateDefaultMission(const std::string& filepath);
 
-	// === ミッション一覧（マニフェスト・捏名一元管理） ===
+	// === ミッション一覧（マニフェスト・別名一元管理） ===
 
 	/// @brief missions.json（ミッション一覧インデックス）をロード
 	bool LoadMissionManifest(const std::string& manifestPath = "Resources/missions/missions.json");
@@ -253,33 +347,29 @@ public:
 
 	// === Phase 1: 目標 & トリガー評価 ===
 
+	/// @brief 個別ターゲット撃破判定用に現在の EnemyManager をバインドする
+	void BindEnemyManager(const EnemyManager* enemyManager) { boundEnemyManager_ = enemyManager; }
+
 	/// @brief ミッション開始時にランタイム状態をリセット
 	void ResetRuntimeState();
 
 	/// @brief 全目標のステータスを評価・更新する
-	/// @param playerPos プレイヤーの現在位置
-	/// @param playerHP プレイヤーの現在HP
-	/// @param destroyedCount 現在の撃破数
-	/// @param allDestroyed 全敵が殲滅されたか
-	/// @param elapsedTime ミッション経過時間
 	void EvaluateObjectives(
 		const MyMath::Vector3& playerPos,
 		float playerHP,
 		int destroyedCount,
 		bool allDestroyed,
-		float elapsedTime
+		float elapsedTime,
+		const EnemyManager* enemyManager = nullptr
 	);
 
 	/// @brief 全トリガーの条件をチェックし、該当するアクションを実行する
-	/// @param playerPos プレイヤーの現在位置
-	/// @param playerHP プレイヤーの現在HP
-	/// @param destroyedCount 現在の撃破数
-	/// @param elapsedTime ミッション経過時間
 	void EvaluateTriggers(
 		const MyMath::Vector3& playerPos,
 		float playerHP,
 		int destroyedCount,
-		float elapsedTime
+		float elapsedTime,
+		const EnemyManager* enemyManager = nullptr
 	);
 
 	/// @brief 全主目標が達成されたかを返す
@@ -297,6 +387,7 @@ public:
 	/// @brief トリガーで出現した追加敵のリストを取得・クリア
 	std::vector<EnemySpawnData> PopPendingEnemySpawns();
 	std::vector<GroundEnemySpawnData> PopPendingGroundEnemySpawns();
+	std::vector<RadioMessage> PopPendingRadioMessages();
 
 	/// @brief 表示中のメッセージを取得
 	const std::vector<RuntimeMessage>& GetActiveMessages() const { return activeMessages_; }
@@ -316,20 +407,24 @@ private:
 	MissionManager(const MissionManager&) = delete;
 	MissionManager& operator=(const MissionManager&) = delete;
 
-	/// @brief トリガーアクションを実行する
+	void CacheInitialObjectiveStatuses();
 	void ExecuteAction(const TriggerAction& action);
 
 	MissionData currentMission_;
 	std::string currentFilePath_;
+	std::vector<ObjectiveStatus> initialObjectiveStatuses_;
+	std::vector<bool> initialTriggerEnabled_;
 
 	// --- ミッション一覧（マニフェスト） ---
 	std::vector<MissionEntry> missionEntries_;
 	bool isManifestLoaded_ = false;
 
 	// --- ランタイム状態 ---
+	const EnemyManager* boundEnemyManager_ = nullptr;
 	bool triggerMissionComplete_ = false;
 	bool triggerMissionFail_ = false;
 	std::vector<EnemySpawnData> pendingEnemySpawns_;
 	std::vector<GroundEnemySpawnData> pendingGroundEnemySpawns_;
 	std::vector<RuntimeMessage> activeMessages_;
+	std::vector<RadioMessage> pendingRadioMessages_;
 };

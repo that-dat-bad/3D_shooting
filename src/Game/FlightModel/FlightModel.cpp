@@ -73,6 +73,7 @@ void FlightModel::Initialize(const AirframeData& airframeData, const EngineData&
 	isInvulnerable_ = false;
 	gEffectsEnabled_ = true;
 	isAutopilot_ = false;
+	groundElevation_ = kDefaultGroundElevation;
 
 	// 入力状態をリセット
 	targetThrottle_ = 0.0f;
@@ -149,7 +150,7 @@ void FlightModel::Update(float deltaTime)
 	position_ = MyMath::Add(position_, MyMath::Multiply(deltaTime, velocity_));
 
 	// 10.5. 地面との部位別物理衝突判定 & ダメージ計算・転倒トルク
-	airframe_.GetDamageModel().ProcessGroundCollision(position_, orientation_, velocity_, angularVelocity_, deltaTime, 0.0f);
+	airframe_.GetDamageModel().ProcessGroundCollision(position_, orientation_, velocity_, angularVelocity_, deltaTime, groundElevation_);
 
 	// 11. G計算
 	if (deltaTime > 0.0001f) {

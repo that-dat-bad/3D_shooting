@@ -6,6 +6,10 @@
 #include "Enemy.h"
 #include "GroundEnemy.h"
 
+namespace EnemyManagerDefaults {
+	inline constexpr int kZeroCount = 0;
+}
+
 class Camera;
 
 /// @brief 敵の配置データ（空中目標）
@@ -49,6 +53,18 @@ public:
 	/// @brief 全敵の描画
 	void Draw(Camera* camera = nullptr);
 
+	/// @brief ミッション内のウェイポイントパス一覧を登録（FollowWaypoint / PatrolVehicle 解決用）
+	void SetWaypointPaths(const std::vector<WaypointPath>& paths);
+
+	/// @brief トリガー等から実行中に追加の空中敵をスポーンする
+	void SpawnAirEnemies(const std::vector<EnemySpawnData>& spawnList);
+
+	/// @brief トリガー等から実行中に追加の地上敵をスポーンする
+	void SpawnGroundEnemies(const std::vector<GroundEnemySpawnData>& groundSpawnList);
+
+	/// @brief 通しインデックス（0..air-1: 空中敵, air..total-1: 地上敵）のユニットが撃破済みか判定
+	bool IsUnitDestroyedByIndex(int unitIndex) const;
+
 	// === ステータス照会 ===
 
 	/// @brief 生存している敵（空中＋地上）の総数
@@ -81,5 +97,14 @@ public:
 private:
 	std::vector<std::unique_ptr<Enemy>> enemies_;
 	std::vector<std::unique_ptr<GroundEnemy>> groundEnemies_;
+	std::vector<WaypointPath> waypointPaths_;
+	AirframeData cachedAirframe_{};
+	EngineData cachedEngine_{};
+	GunPodData cachedGunpod_{};
+	FlightModel* playerFlightModel_ = nullptr;
+	BulletManager* bulletManager_ = nullptr;
+	bool hasCachedInitContext_ = false;
+
+	const WaypointPath* FindWaypointPathByName(const std::string& pathName) const;
 };
 

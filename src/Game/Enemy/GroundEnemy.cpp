@@ -72,13 +72,59 @@ void GroundEnemy::Initialize(
 	currentPatrolOffset_ = 0.0f;
 	animTime_ = 0.0f;
 	smokeEmitTimer_ = 0.0f;
+	hasCustomBodyYaw_ = false;
+	customBodyYaw_ = GroundWaypointDefaults::kZero;
+	waypointPoints_.clear();
+	waypointIsLoop_ = false;
+	currentWaypointIndex_ = GroundWaypointDefaults::kInitialIndex;
+	waypointStepDir_ = GroundWaypointDefaults::kForwardStep;
+}
+
+void GroundEnemy::SetWaypointPath(const WaypointPath& path) {
+	waypointPoints_ = path.points;
+	waypointIsLoop_ = path.isLoop;
+	currentWaypointIndex_ = GroundWaypointDefaults::kInitialIndex;
+	waypointStepDir_ = GroundWaypointDefaults::kForwardStep;
+	hasCustomBodyYaw_ = (waypointPoints_.size() >= GroundWaypointDefaults::kMinPathPoints);
 }
 
 void GroundEnemy::UpdateAI(float deltaTime) {
 	if (!playerFlightModel_) return;
 
 	// 1. 車両のパトロール移動 (PatrolVehicle)
-	if (aiType_ == GroundAIType::PatrolVehicle) {
+	if (aiType_ == GroundAIType::PatrolVehicle && waypointPoints_.size() >= GroundWaypointDefaults::kMinPathPoints) {
+		using namespace GroundWaypointDefaults;
+		if (currentWaypointIndex_ >= waypointPoints_.size()) {
+			currentWaypointIndex_ = kInitialIndex;
+		}
+		const MyMath::Vector3& targetPt = waypointPoints_[currentWaypointIndex_].position;
+		const MyMath::Vector3 toTarget = MyMath::Subtract(targetPt, position_);
+		const float dist = MyMath::Length(toTarget);
+
+		if (dist <= kReachRadiusMeters) {
+			const int nextIdx = static_cast<int>(currentWaypointIndex_) + waypointStepDir_;
+			const int totalPts = static_cast<int>(waypointPoints_.size());
+			if (nextIdx >= totalPts) {
+				if (waypointIsLoop_) {
+					currentWaypointIndex_ = kInitialIndex;
+				} else {
+					waypointStepDir_ = kBackwardStep;
+					currentWaypointIndex_ = static_cast<size_t>(totalPts + kBackwardStep + kBackwardStep);
+				}
+			} else if (nextIdx < static_cast<int>(kInitialIndex)) {
+				waypointStepDir_ = kForwardStep;
+				currentWaypointIndex_ = static_cast<size_t>(kForwardStep);
+			} else {
+				currentWaypointIndex_ = static_cast<size_t>(nextIdx);
+			}
+		} else if (dist > kMinDistEpsilon) {
+			const float step = (std::min)(dist, param_.moveSpeed * deltaTime);
+			const MyMath::Vector3 dir = MyMath::Multiply(step / dist, toTarget);
+			position_ = MyMath::Add(position_, dir);
+			customBodyYaw_ = std::atan2(toTarget.x, toTarget.z);
+			hasCustomBodyYaw_ = true;
+		}
+	} else if (aiType_ == GroundAIType::PatrolVehicle) {
 		float moveStep = param_.moveSpeed * deltaTime * moveDirection_;
 		currentPatrolOffset_ += moveStep;
 
@@ -440,7 +486,9 @@ void GroundEnemy::DrawVehicle(Camera* camera) {
 	uint32_t whiteTex = TextureManager::GetInstance()->GetTextureIndexByFilePath("assets/textures/white1x1.png");
 
 	// 進行方向に応じた車体向き
-	float bodyYaw = (moveDirection_ > 0.0f) ? (kPI * 0.5f) : (-kPI * 0.5f);
+	float bodyYaw = hasCustomBodyYaw_
+		? customBodyYaw_
+		: ((moveDirection_ > GroundWaypointDefaults::kZero) ? (kPI * GroundWaypointDefaults::kHalf) : (-kPI * GroundWaypointDefaults::kHalf));
 
 	// 1. 車体（装甲車シャーシ）
 	{

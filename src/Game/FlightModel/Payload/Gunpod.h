@@ -33,6 +33,7 @@ public:
 	// --- アクセッサ ---
 	int  GetCurrentAmmo() const { return currentAmmo_; }
 	int  GetMaxAmmo() const { return maxAmmo_; }
+	void ReplenishAmmo() { currentAmmo_ = maxAmmo_; }
 	bool IsAttached() const { return isAttached_; }
 
 	// ペイロードを投棄する

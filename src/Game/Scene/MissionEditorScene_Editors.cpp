@@ -464,13 +464,23 @@ void MissionEditorScene::DrawTriggerEditor() {
 			ImGui::Separator();
 			ImGui::Text("Actions (%d):", static_cast<int>(trig.actions.size()));
 
-			const char* actionTypeNames[] = { "SpawnEnemies", "ShowMessage", "SetObjective", "MissionComplete", "MissionFail", "ActivateTrigger" };
-			static int newActionType = 1; 
-			ImGui::Combo("New Action Type##Act", &newActionType, actionTypeNames, 6);
+			const char* actionTypeNames[] = {
+				"SpawnEnemies", "ShowMessage", "SetObjective",
+				"MissionComplete", "MissionFail", "ActivateTrigger", "PlayRadioDialogue"
+			};
+			constexpr int kActionTypeCount = static_cast<int>(std::size(actionTypeNames));
+			constexpr int kDefaultActionIndex = static_cast<int>(TriggerActionType::ShowMessage);
+			static int newActionType = kDefaultActionIndex;
+			ImGui::Combo("New Action Type##Act", &newActionType, actionTypeNames, kActionTypeCount);
 			ImGui::SameLine();
 			if (ImGui::Button("Add Action##Act")) {
 				TriggerAction newAction;
 				newAction.type = static_cast<TriggerActionType>(newActionType);
+				if (newAction.type == TriggerActionType::PlayRadioDialogue) {
+					newAction.speakerName = "AWACS SKY EYE";
+					newAction.speakerFaction = RadioFaction::Awacs;
+					newAction.messageDuration = RadioDefaults::kDefaultHoldSeconds;
+				}
 				trig.actions.push_back(newAction);
 				selectedActionIndex_ = static_cast<int>(trig.actions.size()) - 1;
 			}
@@ -484,7 +494,7 @@ void MissionEditorScene::DrawTriggerEditor() {
 
 				if (selectedActionIndex_ == a) {
 					int actTypeInt = static_cast<int>(action.type);
-					if (ImGui::Combo("Action Type##ActEdit", &actTypeInt, actionTypeNames, 6)) action.type = static_cast<TriggerActionType>(actTypeInt);
+					if (ImGui::Combo("Action Type##ActEdit", &actTypeInt, actionTypeNames, kActionTypeCount)) action.type = static_cast<TriggerActionType>(actTypeInt);
 
 					switch (action.type) {
 					case TriggerActionType::ShowMessage: {
@@ -492,6 +502,35 @@ void MissionEditorScene::DrawTriggerEditor() {
 						strcpy_s(msgBuf, sizeof(msgBuf), action.message.c_str());
 						if (ImGui::InputText("Message##Act", msgBuf, sizeof(msgBuf))) action.message = msgBuf;
 						ImGui::SliderFloat("Duration##Act", &action.messageDuration, 1.0f, 15.0f);
+						break;
+					}
+					case TriggerActionType::PlayRadioDialogue: {
+						constexpr size_t kSpeakerInputBufferSize = 128;
+						constexpr size_t kDialogueInputBufferSize = 512;
+						constexpr float kMinRadioHoldDuration = 0.5f;
+						constexpr float kMaxRadioHoldDuration = 15.0f;
+						const char* factionNames[] = { "Ally", "Awacs", "Enemy", "System" };
+						constexpr int kFactionCount = static_cast<int>(std::size(factionNames));
+
+						static char speakerBuf[kSpeakerInputBufferSize];
+						strcpy_s(speakerBuf, sizeof(speakerBuf), action.speakerName.c_str());
+						if (ImGui::InputText("Speaker##RadioAct", speakerBuf, sizeof(speakerBuf))) {
+							action.speakerName = speakerBuf;
+						}
+
+						int factionIdx = static_cast<int>(action.speakerFaction);
+						if (ImGui::Combo("Faction##RadioAct", &factionIdx, factionNames, kFactionCount)) {
+							action.speakerFaction = static_cast<RadioFaction>(factionIdx);
+						}
+
+						static char dialogueBuf[kDialogueInputBufferSize];
+						strcpy_s(dialogueBuf, sizeof(dialogueBuf), action.message.c_str());
+						if (ImGui::InputTextMultiline("Dialogue << >>##RadioAct", dialogueBuf, sizeof(dialogueBuf))) {
+							action.message = dialogueBuf;
+						}
+
+						ImGui::SliderFloat("Hold Duration##RadioAct", &action.messageDuration, kMinRadioHoldDuration, kMaxRadioHoldDuration);
+						ImGui::Checkbox("Interrupt Active Radio##RadioAct", &action.radioInterrupt);
 						break;
 					}
 					case TriggerActionType::SetObjective:

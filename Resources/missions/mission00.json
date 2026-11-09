@@ -1,27 +1,131 @@
 {
-    "name": "TUTORIAL",
-    "aliasName": "mission 00",
-    "subTitle": "FLIGHT TRAINING",
-    "areaName": "GRAND CANYON & MOUNTAINS (40km x 40km)",
-    "description": "[default description]",
+    "name": "Obuchenie",
+    "aliasName": "ZADANIE 00",
+    "subTitle": "オブチェーニエ：訓練・教程 — 極夜の異変 —",
+    "difficulty": "TUTORIAL",
+    "areaName": "VERNA OUTER CANYON (POLAR DUSK)",
+    "description": "定期哨戒と基礎訓練（Obuchenie）から、監視所炎上・西側機との遭遇へ突入する導入。飛行隊長『Corax』の誘導に従い、M-21A（STAR-BORDER-04 // CALLSIGN: ROOKIE）の基本機動と峡谷低空哨戒ルートを習得せよ。",
     "playerHP": 100.0,
     "playerPosition": {
-        "x": 0.0,
-        "y": 150.0,
-        "z": 0.0
+        "x": 220.0,
+        "y": -290.0,
+        "z": 800.0
     },
-    "timeLimit": 5.0,
+    "playerYawDeg": 0.0,
+    "timeLimit": 0.0,
     "enemies": [],
     "groundEnemies": [],
     "objectives": [
         {
-            "name": "Terrain Reconnaissance",
-            "description": "Fly over the terrain chunks and test flight controls.",
-            "type": "DestroyAll",
+            "name": "Obuchenie // 峡谷哨戒・基礎訓練",
+            "description": "飛行隊長『Corax』の指示に従い、ヴェールナ外縁峡谷の定期哨戒ルートを完遂せよ。",
+            "type": "Survive",
+            "status": "Active",
             "isPrimary": true,
-            "status": "Active"
+            "isHidden": false,
+            "requiredKills": 0,
+            "targetIndex": -1,
+            "areaCenter": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "areaRadius": 100.0,
+            "duration": 3600.0,
+            "minHP": 0.0
         }
     ],
     "triggers": [],
-    "waypointPaths": []
+    "waypointPaths": [
+        {
+            "name": "Obuchenie_Patrol",
+            "isLoop": false,
+            "points": [
+                {
+                    "position": {
+                        "x": 195.0,
+                        "y": -340.0,
+                        "z": 2850.0
+                    },
+                    "speed": 300.0
+                },
+                {
+                    "position": {
+                        "x": 55.0,
+                        "y": -348.0,
+                        "z": 3500.0
+                    },
+                    "speed": 300.0
+                },
+                {
+                    "position": {
+                        "x": -95.0,
+                        "y": -355.0,
+                        "z": 4150.0
+                    },
+                    "speed": 300.0
+                }
+            ]
+        }
+    ],
+    "tutorialLayout": {
+        "useCustomLayout": true,
+        "coraxStartPos": {
+            "x": 244.0,
+            "y": -278.0,
+            "z": 935.0
+        },
+        "outpostPosition": {
+            "x": -52.0,
+            "y": -510.1,
+            "z": 4950.0
+        },
+        "outpostPositions": [
+            {
+                "x": 338.0,
+                "y": -455.0,
+                "z": 1950.0
+            },
+            {
+                "x": 78.0,
+                "y": -468.0,
+                "z": 2920.0
+            },
+            {
+                "x": 172.0,
+                "y": -478.0,
+                "z": 3880.0
+            },
+            {
+                "x": -52.0,
+                "y": -510.1,
+                "z": 4950.0
+            }
+        ],
+        "droneSpawnPosition": {
+            "x": -260.0,
+            "y": -328.0,
+            "z": 5450.0
+        },
+        "westernDiveStart": {
+            "x": -110.0,
+            "y": -25.0,
+            "z": 5950.0
+        },
+        "westernDiveMid": {
+            "x": -380.0,
+            "y": -295.0,
+            "z": 5860.0
+        },
+        "westernPullUp": {
+            "x": -480.0,
+            "y": -310.0,
+            "z": 6220.0
+        },
+        "exitBoundaryPosition": {
+            "x": -680.0,
+            "y": -325.0,
+            "z": 7800.0
+        }
+    }
 }

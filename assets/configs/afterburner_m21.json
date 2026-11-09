@@ -1,8 +1,8 @@
 {
   "isTwinEngine": false,
-  "singleNozzleOffset": [0.0, 0.011, 14.95],
-  "leftNozzleOffset": [-0.407, 0.011, 14.95],
-  "rightNozzleOffset": [0.396, 0.011, 14.95],
+  "singleNozzleOffset": [0.0, 0.011, 7.60],
+  "leftNozzleOffset": [-0.407, 0.011, 7.60],
+  "rightNozzleOffset": [0.396, 0.011, 7.60],
   "baseFlameLength": 6.2,
   "baseFlameRadius": 0.38,
   "shockDiamondCount": 5,

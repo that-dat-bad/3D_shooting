@@ -374,6 +374,9 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="src\engine\Graphics\UI\UISelectionManager.h" />
     <ClInclude Include="src\engine\Graphics\UI\UITextRegistry.h" />
     <ClInclude Include="src\Game\System\AsyncPreloadManager.h" />
+    <ClInclude Include="src\Game\UI\RadioCommunicator.h" />
+    <ClInclude Include="src\Game\Mission\TutorialMissionDirector.h" />
+    <ClInclude Include="src\Game\Mission\MissionSyncManager.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\Game\Graphics\AircraftVisualModel.cpp" />
@@ -512,6 +515,9 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="src\engine\Graphics\UI\UISelectionManager.cpp" />
     <ClCompile Include="src\engine\Graphics\UI\UITextRegistry.cpp" />
     <ClCompile Include="src\Game\System\AsyncPreloadManager.cpp" />
+    <ClCompile Include="src\Game\UI\RadioCommunicator.cpp" />
+    <ClCompile Include="src\Game\Mission\TutorialMissionDirector.cpp" />
+    <ClCompile Include="src\Game\Mission\MissionSyncManager.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="external\imgui\LICENSE.txt" />

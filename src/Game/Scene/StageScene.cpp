@@ -153,6 +153,8 @@ void StageScene::InitializeAssets() {
 	SpriteCommon* spriteCommon = SpriteCommon::GetInstance();
 	combatBootSequence_.Initialize(spriteCommon);
 	hud_.Initialize(spriteCommon);
+	radioCommunicator_.Initialize(spriteCommon);
+	tutorialDirector_.Initialize(spriteCommon);
 
 	seqOverlaySprite_ = std::make_unique<Sprite>();
 	seqOverlaySprite_->Initialize(spriteCommon, "assets/textures/white1x1.png");
@@ -224,6 +226,15 @@ void StageScene::ResetGameplayState() {
 	// Blender MCP リアルタイム同期の初期化＆自動開始
 	TerrainSyncManager::GetInstance()->Initialize("localhost", 8765);
 	TerrainSyncManager::GetInstance()->StartSync();
+	{
+		std::string syncMissionPath = MissionManager::GetInstance().GetCurrentFilePath();
+		if (syncMissionPath.empty()) {
+			syncMissionPath = MissionSyncDefaults::kDefaultMissionFilePath;
+		}
+		MissionSyncManager::GetInstance()->Initialize();
+		MissionSyncManager::GetInstance()->SetActiveMissionFilePath(syncMissionPath);
+		MissionSyncManager::GetInstance()->StartSync();
+	}
 
 	// カメラ初期位置
 	Vector3 initPos = flightModel_.GetPosition();
@@ -260,9 +271,31 @@ void StageScene::ResetGameplayState() {
 	playerMaxHP_ = mission.playerHP;
 	playerHP_ = mission.playerHP;
 	flightModel_.SetPosition(mission.playerPosition);
+	{
+		const float yawRad = mission.playerYawDeg * StageRadioDefaults::kDegToRad;
+		const float halfYaw = yawRad * StageRadioDefaults::kHalfAngleFactor;
+		flightModel_.SetOrientation({
+			StageRadioDefaults::kZeroTimeLimit,
+			std::sin(halfYaw),
+			StageRadioDefaults::kZeroTimeLimit,
+			std::cos(halfYaw)
+		});
+		flightModel_.SetVelocity(Multiply(initialSpeed, flightModel_.GetForwardDirection()));
+		mouseAimController_.ResetToDirection(flightModel_.GetForwardDirection());
+	}
+	if (terrainChunkManager_ && terrainChunkManager_->IsLoaded()) {
+		flightModel_.SetGroundElevation(terrainChunkManager_->GetTerrainHeightAt(
+			mission.playerPosition.x,
+			mission.playerPosition.z,
+			HalcyonDefaults::kFallbackCanyonFloorY));
+	}
+	playerCamera_.Initialize(mission.playerPosition, flightModel_.GetForwardDirection());
+	tutorialDirector_.ResetForMission(mission, loadPath, mission.playerPosition);
+	GameResult::GetInstance().isHalcyonDaysTutorial = tutorialDirector_.IsTutorialActive();
 
 	static const std::vector<EnemySpawnData> kEmptyAirEnemies = {};
 	static const std::vector<GroundEnemySpawnData> kEmptyGroundEnemies = {};
+	enemyManager_.SetWaypointPaths(mission.waypointPaths);
 
 	enemyManager_.Initialize(
 		enableEnemies_ ? mission.enemies : kEmptyAirEnemies,
@@ -317,7 +350,10 @@ void StageScene::ResetGameplayState() {
 	timeText_.SetAnchorPoint({ 0.5f, 0.0f });
 	timeText_.SetPosition({ WinApp::kClientWidth * 0.5f, 20.0f });
 	timeText_.SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
-	timeText_.SetCondition("Warning", [this]() { return remainingTime_ <= 30.0f; });
+	timeText_.SetCondition("Warning", [this]() {
+		return MissionManager::GetInstance().GetCurrentMission().timeLimit > StageRadioDefaults::kZeroTimeLimit &&
+		       remainingTime_ <= StageRadioDefaults::kTimeWarningThresholdSeconds;
+	});
 	UITextRegistry::GetInstance()->Register("Stage_Time", &timeText_);
 
 	// 出撃イントロ
@@ -345,15 +381,21 @@ void StageScene::ResetGameplayState() {
 	hud_.SetWarningColorMode(false);
 	hud_.ResetShutdown();
 	hud_.ResetDeploy();
+	radioCommunicator_.Clear();
+	hasSentSortieRadio_ = false;
+	hasSentDamageWarningRadio_ = false;
+	lastRadioKillCount_ = StageRadioDefaults::kInitialKillCount;
 	isFiringThisFrame_ = false;
 
 	endSequence_ = StageEndSequence::None;
 	endSeqTimer_ = 0.0f;
 
+	missionManager.BindEnemyManager(&enemyManager_);
 	missionManager.ResetRuntimeState();
 }
 
 void StageScene::Update() {
+	ApplyMissionLiveSyncUpdate();
 	// ----------------------------------------------------
 	// ポーズメニュー制御（ゲームプレイ中のみ作動）
 	// ----------------------------------------------------
@@ -397,15 +439,21 @@ void StageScene::Update() {
 
 	// ミッション制限時間の更新 (出撃演出・ブリーフィング完了後の実プレイ中のみ減算)
 	if (IsGameplayActive()) {
-		remainingTime_ -= kDeltaTime;
-		if (remainingTime_ <= 0.0f) {
+		missionElapsedTime_ += kDeltaTime;
+		const bool hasMissionTimeLimit =
+			(MissionManager::GetInstance().GetCurrentMission().timeLimit > StageRadioDefaults::kZeroTimeLimit);
+		if (hasMissionTimeLimit) {
+			remainingTime_ -= kDeltaTime;
+		}
+		if (hasMissionTimeLimit && remainingTime_ <= StageRadioDefaults::kZeroTimeLimit) {
 			remainingTime_ = 0.0f;
 			// 制限時間切れ時は爆発させず作戦離脱シーケンスを開始
 			TriggerTimeOver();
 		}
 
-		int minutes = static_cast<int>(remainingTime_) / 60;
-		int seconds = static_cast<int>(remainingTime_) % 60;
+		const float displayClockSeconds = hasMissionTimeLimit ? remainingTime_ : missionElapsedTime_;
+		int minutes = static_cast<int>(displayClockSeconds) / HalcyonDefaults::kSecondsPerMinute;
+		int seconds = static_cast<int>(displayClockSeconds) % HalcyonDefaults::kSecondsPerMinute;
 		char timeStr[32];
 		snprintf(timeStr, sizeof(timeStr), "TIME %02d:%02d", minutes, seconds);
 		timeText_.SetText(timeStr);
@@ -441,6 +489,19 @@ void StageScene::Update() {
 	// 地形チャンクの更新（距離カリング）
 	if (terrainChunkManager_) {
 		terrainChunkManager_->Update(flightModel_.GetPosition());
+	}
+
+	if (tutorialDirector_.IsReadyForDebriefScene()) {
+		PostEffect::GetInstance()->ClearActiveEffects();
+		auto& res = GameResult::GetInstance();
+		res.missionCleared = true;
+		res.isHalcyonDaysTutorial = true;
+		res.enemiesDestroyed = StageRadioDefaults::kTutorialConfirmedHostileCount;
+		res.clearTimeSeconds = missionElapsedTime_;
+		res.playerHPRemaining = playerHP_;
+		res.playerMaxHP = playerMaxHP_;
+		sceneID = SCENE::CLEAR;
+		return;
 	}
 }
 
@@ -523,6 +584,9 @@ void StageScene::Draw() {
 	}
 
 	// 弾丸描画
+	tutorialDirector_.Draw3D(cam);
+	DrawMissionReachAreaRings(cam);
+
 	bulletManager_.Draw(cam);
 
 	// エフェクト描画
@@ -548,6 +612,16 @@ void StageScene::DrawUI() {
 	float hudThreshold = combatBootSequence_.IsQuickMode() ? 0.0f : 4.00f;
 	if (sortieIntroTimer_ >= hudThreshold) {
 		hud_.Draw();
+		if (endSequence_ == StageEndSequence::None) {
+			const float screenW = static_cast<float>(WinApp::kClientWidth);
+			const float screenH = static_cast<float>(WinApp::kClientHeight);
+			radioCommunicator_.Draw(screenW, screenH);
+			tutorialDirector_.DrawUI(CameraManager::GetInstance()->GetActiveCamera(), screenW, screenH);
+			if (!tutorialDirector_.IsTutorialActive()) {
+				DrawMissionObjectivesHUD();
+				DrawMissionMessages();
+			}
+		}
 	}
 
 	// 3. AC6スタイル「メインシステム、戦闘モード起動...」ブートUI描画（最前面）
@@ -566,11 +640,14 @@ void StageScene::DrawUI() {
 
 	// 5. ポーズメニューUI描画（最前面）
 	if (isPaused_) {
+		TextRenderer::GetInstance()->Flush();
 		DrawPauseMenuUI();
 	}
 }
 
 void StageScene::Finalize() {
+	MissionSyncManager::GetInstance()->Finalize();
+	MissionManager::GetInstance().BindEnemyManager(nullptr);
 #ifdef _DEBUG
 	TerrainSyncManager::GetInstance()->Finalize();
 #endif

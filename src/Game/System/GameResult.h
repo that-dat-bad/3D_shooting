@@ -20,6 +20,7 @@ struct GameResult {
 	float playerMaxHP = 100.0f;		///< 最大HP
 	bool missionCleared = false;	///< ミッションクリアしたか
 	bool isRetry = false;           ///< リトライ出撃か（trueなら起動シーケンスを高速短縮）
+	bool isHalcyonDaysTutorial = false; ///< Operation Halcyon Days チュートリアルクリアか
 	GameOverReason gameOverReason = GameOverReason::Destroyed; ///< 失敗要因
 	TitleEntryReason titleEntryReason = TitleEntryReason::InitialBoot; ///< タイトル画面への突入理由
 
@@ -31,6 +32,7 @@ struct GameResult {
 		playerMaxHP = 100.0f;
 		missionCleared = false;
 		isRetry = false;
+		isHalcyonDaysTutorial = false;
 		gameOverReason = GameOverReason::Destroyed;
 		titleEntryReason = TitleEntryReason::InitialBoot;
 	}

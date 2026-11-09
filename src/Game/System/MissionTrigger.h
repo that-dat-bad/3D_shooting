@@ -4,6 +4,7 @@
 #include "../../engine/base/Math/MyMath.h"
 #include "../../engine/io/json.hpp"
 #include "../Enemy/EnemyManager.h"
+#include "../UI/RadioCommunicator.h"
 
 // ============================================================
 // ミッショントリガー (Mission Trigger) の型定義
@@ -29,6 +30,7 @@ enum class TriggerActionType {
 	MissionComplete,    ///< ミッション成功
 	MissionFail,        ///< ミッション失敗
 	ActivateTrigger,    ///< 別のトリガーを有効化
+	PlayRadioDialogue,  ///< エースコンバット風の無線会話を再生
 };
 
 /// @brief トリガーアクションのデータ
@@ -49,6 +51,11 @@ struct TriggerAction {
 
 	// --- ActivateTrigger 用 ---
 	int activateTriggerIndex = -1;   ///< 有効化する別トリガーのインデックス
+
+	// --- PlayRadioDialogue 用 ---
+	std::string speakerName = "";                     ///< 無線の話者名（自動で <○○> 整形）
+	RadioFaction speakerFaction = RadioFaction::Awacs; ///< 話者の所属・色分け属性
+	bool radioInterrupt = false;                      ///< true の場合は再生中の無線を割り込み更新
 };
 
 /// @brief ミッショントリガーのデータ
@@ -103,22 +110,24 @@ inline TriggerCondition StringToTriggerCondition(const std::string& str) {
 
 inline const char* TriggerActionTypeToString(TriggerActionType t) {
 	switch (t) {
-	case TriggerActionType::SpawnEnemies:    return "SpawnEnemies";
-	case TriggerActionType::ShowMessage:     return "ShowMessage";
-	case TriggerActionType::SetObjective:    return "SetObjective";
-	case TriggerActionType::MissionComplete: return "MissionComplete";
-	case TriggerActionType::MissionFail:     return "MissionFail";
-	case TriggerActionType::ActivateTrigger: return "ActivateTrigger";
-	default:                                 return "ShowMessage";
+	case TriggerActionType::SpawnEnemies:      return "SpawnEnemies";
+	case TriggerActionType::ShowMessage:       return "ShowMessage";
+	case TriggerActionType::SetObjective:      return "SetObjective";
+	case TriggerActionType::MissionComplete:   return "MissionComplete";
+	case TriggerActionType::MissionFail:       return "MissionFail";
+	case TriggerActionType::ActivateTrigger:   return "ActivateTrigger";
+	case TriggerActionType::PlayRadioDialogue: return "PlayRadioDialogue";
+	default:                                   return "ShowMessage";
 	}
 }
 
 inline TriggerActionType StringToTriggerActionType(const std::string& str) {
-	if (str == "SpawnEnemies")    return TriggerActionType::SpawnEnemies;
-	if (str == "SetObjective")    return TriggerActionType::SetObjective;
-	if (str == "MissionComplete") return TriggerActionType::MissionComplete;
-	if (str == "MissionFail")     return TriggerActionType::MissionFail;
-	if (str == "ActivateTrigger") return TriggerActionType::ActivateTrigger;
+	if (str == "SpawnEnemies")      return TriggerActionType::SpawnEnemies;
+	if (str == "SetObjective")      return TriggerActionType::SetObjective;
+	if (str == "MissionComplete")   return TriggerActionType::MissionComplete;
+	if (str == "MissionFail")       return TriggerActionType::MissionFail;
+	if (str == "ActivateTrigger")   return TriggerActionType::ActivateTrigger;
+	if (str == "PlayRadioDialogue") return TriggerActionType::PlayRadioDialogue;
 	return TriggerActionType::ShowMessage;
 }
 
@@ -133,19 +142,28 @@ inline void to_json(nlohmann::json& j, const TriggerAction& a) {
 		{"messageDuration", a.messageDuration},
 		{"objectiveIndex", a.objectiveIndex},
 		{"newStatus", a.newStatus},
-		{"activateTriggerIndex", a.activateTriggerIndex}
+		{"activateTriggerIndex", a.activateTriggerIndex},
+		{"speakerName", a.speakerName},
+		{"speakerFaction", RadioFactionToString(a.speakerFaction)},
+		{"radioInterrupt", a.radioInterrupt}
 	};
 	// SpawnEnemies: EnemySpawnData のJSON変換は MissionManager.h で定義されるため
 	// ここでは手動でシリアライズする
 	if (!a.spawnEnemies.empty()) {
 		nlohmann::json arr = nlohmann::json::array();
 		for (const auto& e : a.spawnEnemies) {
-			std::string aiStr = (e.aiType == AIType::ChaseAttack) ? "ChaseAttack" : "CruiseEvade";
+			std::string aiStr = "ChaseAttack";
+			if (e.aiType == AIType::CruiseEvade) {
+				aiStr = "CruiseEvade";
+			} else if (e.aiType == AIType::FollowWaypoint) {
+				aiStr = "FollowWaypoint";
+			}
 			arr.push_back({
 				{"position", e.position},
 				{"modelPath", e.modelPath},
 				{"health", e.health},
-				{"aiType", aiStr}
+				{"aiType", aiStr},
+				{"waypointPathName", e.waypointPathName}
 			});
 		}
 		j["spawnEnemies"] = arr;
@@ -159,7 +177,23 @@ inline void to_json(nlohmann::json& j, const TriggerAction& a) {
 			arr.push_back({
 				{"position", g.position},
 				{"aiType", aiStr},
-				{"health", g.health}
+				{"health", g.health},
+				{"waypointPathName", g.waypointPathName},
+				{"param", {
+					{"maxHealth", g.param.maxHealth},
+					{"collisionRadius", g.param.collisionRadius},
+					{"fireRange", g.param.fireRange},
+					{"minElevationDeg", g.param.minElevationDeg},
+					{"maxElevationDeg", g.param.maxElevationDeg},
+					{"turnSpeedDeg", g.param.turnSpeedDeg},
+					{"bulletSpeed", g.param.bulletSpeed},
+					{"bulletDamage", g.param.bulletDamage},
+					{"fireInterval", g.param.fireInterval},
+					{"burstCount", g.param.burstCount},
+					{"burstCooldown", g.param.burstCooldown},
+					{"moveSpeed", g.param.moveSpeed},
+					{"patrolDistance", g.param.patrolDistance}
+				}}
 			});
 		}
 		j["spawnGroundEnemies"] = arr;
@@ -173,10 +207,18 @@ inline void from_json(const nlohmann::json& j, TriggerAction& a) {
 		a.type = StringToTriggerActionType(typeStr);
 	}
 	if (j.contains("message"))              j.at("message").get_to(a.message);
+	if (j.contains("dialogue") && a.message.empty()) j.at("dialogue").get_to(a.message);
 	if (j.contains("messageDuration"))      j.at("messageDuration").get_to(a.messageDuration);
 	if (j.contains("objectiveIndex"))       j.at("objectiveIndex").get_to(a.objectiveIndex);
 	if (j.contains("newStatus"))            j.at("newStatus").get_to(a.newStatus);
 	if (j.contains("activateTriggerIndex")) j.at("activateTriggerIndex").get_to(a.activateTriggerIndex);
+	if (j.contains("speakerName"))          j.at("speakerName").get_to(a.speakerName);
+	if (j.contains("speakerFaction")) {
+		std::string factionStr;
+		j.at("speakerFaction").get_to(factionStr);
+		a.speakerFaction = StringToRadioFaction(factionStr);
+	}
+	if (j.contains("radioInterrupt"))       j.at("radioInterrupt").get_to(a.radioInterrupt);
 	// SpawnEnemies: 手動デシリアライズ
 	if (j.contains("spawnEnemies")) {
 		a.spawnEnemies.clear();
@@ -188,8 +230,15 @@ inline void from_json(const nlohmann::json& j, TriggerAction& a) {
 			if (elem.contains("aiType")) {
 				std::string aiStr;
 				elem.at("aiType").get_to(aiStr);
-				e.aiType = (aiStr == "CruiseEvade") ? AIType::CruiseEvade : AIType::ChaseAttack;
+				if (aiStr == "CruiseEvade") {
+					e.aiType = AIType::CruiseEvade;
+				} else if (aiStr == "FollowWaypoint") {
+					e.aiType = AIType::FollowWaypoint;
+				} else {
+					e.aiType = AIType::ChaseAttack;
+				}
 			}
+			if (elem.contains("waypointPathName")) elem.at("waypointPathName").get_to(e.waypointPathName);
 			a.spawnEnemies.push_back(e);
 		}
 	}
@@ -206,7 +255,23 @@ inline void from_json(const nlohmann::json& j, TriggerAction& a) {
 				else if (aiStr == "PatrolVehicle") g.aiType = GroundAIType::PatrolVehicle;
 				else g.aiType = GroundAIType::Turret;
 			}
+			if (elem.contains("param")) {
+				const auto& pj = elem.at("param");
+				if (pj.contains("collisionRadius")) pj.at("collisionRadius").get_to(g.param.collisionRadius);
+				if (pj.contains("fireRange")) pj.at("fireRange").get_to(g.param.fireRange);
+				if (pj.contains("minElevationDeg")) pj.at("minElevationDeg").get_to(g.param.minElevationDeg);
+				if (pj.contains("maxElevationDeg")) pj.at("maxElevationDeg").get_to(g.param.maxElevationDeg);
+				if (pj.contains("turnSpeedDeg")) pj.at("turnSpeedDeg").get_to(g.param.turnSpeedDeg);
+				if (pj.contains("bulletSpeed")) pj.at("bulletSpeed").get_to(g.param.bulletSpeed);
+				if (pj.contains("bulletDamage")) pj.at("bulletDamage").get_to(g.param.bulletDamage);
+				if (pj.contains("fireInterval")) pj.at("fireInterval").get_to(g.param.fireInterval);
+				if (pj.contains("burstCount")) pj.at("burstCount").get_to(g.param.burstCount);
+				if (pj.contains("burstCooldown")) pj.at("burstCooldown").get_to(g.param.burstCooldown);
+				if (pj.contains("moveSpeed")) pj.at("moveSpeed").get_to(g.param.moveSpeed);
+				if (pj.contains("patrolDistance")) pj.at("patrolDistance").get_to(g.param.patrolDistance);
+			}
 			g.param.maxHealth = g.health;
+			if (elem.contains("waypointPathName")) elem.at("waypointPathName").get_to(g.waypointPathName);
 			a.spawnGroundEnemies.push_back(g);
 		}
 	}

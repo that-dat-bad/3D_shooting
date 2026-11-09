@@ -1,4 +1,5 @@
 #include "Enemy.h"
+#include <algorithm>
 #include "../../engine/Graphics/Model/Object3d.h"
 #include "../../engine/Graphics/Model/Object3dCommon.h"
 #include "../../engine/Graphics/Camera/CameraManager.h"
@@ -59,6 +60,19 @@ void Enemy::Initialize(
 
 	// スケール
 	object3d_->SetScale({ 1.0f, 1.0f, 1.0f });
+}
+
+void Enemy::SetWaypointPath(const WaypointPath& path) {
+	waypointPoints_ = path.points;
+	waypointIsLoop_ = path.isLoop;
+	currentWaypointIndex_ = EnemyWaypointDefaults::kInitialWaypointIndex;
+	if (!waypointPoints_.empty()) {
+		const MyMath::Vector3 toFirst = MyMath::Subtract(waypointPoints_.front().position, flightModel_.GetPosition());
+		if (MyMath::Length(toFirst) > EnemyWaypointDefaults::kMinTargetDirectionLength) {
+			cruiseDirection_ = MyMath::Normalize(toFirst);
+			aimController_.ResetToDirection(cruiseDirection_);
+		}
+	}
 }
 
 // クォータニオンからオイラー角への変換ヘルパー
@@ -200,6 +214,87 @@ void Enemy::UpdateAI(float deltaTime) {
 		aimController_.CalculateSteeringInput(flightModel_.GetOrientation(), deltaTime, finalPitch, finalRoll, finalYaw);
 		flightModel_.SetControlInput(finalPitch, finalRoll, finalYaw);
 		flightModel_.SetThrottleInput(targetThrottle);
+	}
+	else if (aiType_ == AIType::FollowWaypoint) {
+		using namespace EnemyWaypointDefaults;
+		if (waypointPoints_.empty()) {
+			aimController_.ResetToDirection(cruiseDirection_);
+			float finalPitch = kZero;
+			float finalRoll = kZero;
+			float finalYaw = kZero;
+			aimController_.CalculateSteeringInput(flightModel_.GetOrientation(), deltaTime, finalPitch, finalRoll, finalYaw);
+			flightModel_.SetControlInput(finalPitch, finalRoll, finalYaw);
+			flightModel_.SetThrottleInput(kBaseCruiseThrottle);
+			return;
+		}
+
+		if (currentWaypointIndex_ >= waypointPoints_.size()) {
+			currentWaypointIndex_ = kInitialWaypointIndex;
+		}
+
+		const Waypoint& targetWp = waypointPoints_[currentWaypointIndex_];
+		MyMath::Vector3 toWp = MyMath::Subtract(targetWp.position, myPos);
+		const float distToWp = MyMath::Length(toWp);
+
+		if (distToWp <= kWaypointCaptureRadiusMeters) {
+			currentWaypointIndex_ += kWaypointStep;
+			if (currentWaypointIndex_ >= waypointPoints_.size()) {
+				if (waypointIsLoop_) {
+					currentWaypointIndex_ = kInitialWaypointIndex;
+				} else {
+					aiType_ = AIType::ChaseAttack;
+					return;
+				}
+			}
+		}
+
+		const Waypoint& activeWp = waypointPoints_[currentWaypointIndex_];
+		const MyMath::Vector3 activeToWp = MyMath::Subtract(activeWp.position, myPos);
+		MyMath::Vector3 targetDir = cruiseDirection_;
+		if (MyMath::Length(activeToWp) > kMinTargetDirectionLength) {
+			targetDir = MyMath::Normalize(activeToWp);
+			cruiseDirection_ = targetDir;
+		}
+
+		aimController_.ResetToDirection(targetDir);
+		float finalPitch = kZero;
+		float finalRoll = kZero;
+		float finalYaw = kZero;
+		aimController_.CalculateSteeringInput(flightModel_.GetOrientation(), deltaTime, finalPitch, finalRoll, finalYaw);
+		flightModel_.SetControlInput(finalPitch, finalRoll, finalYaw);
+
+		const float desiredSpeedKmh = (activeWp.speed > kZero) ? activeWp.speed : kDefaultWaypointSpeedKmh;
+		const float desiredSpeedMps = desiredSpeedKmh / kKmhPerMeterPerSec;
+		const float speedError = desiredSpeedMps - flightModel_.GetSpeed();
+		const float desiredThrottle = std::clamp(
+			kBaseCruiseThrottle + speedError * kThrottleSpeedErrorGain,
+			kMinThrottle,
+			kMaxThrottle);
+		flightModel_.SetThrottleInput(desiredThrottle);
+
+		if (distance > kMinTargetDirectionLength && distance < kOpportunisticFireRangeMeters) {
+			const MyMath::Vector3 forward = flightModel_.GetForwardDirection();
+			const float dotToPlayer = MyMath::Dot(forward, MyMath::Normalize(toPlayer));
+			if (dotToPlayer > kOpportunisticFireDotThreshold) {
+				const int ammoBefore = gunpod_.GetCurrentAmmo();
+				gunpod_.Fire();
+				if (gunpod_.GetCurrentAmmo() < ammoBefore) {
+					const MyMath::Vector3 firePos = MyMath::Add(
+						flightModel_.GetPosition(),
+						MyMath::Multiply(kMuzzleForwardOffset, forward));
+					const MyMath::Vector3 muzzleVel = MyMath::Multiply(kBulletMuzzleSpeed, forward);
+					const MyMath::Vector3 bulletVel = MyMath::Add(flightModel_.GetVelocity(), muzzleVel);
+					if (bulletManager_) {
+						bulletManager_->SpawnBullet(firePos, bulletVel, kBulletDamage, true);
+					}
+					muzzleFlashCount_++;
+					if ((muzzleFlashCount_ % kMuzzleFlashSkipModulo) == kEvenRemainder) {
+						EffectManager::GetInstance()->EmitMuzzleFlash(firePos, forward);
+						muzzleFlashTimer_ = kMuzzleFlashDuration;
+					}
+				}
+			}
+		}
 	}
 }
 

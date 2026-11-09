@@ -189,7 +189,7 @@ void TitleScene::InitializeUI(SpriteCommon* spriteCommon, bool fromCache) {
 		afterburner_ = std::make_unique<Afterburner>();
 		afterburner_->Initialize();
 		afterburner_->SetTwinEngine(false);
-		afterburner_->SetSingleNozzleOffset({ 0.0f, 0.011f, 14.95f });
+		afterburner_->SetSingleNozzleOffset({ 0.0f, 0.011f, 7.60f });
 		afterburner_->SetFlameRadius(0.38f);
 		afterburner_->SetFlameLength(6.2f);
 		afterburner_->SetShockDiamondCount(5);

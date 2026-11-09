@@ -432,6 +432,7 @@ bool TerrainChunkManager::LoadPackage(const std::string& packagePath) {
 			chunk.object3d->SetTranslate({ 0.0f, 0.0f, 0.0f });
 			chunk.object3d->Update();
 			chunk.isLoaded = true;
+			BuildChunkHeightGrid(chunk, ModelManager::GetInstance()->FindModel(chunk.fullPath));
 		}
 
 		chunks_.push_back(std::move(chunk));
@@ -580,6 +581,7 @@ void TerrainChunkManager::LoadChunked(const std::string& jsonPath) {
 			chunk.object3d->SetTranslate({ 0.0f, 0.0f, 0.0f });
 			chunk.object3d->Update();
 			chunk.isLoaded = true;
+			BuildChunkHeightGrid(chunk, model);
 
 			// LOD0メッシュとしても登録
 			TerrainLodMesh lodMesh;
@@ -694,6 +696,122 @@ void TerrainChunkManager::Finalize() {
 	chunks_.clear();
 	singleMeshObject_.reset();
 	isLoaded_ = false;
+}
+
+void TerrainChunkManager::BuildChunkHeightGrid(TerrainChunk& chunk, const Model* model) {
+	using namespace TerrainHeightDefaults;
+	if (!model) {
+		return;
+	}
+	const auto& vertices = model->GetModelData().vertices;
+	if (vertices.empty()) {
+		return;
+	}
+
+	const float spanX = chunk.maxX - chunk.minX;
+	const float spanZ = chunk.maxZ - chunk.minZ;
+	if (spanX <= kMinSpanEpsilon || spanZ <= kMinSpanEpsilon) {
+		return;
+	}
+
+	chunk.heightSamples.assign(kTotalGridSamples, kUnsetHeightSentinel);
+
+	float sumY = kZero;
+	for (const auto& v : vertices) {
+		sumY += v.position.y;
+		const float normX = std::clamp((v.position.x - chunk.minX) / spanX, kZero, kUnit);
+		const float normZ = std::clamp((v.position.z - chunk.minZ) / spanZ, kZero, kUnit);
+		const int ix = static_cast<int>(std::round(normX * static_cast<float>(kMaxCellIndex)));
+		const int iz = static_cast<int>(std::round(normZ * static_cast<float>(kMaxCellIndex)));
+		const size_t cellIdx = static_cast<size_t>(iz * kGridResolution + ix);
+		if (v.position.y > chunk.heightSamples[cellIdx]) {
+			chunk.heightSamples[cellIdx] = v.position.y;
+		}
+	}
+
+	const float meanY = sumY / static_cast<float>(vertices.size());
+
+	for (int pass = kOriginCellIndex; pass < kNeighborFillPasses; ++pass) {
+		std::vector<float> nextSamples = chunk.heightSamples;
+		for (int iz = kOriginCellIndex; iz < kGridResolution; ++iz) {
+			for (int ix = kOriginCellIndex; ix < kGridResolution; ++ix) {
+				const size_t idx = static_cast<size_t>(iz * kGridResolution + ix);
+				if (chunk.heightSamples[idx] > kUnsetHeightSentinel * kHalf) {
+					continue;
+				}
+				float neighborSum = kZero;
+				int neighborCount = kEmptyNeighborCount;
+				for (int dz = kMinNeighborOffset; dz <= kMaxNeighborOffset; ++dz) {
+					for (int dx = kMinNeighborOffset; dx <= kMaxNeighborOffset; ++dx) {
+						const int nx = ix + dx;
+						const int nz = iz + dz;
+						if (nx < kOriginCellIndex || nx > kMaxCellIndex || nz < kOriginCellIndex || nz > kMaxCellIndex) {
+							continue;
+						}
+						const float val = chunk.heightSamples[static_cast<size_t>(nz * kGridResolution + nx)];
+						if (val > kUnsetHeightSentinel * kHalf) {
+							neighborSum += val;
+							++neighborCount;
+						}
+					}
+				}
+				if (neighborCount > kEmptyNeighborCount) {
+					nextSamples[idx] = neighborSum / static_cast<float>(neighborCount);
+				}
+			}
+		}
+		chunk.heightSamples = std::move(nextSamples);
+	}
+
+	for (float& sample : chunk.heightSamples) {
+		if (sample <= kUnsetHeightSentinel * kHalf) {
+			sample = meanY;
+		}
+	}
+}
+
+float TerrainChunkManager::GetTerrainHeightAt(float worldX, float worldZ, float fallbackY) const {
+	using namespace TerrainHeightDefaults;
+	if (!isLoaded_ || chunks_.empty()) {
+		return fallbackY;
+	}
+
+	for (const auto& chunk : chunks_) {
+		if (worldX < chunk.minX || worldX > chunk.maxX ||
+		    worldZ < chunk.minZ || worldZ > chunk.maxZ) {
+			continue;
+		}
+		if (chunk.heightSamples.size() != kTotalGridSamples) {
+			return fallbackY;
+		}
+		const float spanX = chunk.maxX - chunk.minX;
+		const float spanZ = chunk.maxZ - chunk.minZ;
+		if (spanX <= kMinSpanEpsilon || spanZ <= kMinSpanEpsilon) {
+			return fallbackY;
+		}
+
+		const float fx = std::clamp((worldX - chunk.minX) / spanX, kZero, kUnit) * static_cast<float>(kMaxCellIndex);
+		const float fz = std::clamp((worldZ - chunk.minZ) / spanZ, kZero, kUnit) * static_cast<float>(kMaxCellIndex);
+
+		const int x0 = std::clamp(static_cast<int>(std::floor(fx)), kOriginCellIndex, kMaxCellIndex);
+		const int z0 = std::clamp(static_cast<int>(std::floor(fz)), kOriginCellIndex, kMaxCellIndex);
+		const int x1 = (std::min)(x0 + kNextCellStep, kMaxCellIndex);
+		const int z1 = (std::min)(z0 + kNextCellStep, kMaxCellIndex);
+
+		const float tx = fx - static_cast<float>(x0);
+		const float tz = fz - static_cast<float>(z0);
+
+		const float h00 = chunk.heightSamples[static_cast<size_t>(z0 * kGridResolution + x0)];
+		const float h10 = chunk.heightSamples[static_cast<size_t>(z0 * kGridResolution + x1)];
+		const float h01 = chunk.heightSamples[static_cast<size_t>(z1 * kGridResolution + x0)];
+		const float h11 = chunk.heightSamples[static_cast<size_t>(z1 * kGridResolution + x1)];
+
+		const float hx0 = h00 + (h10 - h00) * tx;
+		const float hx1 = h01 + (h11 - h01) * tx;
+		return hx0 + (hx1 - hx0) * tz;
+	}
+
+	return fallbackY;
 }
 
 void TerrainChunkManager::DrawImGui() {

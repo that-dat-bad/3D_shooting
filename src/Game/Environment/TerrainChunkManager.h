@@ -24,6 +24,24 @@ struct TerrainLodMesh {
 	std::unique_ptr<Object3d> object3d;
 };
 
+namespace TerrainHeightDefaults {
+	inline constexpr int kGridResolution = 51;
+	inline constexpr int kOriginCellIndex = 0;
+	inline constexpr int kNextCellStep = 1;
+	inline constexpr int kMaxCellIndex = kGridResolution - kNextCellStep;
+	inline constexpr size_t kTotalGridSamples = static_cast<size_t>(kGridResolution * kGridResolution);
+	inline constexpr float kZero = 0.0f;
+	inline constexpr float kHalf = 0.5f;
+	inline constexpr float kUnit = 1.0f;
+	inline constexpr float kMinSpanEpsilon = 0.001f;
+	inline constexpr float kUnsetHeightSentinel = -1.0e8f;
+	inline constexpr float kDefaultFallbackHeight = 0.0f;
+	inline constexpr int kNeighborFillPasses = 2;
+	inline constexpr int kMinNeighborOffset = -1;
+	inline constexpr int kMaxNeighborOffset = 1;
+	inline constexpr int kEmptyNeighborCount = 0;
+}
+
 /// @brief 個別チャンクのメタデータと3Dオブジェクト（LOD拡張性対応）
 struct TerrainChunk {
 	int gridX = 0;
@@ -37,6 +55,9 @@ struct TerrainChunk {
 	Vector3 center = { 0.0f, 0.0f, 0.0f };
 	std::string fileName;
 	std::string fullPath;
+
+	// 高速対地高度(AGL)・地面衝突判定用 2Dハイトマップサンプル (51x51)
+	std::vector<float> heightSamples;
 
 	// LODメッシュ配列（将来の多段階LOD用）
 	std::vector<TerrainLodMesh> lodMeshes;
@@ -94,6 +115,12 @@ public:
 	void SetDrawDistance(float distance) { drawDistance_ = distance; }
 	float GetDrawDistance() const { return drawDistance_; }
 
+	/// @brief ワールドXZ座標における地形標高Yを高速バイリニア補間で取得
+	float GetTerrainHeightAt(
+		float worldX,
+		float worldZ,
+		float fallbackY = TerrainHeightDefaults::kDefaultFallbackHeight) const;
+
 	/// @brief ImGuiによる地形監視・モード切り替えUI
 	void DrawImGui();
 
@@ -107,6 +134,7 @@ private:
 	void LoadChunked(const std::string& jsonPath);
 	bool LoadPackage(const std::string& packagePath);
 	bool SavePackage(const std::string& packagePath);
+	static void BuildChunkHeightGrid(TerrainChunk& chunk, const Model* model);
 
 	TerrainMode mode_ = TerrainMode::Chunked;
 	std::string singleMeshPath_ = "Resources/terrains/demo.obj";

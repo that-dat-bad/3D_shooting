@@ -4,9 +4,17 @@
         {
             "id": "[00]",
             "filePath": "Resources/missions/mission00.json",
-            "title": "TUTORIAL",
-            "aliasName": "mission 00",
-            "subTitle": "FLIGHT TRAINING",
+            "title": "Obuchenie",
+            "aliasName": "ZADANIE 00",
+            "subTitle": "オブチェーニエ：訓練・教程 — 極夜の異変 —",
+            "isLocked": false
+        },
+        {
+            "id": "[01]",
+            "filePath": "Resources/missions/mission01.json",
+            "title": "COMBINED STRIKE",
+            "aliasName": "OP: DAWN BREAK",
+            "subTitle": "空対空・空対地 統合防衛任務",
             "isLocked": false
         }
     ]

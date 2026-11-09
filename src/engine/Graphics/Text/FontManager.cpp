@@ -89,7 +89,12 @@ FontRasterResult FontManager::RasterizeFontInternal(const std::string& fontName,
         U"衰被装裏裕補複西要覆見規視覚覧親観角解触言計記訪設許診証評詰該詳認誘語誤説読課調識警譲護象負費質赤走起超足距跡路跳身車軌"
         U"軍転軸軽較載輝輪辺込辿迎近返迫追退送逆透途這通速造連進遅遊運過道達遠適遮遷選避還部郭都配重野量金鉄銀銃銅鋭鋼錐録鍮鎖鏡長"
         U"閃閉開間関閾闘防降限除陸険陽隅階随隔隙際障隠隣集離難雲雷電震青静非面音響頂項順須領頭頻題類風飛食飾首駄駆骨骸高魔鮮鶏麗黄"
-        U"黒";
+        U"黒"
+        U"隊援哨聴傍妨暗号艦母偵輸官佐尉曹兵督旗貴奴俺僕私君彼彼女誰何処"
+        U"答了解承知拒否要請救難帰投離陸着陸旋回急昇潜捕捉尾追撃迎撃援護制圧突破"
+        U"佐藤鈴木高橋田中伊藤渡辺山本中村小林加藤吉田山田佐々木山口松本井上木村林斎藤清水"
+        U"太郎健翔蓮颯大輝誠勇剛仁義礼智忠信零壱弐参肆伍陸漆捌玖拾"
+        U"侵勤叩国奪好峡暴治混狙皮秘網者聞肉試谷轄邦慣熟誘導帰還離脱損傷折損破損機関双単訓練模擬掃射偵察生存指令教礎遭遇編集同期拠点制空権補給船団施設車両砲台目標到達";
 
     // 必要な全コードポイントを1つの配列に集約
     std::vector<int> codepoints;
@@ -110,11 +115,18 @@ FontRasterResult FontManager::RasterizeFontInternal(const std::string& fontName,
     // 5. 全角記号・英数 (0xFF01-0xFF5E)
     for (int c = 0xFF01; c <= 0xFF5E; ++c) codepoints.push_back(c);
 
-    // 6. 一般的な追加特殊記号 (度数、矢印、幾何学記号、三点リーダー等)
+    // 6. 一般的な追加特殊記号 (度数、矢印、幾何学記号、三点リーダー、ダッシュ、キリル文字等)
+    static constexpr int kCyrillicStartCodepoint = 0x0410;
+    static constexpr int kCyrillicEndCodepoint = 0x044F;
+    for (int c = kCyrillicStartCodepoint; c <= kCyrillicEndCodepoint; ++c) {
+        codepoints.push_back(c);
+    }
+
     static const char32_t kCommonSymbols[] = {
         U'°', U'±', U'×', U'÷', U'…', U'※', U'★', U'☆',
         U'■', U'□', U'▲', U'△', U'▼', U'▽', U'◆', U'◇',
-        U'○', U'●', U'◎', U'→', U'←', U'↑', U'↓'
+        U'○', U'●', U'◎', U'→', U'←', U'↑', U'↓',
+        U'―', U'—', U'–'
     };
     for (char32_t c : kCommonSymbols) {
         codepoints.push_back(static_cast<int>(c));

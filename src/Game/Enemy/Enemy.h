@@ -9,6 +9,30 @@
 #include "../FlightModel/Payload/Gunpod.h"
 #include "../Bullet/BulletManager.h"
 #include "../FlightModel/MouseAimController.h"
+#include "../System/Waypoint.h"
+
+namespace EnemyWaypointDefaults {
+	inline constexpr size_t kInitialWaypointIndex = 0;
+	inline constexpr size_t kWaypointStep = 1;
+	inline constexpr int kMuzzleFlashSkipModulo = 2;
+	inline constexpr int kEvenRemainder = 0;
+	inline constexpr float kZero = 0.0f;
+	inline constexpr float kUnit = 1.0f;
+	inline constexpr float kKmhPerMeterPerSec = 3.6f;
+	inline constexpr float kWaypointCaptureRadiusMeters = 85.0f;
+	inline constexpr float kMinTargetDirectionLength = 0.001f;
+	inline constexpr float kMinThrottle = 0.25f;
+	inline constexpr float kMaxThrottle = 1.00f;
+	inline constexpr float kBaseCruiseThrottle = 0.72f;
+	inline constexpr float kThrottleSpeedErrorGain = 0.025f;
+	inline constexpr float kDefaultWaypointSpeedKmh = 280.0f;
+	inline constexpr float kOpportunisticFireRangeMeters = 850.0f;
+	inline constexpr float kOpportunisticFireDotThreshold = 0.995f;
+	inline constexpr float kMuzzleForwardOffset = 8.0f;
+	inline constexpr float kBulletMuzzleSpeed = 500.0f;
+	inline constexpr float kBulletDamage = 10.0f;
+	inline constexpr float kMuzzleFlashDuration = 0.08f;
+}
 
 class Object3dCommon;
 class Camera;
@@ -72,6 +96,9 @@ public:
 	/// <param name="damage">ダメージ量</param>
 	void TakeDamage(float damage);
 
+	/// @brief 追従するウェイポイントパスを設定
+	void SetWaypointPath(const WaypointPath& path);
+
 	// === アクセッサ ===
 	bool IsAlive() const { return isAlive_; }
 	MyMath::Vector3 GetPosition() const { return flightModel_.GetPosition(); }
@@ -126,4 +153,7 @@ private:
 	AIType aiType_ = AIType::ChaseAttack;
 	TypeBState typeBState_ = TypeBState::Cruising;
 	MyMath::Vector3 cruiseDirection_ = { 0.0f, 0.0f, 1.0f };
+	std::vector<Waypoint> waypointPoints_;
+	bool waypointIsLoop_ = false;
+	size_t currentWaypointIndex_ = EnemyWaypointDefaults::kInitialWaypointIndex;
 };

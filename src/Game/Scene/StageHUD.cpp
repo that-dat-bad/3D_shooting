@@ -150,6 +150,55 @@ bool StageHUD::ProjectToScreen(const Vector3& worldPos, const Matrix4x4& vpMat, 
 	return true;
 }
 
+void StageHUD::ProjectToScreenClamped(
+	const Vector3& worldPos,
+	const Matrix4x4& vpMat,
+	float screenW,
+	float screenH,
+	float marginPx,
+	Vector2& outScreen,
+	bool& outIsClamped)
+{
+	const float cX = worldPos.x * vpMat.m[0][0] + worldPos.y * vpMat.m[1][0] + worldPos.z * vpMat.m[2][0] + vpMat.m[3][0];
+	const float cY = worldPos.x * vpMat.m[0][1] + worldPos.y * vpMat.m[1][1] + worldPos.z * vpMat.m[2][1] + vpMat.m[3][1];
+	const float cW = worldPos.x * vpMat.m[0][3] + worldPos.y * vpMat.m[1][3] + worldPos.z * vpMat.m[2][3] + vpMat.m[3][3];
+
+	const float halfW = screenW * 0.5f;
+	const float halfH = screenH * 0.5f;
+	const float maxX = (std::max)(16.0f, halfW - marginPx);
+	const float maxY = (std::max)(16.0f, halfH - marginPx);
+
+	// 透視投影行列の構造上 cX = vx * cotHalfFovX, cY = vy * cotHalfFovY, cW = vz であるため、
+	// cW <= 0 (90°〜180°の大フリック時) でも (rx, ry) は目標への正確な2Dスクリーン方位を保持する
+	const float rx = cX * halfW;
+	const float ry = -cY * halfH;
+
+	// 角を滑らかに丸めたスーパー楕円(p=8)で安全枠を評価し、cW = edgeFactor で1ビット単位まで連続接続する
+	const float nx = std::fabs(rx) / maxX;
+	const float ny = std::fabs(ry) / maxY;
+	const float nx2 = nx * nx;
+	const float ny2 = ny * ny;
+	const float nx4 = nx2 * nx2;
+	const float ny4 = ny2 * ny2;
+	const float edgeFactor = std::pow(nx4 * nx4 + ny4 * ny4, 0.125f);
+
+	if (cW > 1e-4f && cW >= edgeFactor) {
+		outScreen.x = halfW + rx / cW;
+		outScreen.y = halfH + ry / cW;
+		outIsClamped = false;
+		return;
+	}
+
+	outIsClamped = true;
+	if (edgeFactor > 1e-6f) {
+		outScreen.x = halfW + rx / edgeFactor;
+		outScreen.y = halfH + ry / edgeFactor;
+	} else {
+		outScreen.x = halfW + maxX;
+		outScreen.y = halfH;
+	}
+}
+
 // ================================================================
 // ================================================================
 // 各HUD要素の描画
@@ -196,13 +245,13 @@ void StageHUD::DrawTimer() {
 		textColor = { 1.0f, 0.30f, 0.30f, 0.90f * alpha };
 		borderColor = { 0.60f, 0.20f, 0.20f, 0.70f * alpha };
 		bgColor = { 0.15f, 0.02f, 0.02f, 0.80f * alpha };
-	} else if (hudData_.remainingTime <= 30.0f) {
+	} else if (!hudData_.isElapsedTimerMode && hudData_.remainingTime <= 30.0f) {
 		// 30秒以下: 赤色点滅警告
 		float pulse = 0.55f + 0.45f * std::sin(animTimer_ * 10.0f);
 		textColor = { 1.0f, 0.25f, 0.25f, pulse * alpha };
 		borderColor = { 1.0f, 0.3f, 0.3f, pulse * 0.9f * alpha };
 		bgColor = { 0.18f, 0.03f, 0.03f, 0.80f * alpha };
-	} else if (hudData_.remainingTime <= 60.0f) {
+	} else if (!hudData_.isElapsedTimerMode && hudData_.remainingTime <= 60.0f) {
 		// 1分以下: 黄色注意
 		textColor = { 1.0f, 0.85f, 0.25f, 1.0f * alpha };
 		borderColor = { 0.85f, 0.70f, 0.20f, 0.85f * alpha };
@@ -218,8 +267,9 @@ void StageHUD::DrawTimer() {
 	if (isTimerOffline) {
 		snprintf(timeStr, sizeof(timeStr), "[ TIMER : OFFLINE ]");
 	} else {
-		int minutes = static_cast<int>(hudData_.remainingTime) / 60;
-		int seconds = static_cast<int>(hudData_.remainingTime) % 60;
+		const float displayTime = hudData_.isElapsedTimerMode ? hudData_.elapsedTime : hudData_.remainingTime;
+		int minutes = static_cast<int>(displayTime) / StageHUDTimerDefaults::kSecondsPerMinute;
+		int seconds = static_cast<int>(displayTime) % StageHUDTimerDefaults::kSecondsPerMinute;
 		snprintf(timeStr, sizeof(timeStr), "[ TIME %02d:%02d ]", minutes, seconds);
 	}
 
@@ -523,17 +573,27 @@ void StageHUD::DrawReticles() {
 	}
 
 	Vector2 noseScreen{};
+	Vector2 noseGuideScreen{};
 	Vector2 aimScreen{};
 
 	// 1. 自機が向いている方向（機首方向 / ボアシサイト照準）
 	Vector3 noseTargetWorld = Add(hudData_.aircraftPosition, Multiply(500.0f, hudData_.aircraftForward));
-	bool noseVisible = ProjectToScreen(noseTargetWorld, hudData_.viewProjectionMatrix, hudData_.screenWidth, hudData_.screenHeight, noseScreen);
+	bool noseInFront = ProjectToScreen(noseTargetWorld, hudData_.viewProjectionMatrix, hudData_.screenWidth, hudData_.screenHeight, noseScreen);
+	bool noseVisible = noseInFront &&
+		noseScreen.x >= -48.0f && noseScreen.x <= hudData_.screenWidth + 48.0f &&
+		noseScreen.y >= -48.0f && noseScreen.y <= hudData_.screenHeight + 48.0f;
 
-	// 2. マウスの向き（目標照準）
+	// リードガイダンス用：機首が大きく画面外（または大旋回で90°超）にある場合も巨大スプライト化を防ぎ画面外縁へクリップ
+	bool noseGuideClamped = false;
+	ProjectToScreenClamped(noseTargetWorld, hudData_.viewProjectionMatrix, hudData_.screenWidth, hudData_.screenHeight, -16.0f, noseGuideScreen, noseGuideClamped);
+
+	// 2. マウスの向き（War Thunder準拠：視野内は厳密透視投影、急フリックで一時的にFOV外に出た間は安全枠38px内縁へ連続クランプ表示）
 	bool aimVisible = false;
+	bool aimClamped = false;
 	if (hudData_.mouseAimEnabled) {
 		Vector3 aimTargetWorld = Add(hudData_.aircraftPosition, Multiply(500.0f, hudData_.mouseAimTargetDirection));
-		aimVisible = ProjectToScreen(aimTargetWorld, hudData_.viewProjectionMatrix, hudData_.screenWidth, hudData_.screenHeight, aimScreen);
+		ProjectToScreenClamped(aimTargetWorld, hudData_.viewProjectionMatrix, hudData_.screenWidth, hudData_.screenHeight, 38.0f, aimScreen, aimClamped);
+		aimVisible = true;
 	}
 
 	// 項目9: HUD順次展開（0.00s〜0.40s でレティクルが拡大から収束しながら点灯展開）
@@ -551,10 +611,10 @@ void StageHUD::DrawReticles() {
 		: Vector4{ 0.0f, 1.0f, 0.55f, 0.95f * alpha };
 
 	// -----------------------------------------------------------------
-	// リードガイダンスライン（機首照準とマウス目標照準を結ぶHUDライン）
+	// リードガイダンスライン（機首方向とマウス目標照準を結ぶHUDライン）
 	// -----------------------------------------------------------------
-	if (noseVisible && aimVisible) {
-		DrawLeadGuidanceLine(noseScreen, aimScreen, alpha);
+	if (aimVisible) {
+		DrawLeadGuidanceLine(noseGuideScreen, aimScreen, alpha);
 	}
 
 	// -----------------------------------------------------------------

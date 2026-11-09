@@ -28,6 +28,13 @@ public:
 	/// @brief 現在選択されているボタンのインデックスを取得
 	int GetSelectedIndex() const { return selectedIndex_; }
 
+	/// @brief 選択インデックスを設定
+	void SetSelectedIndex(int index) {
+		if (!buttons_.empty() && index >= 0 && index < static_cast<int>(buttons_.size())) {
+			selectedIndex_ = index;
+		}
+	}
+
 	/// @brief 毎フレームの更新処理（入力とフォーカスの反映）
 	void Update();
 

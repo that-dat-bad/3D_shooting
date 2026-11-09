@@ -17,6 +17,7 @@
 #include "../../engine/Physics/Collision3DManager.h"
 #include "../Environment/TerrainSyncManager.h"
 #include "../Environment/TerrainChunkManager.h"
+#include "../Mission/MissionSyncManager.h"
 #include "../../engine/Graphics/UI/UITextRegistry.h"
 #include "../../engine/Graphics/Text/TextRenderer.h"
 #include "../../engine/Graphics/Sprite/SpriteCommon.h"

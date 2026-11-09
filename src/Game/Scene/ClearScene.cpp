@@ -291,6 +291,21 @@ void ClearScene::Initialize() {
 	btnClickFlashTimer_ = 0.0f;
 	clickedButtonIdx_ = -1;
 
+	if (auto* w0 = pseudoOS_.GetWindow(HalcyonClearDefaults::kDefaultMainWinId)) {
+		w0->title = result.isHalcyonDaysTutorial
+			? HalcyonClearDefaults::kTutorialMainWinTitle
+			: HalcyonClearDefaults::kDefaultMainWinTitle;
+	}
+	missionCompleteText_.SetText(result.isHalcyonDaysTutorial
+		? HalcyonClearDefaults::kTutorialMissionHeader
+		: HalcyonClearDefaults::kDefaultMissionHeader);
+	titleButton_.SetLabel(result.isHalcyonDaysTutorial
+		? HalcyonClearDefaults::kTutorialReturnBtnLabel
+		: HalcyonClearDefaults::kDefaultReturnBtnLabel);
+	selectionManager_.SetSelectedIndex(result.isHalcyonDaysTutorial
+		? HalcyonClearDefaults::kReturnButtonIndex
+		: HalcyonClearDefaults::kReplayButtonIndex);
+
 	UITextRegistry::GetInstance()->Register("Clear_MissionComplete", &missionCompleteText_);
 	UITextRegistry::GetInstance()->Register("Clear_EnemiesLabel", &enemiesDestroyedLabel_);
 	UITextRegistry::GetInstance()->Register("Clear_EnemiesValue", &enemiesDestroyedValue_);

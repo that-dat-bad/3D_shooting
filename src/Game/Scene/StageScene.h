@@ -24,6 +24,39 @@
 #include "CombatBootSequence.h"
 #include "../System/MissionManager.h"
 #include "../System/MissionMapView.h"
+#include "../UI/RadioCommunicator.h"
+#include "../Mission/TutorialMissionDirector.h"
+
+namespace StageRadioDefaults {
+	inline constexpr int kInitialKillCount = 0;
+	inline constexpr int kAlternateModulo = 2;
+	inline constexpr int kEvenRemainder = 0;
+	inline constexpr float kCriticalHpRatioThreshold = 0.35f;
+	inline constexpr size_t kImGuiSpeakerBufferSize = 128;
+	inline constexpr size_t kImGuiDialogueBufferSize = 512;
+	inline constexpr float kImGuiMinHoldSeconds = 0.5f;
+	inline constexpr float kImGuiMaxHoldSeconds = 12.0f;
+
+	inline constexpr const char* kAwacsName = "AWACS SKY EYE";
+	inline constexpr const char* kWingmanName = "Joker 2 Coster";
+	inline constexpr const char* kEnemyAceName = "STRIGON 1";
+
+	inline constexpr const char* kSortieDialogue = "全機、作戦空域へ突入。自由交戦を許可する。";
+	inline constexpr const char* kKillAwacsDialogue = "敵機の撃墜を確認。引き続き周囲を警戒せよ。";
+	inline constexpr const char* kKillWingmanDialogue = "命中確認！ナイスショットだ！";
+	inline constexpr const char* kCriticalDamageDialogue = "機体損傷増大！無理はするな、回避機動をとれ！";
+	inline constexpr const char* kPresetEnemyDialogue = "来い、見せてみろ……その翼の力を！";
+	inline constexpr const char* kImGuiDefaultDialogue = "今はやめだ";
+	inline constexpr float kZeroTimeLimit = 0.0f;
+	inline constexpr float kTimeWarningThresholdSeconds = 30.0f;
+	inline constexpr int kTutorialConfirmedHostileCount = 1;
+	inline constexpr float kDegToRad = 3.14159265358979f / 180.0f;
+	inline constexpr float kHalfAngleFactor = 0.5f;
+	inline constexpr float kReachAreaRingDepthScale = 3.5f;
+	inline constexpr float kReachAreaRingSpinSpeed = 0.45f;
+	inline constexpr const char* kRingTexPath = "assets/textures/circle2.png";
+	inline constexpr MyMath::Vector4 kReachAreaRingColor = { 0.22f, 0.96f, 0.72f, 0.88f };
+}
 
 class TerrainChunkManager;
 
@@ -88,7 +121,7 @@ private:
 	GunPod gunpod_;
 	EnemyManager enemyManager_;
 	BulletManager bulletManager_;
-	bool enableEnemies_ = false; ///< 敵出現フラグ（falseで敵スポーン無効）
+	bool enableEnemies_ = true; ///< 敵出現フラグ（falseで敵スポーン無効）
 
 	// --- 統合当たり判定 ---
 	CollisionSystem collisionSystem_;
@@ -175,6 +208,12 @@ private:
 
 	// 戦闘HUD（残弾数・照準・タイマー）
 	StageHUD hud_;
+	RadioCommunicator radioCommunicator_;
+	TutorialMissionDirector tutorialDirector_;
+	bool hasSentSortieRadio_ = false;
+	bool hasSentDamageWarningRadio_ = false;
+	int lastRadioKillCount_ = StageRadioDefaults::kInitialKillCount;
+	void UpdateRadioCommunications(float gameDeltaTime);
 	bool isFiringThisFrame_ = false;
 
 	// プレイヤーのステータス
@@ -220,6 +259,8 @@ private:
 	void DrawAircraftTuningEditor();
 	void DrawMissionObjectivesHUD();
 	void DrawMissionMessages();
+	void ApplyMissionLiveSyncUpdate();
+	void DrawMissionReachAreaRings(Camera* cam);
 
 	// ============================
 	// 分割ヘルパー関数群 (Gameplay / Rendering / Combat)

@@ -509,7 +509,7 @@ void TitleScene::Draw() {
 			afterburner_->Draw(currentAircraftMatrix_, titleCamera);
 
 			// ノズル開口部内部のプラズマ発光ディスク＆照り返しグロー（過剰発光を抑え、機体形状をくっきり見せる：項目1）
-			MyMath::Vector3 localNozzleCore = { 0.0f, 0.011f, 14.85f };
+			MyMath::Vector3 localNozzleCore = { 0.0f, 0.011f, 7.50f };
 			MyMath::Vector3 worldNozzleCore = MyMath::TransformV3(localNozzleCore, currentAircraftMatrix_);
 			MyMath::Vector3 nozzleRot = loc.aircraftRotation;
 			// ノズル中心のプラズマディスク（開口部サイズジャストに調整）

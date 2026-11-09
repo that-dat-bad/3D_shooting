@@ -51,10 +51,14 @@ void MCPClient::Configure(const std::string& host, int port) {
 	port_ = port;
 }
 
-void MCPClient::StartPolling(int intervalMs, std::function<void(const nlohmann::json&)> callback) {
+void MCPClient::StartPolling(
+	int intervalMs,
+	std::function<void(const nlohmann::json&)> callback,
+	const std::string& endpointPath) {
 	StopPolling(); // 既存のポーリングがあれば安全に停止
 
 	pollingIntervalMs_ = intervalMs;
+	pollingEndpoint_ = endpointPath;
 	pollingCallback_ = callback;
 	shouldStop_.store(false);
 	isPolling_.store(true);
@@ -234,7 +238,7 @@ bool MCPClient::SendRequest(const std::string& method, const std::string& path,
 void MCPClient::PollingWorker() {
 	while (!shouldStop_.load()) {
 		nlohmann::json data;
-		if (Get("/terrain/params", data)) {
+		if (Get(pollingEndpoint_, data)) {
 			failureCount_.store(0);
 			if (pollingCallback_) {
 				pollingCallback_(data);

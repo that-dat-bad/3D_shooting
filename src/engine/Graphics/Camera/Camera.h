@@ -18,6 +18,9 @@ public:
 	/// </summary>
 	void Update();
 
+	/// <summary>シェイクタイマーを進めずに現在のTransform・FOVから各種行列のみ即座に再計算する</summary>
+	void UpdateMatrices();
+
 	//アクセッサ
 	//--セッター--//
 	void SetRotate(const Vector3& rotate) { transform_.rotate = rotate; }
@@ -64,5 +67,8 @@ private:
 	// カメラシェイク用
 	float shakeTimer_ = 0.0f;
 	float shakeMagnitude_ = 0.0f;
+	Vector3 shakeOffset_ = { 0.0f, 0.0f, 0.0f };
+	bool shakeSteppedThisFrame_ = false;
+	void StepShakeOncePerFrame();
 };
 

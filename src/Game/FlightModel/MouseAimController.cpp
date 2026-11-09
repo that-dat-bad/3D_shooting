@@ -4,6 +4,10 @@
 
 namespace {
 	constexpr float kPi = 3.14159265358979f;
+	constexpr float kTwoPi = 6.283185307179586f;
+
+	// War Thunder準拠：天頂・天底のジンバル反転を防止する最大仰角（±89度）
+	constexpr float kMaxElevation = 89.0f * (kPi / 180.0f);
 
 	// デッドゾーン（この角度以下の差分は無視）
 	constexpr float kDeadZone = 0.005f;      // ≈ 0.3度
@@ -13,23 +17,6 @@ namespace {
 
 	// マウス移動量 → 角度変換のスケール (rad per mouse_delta per sensitivity)
 	constexpr float kAngleScale = 0.02f;
-
-	/// ロドリゲスの回転公式: ベクトルvを軸axisの周りにangle(rad)回転
-	MyMath::Vector3 RotateAroundAxis(const MyMath::Vector3& v, const MyMath::Vector3& axis, float angle) {
-		float cosA = std::cos(angle);
-		float sinA = std::sin(angle);
-		MyMath::Vector3 cross = {
-			axis.y * v.z - axis.z * v.y,
-			axis.z * v.x - axis.x * v.z,
-			axis.x * v.y - axis.y * v.x
-		};
-		float dot = axis.x * v.x + axis.y * v.y + axis.z * v.z;
-		return {
-			v.x * cosA + cross.x * sinA + axis.x * dot * (1.0f - cosA),
-			v.y * cosA + cross.y * sinA + axis.y * dot * (1.0f - cosA),
-			v.z * cosA + cross.z * sinA + axis.z * dot * (1.0f - cosA)
-		};
-	}
 }
 
 
@@ -38,6 +25,8 @@ namespace {
 // ===========================================================
 void MouseAimController::Initialize()
 {
+	targetYaw_ = 0.0f;
+	targetPitch_ = 0.0f;
 	targetDirection_ = { 0.0f, 0.0f, 1.0f };
 
 	// --- PIDゲインの初期設定 ---
@@ -49,36 +38,42 @@ void MouseAimController::Initialize()
 
 
 // ===========================================================
-// マウス相対移動量でワールド空間の目標方向を回転
+// マウス相対移動量でワールド空間の目標方向を回転（War Thunder準拠・球面方位角/仰角更新）
 // ===========================================================
 void MouseAimController::UpdateTargetDirection(long deltaX, long deltaY, const MyMath::Vector3& camRight, const MyMath::Vector3& camUp)
 {
+	(void)camRight;
+	(void)camUp;
 	if (!enabled_) { return; }
 	if (deltaX == 0 && deltaY == 0) { return; }
 
 	float yawDelta = static_cast<float>(deltaX) * sensitivity_ * kAngleScale;
 	float pitchDelta = static_cast<float>(deltaY) * sensitivity_ * kAngleScale;
 
-	if (std::fabs(yawDelta) > 0.00001f) {
-		targetDirection_ = RotateAroundAxis(targetDirection_, camUp, yawDelta);
+	// 1フレーム内の極端なOSスパイク入力に対する安全ガード
+	constexpr float kMaxStepAngle = 0.85f;
+	float stepAngle = std::sqrt(yawDelta * yawDelta + pitchDelta * pitchDelta);
+	if (stepAngle > kMaxStepAngle) {
+		float scale = kMaxStepAngle / stepAngle;
+		yawDelta *= scale;
+		pitchDelta *= scale;
 	}
 
-	if (std::fabs(pitchDelta) > 0.00001f) {
-		targetDirection_ = RotateAroundAxis(targetDirection_, camRight, pitchDelta);
+	targetYaw_ += yawDelta;
+	if (targetYaw_ > kPi) {
+		targetYaw_ = std::fmod(targetYaw_ + kPi, kTwoPi) - kPi;
+	} else if (targetYaw_ < -kPi) {
+		targetYaw_ = std::fmod(targetYaw_ - kPi, kTwoPi) + kPi;
 	}
 
-	// 正規化（数値誤差の蓄積を防止）
-	float len = std::sqrt(
-		targetDirection_.x * targetDirection_.x +
-		targetDirection_.y * targetDirection_.y +
-		targetDirection_.z * targetDirection_.z
-	);
-	if (len > 0.0001f) {
-		float invLen = 1.0f / len;
-		targetDirection_.x *= invLen;
-		targetDirection_.y *= invLen;
-		targetDirection_.z *= invLen;
-	}
+	targetPitch_ = std::clamp(targetPitch_ - pitchDelta, -kMaxElevation, kMaxElevation);
+
+	const float cosPitch = std::cos(targetPitch_);
+	targetDirection_ = {
+		cosPitch * std::sin(targetYaw_),
+		std::sin(targetPitch_),
+		cosPitch * std::cos(targetYaw_)
+	};
 }
 
 
@@ -88,12 +83,24 @@ void MouseAimController::UpdateTargetDirection(long deltaX, long deltaY, const M
 void MouseAimController::ResetToDirection(const MyMath::Vector3& forward)
 {
 	float len = std::sqrt(forward.x * forward.x + forward.y * forward.y + forward.z * forward.z);
+	MyMath::Vector3 dir = { 0.0f, 0.0f, 1.0f };
 	if (len > 0.0001f) {
 		float invLen = 1.0f / len;
-		targetDirection_ = { forward.x * invLen, forward.y * invLen, forward.z * invLen };
-	} else {
-		targetDirection_ = { 0.0f, 0.0f, 1.0f };
+		dir = { forward.x * invLen, forward.y * invLen, forward.z * invLen };
 	}
+
+	targetPitch_ = std::clamp(std::asin(std::clamp(dir.y, -1.0f, 1.0f)), -kMaxElevation, kMaxElevation);
+	float horizLen = std::sqrt(dir.x * dir.x + dir.z * dir.z);
+	if (horizLen > 0.0001f) {
+		targetYaw_ = std::atan2(dir.x, dir.z);
+	}
+
+	const float cosPitch = std::cos(targetPitch_);
+	targetDirection_ = {
+		cosPitch * std::sin(targetYaw_),
+		std::sin(targetPitch_),
+		cosPitch * std::cos(targetYaw_)
+	};
 
 	pitchPID_.Reset();
 	rollPID_.Reset();

@@ -7,6 +7,18 @@
 #include "../../engine/Physics/ICollisionBody.h"
 #include "../../engine/Physics/CollisionConfig.h"
 #include "../Bullet/BulletManager.h"
+#include "../System/Waypoint.h"
+
+namespace GroundWaypointDefaults {
+	inline constexpr size_t kMinPathPoints = 2;
+	inline constexpr size_t kInitialIndex = 0;
+	inline constexpr int kForwardStep = 1;
+	inline constexpr int kBackwardStep = -1;
+	inline constexpr float kZero = 0.0f;
+	inline constexpr float kHalf = 0.5f;
+	inline constexpr float kReachRadiusMeters = 6.0f;
+	inline constexpr float kMinDistEpsilon = 0.001f;
+}
 
 class FlightModel;
 class Camera;
@@ -70,6 +82,9 @@ public:
 	/// @brief ダメージ処理
 	/// @param damage ダメージ量
 	void TakeDamage(float damage);
+
+	/// @brief 巡回車両用のウェイポイントパスを設定
+	void SetWaypointPath(const WaypointPath& path);
 
 	// === アクセッサ ===
 	bool IsAlive() const { return isAlive_; }
@@ -149,6 +164,12 @@ private:
 	// 移動制御 (Patrol用)
 	float moveDirection_ = 1.0f;     ///< +1.0 または -1.0
 	float currentPatrolOffset_ = 0.0f;
+	bool hasCustomBodyYaw_ = false;
+	float customBodyYaw_ = GroundWaypointDefaults::kZero;
+	std::vector<Waypoint> waypointPoints_;
+	bool waypointIsLoop_ = false;
+	size_t currentWaypointIndex_ = GroundWaypointDefaults::kInitialIndex;
+	int waypointStepDir_ = GroundWaypointDefaults::kForwardStep;
 
 	// アニメーション用タイマー
 	float animTime_ = 0.0f;

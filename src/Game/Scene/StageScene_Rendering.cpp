@@ -84,6 +84,34 @@ void StageScene::DrawGround() {
 	}
 }
 
+void StageScene::DrawMissionReachAreaRings(Camera* cam) {
+	if (!cam || tutorialDirector_.IsTutorialActive()) {
+		return;
+	}
+	PrimitiveModel* prim = PrimitiveModel::GetInstance();
+	if (!prim) {
+		return;
+	}
+
+	const auto& objectives = MissionManager::GetInstance().GetCurrentMission().objectives;
+	const uint32_t ringTex = TextureManager::GetInstance()->GetTextureIndexByFilePath(StageRadioDefaults::kRingTexPath);
+	const float spinAngle = totalTime_ * StageRadioDefaults::kReachAreaRingSpinSpeed;
+
+	for (const auto& obj : objectives) {
+		if (obj.status != ObjectiveStatus::Active || obj.type != ObjectiveType::ReachArea) {
+			continue;
+		}
+		prim->DrawRing(
+			{ obj.areaRadius, obj.areaRadius, StageRadioDefaults::kReachAreaRingDepthScale },
+			{ StageRadioDefaults::kZeroTimeLimit, StageRadioDefaults::kZeroTimeLimit, spinAngle },
+			obj.areaCenter,
+			StageRadioDefaults::kReachAreaRingColor,
+			ringTex,
+			cam,
+			BlendMode::kAdd);
+	}
+}
+
 // ============================================================
 // ミッション目標HUD表示
 // ============================================================

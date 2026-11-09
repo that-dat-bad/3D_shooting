@@ -330,8 +330,9 @@ void StageScene::UpdateEndSequence(float dt) {
 
 		Vector3 curPos = flightModel_.GetPosition();
 		Vector3 newPos = Add(curPos, Multiply(dt, gameOverVelocity_));
-		if (newPos.y < -5.0f) {
-			newPos.y = -5.0f;
+		const float crashFloorY = flightModel_.GetGroundElevation();
+		if (newPos.y < crashFloorY) {
+			newPos.y = crashFloorY;
 			gameOverVelocity_.y = 0.0f;
 		}
 		flightModel_.SetPosition(newPos);
@@ -761,6 +762,7 @@ void StageScene::UpdateEndSequence(float dt) {
 			// クリアリザルトへ記録を保存して遷移
 			auto& res = GameResult::GetInstance();
 			res.missionCleared = true;
+			res.isHalcyonDaysTutorial = tutorialDirector_.IsTutorialActive();
 			res.clearTimeSeconds = missionElapsedTime_;
 			res.playerHPRemaining = playerHP_;
 			res.playerMaxHP = playerMaxHP_;

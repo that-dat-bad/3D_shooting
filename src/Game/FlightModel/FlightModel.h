@@ -92,7 +92,10 @@ public:
 	// 外部から位置・姿勢・速度をセットする（スポーン時など）
 	void SetPosition(const MyMath::Vector3& pos) { position_ = pos; }
 	void SetOrientation(const MyMath::Quaternion& ori) { orientation_ = ori; }
+	static constexpr float kDefaultGroundElevation = 0.0f;
 	void SetVelocity(const MyMath::Vector3& vel) { velocity_ = vel; }
+	void SetGroundElevation(float groundY) { groundElevation_ = groundY; }
+	float GetGroundElevation() const { return groundElevation_; }
 
 	// 方向ベクトルの取得（クォータニオンから計算）
 	MyMath::Vector3 GetForwardDirection() const;
@@ -132,6 +135,7 @@ private:
 	bool  isInvulnerable_ = false;       // 無敵フラグ
 	bool  gEffectsEnabled_ = true;       // G効果有効フラグ
 	bool  isAutopilot_ = false;          // オートパイロット演出フラグ
+	float groundElevation_ = kDefaultGroundElevation; // 現在XZ座標直下の地形標高Y
 
 	// プレイヤーからの入力状態
 	float targetThrottle_;  // 目標スロットル

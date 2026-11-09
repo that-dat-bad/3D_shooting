@@ -42,7 +42,7 @@ void TitleScene::DrawAfterburnerEditor() {
 			if (ImGui::DragFloat3("Single Nozzle Offset (X,Y,Z)", &single.x, 0.005f)) {
 				afterburner_->SetSingleNozzleOffset(single);
 			}
-			ImGui::TextColored(ImVec4(0.4f, 0.8f, 1.0f, 0.9f), "Mig-21 standard single nozzle: (0.000, 0.011, 14.950)");
+			ImGui::TextColored(ImVec4(0.4f, 0.8f, 1.0f, 0.9f), "Mig-21 standard single nozzle: (0.000, 0.011, 7.600)");
 		}
 
 		// ノズル噴射角（向き・オイラー角）
@@ -135,7 +135,7 @@ void TitleScene::DrawAfterburnerEditor() {
 		ImGui::SameLine();
 		if (ImGui::Button("Reset Mig-21 Preset")) {
 			afterburner_->SetTwinEngine(false);
-			afterburner_->SetSingleNozzleOffset({ 0.0f, 0.011f, 14.95f });
+			afterburner_->SetSingleNozzleOffset({ 0.0f, 0.011f, 7.60f });
 			afterburner_->SetNozzleRotation({ 0.0f, 0.0f, 0.0f });
 			afterburner_->SetFlameRadius(0.38f);
 			afterburner_->SetFlameLength(6.2f);
