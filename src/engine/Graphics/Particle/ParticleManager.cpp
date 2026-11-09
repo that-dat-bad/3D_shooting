@@ -96,8 +96,48 @@ void ParticleManager::Update() {
 			}
 
 			// 移動処理 (速度を加算: パーティクルの個別加速度 + フィールド加速度)
-			it->velocity = Add(it->velocity, Add(it->acceleration, fieldAcceleration));
+			Vector3 effectiveAccel = Add(it->acceleration, fieldAcceleration);
+			if (it->maxRiseHeight > ParticleHeightCapDefaults::kNoHeightLimit) {
+				const float currentRise = it->transform.translate.y - it->spawnY;
+				const float heightRatio = std::clamp(
+					currentRise / it->maxRiseHeight,
+					ParticleHeightCapDefaults::kNoHeightLimit,
+					ParticleHeightCapDefaults::kUnitRatio);
+				if (effectiveAccel.y > ParticleHeightCapDefaults::kNoHeightLimit) {
+					effectiveAccel.y *= (ParticleHeightCapDefaults::kUnitRatio - heightRatio);
+				}
+			}
+
+			it->velocity = Add(it->velocity, effectiveAccel);
+
+			if (it->maxRiseHeight > ParticleHeightCapDefaults::kNoHeightLimit) {
+				const float currentRise = it->transform.translate.y - it->spawnY;
+				const float heightRatio = std::clamp(
+					currentRise / it->maxRiseHeight,
+					ParticleHeightCapDefaults::kNoHeightLimit,
+					ParticleHeightCapDefaults::kUnitRatio);
+				if (heightRatio > ParticleHeightCapDefaults::kSoftBrakeStartRatio &&
+					it->velocity.y > ParticleHeightCapDefaults::kNoHeightLimit) {
+					const float brakeT = std::clamp(
+						(heightRatio - ParticleHeightCapDefaults::kSoftBrakeStartRatio) /
+						ParticleHeightCapDefaults::kSoftBrakeSpanRatio,
+						ParticleHeightCapDefaults::kNoHeightLimit,
+						ParticleHeightCapDefaults::kUnitRatio);
+					it->velocity.y *= (ParticleHeightCapDefaults::kUnitRatio - brakeT);
+				}
+			}
+
 			it->transform.translate = Add(it->transform.translate, it->velocity);
+
+			if (it->maxRiseHeight > ParticleHeightCapDefaults::kNoHeightLimit) {
+				const float ceilingY = it->spawnY + it->maxRiseHeight;
+				if (it->transform.translate.y > ceilingY) {
+					it->transform.translate.y = ceilingY;
+					if (it->velocity.y > ParticleHeightCapDefaults::kNoHeightLimit) {
+						it->velocity.y = ParticleHeightCapDefaults::kNoHeightLimit;
+					}
+				}
+			}
 
 			// 経過時間を加算
 			it->currentTime += 1.0f / 60.0f; // 60FPS想定
@@ -268,6 +308,29 @@ void ParticleManager::AddAccelerationField(const std::string& name, const Vector
 	accelerationFields_[name] = field;
 }
 
+void ParticleManager::ClearAllParticles() {
+	for (auto& [name, group] : particleGroups_) {
+		group.particles.clear();
+		group.instanceCount = ParticleHeightCapDefaults::kZeroCount;
+	}
+}
+
+uint32_t ParticleManager::GetTotalActiveParticleCount() const {
+	uint32_t total = ParticleHeightCapDefaults::kZeroCount;
+	for (const auto& [name, group] : particleGroups_) {
+		total += static_cast<uint32_t>(group.particles.size());
+	}
+	return total;
+}
+
+uint32_t ParticleManager::GetGroupActiveParticleCount(const std::string& name) const {
+	auto it = particleGroups_.find(name);
+	if (it == particleGroups_.end()) {
+		return ParticleHeightCapDefaults::kZeroCount;
+	}
+	return static_cast<uint32_t>(it->second.particles.size());
+}
+
 
 void ParticleManager::Finalize() {
 	// リソースの解放など
@@ -348,6 +411,8 @@ void ParticleManager::Emit(const std::string& name, const Vector3& position, con
 		// 位置に少しランダム要素を加える
 		Vector3 randomPos = { distPos(randomEngine_), distPos(randomEngine_), distPos(randomEngine_) };
 		particle.transform.translate = Add(position, randomPos);
+		particle.spawnY = particle.transform.translate.y;
+		particle.maxRiseHeight = params.maxRiseHeight;
 
 		// 速度設定
 		particle.velocity = { distVelX(randomEngine_), distVelY(randomEngine_), distVelZ(randomEngine_) };

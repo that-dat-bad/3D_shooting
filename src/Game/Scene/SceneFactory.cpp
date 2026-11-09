@@ -5,6 +5,9 @@
 #include "GameOverScene.h"
 #include "DebugScene.h"
 #include "MissionEditorScene.h"
+#ifdef _DEBUG
+#include "EffectEditorScene.h"
+#endif
 
 std::unique_ptr<IScene> SceneFactory::CreateScene(int sceneID) {
 	std::unique_ptr<IScene> newScene = nullptr;
@@ -28,6 +31,11 @@ std::unique_ptr<IScene> SceneFactory::CreateScene(int sceneID) {
 	case SCENE::MISSION_EDITOR:
 		newScene = std::make_unique<MissionEditorScene>();
 		break;
+#ifdef _DEBUG
+	case SCENE::EFFECT_EDITOR:
+		newScene = std::make_unique<EffectEditorScene>();
+		break;
+#endif
 	}
 
 	return newScene;

@@ -1055,6 +1055,12 @@ void StageScene::UpdateDebugAndStatusUI(float gameDeltaTime) {
 		}
 	}
 
+#ifdef _DEBUG
+	if (EffectManager::GetInstance()) {
+		EffectManager::GetInstance()->DrawDebugGui();
+	}
+#endif
+
 	if (isMissionCleared_) {
 		ImGui::TextColored(ImVec4(0, 1, 0, 1), "*** MISSION CLEAR ***");
 	}

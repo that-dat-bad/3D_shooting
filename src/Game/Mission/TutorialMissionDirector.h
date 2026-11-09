@@ -19,6 +19,8 @@
 #include "../System/MissionManager.h"
 #include "../UI/RadioCommunicator.h"
 
+class EffectHandle;
+
 /// @brief チュートリアルミッション『Operation Halcyon Days』の全定数定義（マジックナンバー完全排除）
 namespace HalcyonDefaults {
 	// --- 基本数値定数 ---
@@ -421,33 +423,10 @@ namespace HalcyonDefaults {
 	inline constexpr float kCrashGroundOffsetY = 2.5f;
 	inline constexpr float kCrashHorizDragRate = 0.18f;
 
-	// パーティクル演出定数（監視塔黒煙・火災／被弾煙：上昇速度0.1倍スケール）
-	inline constexpr uint32_t kOutpostFireEmitCount = 2;
-	inline constexpr uint32_t kOutpostSmokeEmitCount = 3;
-	inline constexpr uint32_t kDamageSmokeEmitCount = 2;
-	inline constexpr uint32_t kCrashFireEmitCount = 3;
-	inline constexpr uint32_t kCrashSmokeEmitCount = 3;
-	inline constexpr float kOutpostFireMinLife = 0.65f;
-	inline constexpr float kOutpostFireMaxLife = 1.25f;
-	inline constexpr float kOutpostFireMinScale = 5.5f;
-	inline constexpr float kOutpostFireMaxScale = 9.0f;
-	inline constexpr float kOutpostFireEndScale = 16.0f;
-	inline constexpr float kOutpostFireUpMin = 0.6f;
-	inline constexpr float kOutpostFireUpMax = 1.4f;
-	inline constexpr float kOutpostSmokeMinLife = 12.0f;
-	inline constexpr float kOutpostSmokeMaxLife = 18.0f;
-	inline constexpr float kOutpostSmokeMinScale = 7.0f;
-	inline constexpr float kOutpostSmokeMaxScale = 11.5f;
-	inline constexpr float kOutpostSmokeEndScale = 34.0f;
-	inline constexpr float kOutpostSmokeUpMin = 1.2f;
-	inline constexpr float kOutpostSmokeUpMax = 2.4f;
-	inline constexpr float kOutpostSmokeDrift = 0.32f;
-	inline constexpr float kParticleScaleEasing = 0.42f;
-	inline constexpr float kSmokeRotSpeedLimit = 0.065f;
-	inline constexpr MyMath::Vector4 kBlackSmokeMinCol = { 0.05f, 0.05f, 0.06f, 0.86f };
-	inline constexpr MyMath::Vector4 kBlackSmokeMaxCol = { 0.14f, 0.14f, 0.16f, 0.94f };
-	inline constexpr MyMath::Vector4 kFireParticleMinCol = { 1.00f, 0.38f, 0.06f, 0.92f };
-	inline constexpr MyMath::Vector4 kFireParticleMaxCol = { 1.00f, 0.88f, 0.30f, 0.98f };
+	// 外部 .effect プリセット識別子（Resources/effects/*.effect で外部データ駆動）
+	inline constexpr const char* kOutpostPlumeEffectName = "outpost_plume";
+	inline constexpr const char* kDamageSmokeEffectName = "damage_smoke";
+	inline constexpr const char* kCrashPlumeEffectName = "crash_plume";
 
 	// マルチパーツノード名定数
 	inline constexpr const char* kNodeWingL = "Wing_L";
@@ -711,7 +690,7 @@ private:
 	bool p4Wrn2Sent_ = false;
 	std::vector<MyMath::Vector3> outpostPositions_;
 	MyMath::Vector3 outpostPos_{};
-	float outpostSmokeTimer_ = HalcyonDefaults::kZero;
+	EffectHandle* outpostPlumeEffect_ = nullptr;
 
 	// --- Phase 5 訓練用オレンジドローン状態 ---
 	std::unique_ptr<Object3d> droneObject_;
@@ -747,7 +726,8 @@ private:
 	};
 	float westernCruiseZ_ = HalcyonDefaults::kZero;
 	float westernStrafeTimer_ = HalcyonDefaults::kZero;
-	float westernSmokeTimer_ = HalcyonDefaults::kZero;
+	EffectHandle* damageSmokeEffect_ = nullptr;
+	EffectHandle* crashPlumeEffect_ = nullptr;
 	float portWingHp_ = HalcyonDefaults::kWesternWingPartMaxHp;
 	float stbdWingHp_ = HalcyonDefaults::kWesternWingPartMaxHp;
 	float engineCoreHp_ = HalcyonDefaults::kWesternEnginePartMaxHp;

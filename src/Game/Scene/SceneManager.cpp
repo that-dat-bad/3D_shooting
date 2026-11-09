@@ -20,6 +20,7 @@ const char* SceneManager::GetSceneName(int sceneID) {
 	case SCENE::GAMEOVER: return "GAMEOVER";
 	case SCENE::DEBUG: return "DEBUG";
 	case SCENE::MISSION_EDITOR: return "MISSION_EDITOR";
+	case SCENE::EFFECT_EDITOR: return "EFFECT_EDITOR";
 	default: return "UNKNOWN";
 	}
 }
@@ -276,6 +277,11 @@ void SceneManager::Update() {
 	} else if (Input::GetInstance()->TriggerKey(DIK_F8)) {
 		IScene::SetSceneID(SCENE::CLEAR);
 	}
+#ifdef _DEBUG
+	else if (Input::GetInstance()->TriggerKey(DIK_F9)) {
+		IScene::SetSceneID(SCENE::EFFECT_EDITOR);
+	}
+#endif
 
 	if (ImGui::BeginMainMenuBar()) {
 		if (ImGui::BeginMenu("Scene")) {
@@ -294,6 +300,11 @@ void SceneManager::Update() {
 			if (ImGui::MenuItem("Debug", nullptr, currentSceneID == SCENE::DEBUG)) {
 				IScene::SetSceneID(SCENE::DEBUG);
 			}
+#ifdef _DEBUG
+			if (ImGui::MenuItem("Effect Manager (F9)", nullptr, currentSceneID == SCENE::EFFECT_EDITOR)) {
+				IScene::SetSceneID(SCENE::EFFECT_EDITOR);
+			}
+#endif
 			ImGui::Separator();
 			if (ImGui::MenuItem("Scene Profiler (F2)", nullptr, showProfilerWindow_)) {
 				ToggleProfilerWindow();
@@ -310,6 +321,11 @@ void SceneManager::Update() {
 			if (ImGui::MenuItem("Scene Profiler (F2)", nullptr, showProfilerWindow_)) {
 				ToggleProfilerWindow();
 			}
+#ifdef _DEBUG
+			if (ImGui::MenuItem("Effect Manager Scene (F9)", nullptr, currentSceneID == SCENE::EFFECT_EDITOR)) {
+				IScene::SetSceneID(SCENE::EFFECT_EDITOR);
+			}
+#endif
 			ImGui::EndMenu();
 		}
 		ImGui::EndMainMenuBar();

@@ -12,6 +12,7 @@ enum SCENE {
 	RESULT = GAMEOVER, // 互換性エイリアス
 	DEBUG,
 	MISSION_EDITOR,
+	EFFECT_EDITOR,
 };
 
 /// <summary>

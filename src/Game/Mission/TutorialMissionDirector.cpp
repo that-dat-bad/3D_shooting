@@ -304,7 +304,14 @@ void TutorialMissionDirector::ResetForMission(
 	outpostIgnited_ = false;
 	watchtowersGrounded_ = false;
 	p4Wrn2Sent_ = false;
-	outpostSmokeTimer_ = kZero;
+	if (EffectManager::GetInstance()) {
+		outpostPlumeEffect_ = EffectManager::GetInstance()->GetHandle(kOutpostPlumeEffectName, kOutpostPlumeEffectName);
+		damageSmokeEffect_ = EffectManager::GetInstance()->GetHandle(kDamageSmokeEffectName, kDamageSmokeEffectName);
+		crashPlumeEffect_ = EffectManager::GetInstance()->GetHandle(kCrashPlumeEffectName, kCrashPlumeEffectName);
+		if (outpostPlumeEffect_) { outpostPlumeEffect_->stop(); }
+		if (damageSmokeEffect_) { damageSmokeEffect_->stop(); }
+		if (crashPlumeEffect_) { crashPlumeEffect_->stop(); }
+	}
 	InitializeWatchtowers(playerStartPos, nullptr);
 
 	// Phase 5 状態初期化
@@ -332,7 +339,6 @@ void TutorialMissionDirector::ResetForMission(
 	westernVel_ = {};
 	westernCruiseZ_ = kZero;
 	westernStrafeTimer_ = kZero;
-	westernSmokeTimer_ = kZero;
 	portWingHp_ = kWesternWingPartMaxHp;
 	stbdWingHp_ = kWesternWingPartMaxHp;
 	engineCoreHp_ = kWesternEnginePartMaxHp;
@@ -968,7 +974,6 @@ void TutorialMissionDirector::SpawnOutpost04(
 
 	outpostVisible_ = true;
 	outpostIgnited_ = true;
-	outpostSmokeTimer_ = kZero;
 
 	// 監視塔被弾跡の初期爆炎エフェクト
 	const MyMath::Vector3 towerTop = {
@@ -982,62 +987,15 @@ void TutorialMissionDirector::SpawnOutpost04(
 }
 
 void TutorialMissionDirector::UpdateOutpostEffects(float dt) {
-	if (!outpostVisible_ || !outpostIgnited_ || dt <= kEpsilon) {
-		return;
+	(void)dt;
+	if (outpostVisible_ && outpostIgnited_ && outpostPlumeEffect_) {
+		const MyMath::Vector3 fireOrigin = {
+			outpostPos_.x,
+			outpostPos_.y + kOutpostTowerHeight,
+			outpostPos_.z
+		};
+		outpostPlumeEffect_->emit(fireOrigin);
 	}
-
-	outpostSmokeTimer_ += dt;
-	if (outpostSmokeTimer_ < kOutpostSmokeEmitInterval) {
-		return;
-	}
-	outpostSmokeTimer_ = kZero;
-
-	ParticleManager* pm = ParticleManager::GetInstance();
-	if (!pm) {
-		return;
-	}
-
-	const MyMath::Vector3 fireOrigin = {
-		outpostPos_.x,
-		outpostPos_.y + kOutpostTowerHeight,
-		outpostPos_.z
-	};
-
-	// 1. 監視塔頂部の継続火災
-	ParticleParameters fireParams{};
-	fireParams.minVelocity = { -kOutpostSmokeDrift * kHalf, kOutpostFireUpMin, -kOutpostSmokeDrift * kHalf };
-	fireParams.maxVelocity = {  kOutpostSmokeDrift * kHalf, kOutpostFireUpMax,  kOutpostSmokeDrift * kHalf };
-	fireParams.minColor = kFireParticleMinCol;
-	fireParams.maxColor = kFireParticleMaxCol;
-	fireParams.minLifeTime = kOutpostFireMinLife;
-	fireParams.maxLifeTime = kOutpostFireMaxLife;
-	fireParams.minScale = kOutpostFireMinScale;
-	fireParams.maxScale = kOutpostFireMaxScale;
-	fireParams.endScale = kOutpostFireEndScale;
-	fireParams.fadeOut = true;
-	fireParams.scaleEasing = kParticleScaleEasing;
-	fireParams.minRotation = kZero;
-	fireParams.maxRotation = kTwoPi;
-	pm->Emit(kExplosionFireGroup, fireOrigin, fireParams, kOutpostFireEmitCount);
-
-	// 2. 遠方からも視認できる高い黒煙柱
-	ParticleParameters smokeParams{};
-	smokeParams.minVelocity = { -kOutpostSmokeDrift, kOutpostSmokeUpMin, -kOutpostSmokeDrift };
-	smokeParams.maxVelocity = {  kOutpostSmokeDrift, kOutpostSmokeUpMax,  kOutpostSmokeDrift };
-	smokeParams.minColor = kBlackSmokeMinCol;
-	smokeParams.maxColor = kBlackSmokeMaxCol;
-	smokeParams.minLifeTime = kOutpostSmokeMinLife;
-	smokeParams.maxLifeTime = kOutpostSmokeMaxLife;
-	smokeParams.minScale = kOutpostSmokeMinScale;
-	smokeParams.maxScale = kOutpostSmokeMaxScale;
-	smokeParams.endScale = kOutpostSmokeEndScale;
-	smokeParams.fadeOut = true;
-	smokeParams.scaleEasing = kParticleScaleEasing;
-	smokeParams.minRotation = kZero;
-	smokeParams.maxRotation = kTwoPi;
-	smokeParams.minRotationSpeed = -kSmokeRotSpeedLimit;
-	smokeParams.maxRotationSpeed = kSmokeRotSpeedLimit;
-	pm->Emit(kExplosionSmokeGroup, fireOrigin, smokeParams, kOutpostSmokeEmitCount);
 }
 
 void TutorialMissionDirector::UpdatePhase4(const TutorialUpdateContext& ctx) {
@@ -1200,7 +1158,8 @@ void TutorialMissionDirector::StartPhase6Ambush(const TutorialUpdateContext& ctx
 	p6LogIntelSent_ = false;
 	p6EngageRadioSent_ = false;
 	westernStrafeTimer_ = kZero;
-	westernSmokeTimer_ = kZero;
+	if (damageSmokeEffect_) { damageSmokeEffect_->stop(); }
+	if (crashPlumeEffect_) { crashPlumeEffect_->stop(); }
 
 	portWingHp_ = kWesternWingPartMaxHp;
 	stbdWingHp_ = kWesternWingPartMaxHp;
@@ -1377,24 +1336,9 @@ void TutorialMissionDirector::UpdatePhase6(const TutorialUpdateContext& ctx) {
 	}
 	westernModel_.Update(westernWorldMat, dt);
 
-	// 損傷部位からの黒煙放出
-	if (isWingDamaged || isEngineDamaged) {
-		westernSmokeTimer_ += dt;
-		if (westernSmokeTimer_ >= kWesternSmokeEmitInterval && ParticleManager::GetInstance()) {
-			westernSmokeTimer_ = kZero;
-			ParticleParameters dmgSmoke{};
-			dmgSmoke.minVelocity = { -kUnit, kZero, -kUnit };
-			dmgSmoke.maxVelocity = {  kUnit, kTwo,   kUnit };
-			dmgSmoke.minColor = kBlackSmokeMinCol;
-			dmgSmoke.maxColor = kBlackSmokeMaxCol;
-			dmgSmoke.minLifeTime = kOutpostFireMinLife;
-			dmgSmoke.maxLifeTime = kOutpostFireMaxLife * kTwo;
-			dmgSmoke.minScale = kTwo;
-			dmgSmoke.maxScale = static_cast<float>(kFourInt);
-			dmgSmoke.endScale = kGateTickLength;
-			dmgSmoke.fadeOut = true;
-			ParticleManager::GetInstance()->Emit(kExplosionSmokeGroup, westernPos_, dmgSmoke, kDamageSmokeEmitCount);
-		}
+	// 損傷部位からの黒煙放出（Resources/effects/damage_smoke.effect 駆動）
+	if ((isWingDamaged || isEngineDamaged) && damageSmokeEffect_) {
+		damageSmokeEffect_->emit(westernPos_);
 	}
 
 	// --- 3. 機体ローカル座標系での3部位（左主翼・右主翼・エンジン）被弾判定 ---
@@ -1465,6 +1409,9 @@ void TutorialMissionDirector::TriggerWesternStructuralBreak(
 	brokenPart_ = brokenPart;
 	westernDownedSpiral_ = true;
 	westernCrashedFloor_ = false;
+	if (damageSmokeEffect_) {
+		damageSmokeEffect_->stop();
+	}
 
 	Model* westernRawModel = ModelManager::GetInstance()->FindModel(kWesternFighterModelPath);
 	MyMath::Vector3 right{}, up{}, fwd{};
@@ -1567,34 +1514,8 @@ void TutorialMissionDirector::UpdatePhase7Exit(const TutorialUpdateContext& ctx)
 		BuildAircraftBasis(westernVel_, spiralRoll, right, up, fwd);
 		westernModel_.Update(BuildWorldMatrixFromBasis(right, up, fwd, westernPos_), dt);
 
-		westernSmokeTimer_ += dt;
-		if (westernSmokeTimer_ >= kWesternSmokeEmitInterval && ParticleManager::GetInstance()) {
-			westernSmokeTimer_ = kZero;
-			ParticleParameters fireP = {};
-			fireP.minVelocity = { -kTwo, kZero, -kTwo };
-			fireP.maxVelocity = {  kTwo, static_cast<float>(kFourInt),  kTwo };
-			fireP.minColor = kFireParticleMinCol;
-			fireP.maxColor = kFireParticleMaxCol;
-			fireP.minLifeTime = kOutpostFireMinLife;
-			fireP.maxLifeTime = kOutpostFireMaxLife;
-			fireP.minScale = static_cast<float>(kFourInt);
-			fireP.maxScale = kOutpostSmokeMinScale;
-			fireP.endScale = kOutpostFireEndScale;
-			fireP.fadeOut = true;
-			ParticleManager::GetInstance()->Emit(kExplosionFireGroup, westernPos_, fireP, kCrashFireEmitCount);
-
-			ParticleParameters smokeP = {};
-			smokeP.minVelocity = { -kTwo, kTwo, -kTwo };
-			smokeP.maxVelocity = {  kTwo, kOutpostFireUpMin, kTwo };
-			smokeP.minColor = kBlackSmokeMinCol;
-			smokeP.maxColor = kBlackSmokeMaxCol;
-			smokeP.minLifeTime = kOutpostSmokeMinLife;
-			smokeP.maxLifeTime = kOutpostSmokeMaxLife;
-			smokeP.minScale = kOutpostFireMinScale;
-			smokeP.maxScale = kOutpostFireMaxScale;
-			smokeP.endScale = kOutpostSmokeEndScale * kHalf;
-			smokeP.fadeOut = true;
-			ParticleManager::GetInstance()->Emit(kExplosionSmokeGroup, westernPos_, smokeP, kCrashSmokeEmitCount);
+		if (crashPlumeEffect_) {
+			crashPlumeEffect_->emit(westernPos_);
 		}
 
 		const float crashGroundY = QueryTerrainY(ctx.terrain, westernPos_.x, westernPos_.z);
@@ -1602,6 +1523,9 @@ void TutorialMissionDirector::UpdatePhase7Exit(const TutorialUpdateContext& ctx)
 			westernPos_.y = crashGroundY + kCrashGroundOffsetY;
 			westernCrashedFloor_ = true;
 			westernVisible_ = false;
+			if (crashPlumeEffect_) {
+				crashPlumeEffect_->stop();
+			}
 			if (EffectManager::GetInstance()) {
 				EffectManager::GetInstance()->EmitDestroyEffect(westernPos_);
 			}

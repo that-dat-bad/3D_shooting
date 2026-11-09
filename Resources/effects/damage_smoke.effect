@@ -1,0 +1,52 @@
+# ========================================================
+# Effect Configuration File (.effect)
+# Damage Smoke Effect (機体部位損傷時の黒煙トレイル)
+# ========================================================
+
+[General]
+name = damage_smoke
+stopCondition = Manual          # Manual / ByDuration / ByCount
+emitInterval = 0.06
+maxDuration = 5.0
+maxEmitCount = 40
+layerCount = 1
+
+[Layer0]
+layerName = DamageBlackSmoke
+groupName = ExplosionSmoke
+texturePath = assets/textures/smoke_particle.png
+blendMode = Normal
+emitCount = 2
+maxRiseHeight = 3.5
+minLifeTime = 0.65
+maxLifeTime = 1.35
+minVelocityX = -0.025
+minVelocityY = 0.010
+minVelocityZ = -0.025
+maxVelocityX = 0.025
+maxVelocityY = 0.030
+maxVelocityZ = 0.025
+accelerationX = 0.0
+accelerationY = 0.0
+accelerationZ = 0.0
+randomPositionRange = 0.6
+minScale = 2.2
+maxScale = 4.0
+endScale = 9.0
+scaleEasing = 0.45
+fadeOut = true
+minColorR = 0.06
+minColorG = 0.06
+minColorB = 0.07
+minColorA = 0.25
+maxColorR = 0.15
+maxColorG = 0.15
+maxColorB = 0.17
+maxColorA = 0.42
+minRotation = 0.0
+maxRotation = 6.283185
+minRotationSpeed = -0.15
+maxRotationSpeed = 0.15
+isStretched = false
+stretchFactor = 1.0
+

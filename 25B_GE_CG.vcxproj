@@ -377,6 +377,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="src\Game\UI\RadioCommunicator.h" />
     <ClInclude Include="src\Game\Mission\TutorialMissionDirector.h" />
     <ClInclude Include="src\Game\Mission\MissionSyncManager.h" />
+    <ClInclude Include="src\Game\Scene\EffectEditorScene.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\Game\Graphics\AircraftVisualModel.cpp" />
@@ -518,6 +519,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="src\Game\UI\RadioCommunicator.cpp" />
     <ClCompile Include="src\Game\Mission\TutorialMissionDirector.cpp" />
     <ClCompile Include="src\Game\Mission\MissionSyncManager.cpp" />
+    <ClCompile Include="src\Game\Scene\EffectEditorScene.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="external\imgui\LICENSE.txt" />
