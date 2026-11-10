@@ -134,6 +134,18 @@ private:
 	// スキャンパイプライン（案1: 自機専用GSマテリアライズ）
 	void InitializeScanPipeline(DirectXCommon* dxCommon);
 
+	// 実地形等高線（3D Terrain Chunk Manager 連携 Marching Squares）
+	struct RealContourSegment {
+		Vector2 normP1; // [0.0f, 1.0f] 範囲
+		Vector2 normP2;
+		float elevation;
+		Vector4 color;
+	};
+
+	void GenerateRealTerrainContours();
+	std::vector<RealContourSegment> realContourSegments_;
+	bool realContoursGenerated_ = false;
+
 	DirectXCommon* dxCommon_ = nullptr;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> scanPipelineState_;
 	Microsoft::WRL::ComPtr<ID3D12Resource> scanSettingsResource_;

@@ -98,16 +98,21 @@ PixelShaderOutput main(PixelInput input)
     {
         float32_t3 N = normalize(input.normal);
         float32_t3 toEye = normalize(gLightingSettings.cameraPosition - input.worldPosition);
+        float NdotV = saturate(dot(N, toEye));
 
-        // 金属的な反射色を計算（ベースカラーを80%染める）
-        float32_t3 specColor = lerp(float32_t3(1.0f, 1.0f, 1.0f), texColor.rgb, 0.8f) * gMaterial.specularIntensity;
+        // フレネル反射率 (Schlick's approximation: F0 + (1 - F0) * (1 - NdotV)^5)
+        // 戦闘機のジュラルミン・塗装金属装甲に適した基本反射率 (F0 = 0.08〜0.12)
+        float F0 = 0.10f;
+        float fresnel = F0 + (1.0f - F0) * pow(1.0f - NdotV, 5.0f);
+
+        // 金属的な反射色を計算（ベースカラーを65%反映し、重厚なメタルハイライトを生成）
+        float32_t3 specColor = lerp(float32_t3(1.0f, 1.0f, 1.0f), texColor.rgb, 0.65f) * gMaterial.specularIntensity;
 
         // アンビエントライト（天空光と地面反射光による半球ライティング）
-        // 暗部が真っ黒にならず、かつ機体全体が白飛び・まぶしくならないよう適正な照度(0.16)に抑制
         float hemi = N.y * 0.5f + 0.5f;
-        float32_t3 skyAmbient = float32_t3(0.30f, 0.35f, 0.42f);
-        float32_t3 groundAmbient = float32_t3(0.18f, 0.16f, 0.14f);
-        float32_t3 ambientLight = lerp(groundAmbient, skyAmbient, hemi) * 0.16f;
+        float32_t3 skyAmbient = float32_t3(0.25f, 0.32f, 0.42f);
+        float32_t3 groundAmbient = float32_t3(0.14f, 0.13f, 0.12f);
+        float32_t3 ambientLight = lerp(groundAmbient, skyAmbient, hemi) * 0.22f;
 
         float32_t3 totalDiffuse = gMaterial.color.rgb * texColor.rgb * ambientLight;
         float32_t3 totalSpecular = float32_t3(0.0f, 0.0f, 0.0f);
@@ -263,32 +268,28 @@ PixelShaderOutput main(PixelInput input)
              }
         }
 
-        // 環境マップ (Environment Mapping) の計算
+        // 環境マップ (Environment Mapping / PBR金属反射) の計算
         float32_t3 envColor = float32_t3(0.0f, 0.0f, 0.0f);
         if (gMaterial.environmentCoefficient > 0.0f)
         {
             float32_t3 reflectVector = reflect(-toEye, N); // 視線からサーフェスへのベクトルの反射
             float32_t3 baseEnv = gEnvTexture.Sample(gSampler, reflectVector).rgb;
             
-            // 高輝度空テクスチャの白飛び・まぶしさを抑制
-            baseEnv = min(baseEnv, 1.2f);
+            // 高輝度空テクスチャの白飛び・まぶしさを抑制しつつ、金属反射のコントラストを保持
+            baseEnv = min(baseEnv, 1.8f);
             
-            // 環境反射光もベースカラーで染める (70% tint)
-            float32_t3 envTint = lerp(float32_t3(1.0f, 1.0f, 1.0f), texColor.rgb, 0.7f);
-            // specularIntensityの重複掛けを排除し、サテン金属の落ち着いた適正反射に調整
-            envColor = baseEnv * envTint * gMaterial.environmentCoefficient * 0.35f;
+            // 環境反射光（フレネル項を掛け合わせ、浅い角度で金属反射が鋭く輝くPBR挙動）
+            float32_t3 envTint = lerp(float32_t3(1.0f, 1.0f, 1.0f), texColor.rgb, 0.50f);
+            float envReflectance = lerp(gMaterial.environmentCoefficient * 0.40f, gMaterial.environmentCoefficient * 1.35f, fresnel);
+            envColor = baseEnv * envTint * envReflectance;
 
-            // 暗い場所（影）で光って見える現象をごまかすハック
-            // 主光源（平行光源）の当たり具合を利用して、光が当たりにくい面の反射を暗くする
+            // 主光源（平行光源）の当たり具合を利用して、日陰側の反射を適正に減光
             if (gLightingSettings.lightType & 1)
             {
                 float32_t3 dirLightL = normalize(-gDirectionalLight.direction);
                 float NdotL = dot(N, dirLightL);
-                
-                // 完全に光の裏側であっても少しは反射させるため、0.2程度の下限を設ける
                 float shadowFactor = saturate(NdotL * 0.5f + 0.5f);
-                shadowFactor = max(shadowFactor, 0.2f); 
-                
+                shadowFactor = max(shadowFactor, 0.35f); 
                 envColor *= shadowFactor;
             }
         }

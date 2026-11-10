@@ -8,14 +8,6 @@
             "aliasName": "ZADANIE 00",
             "subTitle": "",
             "isLocked": false
-        },
-        {
-            "id": "[01]",
-            "filePath": "Resources/missions/mission01.json",
-            "title": "COMBINED STRIKE",
-            "aliasName": "OP: DAWN BREAK",
-            "subTitle": "空対空・空対地 統合防衛任務",
-            "isLocked": false
         }
     ]
 }

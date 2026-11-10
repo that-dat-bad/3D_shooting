@@ -133,7 +133,7 @@ private:
 	void UpdateMenuState(float dt);
 	void UpdateSortieState(float dt);
 
-	// --- 疑似ウィンドウ（DAWN_OS ターミナル）のマウスドラッグ移動管理 ---
+	// --- 疑似ウィンドウ（SOVI_OS ターミナル）のマウスドラッグ移動管理 ---
 	Vector2 menuWindowPos_ = { 392.0f, 44.0f }; ///< ウィンドウ左上座標
 	bool isWindowDragging_ = false;             ///< ドラッグ中フラグ
 	bool wasLButtonDown_ = false;               ///< 前フレームの左マウスボタン押下状態
@@ -161,6 +161,7 @@ private:
 		float titleBarHeight = 34.0f;
 		bool isOpen = true;
 		bool isMinimized = false;
+		bool isMaximized = false;
 		bool isDragging = false;
 		Vector2 dragOffset = { 0.0f, 0.0f };
 		float animScale = 1.0f;               ///< 最小化・復元アニメーションスケール (0.0:タスクバー格納, 1.0:通常展開)
@@ -199,6 +200,17 @@ private:
 	void DrawOSRect(const Vector2& pos, const Vector2& size, const MyMath::Vector4& color);
 	void DrawOSBorder(const Vector2& pos, const Vector2& size, const MyMath::Vector4& color, float thick = 1.5f);
 	void DrawOSPanel(const Vector2& pos, const Vector2& size, const MyMath::Vector4& bgCol, const MyMath::Vector4& borderCol, float thick = 1.5f);
+	void DrawOSAppIcon(const Vector2& pos, int iconType, const MyMath::Vector4& col);
+	void DrawOSIndexTicks(const Vector2& pos, const Vector2& size, const MyMath::Vector4& col);
+	void DrawOSTitleBar3Buttons(
+		const Vector2& winPos,
+		const Vector2& winSize,
+		float mouseX,
+		float mouseY,
+		bool isModalOpen,
+		bool isActive,
+		const MyMath::Vector4& greenCol,
+		const MyMath::Vector4& whiteBorderCol);
 
 	void InitializeOSDesktop(SpriteCommon* spriteCommon);
 	void ResetOSDesktopWindows();

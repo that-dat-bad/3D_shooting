@@ -16,6 +16,7 @@
 #include "../FlightModel/MouseAimController.h"
 #include "../FlightModel/Payload/Gunpod.h"
 #include "../Graphics/AircraftVisualModel.h"
+#include "../Graphics/Afterburner.h"
 #include "../System/MissionManager.h"
 #include "../UI/RadioCommunicator.h"
 
@@ -59,12 +60,12 @@ namespace HalcyonDefaults {
 	inline constexpr const char* kObuchenieTitle = "Obuchenie";
 	inline constexpr const char* kZadanie00Alias = "ZADANIE 00";
 	inline constexpr const char* kMissionFileSuffix = "mission00.json";
-	inline constexpr float kMinForwardSafetyOffsetZ = 180.0f;
+	inline constexpr float kMinForwardSafetyOffsetZ = 600.0f;
 	inline constexpr const char* kFontName = "HackGen";
 	inline constexpr const char* kWhiteTexPath = "assets/textures/white1x1.png";
 	inline constexpr const char* kRingTexPath = "assets/textures/circle2.png";
 	inline constexpr const char* kCoraxModelPath = "Resources/models/m21.gltf";
-	inline constexpr const char* kDroneModelCloneKey = "Resources/models/m21.gltf#OrangeTargetDrone";
+	inline constexpr const char* kDroneModelPath = "Resources/models/quadcopter.obj";
 	inline constexpr const char* kWesternFighterModelPath = "Resources/models/m15.gltf";
 	inline constexpr const char* kExplosionFireGroup = "ExplosionFire";
 	inline constexpr const char* kExplosionSmokeGroup = "ExplosionSmoke";
@@ -75,6 +76,7 @@ namespace HalcyonDefaults {
 	inline constexpr const char* kOutpostSpeakerName = "第4監視所";
 	inline constexpr const char* kCoraxHudLabel = "ALLY // CORAX [M-21A]";
 	inline constexpr const char* kOutpostHudLabel = "OUTPOST 04 // CARRIER LOST";
+	inline constexpr const char* kOutpostIntactHudLabel = "OUTPOST 04";
 	inline constexpr const char* kDroneHudLabel = "TRAINING DRONE [ORANGE]";
 	inline constexpr const char* kWesternHudLabel = "UNKNOWN FIGHTER [WESTERN]";
 	inline constexpr const char* kBoundaryHudLabel = "RTB SECTOR BOUNDARY";
@@ -94,9 +96,9 @@ namespace HalcyonDefaults {
 	inline constexpr float kCoraxBankGain = 1.6f;
 	inline constexpr float kCoraxMaxBankRad = 0.95f;
 	inline constexpr float kCoraxRollSmoothRate = 5.0f;
-	inline constexpr float kCoraxMaterialShininess = 36.0f;
-	inline constexpr float kCoraxMaterialSpecular = 0.55f;
-	inline constexpr float kCoraxMaterialEnv = 0.18f;
+	inline constexpr float kCoraxMaterialShininess = 48.0f;
+	inline constexpr float kCoraxMaterialSpecular = 1.15f;
+	inline constexpr float kCoraxMaterialEnv = 0.42f;
 	inline constexpr MyMath::Vector4 kCoraxTintColor = { 0.86f, 0.92f, 0.98f, 1.00f };
 
 	// --- Phase 1: 起動と基本操作（視線誘導・水平復帰）定数 ---
@@ -139,22 +141,24 @@ namespace HalcyonDefaults {
 
 	// --- Phase 3: 峡谷通過（低空地形追従）定数 ---
 	inline constexpr size_t kGateCount = 3;
-	inline constexpr float kFirstGateDistanceAheadZ = 500.0f;
-	inline constexpr float kSubsequentGateSpacingZ = 640.0f;
+	inline constexpr float kFirstGateDistanceAheadZ = 950.0f;
+	inline constexpr float kSubsequentGateSpacingZ = 900.0f;
 	inline constexpr float kGateAglHeight0 = 138.0f;
 	inline constexpr float kGateAglHeight1 = 128.0f;
 	inline constexpr float kGateAglHeight2 = 122.0f;
-	inline constexpr float kGateVisualRadius = 46.0f;
-	inline constexpr float kGateOuterGlowScale = 1.14f;
-	inline constexpr float kGateRingDepthScale = 3.5f;
-	inline constexpr float kGateTickLength = 12.0f;
-	inline constexpr float kGateCaptureSphereRadius = 74.0f;
-	inline constexpr float kGatePlaneCorridorX = 125.0f;
-	inline constexpr float kGatePlaneCorridorY = 115.0f;
+	inline constexpr float kGateVisualRadius = 52.0f;
+	inline constexpr float kGateOuterGlowScale = 1.25f;
+	inline constexpr float kGateRingDepthScale = 4.0f;
+	inline constexpr float kGateTickLength = 16.0f;
+	inline constexpr float kGateCaptureSphereRadius = 65.0f;
+	inline constexpr float kGatePlaneCorridorX = 65.0f;
+	inline constexpr float kGatePlaneCorridorY = 60.0f;
+	inline constexpr float kGatePassOvershootToleranceZ = 280.0f;
+	inline constexpr float kGatePlaneThicknessZ = 45.0f;
 	inline constexpr float kGateSpinSpeedRad = 0.55f;
 	inline constexpr float kPhase3Radio1Hold = 3.60f;
 	inline constexpr float kPhase3Radio2Hold = 4.50f;
-	inline constexpr float kPhase3ClearRadioHold = 3.40f;
+	inline constexpr float kPhase3ClearRadioHold = 3.80f;
 
 	inline constexpr const char* kPhase3Radio1Text = "峡谷の哨戒ルートに入る。前方のガイドマーカーを順に通っていけ。";
 	inline constexpr const char* kPhase3Radio2Text =
@@ -166,17 +170,22 @@ namespace HalcyonDefaults {
 	inline constexpr const char* kHighAltCautionText = "[ ! ALTITUDE CAUTION : 峡谷低空を維持せよ ! ]";
 
 	// --- Phase 4: 異変（通信途絶と監視所炎上）定数 ---
+	inline constexpr const char* kWatchtowerModelPath = "Resources/models/tower.obj";
+	inline constexpr float kWatchtowerModelScale = 2.8f;
+	inline constexpr float kWatchtowerModelHeight = 12.83f;
 	inline constexpr size_t kDefaultWatchtowerCount = 4;
 	inline constexpr float kWatchtowerFirstOffsetZ = 1150.0f;
 	inline constexpr float kWatchtowerSpacingZ = 980.0f;
-	inline constexpr float kPhase4StartDelaySeconds = 1.00f;
-	inline constexpr float kOutpostSpawnAheadZ = 820.0f;
+	inline constexpr float kPhase4StartDelaySeconds = 4.20f;
+	inline constexpr float kOutpostSpawnAheadZ = 1200.0f;
 	inline constexpr float kOutpostShelfOffsetX = 118.0f;
-	inline constexpr float kOutpostTowerRadius = 7.5f;
-	inline constexpr float kOutpostTowerHeight = 28.0f;
+	inline constexpr float kOutpostTowerRadius = 5.5f;
+	inline constexpr float kOutpostTowerHeight = kWatchtowerModelHeight * kWatchtowerModelScale;
 	inline constexpr float kOutpostDeckRadius = 11.5f;
 	inline constexpr float kOutpostDeckHeight = 4.5f;
 	inline constexpr float kOutpostMastHeight = 14.0f;
+	inline constexpr float kOutpostColliderRadius = 6.5f;
+	inline constexpr float kOutpostTotalHeight = kOutpostTowerHeight;
 	inline constexpr float kOutpostFireGlowRadius = 16.0f;
 	inline constexpr float kOutpostSmokeEmitInterval = 0.16f;
 	inline constexpr float kOutpostCornerTriggerOffsetZ = -45.0f;
@@ -195,22 +204,23 @@ namespace HalcyonDefaults {
 	inline constexpr const char* kPhase4GuideTitle = "【緊急確認】黒煙の上がる第4監視所へ接近せよ";
 	inline constexpr const char* kPhase4GuideSub = "前方の峡谷コーナーに位置する監視塔の上空を通過して状況を確認してください。";
 
-	// --- Phase 5: 模擬標的／偏差射撃定数 ---
-	inline constexpr float kDroneSpawnAheadZ = 440.0f;
-	inline constexpr float kDroneBaseAglMeters = 152.0f;
-	inline constexpr float kDroneScale = 0.64f;
+	// --- Phase 5: 模擬標的／偏差射撃定数 (4ローター・クアッドコプター大型低速ドローン) ---
+	inline constexpr float kDroneSpawnAheadZ = 380.0f;
+	inline constexpr float kDroneBaseAglMeters = 110.0f;
+	inline constexpr float kDroneScale = 2.4f;
 	inline constexpr float kDroneMaxHp = 40.0f;
-	inline constexpr float kDroneHitRadius = 12.0f;
-	inline constexpr float kDroneWeaveAmplitudeX = 88.0f;
-	inline constexpr float kDroneWeaveFrequency = 0.58f;
-	inline constexpr float kDroneWeaveAmplitudeY = 18.0f;
-	inline constexpr float kDroneWeaveFreqY = 0.85f;
-	inline constexpr float kDroneMinDistanceAheadZ = 220.0f;
-	inline constexpr float kDroneMaxDistanceAheadZ = 470.0f;
-	inline constexpr float kDroneMinSpeed = 78.0f;
-	inline constexpr float kDroneMaxSpeed = 165.0f;
-	inline constexpr float kDroneSpeedMatchRatio = 0.90f;
-	inline constexpr float kDroneBeaconRadius = 4.2f;
+	inline constexpr float kDroneHitRadius = 9.5f;
+	inline constexpr float kDroneWeaveAmplitudeX = 42.0f;
+	inline constexpr float kDroneWeaveFrequency = 0.42f;
+	inline constexpr float kDroneWeaveAmplitudeY = 12.0f;
+	inline constexpr float kDroneWeaveFreqY = 0.55f;
+	inline constexpr float kDroneMinDistanceAheadZ = 160.0f;
+	inline constexpr float kDroneMaxDistanceAheadZ = 350.0f;
+	inline constexpr float kDroneMinSpeed = 26.0f;
+	inline constexpr float kDroneMaxSpeed = 42.0f;
+	inline constexpr float kDroneSpeedMatchRatio = 0.35f;
+	inline constexpr float kDroneBeaconRadius = 4.8f;
+	inline constexpr float kDroneRotorVisualRadius = 1.45f;
 	inline constexpr MyMath::Vector4 kDroneOrangeColor = { 1.00f, 0.46f, 0.06f, 1.00f };
 	inline constexpr float kPhase5Log2Delay = 0.45f;
 	inline constexpr float kPhase5Radio1Hold = 3.60f;
@@ -285,7 +295,7 @@ namespace HalcyonDefaults {
 	inline constexpr float kPhase6EngageRadioHold = 4.40f;
 	inline constexpr float kPhase6DownRadio1Hold = 3.00f;
 	inline constexpr float kPhase6DownRadio2Hold = 4.20f;
-	inline constexpr float kPhase6DownRadio3Hold = 4.50f;
+	inline constexpr float kPhase6DownRadio3Hold = 5.20f;
 
 	inline constexpr const char* kPhase6LogAlr = "WARNING: UNIDENTIFIED RADAR LOCK (AIR-TO-AIR)";
 	inline constexpr const char* kPhase6LogRwr = "HIGH-ENERGY CONTACT: BEARING 040, DIVE ANGLE -45";
@@ -306,7 +316,7 @@ namespace HalcyonDefaults {
 
 	inline constexpr const char* kPhase6RadioDown1 = "命中確認！ 敵機、谷底へ落ちていくぞ！";
 	inline constexpr const char* kPhase6RadioDown2 = "……外縁のボロ哨戒任務のはずが、とんでもないものを引き当てちまったな。";
-	inline constexpr const char* kPhase6RadioDown3 = "全機、これより基地へ緊急帰投する。……急ぐぞ、何かが始まろうとしている。";
+	inline constexpr const char* kPhase6RadioDown3 = "全機、これより基地へ緊急帰投する。……急ぐぞ、これから何かが始まる……！";
 
 	// --- クリア後: 峡谷境界ライン＆フェードアウト定数 ---
 	inline constexpr float kExitBoundaryAheadDistanceZ = 920.0f;
@@ -318,29 +328,29 @@ namespace HalcyonDefaults {
 	inline constexpr const char* kSysLogBoundaryCross = "SECTOR BOUNDARY CROSSED // RETURNING TO BASE...";
 
 	// --- システムテレメトリログ＆チュートリアルHUD描画定数 ---
-	inline constexpr size_t kMaxVisibleSysLogs = 6;
-	inline constexpr float kSysLogLifetimeSeconds = 11.0f;
+	inline constexpr size_t kMaxVisibleSysLogs = 4;
+	inline constexpr float kSysLogLifetimeSeconds = 9.0f;
 	inline constexpr float kSysLogFadeInSeconds = 0.16f;
 	inline constexpr float kSysLogFadeOutSeconds = 0.80f;
 	inline constexpr float kSysLogPanelX = 22.0f;
-	inline constexpr float kSysLogPanelY = 82.0f;
-	inline constexpr float kSysLogRowHeight = 21.0f;
-	inline constexpr float kSysLogFontSize = 12.5f;
+	inline constexpr float kSysLogPanelY = 160.0f;         ///< 左上計器(InfoUI: Y=32~145)と重ならないよう下部に配置
+	inline constexpr float kSysLogRowHeight = 20.0f;
+	inline constexpr float kSysLogFontSize = 12.0f;
 	inline constexpr float kSysLogAccentWidth = 3.0f;
 	inline constexpr float kSysLogBgPadX = 8.0f;
-	inline constexpr float kSysLogBgWidth = 468.0f;
+	inline constexpr float kSysLogBgWidth = 360.0f;        ///< 中央無線字幕との干渉を排除するコンパクト幅
 
 	inline constexpr float kGuidePanelWidth = 620.0f;
-	inline constexpr float kGuidePanelHeight = 76.0f;
-	inline constexpr float kGuidePanelBottomMargin = 104.0f;
+	inline constexpr float kGuidePanelHeight = 72.0f;
+	inline constexpr float kGuidePanelBottomMargin = 16.0f; ///< 自機後部を遮らないよう画面最下部付近に配置
 	inline constexpr float kGuideBorderThickness = 1.5f;
 	inline constexpr float kGuideCornerLen = 10.0f;
-	inline constexpr float kGuideTitleFontSize = 16.5f;
-	inline constexpr float kGuideSubFontSize = 12.5f;
-	inline constexpr float kGuideTitleOffsetY = 10.0f;
-	inline constexpr float kGuideSubOffsetY = 34.0f;
+	inline constexpr float kGuideTitleFontSize = 15.5f;
+	inline constexpr float kGuideSubFontSize = 12.0f;
+	inline constexpr float kGuideTitleOffsetY = 8.0f;
+	inline constexpr float kGuideSubOffsetY = 31.0f;
 	inline constexpr float kGuideProgressBarMarginX = 22.0f;
-	inline constexpr float kGuideProgressBarOffsetY = 58.0f;
+	inline constexpr float kGuideProgressBarOffsetY = 54.0f;
 	inline constexpr float kGuideProgressBarHeight = 6.0f;
 
 	inline constexpr float kAlertBannerWidth = 420.0f;
@@ -379,15 +389,19 @@ namespace HalcyonDefaults {
 	inline constexpr MyMath::Vector4 kCautionPanelBg = { 0.20f, 0.12f, 0.02f, 0.84f };
 	inline constexpr MyMath::Vector4 kCautionBorderCol = { 1.00f, 0.82f, 0.24f, 0.95f };
 
-	inline constexpr MyMath::Vector4 kGateActiveColor = { 0.20f, 1.00f, 0.58f, 0.92f };
-	inline constexpr MyMath::Vector4 kGateGlowColor = { 0.35f, 1.00f, 0.72f, 0.38f };
-	inline constexpr MyMath::Vector4 kGateUpcomingColor = { 0.18f, 0.78f, 0.68f, 0.38f };
+	inline constexpr MyMath::Vector4 kGateActiveColor = { 0.30f, 1.00f, 0.65f, 1.00f };
+	inline constexpr MyMath::Vector4 kGateGlowColor = { 0.45f, 1.00f, 0.80f, 0.60f };
+	inline constexpr MyMath::Vector4 kGateUpcomingColor = { 0.22f, 0.85f, 0.72f, 0.55f };
 	inline constexpr MyMath::Vector4 kBoundaryGateColor = { 0.28f, 0.92f, 1.00f, 0.90f };
 
 	inline constexpr MyMath::Vector4 kOutpostConcreteColor = { 0.34f, 0.35f, 0.38f, 1.00f };
 	inline constexpr MyMath::Vector4 kOutpostDeckColor = { 0.24f, 0.25f, 0.28f, 1.00f };
 	inline constexpr MyMath::Vector4 kOutpostIntactMastColor = { 0.42f, 0.72f, 0.64f, 0.72f };
+	inline constexpr MyMath::Vector4 kOutpostIntactColor = { 0.42f, 0.82f, 0.70f, 0.70f };
 	inline constexpr MyMath::Vector4 kOutpostEmberColor = { 1.00f, 0.42f, 0.08f, 0.75f };
+	inline constexpr MyMath::Vector4 kObstacleBeaconColor = { 1.00f, 0.18f, 0.12f, 0.95f };
+	inline constexpr float kObstacleBeaconRadius = 3.2f;
+	inline constexpr float kObstacleBeaconBlinkRate = 2.4f;
 
 	inline constexpr MyMath::Vector4 kAllyHudColor = { 0.68f, 0.98f, 0.84f, 0.96f };
 	inline constexpr MyMath::Vector4 kDroneHudColor = { 1.00f, 0.58f, 0.16f, 0.98f };
@@ -539,6 +553,18 @@ public:
 	bool IsReadyForDebriefScene() const { return readyForClearScene_; }
 	HalcyonPhase GetCurrentPhase() const { return phase_; }
 
+	/// @brief 画面下に操作ガイドパネルが表示中かどうか（操作許可の基準フラグ）
+	bool IsGuideDialogVisible() const;
+
+	/// @brief 自機の操縦桿（ピッチ/ロール/ヨー・マウスエイム）の操作が許可されているか
+	bool IsPlayerSteeringAllowed() const;
+
+	/// @brief 自機のスロットル加減速（[W]/[S]）の操作が許可されているか
+	bool IsPlayerThrottleAllowed() const;
+
+	/// @brief 自機の兵装発射（ガンポッド射撃）が許可されているか
+	bool IsPlayerWeaponAllowed() const;
+
 	/// @brief 峡谷ルート中心X座標の評価
 	static float EvaluateCanyonCenterX(float worldZ);
 
@@ -577,6 +603,7 @@ private:
 	// --- スポーン＆イベント補助 ---
 	void InitializeWatchtowers(const MyMath::Vector3& playerStartPos, const TerrainChunkManager* terrain);
 	void GroundWatchtowersToTerrain(const TerrainChunkManager* terrain);
+	void SyncWatchtowerObjects(Camera* camera);
 	void SpawnPhase3Gates(const MyMath::Vector3& playerPos, const TerrainChunkManager* terrain);
 	void SpawnOutpost04(const MyMath::Vector3& playerPos, const TerrainChunkManager* terrain);
 	void SpawnTrainingDrone(const MyMath::Vector3& playerPos, const TerrainChunkManager* terrain);
@@ -626,6 +653,7 @@ private:
 	void DrawAlertsHUD(float screenWidth, float screenHeight, float hudScale);
 	void DrawWorldMarkersAndLeadSightHUD(Camera* camera, float screenWidth, float screenHeight, float hudScale);
 	void DrawWesternPartStatusHUD(float screenWidth, float hudScale);
+	void CheckWatchtowerCollisions(const TutorialUpdateContext& ctx);
 
 private:
 	SpriteCommon* spriteCommon_ = nullptr;
@@ -650,11 +678,15 @@ private:
 
 	// --- 隊長機 Corax 状態 ---
 	AircraftVisualModel coraxModel_;
+	std::unique_ptr<Afterburner> coraxAfterburner_;
 	MyMath::Vector3 coraxPos_{};
 	MyMath::Vector3 coraxVel_{};
 	MyMath::Vector3 coraxForward_{ HalcyonDefaults::kZero, HalcyonDefaults::kZero, HalcyonDefaults::kUnit };
 	float coraxRollRad_ = HalcyonDefaults::kZero;
 	float coraxFireTimer_ = HalcyonDefaults::kZero;
+	MyMath::Vector3 lastCoraxWingL_{};
+	MyMath::Vector3 lastCoraxWingR_{};
+	bool hasLastCoraxWings_ = false;
 
 	// --- Phase 1 進行状態 ---
 	bool p1Log0Sent_ = false;
@@ -691,6 +723,7 @@ private:
 	std::vector<MyMath::Vector3> outpostPositions_;
 	MyMath::Vector3 outpostPos_{};
 	EffectHandle* outpostPlumeEffect_ = nullptr;
+	std::vector<std::unique_ptr<Object3d>> watchtowerObjects_;
 
 	// --- Phase 5 訓練用オレンジドローン状態 ---
 	std::unique_ptr<Object3d> droneObject_;
@@ -700,6 +733,7 @@ private:
 	MyMath::Vector3 droneVel_{};
 	float droneHp_ = HalcyonDefaults::kDroneMaxHp;
 	float droneCruiseZ_ = HalcyonDefaults::kZero;
+	float droneRotorAngle_ = HalcyonDefaults::kZero;
 	bool p5CompletedWaitingDelay_ = false;
 	float p5PostKillTimer_ = HalcyonDefaults::kZero;
 
@@ -725,6 +759,10 @@ private:
 		HalcyonDefaults::kUnit
 	};
 	float westernCruiseZ_ = HalcyonDefaults::kZero;
+	float westernCurrentSpeed_ = HalcyonDefaults::kCoraxMinSpeed;
+	float westernWeavePhaseX_ = HalcyonDefaults::kZero;
+	float westernWeavePhaseY_ = HalcyonDefaults::kZero;
+	float westernSmoothedGroundY_ = HalcyonDefaults::kFallbackCanyonFloorY;
 	float westernStrafeTimer_ = HalcyonDefaults::kZero;
 	EffectHandle* damageSmokeEffect_ = nullptr;
 	EffectHandle* crashPlumeEffect_ = nullptr;

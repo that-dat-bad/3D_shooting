@@ -57,10 +57,10 @@ namespace RadioDefaults {
 
 	// --- フローティング字幕レイアウト定数（ウィンドウ枠なし・画面上部中央） ---
 	inline constexpr float kCenterAnchorRatioX = 0.5f;
-	inline constexpr float kTopAnchorRatioY = 0.118f;     ///< 上部タイマー直下・空背景上のフローティング位置
-	inline constexpr float kSpeakerFontSize = 20.0f;      ///< 1行目: 話者名フォントサイズ
-	inline constexpr float kDialogueFontSize = 23.0f;     ///< 2行目: << 会話内容 >> フォントサイズ
-	inline constexpr float kSpeakerToDialogueGap = 7.0f;  ///< 話者名とセリフ行の垂直間隔
+	inline constexpr float kTopAnchorRatioY = 0.145f;     ///< 上部タイマー直下・空背景上のフローティング位置（左上計器・システムログとの干渉を回避）
+	inline constexpr float kSpeakerFontSize = 18.0f;      ///< 1行目: 話者名フォントサイズ
+	inline constexpr float kDialogueFontSize = 20.5f;     ///< 2行目: << 会話内容 >> フォントサイズ
+	inline constexpr float kSpeakerToDialogueGap = 6.0f;  ///< 話者名とセリフ行の垂直間隔
 	inline constexpr float kDialogueLineGap = 5.0f;       ///< 複数行セリフ時の行間
 
 	// --- 雲・青空背景でもくっきり読める2層ソフトドロップシャドウ定数 ---

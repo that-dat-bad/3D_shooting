@@ -27,6 +27,7 @@
 #include "../UI/RadioCommunicator.h"
 #include "../UI/InfoUI.h"
 #include "../Mission/TutorialMissionDirector.h"
+#include "../Graphics/Afterburner.h"
 
 namespace StageRadioDefaults {
 	inline constexpr int kInitialKillCount = 0;
@@ -88,6 +89,9 @@ private:
 
 	// 部位破壊対応マルチパーツビジュアルモデル
 	AircraftVisualModel aircraftVisualModel_;
+
+	// 自機アフターバーナーエフェクト（ジェットプルーム・ショックダイヤモンド）
+	std::unique_ptr<Afterburner> afterburner_ = nullptr;
 
 	// パーツ破壊イベントチェック
 	void CheckPartDestructionEvents();

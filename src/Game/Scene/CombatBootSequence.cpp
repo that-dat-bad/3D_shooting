@@ -10,11 +10,22 @@
 #include "../../engine/base/WinApp.h"
 #include "../../engine/io/Input.h"
 #include "../System/MissionManager.h"
+#include "../Environment/TerrainChunkManager.h"
 #include <cmath>
 #include <algorithm>
 #include <cstdio>
+#include <unordered_set>
 
 namespace {
+bool IsForbiddenLineStart(const std::string& ch) {
+	static const std::unordered_set<std::string> kForbidden = {
+		"。", "、", "，", "．", "！", "？", "：", "；", "・",
+		"）", "」", "』", "】", "〉", "》", "〕", "ー", "〜", "…",
+		")", "]", "}", ">", "!", "?", ":", ";", ",", "."
+	};
+	return kForbidden.count(ch) > 0;
+}
+
 std::vector<std::string> WrapTextByWidth(
 	TextRenderer* tr,
 	const std::string& fontName,
@@ -60,8 +71,13 @@ std::vector<std::string> WrapTextByWidth(
 			std::string candidate = currentLine + nextChar;
 
 			if (maxWidth > 0.0f && tr->CalculateTextSize(fontName, candidate, fontSize).x > maxWidth && !currentLine.empty()) {
-				resultLines.push_back(currentLine);
-				currentLine = nextChar;
+				// 禁則処理：行頭禁則文字の場合は改行せず現在の行末にぶら下げる
+				if (IsForbiddenLineStart(nextChar)) {
+					currentLine = candidate;
+				} else {
+					resultLines.push_back(currentLine);
+					currentLine = nextChar;
+				}
 			} else {
 				currentLine = candidate;
 			}
@@ -257,6 +273,122 @@ void CombatBootSequence::Finalize() {
 		scanSettingsResource_.Reset();
 	}
 	scanPipelineState_.Reset();
+
+	realContourSegments_.clear();
+	realContoursGenerated_ = false;
+}
+
+void CombatBootSequence::GenerateRealTerrainContours() {
+	if (realContoursGenerated_) return;
+
+	TerrainChunkManager* terrain = TerrainChunkManager::GetInstance();
+	if (!terrain || !terrain->IsLoaded()) return;
+
+	realContourSegments_.clear();
+
+	// 作戦空域（ZADANIE 00: 峡谷進入 Z=400m 〜 離脱 Z=8000m、X=-2400m 〜 +2000m）
+	const float worldMinX = -2400.0f;
+	const float worldMaxX =  2000.0f;
+	const float worldMinZ =   400.0f;
+	const float worldMaxZ =  8000.0f;
+
+	const int kGridW = 60;
+	const int kGridH = 64;
+	std::vector<std::vector<float>> heights(kGridW, std::vector<float>(kGridH, -500.0f));
+
+	for (int ix = 0; ix < kGridW; ++ix) {
+		float u = static_cast<float>(ix) / static_cast<float>(kGridW - 1);
+		float wx = worldMinX + u * (worldMaxX - worldMinX);
+		for (int iz = 0; iz < kGridH; ++iz) {
+			float v = static_cast<float>(iz) / static_cast<float>(kGridH - 1);
+			float wz = worldMinZ + v * (worldMaxZ - worldMinZ);
+			heights[ix][iz] = terrain->GetTerrainHeightAt(wx, wz, -500.0f);
+		}
+	}
+
+	// 抽出する実際の3D地形等高線レベル（標高値・メートル）
+	// -450m (最深部川床/ゴージ), -350m (下段テラス/ゲート飛行高度), -250m (中段テラス), -150m (上段崖面), -50m (リム/縁), 0m (台地表面)
+	struct IsoLevel {
+		float elevation;
+		Vector4 color;
+	};
+	const IsoLevel kLevels[] = {
+		{ -450.0f, { 0.0f, 0.70f, 0.35f, 0.40f } },
+		{ -350.0f, { 0.0f, 0.90f, 0.20f, 0.60f } },
+		{ -250.0f, { 0.0f, 1.00f, 0.12f, 0.75f } },
+		{ -150.0f, { 0.35f, 1.00f, 0.25f, 0.85f } },
+		{  -50.0f, { 0.75f, 1.00f, 0.60f, 0.92f } },
+		{    0.0f, { 0.95f, 1.00f, 0.95f, 0.95f } }
+	};
+
+	auto interp = [](float vA, float vB, float target) -> float {
+		float diff = vB - vA;
+		if (std::abs(diff) < 1e-5f) return 0.5f;
+		return std::clamp((target - vA) / diff, 0.0f, 1.0f);
+	};
+
+	// 各等高線ごとに Marching Squares を実行
+	for (const auto& lvl : kLevels) {
+		float isoH = lvl.elevation;
+		Vector4 col = lvl.color;
+
+		for (int ix = 0; ix < kGridW - 1; ++ix) {
+			float x0 = static_cast<float>(ix) / static_cast<float>(kGridW - 1);
+			float x1 = static_cast<float>(ix + 1) / static_cast<float>(kGridW - 1);
+
+			for (int iz = 0; iz < kGridH - 1; ++iz) {
+				float z0 = static_cast<float>(iz) / static_cast<float>(kGridH - 1);
+				float z1 = static_cast<float>(iz + 1) / static_cast<float>(kGridH - 1);
+
+				float v0 = heights[ix][iz];         // BL
+				float v1 = heights[ix + 1][iz];     // BR
+				float v2 = heights[ix + 1][iz + 1]; // TR
+				float v3 = heights[ix][iz + 1];     // TL
+
+				int mask = (v0 >= isoH ? 1 : 0) |
+				           (v1 >= isoH ? 2 : 0) |
+				           (v2 >= isoH ? 4 : 0) |
+				           (v3 >= isoH ? 8 : 0);
+
+				if (mask == 0 || mask == 15) continue;
+
+				// 各エッジ上の交点座標
+				Vector2 e0 = { x0 + interp(v0, v1, isoH) * (x1 - x0), z0 }; // Bottom
+				Vector2 e1 = { x1, z0 + interp(v1, v2, isoH) * (z1 - z0) }; // Right
+				Vector2 e2 = { x0 + interp(v3, v2, isoH) * (x1 - x0), z1 }; // Top
+				Vector2 e3 = { x0, z0 + interp(v0, v3, isoH) * (z1 - z0) }; // Left
+
+				auto addSeg = [&](Vector2 a, Vector2 b) {
+					RealContourSegment seg;
+					seg.normP1 = a;
+					seg.normP2 = b;
+					seg.elevation = isoH;
+					seg.color = col;
+					realContourSegments_.push_back(seg);
+				};
+
+				switch (mask) {
+				case 1:  addSeg(e3, e0); break;
+				case 2:  addSeg(e0, e1); break;
+				case 3:  addSeg(e3, e1); break;
+				case 4:  addSeg(e1, e2); break;
+				case 5:  addSeg(e3, e2); addSeg(e0, e1); break;
+				case 6:  addSeg(e0, e2); break;
+				case 7:  addSeg(e3, e2); break;
+				case 8:  addSeg(e2, e3); break;
+				case 9:  addSeg(e2, e0); break;
+				case 10: addSeg(e0, e3); addSeg(e1, e2); break;
+				case 11: addSeg(e1, e2); break;
+				case 12: addSeg(e1, e3); break;
+				case 13: addSeg(e0, e1); break;
+				case 14: addSeg(e3, e0); break;
+				default: break;
+				}
+			}
+		}
+	}
+
+	realContoursGenerated_ = true;
 }
 
 
@@ -763,57 +895,80 @@ void CombatBootSequence::DrawBootUI() {
 		const float px = cx - panelW * 0.5f;
 		const float py = cy - panelH * 0.5f - 4.0f;
 
-		// ウィンドウ背景
-		drawBriefRect({ px, py }, { panelW, panelH }, { 0.01f, 0.04f, 0.015f, 0.94f });
-		drawBriefRect({ px + 2.0f, py + 2.0f }, { panelW - 4.0f, panelH - 4.0f }, { 0.005f, 0.02f, 0.008f, 0.90f });
+		// 外周ドロップシャドウ（3D背景から手前にくっきりと浮き上がらせる半透明黒の影）
+		drawBriefRect({ px + 12.0f, py + 14.0f }, { panelW, panelH }, { 0.0f, 0.0f, 0.0f, 0.70f });
+		drawBriefRect({ px - 10.0f, py - 8.0f }, { panelW + 20.0f, panelH + 18.0f }, { 0.0f, 0.0f, 0.0f, 0.35f });
 
-		// 二重枠線 ＆ タクティカルブラケット
-		Vector4 pBorder = { 0.46f, 0.82f, 0.49f, 0.95f };
+		// ウィンドウ背景（純黒ミリタリーコンソール）
+		drawBriefRect({ px, py }, { panelW, panelH }, { 0.005f, 0.02f, 0.01f, 0.98f });
+		drawBriefRect({ px + 2.0f, py + 2.0f }, { panelW - 4.0f, panelH - 4.0f }, { 0.002f, 0.012f, 0.005f, 0.96f });
+
+		// 二重枠線 ＆ タクティカルブラケット（白枠）
+		Vector4 pBorder = { 1.0f, 1.0f, 1.0f, 0.85f };
 		drawBriefLine({ px, py }, { px + panelW, py }, 2.0f, pBorder, BlendMode::kAdd);
 		drawBriefLine({ px, py + panelH }, { px + panelW, py + panelH }, 2.0f, pBorder, BlendMode::kAdd);
 		drawBriefLine({ px, py }, { px, py + panelH }, 2.0f, pBorder, BlendMode::kAdd);
 		drawBriefLine({ px + panelW, py }, { px + panelW, py + panelH }, 2.0f, pBorder, BlendMode::kAdd);
-		drawBriefBracket({ cx, py + panelH * 0.5f }, { panelW + 24.0f, panelH + 24.0f }, 36.0f, 2.0f, { 0.53f, 0.88f, 0.55f, 0.90f });
+		drawBriefBracket({ cx, py + panelH * 0.5f }, { panelW + 24.0f, panelH + 24.0f }, 36.0f, 2.0f, { 1.0f, 1.0f, 1.0f, 1.0f });
 
 		// パネルタイトルバー
 		float tbH = 38.0f;
-		drawBriefRect({ px, py }, { panelW, tbH }, { 0.05f, 0.16f, 0.06f, 0.95f });
+		drawBriefRect({ px, py }, { panelW, tbH }, { 0.03f, 0.12f, 0.04f, 0.98f });
 		drawBriefLine({ px, py + tbH }, { px + panelW, py + tbH }, 1.5f, pBorder, BlendMode::kAdd);
 
 		// 点滅LED
 		bool blink = (std::fmod(animTime, 0.6f) < 0.35f);
-		Vector4 ledCol = blink ? Vector4{ 0.50f, 0.86f, 0.53f, 1.0f } : Vector4{ 0.25f, 0.48f, 0.28f, 0.6f };
+		Vector4 ledCol = blink ? Vector4{ 0.0f, 1.0f, 0.12f, 1.0f } : Vector4{ 0.15f, 0.45f, 0.18f, 0.6f };
 		drawBriefRect({ px + 16.0f, py + 14.0f }, { 10.0f, 10.0f }, ledCol);
-		printBriefText("HackGen", "MISSION FILE: SORTIE_DIRECTIVE_ARCHIVE", px + 36.0f, py + 9.0f, 15.5f, { 0.78f, 0.95f, 0.80f, 1.0f });
+		printBriefText("HackGen", "MISSION FILE: SORTIE_DIRECTIVE_ARCHIVE // SOVI_OS [v4.12]", px + 36.0f, py + 9.0f, 14.0f, { 0.0f, 1.0f, 0.12f, 1.0f });
 
 		// 作戦名（特大ハイライト表示）
 		float contentY = py + tbH + 16.0f;
 		std::string opHeader = mission.aliasName.empty() ? "// OPERATION NAME" : ("// OPERATION PROTOCOL : " + mission.aliasName);
-		printBriefText("HackGen", opHeader, px + 36.0f, contentY, 15.0f, { 0.42f, 0.78f, 0.45f, 0.85f });
-		contentY += 22.0f;
+
+		// ロシア軍/条約軍風ナンバリングタグ [TR-00] 部隊章バッジ
+		std::string tagStr = "[TR-00]";
+		float tagW = tr->CalculateTextSize("HackGen", tagStr, 12.0f).x + 12.0f;
+		float tagH = 18.0f;
+		float tagX = px + 36.0f;
+		float tagY = contentY - 1.0f;
+		drawBriefRect({ tagX, tagY }, { tagW, tagH }, { 0.05f, 0.20f, 0.08f, 0.95f });
+		drawBriefLine({ tagX, tagY }, { tagX + tagW, tagY }, 1.5f, { 1.0f, 1.0f, 1.0f, 0.90f }, BlendMode::kAdd);
+		drawBriefLine({ tagX, tagY + tagH }, { tagX + tagW, tagY + tagH }, 1.5f, { 1.0f, 1.0f, 1.0f, 0.90f }, BlendMode::kAdd);
+		drawBriefLine({ tagX, tagY }, { tagX, tagY + tagH }, 1.5f, { 1.0f, 1.0f, 1.0f, 0.90f }, BlendMode::kAdd);
+		drawBriefLine({ tagX + tagW, tagY }, { tagX + tagW, tagY + tagH }, 1.5f, { 1.0f, 1.0f, 1.0f, 0.90f }, BlendMode::kAdd);
+		printBriefText("HackGen", tagStr, tagX + 6.0f, tagY + 2.0f, 12.0f, { 1.0f, 1.0f, 1.0f, 1.0f });
+
+		printBriefText("HackGen", opHeader, tagX + tagW + 10.0f, contentY, 14.0f, { 0.0f, 1.0f, 0.12f, 0.95f });
+		printBriefText("HackGenRegular", "[ TREATY FORCES // NORTHERN FRONT ]", px + 510.0f, contentY + 2.0f, 11.5f, { 0.40f, 0.75f, 0.44f, 0.85f }, { 1.0f, 0.0f });
+		contentY += 24.0f;
 
 		std::string opTitle = mission.name.empty() ? "OPERATION COMBINED STRIKE" : mission.name;
 		std::string opSubTitle = (mission.subTitle.empty() || mission.subTitle == mission.name) ? "" : (" // " + mission.subTitle);
-		printBriefText("HackGen", opTitle + opSubTitle, px + 36.0f, contentY, 28.0f, { 0.85f, 0.97f, 0.87f, 1.0f });
-		contentY += 38.0f;
+		printBriefText("HackGen", opTitle + opSubTitle, px + 36.0f, contentY, 26.0f, { 0.95f, 1.0f, 0.96f, 1.0f });
+		contentY += 36.0f;
 
 		// セパレータライン
-		drawBriefLine({ px + 28.0f, contentY }, { px + panelW - 28.0f, contentY }, 1.5f, { 0.30f, 0.58f, 0.33f, 0.50f });
+		drawBriefLine({ px + 28.0f, contentY }, { px + panelW - 28.0f, contentY }, 1.5f, { 1.0f, 1.0f, 1.0f, 0.35f });
 		contentY += 16.0f;
 
 		// 下部フッターセパレータ位置
 		float footLineY = py + panelH - 68.0f;
 
 		// ====================================================================
-		// 左カラム: 主目標 ＋ 作戦指示 ＋ 戦況・パラメーター (幅 450px)
+		// 左カラム: 主目標 ＋ 作戦指示 ＋ 戦況・パラメーター (幅 465px)
 		// ====================================================================
 		float colLeftX = px + 36.0f;
 		float curY = contentY;
-		const float maxLeftColW = (px + 515.0f) - (colLeftX + 8.0f) - 20.0f;
+		float mapX = px + 520.0f;
+		float mapY = contentY - 4.0f;
+		float mapW = panelW - 556.0f; // 524px
+		float mapH = footLineY - mapY - 8.0f; // 278px
+		const float maxLeftColW = (mapX - 18.0f) - (colLeftX + 16.0f); // ~468px
 
 		// 1. 主目標 (PRIMARY OBJECTIVES)
-		printBriefText("HackGen", "[ PRIMARY OBJECTIVES ]", colLeftX, curY, 15.5f, { 0.53f, 0.88f, 0.55f, 0.95f });
-		curY += 22.0f;
+		printBriefText("HackGen", "[ PRIMARY OBJECTIVES ]", colLeftX, curY, 15.0f, { 0.0f, 1.0f, 0.12f, 1.0f });
+		curY += 21.0f;
 
 		if (!mission.objectives.empty()) {
 			for (size_t o = 0; o < (std::min)(mission.objectives.size(), size_t(2)); ++o) {
@@ -821,50 +976,57 @@ void CombatBootSequence::DrawBootUI() {
 				std::string objTxt = "> " + obj.description;
 				auto objLines = WrapTextByWidth(tr, "HackGen", objTxt, 13.5f, maxLeftColW);
 				for (const auto& line : objLines) {
-					printBriefText("HackGen", line, colLeftX + 8.0f, curY, 13.5f, { 0.76f, 0.94f, 0.78f, 0.95f });
+					printBriefText("HackGenRegular", line, colLeftX + 8.0f, curY, 13.5f, { 0.92f, 0.98f, 0.93f, 0.98f });
 					curY += 19.0f;
 				}
 			}
 		} else {
-			printBriefText("HackGen", "> DESTROY ALL HOSTILE AIR & GROUND CONTACTS", colLeftX + 8.0f, curY, 13.5f, { 0.76f, 0.94f, 0.78f, 0.95f });
+			printBriefText("HackGenRegular", "> DESTROY ALL HOSTILE AIR & GROUND CONTACTS", colLeftX + 8.0f, curY, 13.5f, { 0.92f, 0.98f, 0.93f, 0.98f });
 			curY += 19.0f;
 		}
 
-		// 2. 作戦指示 (DIRECTIVE / SITUATION)
+		// 2. 作戦指示 (DIRECTIVE / SITUATION) - 階層・インデント構造
 		curY += 6.0f;
-		printBriefText("HackGen", "[ SITUATION & DIRECTIVE ]", colLeftX, curY, 15.5f, { 0.53f, 0.88f, 0.55f, 0.95f });
-		curY += 22.0f;
+		printBriefText("HackGen", "[ SITUATION & DIRECTIVE ]", colLeftX, curY, 15.0f, { 0.0f, 1.0f, 0.12f, 1.0f });
+		curY += 21.0f;
 		std::string desc = mission.description.empty() ? "Engage all designated hostile targets. Exercise extreme caution in dense combat zones." : mission.description;
-		auto descLines = WrapTextByWidth(tr, "HackGen", desc, 13.5f, maxLeftColW);
+		const float descMaxW = (mapX - 18.0f) - (colLeftX + 22.0f); // 1文字インデント後の幅
+		auto descLines = WrapTextByWidth(tr, "HackGenRegular", desc, 13.0f, descMaxW);
+		float descStartY = curY;
 		for (const auto& line : descLines) {
-			printBriefText("HackGen", line, colLeftX + 8.0f, curY, 13.5f, { 0.68f, 0.88f, 0.70f, 0.92f });
-			curY += 19.0f;
+			// 左端インデント（1文字分下げて公文書らしいヒエラルキーを形成）
+			printBriefText("HackGenRegular", line, colLeftX + 22.0f, curY, 13.0f, { 0.70f, 0.90f, 0.72f, 0.92f });
+			curY += 18.5f;
+		}
+		// 指示文の左端に繊細な垂直クォートライン
+		if (curY > descStartY) {
+			drawBriefLine({ colLeftX + 10.0f, descStartY }, { colLeftX + 10.0f, curY - 3.0f }, 1.5f, { 0.0f, 1.0f, 0.12f, 0.40f });
 		}
 
 		// 3. 戦況パラメーター (TACTICAL CONDITIONS & INTEL)
 		curY += 6.0f;
-		printBriefText("HackGen", "[ TACTICAL CONDITIONS & INTEL ]", colLeftX, curY, 15.5f, { 0.53f, 0.88f, 0.55f, 0.95f });
-		curY += 22.0f;
+		printBriefText("HackGen", "[ TACTICAL CONDITIONS & INTEL ]", colLeftX, curY, 15.0f, { 0.0f, 1.0f, 0.12f, 1.0f });
+		curY += 21.0f;
 
 		if (mission.enemies.empty() && mission.groundEnemies.empty()) {
-			printBriefText("HackGen", "HOSTILE UNITS    : NONE (RECONNAISSANCE ONLY)", colLeftX + 8.0f, curY, 14.0f, { 0.46f, 0.82f, 0.49f, 0.90f });
-			curY += 21.0f;
+			printBriefText("HackGen", "HOSTILE UNITS    : NONE (RECONNAISSANCE ONLY)", colLeftX + 8.0f, curY, 13.5f, { 0.46f, 0.82f, 0.49f, 0.90f });
+			curY += 20.0f;
 		} else {
 			char airBuf[64];
 			snprintf(airBuf, sizeof(airBuf), "HOSTILE AIRBORNE : %zu UNITS", mission.enemies.size());
-			printBriefText("HackGen", airBuf, colLeftX + 8.0f, curY, 14.0f, { 0.95f, 0.40f, 0.35f, 0.95f });
-			curY += 21.0f;
+			printBriefText("HackGen", airBuf, colLeftX + 8.0f, curY, 13.5f, { 0.98f, 0.42f, 0.38f, 0.98f });
+			curY += 20.0f;
 
 			char gndBuf[64];
 			snprintf(gndBuf, sizeof(gndBuf), "HOSTILE GROUND   : %zu SITES", mission.groundEnemies.size());
-			printBriefText("HackGen", gndBuf, colLeftX + 8.0f, curY, 14.0f, { 0.95f, 0.70f, 0.30f, 0.95f });
-			curY += 21.0f;
+			printBriefText("HackGen", gndBuf, colLeftX + 8.0f, curY, 13.5f, { 1.00f, 0.68f, 0.22f, 0.98f });
+			curY += 20.0f;
 		}
 
 		char areaBuf[128];
 		snprintf(areaBuf, sizeof(areaBuf), "COMBAT AIRSPACE  : %s", mission.areaName.c_str());
-		printBriefText("HackGen", areaBuf, colLeftX + 8.0f, curY, 14.0f, { 0.46f, 0.82f, 0.49f, 0.90f });
-		curY += 21.0f;
+		printBriefText("HackGen", areaBuf, colLeftX + 8.0f, curY, 13.5f, { 0.0f, 1.0f, 0.12f, 0.92f });
+		curY += 20.0f;
 
 		char timeBuf[64];
 		if (mission.timeLimit > 0.0f) {
@@ -873,46 +1035,182 @@ void CombatBootSequence::DrawBootUI() {
 		} else {
 			snprintf(timeBuf, sizeof(timeBuf), "TIME LIMIT       : UNLIMITED");
 		}
-		printBriefText("HackGen", timeBuf, colLeftX + 8.0f, curY, 14.0f, { 0.53f, 0.88f, 0.55f, 0.95f });
+		printBriefText("HackGen", timeBuf, colLeftX + 8.0f, curY, 13.5f, { 0.0f, 1.0f, 0.12f, 0.95f });
 
 		// ====================================================================
-		// 右カラム: 作戦空域タクティカルマップ (四角い枠のみ)
+		// 右カラム: 作戦空域戦術マップ (THEATER TACTICAL MAP)
 		// ====================================================================
-		float mapX = px + 515.0f;
-		float mapY = contentY - 4.0f;
-		float mapW = panelW - 550.0f; // 530px
-		float mapH = footLineY - mapY - 8.0f; // 280px
-
-		// マップ背景 & 枠線 (四角い枠)
-		drawBriefRect({ mapX, mapY }, { mapW, mapH }, { 0.005f, 0.03f, 0.01f, 0.98f });
-		Vector4 mapBorderCol = { 0.53f, 0.88f, 0.55f, 1.0f };
+		// マップ背景 & 外枠
+		drawBriefRect({ mapX, mapY }, { mapW, mapH }, { 0.003f, 0.018f, 0.008f, 0.98f });
+		Vector4 mapBorderCol = { 1.0f, 1.0f, 1.0f, 0.85f }; // 白枠
 		drawBriefLine({ mapX, mapY }, { mapX + mapW, mapY }, 2.0f, mapBorderCol, BlendMode::kAdd);
 		drawBriefLine({ mapX, mapY + mapH }, { mapX + mapW, mapY + mapH }, 2.0f, mapBorderCol, BlendMode::kAdd);
 		drawBriefLine({ mapX, mapY }, { mapX, mapY + mapH }, 2.0f, mapBorderCol, BlendMode::kAdd);
 		drawBriefLine({ mapX + mapW, mapY }, { mapX + mapW, mapY + mapH }, 2.0f, mapBorderCol, BlendMode::kAdd);
-		drawBriefBracket({ mapX + mapW * 0.5f, mapY + mapH * 0.5f }, { mapW + 12.0f, mapH + 12.0f }, 20.0f, 2.0f, { 0.65f, 0.92f, 0.68f, 1.0f });
+		drawBriefBracket({ mapX + mapW * 0.5f, mapY + mapH * 0.5f }, { mapW + 12.0f, mapH + 12.0f }, 20.0f, 2.0f, { 1.0f, 1.0f, 1.0f, 1.0f });
 
 		// マップヘッダーバー
-		drawBriefRect({ mapX, mapY }, { mapW, 26.0f }, { 0.05f, 0.15f, 0.06f, 0.95f });
+		drawBriefRect({ mapX, mapY }, { mapW, 26.0f }, { 0.04f, 0.15f, 0.05f, 0.95f });
 		drawBriefLine({ mapX, mapY + 26.0f }, { mapX + mapW, mapY + 26.0f }, 1.5f, mapBorderCol, BlendMode::kAdd);
-		printBriefText("HackGen", "[ THEATER TACTICAL MAP ]", mapX + 12.0f, mapY + 5.0f, 13.0f, { 0.53f, 0.88f, 0.55f, 0.95f });
+		printBriefText("HackGen", "[ THEATER TACTICAL MAP ]", mapX + 12.0f, mapY + 5.0f, 12.5f, { 0.0f, 1.0f, 0.12f, 1.0f });
+		printBriefText("HackGenRegular", "SCALE: 1:50,000 // REAL TOPO ELEVATION", mapX + mapW - 12.0f, mapY + 6.0f, 10.5f, { 0.45f, 0.80f, 0.48f, 0.85f }, { 1.0f, 0.0f });
+
+		// マップ内部描画領域
+		const float inX = mapX + 2.0f;
+		const float inY = mapY + 26.0f;
+		const float inW = mapW - 4.0f;
+		const float inH = mapH - 28.0f;
+		const float mapCenterX = inX + inW * 0.50f;
+		const float mapCenterY = inY + inH * 0.50f;
+
+		// 3D地形チャンクより本物の等高線を生成（初回のみ実行・キャッシュ）
+		GenerateRealTerrainContours();
+
+		// 作戦空域ワールド境界（実地形サンプリング範囲と1:1完全同期）
+		const float worldMinX = -2400.0f;
+		const float worldMaxX =  2000.0f;
+		const float worldMinZ =   400.0f;
+		const float worldMaxZ =  8000.0f;
+
+		auto projectToMap = [&](float wx, float wz) -> Vector2 {
+			float normX = std::clamp((wx - worldMinX) / (worldMaxX - worldMinX), 0.0f, 1.0f);
+			float normZ = std::clamp((wz - worldMinZ) / (worldMaxZ - worldMinZ), 0.0f, 1.0f);
+			return { inX + normX * inW, inY + (1.0f - normZ) * inH };
+		};
+
+		// 1. 戦術グリッド線 & 座標目盛り
+		const float gridStepX = inW / 6.0f;
+		const float gridStepY = inH / 5.0f;
+		Vector4 gridCol = { 0.0f, 0.65f, 0.15f, 0.18f };
+		for (int gx = 1; gx < 6; ++gx) {
+			float lx = inX + gx * gridStepX;
+			drawBriefLine({ lx, inY }, { lx, inY + inH }, 1.0f, gridCol);
+		}
+		for (int gy = 1; gy < 5; ++gy) {
+			float ly = inY + gy * gridStepY;
+			drawBriefLine({ inX, ly }, { inX + inW, ly }, 1.0f, gridCol);
+		}
+
+		// グリッド交点クロスヘア
+		Vector4 tickCol = { 0.0f, 1.0f, 0.12f, 0.40f };
+		for (int gx = 1; gx < 6; ++gx) {
+			for (int gy = 1; gy < 5; ++gy) {
+				float ix = inX + gx * gridStepX;
+				float iy = inY + gy * gridStepY;
+				drawBriefLine({ ix - 3.0f, iy }, { ix + 3.0f, iy }, 1.0f, tickCol);
+				drawBriefLine({ ix, iy - 3.0f }, { ix, iy + 3.0f }, 1.0f, tickCol);
+			}
+		}
+
+		// 2. 実地形等高線描画（3D Terrain Chunk Manager よりサンプリングされた本物の等高線）
+		for (const auto& seg : realContourSegments_) {
+			Vector2 p1 = { inX + seg.normP1.x * inW, inY + (1.0f - seg.normP1.y) * inH };
+			Vector2 p2 = { inX + seg.normP2.x * inW, inY + (1.0f - seg.normP2.y) * inH };
+			drawBriefLine(p1, p2, 1.2f, seg.color, BlendMode::kAdd);
+		}
+
+		// 標高凡例インデックスラベル（実標高）
+		printBriefText("HackGenRegular", "-450M [BED]", inX + 8.0f, inY + inH * 0.72f, 9.0f, { 0.0f, 0.70f, 0.35f, 0.75f });
+		printBriefText("HackGenRegular", "-350M [CORRIDOR]", inX + 8.0f, inY + inH * 0.54f, 9.0f, { 0.0f, 0.90f, 0.20f, 0.80f });
+		printBriefText("HackGenRegular", "-150M [CLIFF]", inX + 8.0f, inY + inH * 0.36f, 9.0f, { 0.35f, 1.00f, 0.25f, 0.85f });
+		printBriefText("HackGenRegular", "0M [PLATEAU]", inX + 8.0f, inY + inH * 0.18f, 9.0f, { 0.95f, 1.00f, 0.95f, 0.90f });
+
+		// 3. 作戦エリア索敵レンジリング
+		drawBriefCircleRing({ mapCenterX, mapCenterY }, 65.0f, { 0.0f, 1.0f, 0.12f, 0.25f });
+		drawBriefCircleRing({ mapCenterX, mapCenterY }, 120.0f, { 0.0f, 1.0f, 0.12f, 0.15f });
+
+		// 方位記号
+		printBriefText("HackGen", "▲ N", inX + inW * 0.5f, inY + 8.0f, 10.5f, { 0.0f, 1.0f, 0.12f, 0.85f }, { 0.5f, 0.0f });
+		printBriefText("HackGen", "W", inX + 8.0f, mapCenterY - 6.0f, 10.0f, { 0.0f, 1.0f, 0.12f, 0.60f });
+		printBriefText("HackGen", "E", inX + inW - 14.0f, mapCenterY - 6.0f, 10.0f, { 0.0f, 1.0f, 0.12f, 0.60f });
+
+		// 4. 実3D座標と1:1完全同期した作戦飛行ルート（Flight Path Trajectory）
+		Vector2 pEntry  = projectToMap(220.0f, 800.0f);
+		Vector2 pGate1  = projectToMap(195.0f, 2850.0f);
+		Vector2 pGate2  = projectToMap(55.0f, 3500.0f);
+		Vector2 pTower  = projectToMap(-52.0f, 4950.0f);
+		Vector2 pDanger = projectToMap(-220.0f, 5800.0f);
+		Vector2 pExit   = projectToMap(-640.0f, 7400.0f);
+		Vector2 pRookie = projectToMap(mission.playerPosition.x, mission.playerPosition.z);
+		Vector2 pCorax  = projectToMap(mission.playerPosition.x + 24.0f, mission.playerPosition.z + 135.0f);
+
+		// 破線ルート描画
+		auto drawDashedRoute = [&](Vector2 a, Vector2 b, Vector4 col) {
+			float dist = std::hypot(b.x - a.x, b.y - a.y);
+			int steps = (std::max)(1, static_cast<int>(dist / 12.0f));
+			for (int s = 0; s < steps; ++s) {
+				if (s % 2 == 0) {
+					float t0 = static_cast<float>(s) / static_cast<float>(steps);
+					float t1 = static_cast<float>(s + 1) / static_cast<float>(steps);
+					drawBriefLine(
+						{ a.x + (b.x - a.x) * t0, a.y + (b.y - a.y) * t0 },
+						{ a.x + (b.x - a.x) * t1, a.y + (b.y - a.y) * t1 },
+						1.5f, col, BlendMode::kAdd);
+				}
+			}
+		};
+		Vector4 routeCol = { 0.0f, 1.0f, 0.12f, 0.85f };
+		drawDashedRoute(pEntry, pGate1, routeCol);
+		drawDashedRoute(pGate1, pGate2, routeCol);
+		drawDashedRoute(pGate2, pDanger, { 1.0f, 0.70f, 0.20f, 0.90f }); // 警戒区間
+		drawDashedRoute(pDanger, pExit, routeCol);
+
+		// 第1ゲートマーカー（実3D座標）
+		drawBriefBracket(pGate1, { 14.0f, 14.0f }, 4.0f, 1.5f, { 0.0f, 1.0f, 0.12f, 1.0f });
+		printBriefText("HackGen", "GATE 01", pGate1.x + 10.0f, pGate1.y - 6.0f, 10.0f, { 0.0f, 1.0f, 0.12f, 0.95f });
+
+		// 第2ゲートマーカー（実3D座標）
+		drawBriefBracket(pGate2, { 14.0f, 14.0f }, 4.0f, 1.5f, { 0.0f, 1.0f, 0.12f, 1.0f });
+		printBriefText("HackGen", "GATE 02", pGate2.x + 10.0f, pGate2.y - 6.0f, 10.0f, { 0.0f, 1.0f, 0.12f, 0.95f });
+
+		// 警戒接敵ゾーン（赤/薄赤アラート円）
+		float zonePulse = 0.5f + 0.5f * std::sin(animTime * 6.0f);
+		drawBriefCircleRing(pDanger, 22.0f, { 0.98f, 0.35f, 0.30f, 0.50f + 0.40f * zonePulse });
+		drawBriefRect({ pDanger.x - 3.0f, pDanger.y - 3.0f }, { 6.0f, 6.0f }, { 0.98f, 0.35f, 0.30f, 0.95f });
+		printBriefText("HackGen", "HOSTILE CONTACT", pDanger.x + 10.0f, pDanger.y - 6.0f, 10.0f, { 0.98f, 0.38f, 0.35f, 0.95f });
+
+		// 監視所4（地上目標・実3D座標）
+		drawBriefRect({ pTower.x - 3.0f, pTower.y - 3.0f }, { 6.0f, 6.0f }, { 1.0f, 0.65f, 0.20f, 0.95f });
+		printBriefText("HackGen", "POST 04", pTower.x + 8.0f, pTower.y - 5.0f, 9.5f, { 1.0f, 0.70f, 0.25f, 0.90f });
+
+		// 離脱地点（実3D座標）
+		drawBriefBracket(pExit, { 14.0f, 14.0f }, 4.0f, 1.5f, { 0.0f, 1.0f, 0.12f, 0.90f });
+		printBriefText("HackGen", "EGRESS", pExit.x + 10.0f, pExit.y - 6.0f, 9.5f, { 0.0f, 1.0f, 0.12f, 0.90f });
+
+		// 自機アイコン (ROOKIE M-21A) & 隊長機 (CORAX) - 実3D座標
+		drawBriefLine({ pRookie.x - 4.0f, pRookie.y + 4.0f }, { pRookie.x, pRookie.y - 5.0f }, 2.0f, { 0.0f, 1.0f, 0.12f, 1.0f });
+		drawBriefLine({ pRookie.x + 4.0f, pRookie.y + 4.0f }, { pRookie.x, pRookie.y - 5.0f }, 2.0f, { 0.0f, 1.0f, 0.12f, 1.0f });
+		printBriefText("HackGen", "ROOKIE [YOU]", pRookie.x - 45.0f, pRookie.y - 4.0f, 9.5f, { 1.0f, 1.0f, 1.0f, 0.95f });
+
+		drawBriefLine({ pCorax.x - 4.0f, pCorax.y + 4.0f }, { pCorax.x, pCorax.y - 5.0f }, 2.0f, { 0.0f, 1.0f, 0.12f, 1.0f });
+		drawBriefLine({ pCorax.x + 4.0f, pCorax.y + 4.0f }, { pCorax.x, pCorax.y - 5.0f }, 2.0f, { 0.0f, 1.0f, 0.12f, 1.0f });
+		printBriefText("HackGen", "CORAX [LEAD]", pCorax.x + 8.0f, pCorax.y - 4.0f, 9.5f, { 0.0f, 1.0f, 0.12f, 0.95f });
+
+		// 5. アニメーション走査ビーム (レーダー走査)
+		float scanX = inX + std::fmod(animTime * 90.0f, inW);
+		drawBriefLine({ scanX, inY }, { scanX, inY + inH }, 1.5f, { 0.0f, 1.0f, 0.12f, 0.45f }, BlendMode::kAdd);
+		drawBriefRect({ scanX - 18.0f, inY }, { 18.0f, inH }, { 0.0f, 0.8f, 0.10f, 0.08f }, { 0.0f, 0.0f }, BlendMode::kAdd);
+
+		// マップ下部ステータスバー
+		printBriefText("HackGenRegular", "DATUM: 3D TERRAIN CHUNK (REAL-ELEV)", inX + 8.0f, inY + inH - 14.0f, 10.0f, { 0.40f, 0.75f, 0.44f, 0.85f });
+		printBriefText("HackGenRegular", "CONTOUR INT: 100M // MSL 0M", inX + inW - 8.0f, inY + inH - 14.0f, 10.0f, { 0.40f, 0.75f, 0.44f, 0.85f }, { 1.0f, 0.0f });
 
 		// ====================================================================
 		// フッターエリア: ステータス ＆ PRESS SPACE TO START
 		// ====================================================================
-		drawBriefLine({ px + 24.0f, footLineY }, { px + panelW - 24.0f, footLineY }, 1.5f, { 0.30f, 0.60f, 0.33f, 0.55f });
+		drawBriefLine({ px + 24.0f, footLineY }, { px + panelW - 24.0f, footLineY }, 1.5f, { 1.0f, 1.0f, 1.0f, 0.40f });
 
 		// 左側: ステータスインジケーター
 		float indY = footLineY + 22.0f;
 		bool indBlink = (std::fmod(animTime, 0.5f) < 0.30f);
-		Vector4 indCol = blink ? Vector4{ 0.48f, 0.84f, 0.50f, 0.95f } : Vector4{ 0.25f, 0.48f, 0.28f, 0.60f };
+		Vector4 indCol = blink ? Vector4{ 0.0f, 1.0f, 0.12f, 1.0f } : Vector4{ 0.15f, 0.45f, 0.18f, 0.60f };
 		drawBriefRect({ px + 32.0f, indY + 3.0f }, { 10.0f, 10.0f }, indCol);
-		printBriefText("HackGen", "SORTIE STANDBY // ALL WEAPONS ARMED", px + 50.0f, indY, 13.5f, { 0.46f, 0.80f, 0.49f, 0.85f });
+		printBriefText("HackGenRegular", "SORTIE STANDBY // ALL WEAPONS ARMED", px + 50.0f, indY, 13.0f, { 0.0f, 1.0f, 0.12f, 0.90f });
 
 		// 右側: サブ入力ガイド
-		printBriefText("HackGen", "[ENTER / CLICK] ALSO ACCEPTED", px + panelW - 32.0f, indY, 13.0f, { 0.38f, 0.68f, 0.41f, 0.75f }, { 1.0f, 0.0f });
+		printBriefText("HackGenRegular", "[ENTER / CLICK] ALSO ACCEPTED", px + panelW - 32.0f, indY, 12.5f, { 0.40f, 0.75f, 0.44f, 0.80f }, { 1.0f, 0.0f });
 
-		// 中央: メイン出撃誘導ボタン (PRESS SPACE TO START MISSION)
+		// 中央: メイン出撃誘導ボタン (PRESS SPACE TO START MISSION) - 視線誘導強化
 		float btnW = 540.0f;
 		float btnH = 40.0f;
 		float btnX = cx - btnW * 0.5f;
@@ -921,11 +1219,42 @@ void CombatBootSequence::DrawBootUI() {
 		if (isWaitingForSpace_) {
 			bool isHover = (cursorPos_.x >= btnX && cursorPos_.x <= btnX + btnW &&
 			                cursorPos_.y >= btnY && cursorPos_.y <= btnY + btnH);
-			float pulse = 0.65f + 0.35f * std::sin(animTime * 4.5f);
-			Vector4 textCol = isHover ? Vector4{ 1.0f, 1.0f, 1.0f, 1.0f } : Vector4{ 0.88f, 0.98f, 0.90f, (0.90f + 0.10f * pulse) };
-			std::string promptText = isHover ? ">> CLICK OR PRESS [ SPACE ] TO START MISSION <<" : ">> PRESS [ SPACE ] TO START MISSION <<";
+
+			// 緩やかなアンバー〜白の明滅（ブリンクパルス）
+			float pulse = 0.5f + 0.5f * std::sin(animTime * 4.2f);
+			Vector4 amberBorder = isHover
+				? Vector4{ 1.0f, 1.0f, 1.0f, 1.0f }
+				: Vector4{ 1.0f, 0.78f + 0.18f * pulse, 0.15f + 0.25f * pulse, 0.95f };
+
+			Vector4 btnPlate = isHover
+				? Vector4{ 0.26f, 0.18f, 0.02f, 0.95f }
+				: Vector4{ 0.10f, 0.07f, 0.01f, 0.90f };
+
+			// ボタンプレート背景
+			drawBriefRect({ btnX, btnY }, { btnW, btnH }, btnPlate);
+
+			// 四周アンバー枠線 ＆ コーナーブラケット
+			drawBriefLine({ btnX, btnY }, { btnX + btnW, btnY }, 1.5f, amberBorder, BlendMode::kAdd);
+			drawBriefLine({ btnX, btnY + btnH }, { btnX + btnW, btnY + btnH }, 1.5f, amberBorder, BlendMode::kAdd);
+			drawBriefLine({ btnX, btnY }, { btnX, btnY + btnH }, 1.5f, amberBorder, BlendMode::kAdd);
+			drawBriefLine({ btnX + btnW, btnY }, { btnX + btnW, btnY + btnH }, 1.5f, amberBorder, BlendMode::kAdd);
+			drawBriefBracket({ cx, btnY + btnH * 0.5f }, { btnW, btnH }, 12.0f, 2.0f, amberBorder);
+
+			// 決定キーガイドテキスト（ハイライト白〜アンバー明滅）
+			Vector4 textCol = isHover
+				? Vector4{ 1.0f, 1.0f, 1.0f, 1.0f }
+				: Vector4{ 1.0f, 0.88f + 0.12f * pulse, 0.25f + 0.70f * pulse, 1.0f };
+
+			std::string promptText = isHover
+				? ">> CLICK OR PRESS [ SPACE ] TO START MISSION <<"
+				: ">> PRESS [ SPACE ] TO START MISSION <<";
 			printBriefText("HackGen", promptText, cx, btnY + 9.0f, 17.5f, textCol, { 0.5f, 0.0f });
 		} else {
+			// 出撃開始時
+			drawBriefRect({ btnX, btnY }, { btnW, btnH }, { 0.0f, 0.30f, 0.05f, 0.95f });
+			drawBriefLine({ btnX, btnY }, { btnX + btnW, btnY }, 2.0f, { 1.0f, 1.0f, 1.0f, 1.0f }, BlendMode::kAdd);
+			drawBriefLine({ btnX, btnY + btnH }, { btnX + btnW, btnY + btnH }, 2.0f, { 1.0f, 1.0f, 1.0f, 1.0f }, BlendMode::kAdd);
+			drawBriefBracket({ cx, btnY + btnH * 0.5f }, { btnW, btnH }, 12.0f, 2.0f, { 1.0f, 1.0f, 1.0f, 1.0f });
 			printBriefText("HackGen", ">> SORTIE INITIATED // STARTING COMBAT MODE <<", cx, btnY + 9.0f, 17.5f, { 1.0f, 1.0f, 1.0f, 1.0f }, { 0.5f, 0.0f });
 		}
 

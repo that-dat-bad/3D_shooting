@@ -137,11 +137,11 @@ void TextRenderer::Print(const std::string& fontName, const std::string& text, f
         if (it != info->glyphs.end()) {
             const stbtt_packedchar* b = &it->second;
             
-            // 四角形の生成
-            float xpos = startX + b->xoff * scale;
-            float ypos = startY + b->yoff * scale;
-            float width = (b->x1 - b->x0) * scale;
-            float height = (b->y1 - b->y0) * scale;
+            // 四角形の生成（整数ピクセルにスナップしてサブピクセル滲みやジャギーを抑制）
+            float xpos = std::round(startX + b->xoff * scale);
+            float ypos = std::round(startY + b->yoff * scale);
+            float width = std::round((b->x1 - b->x0) * scale);
+            float height = std::round((b->y1 - b->y0) * scale);
 
             Sprite* sprite = GetNextSprite();
             sprite->SetTextureIndex(info->textureIndex);

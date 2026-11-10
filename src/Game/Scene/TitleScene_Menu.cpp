@@ -17,17 +17,17 @@ void TitleScene::InitializeUI(SpriteCommon* spriteCommon, bool fromCache) {
 	titleText_.Initialize("HackGen", "DAWN", 48.0f);
 	titleText_.SetAnchorPoint({ 0.5f, 0.0f });
 	titleText_.SetPosition({ kScreenWidth * 0.5f, 106.0f });
-	titleText_.SetColor({ 0.45f, 0.84f, 0.48f, 1.0f }); // 鮮烈なエレクトリック・ターミナルグリーン
+	titleText_.SetColor({ 0.0f, 1.0f, 0.12f, 1.0f }); // (0, 255, 30) ネオングリーン
 	titleText_.SetDropShadow(true, { 2.0f, 3.0f }, { 0.0f, 0.0f, 0.0f, 0.95f });
-	titleText_.SetOutline(true, 1.5f, { 0.03f, 0.14f, 0.04f, 0.95f });
+	titleText_.SetOutline(true, 1.5f, { 0.0f, 0.10f, 0.015f, 0.95f });
 
 	// ============================
-	// サブタイトルテキスト（ターミナルグリーン統一＆重なり解消）
+	// サブタイトルテキスト（(0, 255, 30)統一＆重なり解消）
 	// ============================
 	subtitleText_.Initialize("HackGen", "- OPERATION : DAWN -", 14.0f);
 	subtitleText_.SetAnchorPoint({ 0.5f, 0.0f });
 	subtitleText_.SetPosition({ kScreenWidth * 0.5f, 196.0f });
-	subtitleText_.SetColor({ 0.46f, 0.82f, 0.49f, 0.95f }); // ターミナルグリーン
+	subtitleText_.SetColor({ 0.0f, 1.0f, 0.12f, 0.95f }); // (0, 255, 30) ネオングリーン
 	subtitleText_.SetDropShadow(true, { 1.5f, 2.0f }, { 0.0f, 0.0f, 0.0f, 0.90f });
 
 	// ============================
@@ -40,10 +40,10 @@ void TitleScene::InitializeUI(SpriteCommon* spriteCommon, bool fromCache) {
 	float buttonSpacing = 56.0f;
 
 	const Vector4 btnNormalBg   = { 0.0f, 0.0f, 0.0f, 0.0f };       // 漆黒ウィンドウを活かしたクリーンな背景
-	const Vector4 btnHoverBg    = { 0.08f, 0.24f, 0.09f, 0.50f };  // 上品な深緑半透明ハイライト
-	const Vector4 btnSelectedBg = { 0.08f, 0.24f, 0.09f, 0.50f };  // 上品な深緑半透明ハイライト
-	const Vector4 btnNormalText = { 0.46f, 0.82f, 0.49f, 0.95f };  // ターミナルグリーン文字
-	const Vector4 btnSelText    = { 0.78f, 0.95f, 0.80f, 1.00f };  // 鮮やかな白熱発光グリーン文字
+	const Vector4 btnHoverBg    = { 0.0f, 0.15f, 0.02f, 0.50f };  // 深緑半透明ハイライト
+	const Vector4 btnSelectedBg = { 0.0f, 0.15f, 0.02f, 0.50f };  // 深緑半透明ハイライト
+	const Vector4 btnNormalText = { 0.0f, 0.88f, 0.10f, 0.95f };  // (0, 255, 30) ターミナルグリーン文字
+	const Vector4 btnSelText    = { 0.0f, 1.0f, 0.12f, 1.00f };  // 鮮やかな(0, 255, 30)ネオングリーン文字
 
 	const Vector4 btnLockedBg   = { 0.04f, 0.08f, 0.045f, 0.70f };
 	const Vector4 btnLockedText = { 0.40f, 0.52f, 0.41f, 0.65f };
@@ -278,12 +278,12 @@ void TitleScene::InitializeMenuCard(SpriteCommon* spriteCommon) {
 	headerLampSprite_->SetAnchorPoint({ 0.0f, 0.0f });
 	headerLampSprite_->SetPosition({ cardX + 14.0f, cardY + 13.0f });
 	headerLampSprite_->SetSize({ 8.0f, 8.0f });
-	headerLampSprite_->SetColor({ 0.48f, 0.84f, 0.50f, 0.95f });
+	headerLampSprite_->SetColor({ 0.0f, 1.0f, 0.12f, 0.95f });
 	headerLampSprite_->Update();
 
-	// 5. ウィンドウ外周境界線 (太さ 2px)
-	const MyMath::Vector4 borderColor = { 0.38f, 0.74f, 0.41f, 0.85f };
-	const MyMath::Vector4 cornerColor = { 0.48f, 0.84f, 0.50f, 1.00f };
+	// 5. ウィンドウ外周境界線 (太さ 2px) - ウィンドウの淵は白
+	const MyMath::Vector4 borderColor = { 1.0f, 1.0f, 1.0f, 0.85f };
+	const MyMath::Vector4 cornerColor = { 1.0f, 1.0f, 1.0f, 1.00f };
 	const float cLen = 20.0f;
 	const float cThick = 3.0f;
 
@@ -292,7 +292,7 @@ void TitleScene::InitializeMenuCard(SpriteCommon* spriteCommon) {
 	addBorderLine({ cardX, cardY }, { 2.0f, cardHeight }, borderColor);
 	addBorderLine({ cardX + cardWidth - 2.0f, cardY }, { 2.0f, cardHeight }, borderColor);
 
-	// 四隅のコーナーブラケット (太さ 3px)
+	// 四隅のコーナーブラケット (太さ 3px) - 白
 	addBorderLine({ cardX, cardY }, { cLen, cThick }, cornerColor);
 	addBorderLine({ cardX, cardY }, { cThick, cLen }, cornerColor);
 	addBorderLine({ cardX + cardWidth - cLen, cardY }, { cLen, cThick }, cornerColor);
@@ -303,17 +303,17 @@ void TitleScene::InitializeMenuCard(SpriteCommon* spriteCommon) {
 	addBorderLine({ cardX + cardWidth - cThick, cardY + cardHeight - cLen }, { cThick, cLen }, cornerColor);
 
 	// タイトルバー下部区切り線 (太さ 2px, Y = cardY + 32.0f)
-	addBorderLine({ cardX, cardY + 32.0f }, { cardWidth, 2.0f }, { 0.38f, 0.74f, 0.41f, 0.80f });
+	addBorderLine({ cardX, cardY + 32.0f }, { cardWidth, 2.0f }, { 1.0f, 1.0f, 1.0f, 0.65f });
 
 	// タイトル下の水平区切り線 (Y = cardY + 172.0f)
-	addBorderLine({ cardX + 24.0f, cardY + 172.0f }, { cardWidth - 48.0f, 1.0f }, { 0.35f, 0.68f, 0.38f, 0.45f });
+	addBorderLine({ cardX + 24.0f, cardY + 172.0f }, { cardWidth - 48.0f, 1.0f }, { 1.0f, 1.0f, 1.0f, 0.40f });
 
 	// 操作案内枠（Y=482、高さ38px、幅 cardWidth - 50px）
 	const float gfX = cardX + 25.0f;
 	const float gfY = cardY + 430.0f;
 	const float gfW = cardWidth - 50.0f;
 	const float gfH = 38.0f;
-	const MyMath::Vector4 gfCorner = { 0.38f, 0.74f, 0.41f, 0.65f };
+	const MyMath::Vector4 gfCorner = { 1.0f, 1.0f, 1.0f, 0.60f };
 	addBorderLine({ gfX, gfY }, { 10.0f, 1.0f }, gfCorner);
 	addBorderLine({ gfX, gfY }, { 1.0f, 10.0f }, gfCorner);
 	addBorderLine({ gfX + gfW - 10.0f, gfY }, { 10.0f, 1.0f }, gfCorner);
@@ -325,8 +325,8 @@ void TitleScene::InitializeMenuCard(SpriteCommon* spriteCommon) {
 
 	// ウィンドウ最下部ステータスバー背景＆境界線 (高さ 26px)
 	const float sbY = cardY + cardHeight - 26.0f;
-	addBorderLine({ cardX, sbY }, { cardWidth, 26.0f }, { 0.02f, 0.07f, 0.025f, 1.0f });
-	addBorderLine({ cardX, sbY }, { cardWidth, 1.0f }, { 0.33f, 0.64f, 0.36f, 0.60f });
+	addBorderLine({ cardX, sbY }, { cardWidth, 26.0f }, { 0.0f, 0.0f, 0.0f, 1.0f });
+	addBorderLine({ cardX, sbY }, { cardWidth, 1.0f }, { 1.0f, 1.0f, 1.0f, 0.50f });
 
 	// ------------------------------------------------------------
 	// 各ボタンのアウトライン枠線＆サイバーブラケット（buttonBorders_）
@@ -365,25 +365,25 @@ void TitleScene::InitializeMenuCard(SpriteCommon* spriteCommon) {
 			group.brackets.push_back(createLineSprite(pos, size, color));
 		};
 
-		// 外周枠線 (1px) 4本
-		addOutline({ btnX, by }, { btnW, 1.0f }, { 0.25f, 0.48f, 0.28f, 0.35f });
-		addOutline({ btnX, by + btnH - 1.0f }, { btnW, 1.0f }, { 0.25f, 0.48f, 0.28f, 0.35f });
-		addOutline({ btnX, by }, { 1.0f, btnH }, { 0.25f, 0.48f, 0.28f, 0.35f });
-		addOutline({ btnX + btnW - 1.0f, by }, { 1.0f, btnH }, { 0.25f, 0.48f, 0.28f, 0.35f });
+		// 外周枠線 (1px) 4本 - 白
+		addOutline({ btnX, by }, { btnW, 1.0f }, { 1.0f, 1.0f, 1.0f, 0.35f });
+		addOutline({ btnX, by + btnH - 1.0f }, { btnW, 1.0f }, { 1.0f, 1.0f, 1.0f, 0.35f });
+		addOutline({ btnX, by }, { 1.0f, btnH }, { 1.0f, 1.0f, 1.0f, 0.35f });
+		addOutline({ btnX + btnW - 1.0f, by }, { 1.0f, btnH }, { 1.0f, 1.0f, 1.0f, 0.35f });
 
-		// 四隅ブラケット (2px) 8本
-		addBracket({ btnX, by }, { bcLen, bcThick }, { 0.33f, 0.64f, 0.36f, 0.50f });
-		addBracket({ btnX, by }, { bcThick, bcLen }, { 0.33f, 0.64f, 0.36f, 0.50f });
-		addBracket({ btnX + btnW - bcLen, by }, { bcLen, bcThick }, { 0.33f, 0.64f, 0.36f, 0.50f });
-		addBracket({ btnX + btnW - bcThick, by }, { bcThick, bcLen }, { 0.33f, 0.64f, 0.36f, 0.50f });
-		addBracket({ btnX, by + btnH - bcThick }, { bcLen, bcThick }, { 0.33f, 0.64f, 0.36f, 0.50f });
-		addBracket({ btnX, by + btnH - bcLen }, { bcThick, bcLen }, { 0.33f, 0.64f, 0.36f, 0.50f });
-		addBracket({ btnX + btnW - bcLen, by + btnH - bcThick }, { bcLen, bcThick }, { 0.33f, 0.64f, 0.36f, 0.50f });
-		addBracket({ btnX + btnW - bcThick, by + btnH - bcLen }, { bcThick, bcLen }, { 0.33f, 0.64f, 0.36f, 0.50f });
+		// 四隅ブラケット (2px) 8本 - 白
+		addBracket({ btnX, by }, { bcLen, bcThick }, { 1.0f, 1.0f, 1.0f, 0.50f });
+		addBracket({ btnX, by }, { bcThick, bcLen }, { 1.0f, 1.0f, 1.0f, 0.50f });
+		addBracket({ btnX + btnW - bcLen, by }, { bcLen, bcThick }, { 1.0f, 1.0f, 1.0f, 0.50f });
+		addBracket({ btnX + btnW - bcThick, by }, { bcThick, bcLen }, { 1.0f, 1.0f, 1.0f, 0.50f });
+		addBracket({ btnX, by + btnH - bcThick }, { bcLen, bcThick }, { 1.0f, 1.0f, 1.0f, 0.50f });
+		addBracket({ btnX, by + btnH - bcLen }, { bcThick, bcLen }, { 1.0f, 1.0f, 1.0f, 0.50f });
+		addBracket({ btnX + btnW - bcLen, by + btnH - bcThick }, { bcLen, bcThick }, { 1.0f, 1.0f, 1.0f, 0.50f });
+		addBracket({ btnX + btnW - bcThick, by + btnH - bcLen }, { bcThick, bcLen }, { 1.0f, 1.0f, 1.0f, 0.50f });
 
 		// ボタン左端内側のソリッド・アクティブバー（ボタン枠線と完璧にアライン・統合）
 		buttonBorderIndicatorOffsets_.push_back({ (btnX + 1.0f) - cardX, (by + 2.0f) - cardY });
-		group.indicator = createLineSprite({ btnX + 1.0f, by + 2.0f }, { 3.0f, btnH - 4.0f }, { 0.12f, 0.24f, 0.14f, 0.25f });
+		group.indicator = createLineSprite({ btnX + 1.0f, by + 2.0f }, { 3.0f, btnH - 4.0f }, { 0.0f, 1.0f, 0.12f, 0.25f });
 
 		buttonBorderOutlineOffsets_.push_back(std::move(outOffsets));
 		buttonBorderBracketOffsets_.push_back(std::move(brkOffsets));
@@ -507,9 +507,9 @@ void TitleScene::UpdateMenuConsoleVisuals() {
 			bracketCol   = isSel ? MyMath::Vector4{ 1.00f, 0.55f, 0.30f, 0.95f } : MyMath::Vector4{ 0.25f, 0.30f, 0.22f, 0.35f };
 			indicatorCol = isSel ? MyMath::Vector4{ 1.00f, 0.45f, 0.20f, 0.95f } : MyMath::Vector4{ 0.12f, 0.08f, 0.05f, 0.15f };
 		} else {
-			outlineCol   = isSel ? MyMath::Vector4{ 0.72f, 0.94f, 0.75f, 0.95f } : MyMath::Vector4{ 0.22f, 0.44f, 0.25f, 0.35f };
-			bracketCol   = isSel ? MyMath::Vector4{ 0.82f, 0.96f, 0.84f, 1.00f } : MyMath::Vector4{ 0.30f, 0.58f, 0.33f, 0.50f };
-			indicatorCol = isSel ? MyMath::Vector4{ 0.48f, 0.84f, 0.50f, 1.00f } : MyMath::Vector4{ 0.12f, 0.22f, 0.14f, 0.20f };
+			outlineCol   = isSel ? MyMath::Vector4{ 1.0f, 1.0f, 1.0f, 0.95f } : MyMath::Vector4{ 1.0f, 1.0f, 1.0f, 0.35f };
+			bracketCol   = isSel ? MyMath::Vector4{ 1.0f, 1.0f, 1.0f, 1.00f } : MyMath::Vector4{ 1.0f, 1.0f, 1.0f, 0.50f };
+			indicatorCol = isSel ? MyMath::Vector4{ 0.0f, 1.0f, 0.12f, 1.00f } : MyMath::Vector4{ 0.0f, 1.0f, 0.12f, 0.20f };
 		}
 
 		for (auto& sp : buttonBorders_[i].outlines) {
@@ -528,6 +528,16 @@ void TitleScene::UpdateMenuConsoleVisuals() {
 }
 
 void TitleScene::DrawMenuCard() {
+	const float cardWidth = 520.0f;
+	const float cardHeight = 616.0f;
+	const float cardX = menuWindowPos_.x;
+	const float cardY = menuWindowPos_.y;
+
+	// 0. ウィンドウ立体ドロップシャドウ（外側に4〜8pxのアルファ50%の黒い影を落とし、左側ウィンドウとの境界を浮き立たせる）
+	DrawOSRect({ cardX - 16.0f, cardY - 6.0f }, { cardWidth + 32.0f, cardHeight + 16.0f }, { 0.0f, 0.0f, 0.0f, 0.25f });
+	DrawOSRect({ cardX - 10.0f, cardY - 4.0f }, { cardWidth + 20.0f, cardHeight + 12.0f }, { 0.0f, 0.0f, 0.0f, 0.42f });
+	DrawOSRect({ cardX - 5.0f,  cardY - 2.0f }, { cardWidth + 10.0f, cardHeight + 8.0f  }, { 0.0f, 0.0f, 0.0f, 0.58f });
+
 	menuCardPanel_.Draw();
 	menuHeaderPanel_.Draw();
 	if (headerLampSprite_) {
@@ -545,55 +555,96 @@ void TitleScene::DrawMenuCard() {
 	}
 
 	TextRenderer* tr = TextRenderer::GetInstance();
-	const float cardWidth = 520.0f;
-	const float cardHeight = 616.0f;
-	const float cardX = menuWindowPos_.x;
-	const float cardY = menuWindowPos_.y;
 
 	// 端末ヘッダーテキスト (HackGen 13.0f) - タイトルバー左側（アクティブ時は鮮烈発光＆FOCUSバッジ）
 	bool isActive = (activeWindowId_ == 0) || isMissionSelectModalOpen_;
 	if (isActive) {
-		DrawOSRect({ cardX, cardY }, { cardWidth, 2.0f }, { 0.72f, 0.94f, 0.75f, 1.0f }); // 上端ネオンアクセントライン
-		DrawOSRect({ cardX + 14.0f, cardY + 11.0f }, { 8.0f, 8.0f }, { 0.50f, 0.86f, 0.53f, 1.0f }); // 高輝度LED
+		DrawOSRect({ cardX, cardY }, { cardWidth, 2.0f }, { 1.0f, 1.0f, 1.0f, 0.95f }); // 上端白アクセントライン
+	}
+
+	// 1. 左端のアプリアイコン (14x14px ターミナルアイコン)
+	Vector4 iconCol = isActive ? Vector4{ 0.0f, 1.0f, 0.12f, 1.0f } : Vector4{ 0.0f, 0.50f, 0.06f, 0.55f };
+	DrawOSBorder({ cardX + 8.0f, cardY + 10.0f }, { 14.0f, 14.0f }, iconCol, 1.0f);
+	DrawOSRect({ cardX + 11.0f, cardY + 14.0f }, { 2.0f, 2.0f }, iconCol);
+	DrawOSRect({ cardX + 13.0f, cardY + 16.0f }, { 2.0f, 2.0f }, iconCol);
+	DrawOSRect({ cardX + 11.0f, cardY + 18.0f }, { 2.0f, 2.0f }, iconCol);
+	DrawOSRect({ cardX + 15.0f, cardY + 20.0f }, { 4.0f, 1.5f }, iconCol);
+
+	// 2. LEDインジケーター ＆ タイトル名 (SOVI_OS)
+	if (isActive) {
+		DrawOSRect({ cardX + 26.0f, cardY + 13.0f }, { 8.0f, 8.0f }, { 0.0f, 1.0f, 0.12f, 1.0f }); // 高輝度LED
 		if (isMissionSelectModalOpen_) {
-			tr->Print("HackGen", "[FOCUS] TERMINAL : MISSION SELECT [v4.12]", cardX + 28.0f, cardY + 9.0f, 13.0f, { 0.76f, 0.94f, 0.78f, 1.0f });
+			tr->Print("HackGen", "[FOCUS] TERMINAL : MISSION SELECT [v4.12]", cardX + 38.0f, cardY + 9.0f, 12.0f, { 0.0f, 1.0f, 0.12f, 1.0f });
 		} else {
-			tr->Print("HackGen", "[FOCUS] TERMINAL : DAWN_OS [v4.12]", cardX + 28.0f, cardY + 9.0f, 13.0f, { 0.76f, 0.94f, 0.78f, 1.0f });
+			tr->Print("HackGen", "[FOCUS] TERMINAL : SOVI_OS [v4.12]", cardX + 38.0f, cardY + 9.0f, 12.0f, { 0.0f, 1.0f, 0.12f, 1.0f });
 		}
 	} else {
-		DrawOSRect({ cardX + 14.0f, cardY + 11.0f }, { 8.0f, 8.0f }, { 0.16f, 0.30f, 0.17f, 0.45f }); // 消灯LED
+		DrawOSRect({ cardX + 26.0f, cardY + 13.0f }, { 8.0f, 8.0f }, { 0.0f, 0.25f, 0.03f, 0.45f }); // 消灯LED
 		if (isMissionSelectModalOpen_) {
-			tr->Print("HackGen", "[IDLE]  TERMINAL : MISSION SELECT [v4.12]", cardX + 28.0f, cardY + 9.0f, 13.0f, { 0.28f, 0.50f, 0.30f, 0.65f });
+			tr->Print("HackGen", "[IDLE]  TERMINAL : MISSION SELECT [v4.12]", cardX + 38.0f, cardY + 9.0f, 12.0f, { 0.0f, 0.50f, 0.06f, 0.55f });
 		} else {
-			tr->Print("HackGen", "[IDLE]  TERMINAL : DAWN_OS [v4.12]", cardX + 28.0f, cardY + 9.0f, 13.0f, { 0.28f, 0.50f, 0.30f, 0.65f });
+			tr->Print("HackGen", "[IDLE]  TERMINAL : SOVI_OS [v4.12]", cardX + 38.0f, cardY + 9.0f, 12.0f, { 0.0f, 0.50f, 0.06f, 0.55f });
 		}
 	}
 
-	// タイトルバー右側のステータスバッジ
-	const float badgeX = cardX + cardWidth - 145.0f;
+	// 3. プロセス情報 (PID: 0421)
+	tr->Print("HackGen", "PID: 0421", cardX + cardWidth - 236.0f, cardY + 10.0f, 10.5f, isActive ? Vector4{ 0.0f, 0.75f, 0.09f, 0.80f } : Vector4{ 0.0f, 0.40f, 0.05f, 0.50f });
+
+	// 4. タイトルバー右側のステータスバッジ
+	const float badgeX = cardX + cardWidth - 158.0f;
 	const float badgeY = cardY + 8.0f;
 	bool secBlink = (std::fmod(animTimer_, 1.2f) < 0.6f);
-	Vector4 ledColor = secBlink ? Vector4{ 0.48f, 0.84f, 0.50f, 1.0f } : Vector4{ 0.30f, 0.58f, 0.33f, 0.75f };
+	Vector4 ledColor = secBlink ? (isActive ? Vector4{ 0.0f, 1.0f, 0.12f, 1.0f } : Vector4{ 0.0f, 0.45f, 0.05f, 0.60f }) : Vector4{ 0.0f, 0.25f, 0.03f, 0.40f };
 	DrawOSRect({ badgeX + 7.0f, badgeY + 5.0f }, { 6.0f, 6.0f }, ledColor);
-	tr->Print("HackGen", "SEC:LV5 [OK]", badgeX + 18.0f, badgeY + 2.0f, 10.5f, { 0.53f, 0.88f, 0.55f, 0.95f });
+	tr->Print("HackGen", "SEC:LV5 [OK]", badgeX + 18.0f, badgeY + 2.0f, 10.5f, isActive ? Vector4{ 0.0f, 1.0f, 0.12f, 0.95f } : Vector4{ 0.0f, 0.45f, 0.06f, 0.50f });
 
-	// 右上の [X] 戻る/最小化ボタン (ミッション選択ウィンドウと完全に同一の仕様)
-	const float closeX = cardX + cardWidth - 32.0f;
-	const float closeY = cardY + 6.0f;
-	const float closeW = 24.0f;
-	const float closeH = 22.0f;
-	bool isCloseHover = !isMissionSelectModalOpen_ &&
-	                    (customCursorPos_.x >= closeX && customCursorPos_.x <= closeX + closeW &&
-	                     customCursorPos_.y >= closeY && customCursorPos_.y <= closeY + closeH);
-	if (isCloseHover) {
-		DrawOSRect({ closeX, closeY }, { closeW, closeH }, { 0.88f, 0.15f, 0.18f, 0.95f });
+	// 5. 操作ボタン（[_][口][X]）の3連ボタン化
+	const float btnW = 18.0f;
+	const float btnH = 18.0f;
+	const float btnTopY = cardY + 7.0f;
+	const float closeBtnX = cardX + cardWidth - 24.0f;
+	const float maxBtnX   = cardX + cardWidth - 46.0f;
+	const float minBtnX   = cardX + cardWidth - 68.0f;
+
+	auto isTopHov = [&](float bx) {
+		if (isMissionSelectModalOpen_) return false;
+		return (customCursorPos_.x >= bx && customCursorPos_.x <= bx + btnW &&
+		        customCursorPos_.y >= btnTopY && customCursorPos_.y <= btnTopY + btnH);
+	};
+	bool hovMin = isTopHov(minBtnX);
+	bool hovMax = isTopHov(maxBtnX);
+	bool hovClose = isTopHov(closeBtnX);
+
+	Vector4 btnBrd = isActive ? Vector4{ 1.0f, 1.0f, 1.0f, 0.85f } : Vector4{ 1.0f, 1.0f, 1.0f, 0.35f };
+	Vector4 btnTxt = isActive ? Vector4{ 0.0f, 1.0f, 0.12f, 1.0f } : Vector4{ 0.0f, 0.50f, 0.06f, 0.50f };
+
+	// [_]
+	DrawOSPanel({ minBtnX, btnTopY }, { btnW, btnH }, hovMin ? Vector4{ 0.0f, 0.20f, 0.025f, 0.85f } : Vector4{ 0.0f, 0.0f, 0.0f, 0.8f }, hovMin ? Vector4{ 1.0f, 1.0f, 1.0f, 1.0f } : btnBrd, 1.0f);
+	DrawOSRect({ minBtnX + 4.0f, btnTopY + 12.0f }, { 10.0f, 2.0f }, hovMin ? Vector4{ 0.0f, 1.0f, 0.12f, 1.0f } : btnTxt);
+	// [口]
+	DrawOSPanel({ maxBtnX, btnTopY }, { btnW, btnH }, hovMax ? Vector4{ 0.0f, 0.20f, 0.025f, 0.85f } : Vector4{ 0.0f, 0.0f, 0.0f, 0.8f }, hovMax ? Vector4{ 1.0f, 1.0f, 1.0f, 1.0f } : btnBrd, 1.0f);
+	DrawOSBorder({ maxBtnX + 4.0f, btnTopY + 4.0f }, { 10.0f, 10.0f }, hovMax ? Vector4{ 0.0f, 1.0f, 0.12f, 1.0f } : btnTxt, 1.2f);
+	// [X]
+	if (hovClose) {
+		DrawOSRect({ closeBtnX, btnTopY }, { btnW, btnH }, { 0.88f, 0.15f, 0.18f, 0.95f });
 	} else {
-		DrawOSPanel({ closeX, closeY }, { closeW, closeH }, { 0.06f, 0.15f, 0.07f, 0.80f }, { 0.35f, 0.68f, 0.38f, 0.70f }, 1.0f);
+		DrawOSPanel({ closeBtnX, btnTopY }, { btnW, btnH }, { 0.0f, 0.0f, 0.0f, 0.8f }, btnBrd, 1.0f);
 	}
-	tr->Print("HackGen", "X", closeX + closeW * 0.5f, closeY + 4.0f, 12.0f, isCloseHover ? Vector4{ 1.0f, 1.0f, 1.0f, 1.0f } : Vector4{ 0.53f, 0.88f, 0.55f, 0.95f }, { 0.5f, 0.0f });
+	tr->Print("HackGen", "X", closeBtnX + btnW * 0.5f, btnTopY + 2.0f, 11.5f, hovClose ? Vector4{ 1.0f, 1.0f, 1.0f, 1.0f } : btnTxt, { 0.5f, 0.0f });
+
+	// 工業的なインデックス刻み（チックマーク & 3連ドット）
+	float tickMidY = cardY + cardHeight * 0.5f - 10.0f;
+	Vector4 tickCol = isActive ? Vector4{ 1.0f, 1.0f, 1.0f, 0.60f } : Vector4{ 0.40f, 0.50f, 0.42f, 0.35f };
+	for (int i = 0; i < 4; ++i) {
+		DrawOSRect({ cardX - 3.0f, tickMidY + static_cast<float>(i) * 5.0f }, { 3.0f, 1.0f }, tickCol);
+		DrawOSRect({ cardX + cardWidth, tickMidY + static_cast<float>(i) * 5.0f }, { 3.0f, 1.0f }, tickCol);
+	}
+	for (int i = 0; i < 3; ++i) {
+		DrawOSRect({ cardX + cardWidth - 76.0f + static_cast<float>(i) * 5.0f, cardY + 30.0f }, { 2.5f, 2.5f }, tickCol);
+	}
 
 	// 作戦指令ヘッダーラベル - タイトルバー直下の独立行（ロゴの上に綺麗に独立配置）
-	tr->Print("HackGenRegular", "/// CLASSIFIED OPERATION DIRECTIVE ///", cardX + cardWidth * 0.5f, cardY + 44.0f, 11.5f, { 0.46f, 0.82f, 0.49f, 0.90f }, { 0.5f, 0.0f });
+	tr->Print("HackGenRegular", "/// CLASSIFIED OPERATION DIRECTIVE ///", cardX + cardWidth * 0.5f, cardY + 44.0f, 11.5f, { 0.0f, 1.0f, 0.12f, 0.90f }, { 0.5f, 0.0f });
 
 	// メインタイトル：DAWN ロゴスプライト（Y: 60.1〜151.9px、指令テキストと一切被らず堂々配置）
 	if (titleLogoSprite_) {
@@ -602,7 +653,7 @@ void TitleScene::DrawMenuCard() {
 
 	// サブタイトル
 	if (isMissionSelectModalOpen_) {
-		tr->Print("HackGen", "- TARGET OPERATION SELECTION -", cardX + cardWidth * 0.5f, cardY + 154.0f, 14.0f, { 0.46f, 0.82f, 0.49f, 0.95f }, { 0.5f, 0.0f });
+		tr->Print("HackGen", "- TARGET OPERATION SELECTION -", cardX + cardWidth * 0.5f, cardY + 154.0f, 14.0f, { 0.0f, 1.0f, 0.12f, 0.95f }, { 0.5f, 0.0f });
 	} else {
 		subtitleText_.Draw();
 	}
@@ -616,7 +667,7 @@ void TitleScene::DrawMenuCard() {
 		: "AUTH LEVEL 5 GRANTED // READY FOR MISSION INPUT";
 	Vector2 authSize = tr->CalculateTextSize("HackGenRegular", authStr, 11.0f);
 	DrawOSRect({ authCenterX - (authSize.x * 0.5f + 8.0f), authY - 8.0f }, { authSize.x + 16.0f, 16.0f }, { 0.0f, 0.0f, 0.0f, 1.0f });
-	tr->Print("HackGenRegular", authStr, authCenterX, authY, 11.0f, { 0.42f, 0.78f, 0.45f, 0.90f }, { 0.5f, 0.5f });
+	tr->Print("HackGenRegular", authStr, authCenterX, authY, 11.0f, { 0.0f, 1.0f, 0.12f, 0.90f }, { 0.5f, 0.5f });
 
 	if (state_ == TitleState::SortieSequence) {
 		// ============================================================
@@ -736,40 +787,48 @@ void TitleScene::DrawMenuCard() {
 				cardX + cardWidth * 0.5f,
 				cardY + 449.0f,
 				14.0f,
-				{ 0.46f, 0.82f, 0.49f, 0.95f },
+				{ 0.0f, 1.0f, 0.12f, 0.95f },
 				{ 0.5f, 0.5f }
 			);
 		}
 	}
 
-	// ウィンドウ最下部ステータスバー (高さ26pxのバーの中央にジャスト配置・文字つぶれ防止)
-	const float sbCenterY = cardY + cardHeight - 13.0f;
-	const float sbFontSize = 13.0f;
+	// 5. ウィンドウ最下部ステータスバー（独立フッター領域: 画像仕様に準拠）
+	const float footH = 24.0f;
+	const float footY = cardY + cardHeight - footH;
+	// 上部水平仕切り線（白）
+	DrawOSRect({ cardX, footY }, { cardWidth, 1.0f }, isActive ? Vector4{ 1.0f, 1.0f, 1.0f, 0.45f } : Vector4{ 0.35f, 0.45f, 0.38f, 0.25f });
+	// 独立フッター背景
+	DrawOSRect({ cardX, footY + 1.0f }, { cardWidth, footH - 1.0f }, { 0.0f, 0.025f, 0.006f, 0.98f });
+	// ステータスLED
+	DrawOSRect({ cardX + 12.0f, footY + 9.0f }, { 6.0f, 6.0f }, isActive ? Vector4{ 0.0f, 1.0f, 0.12f, 1.0f } : Vector4{ 0.0f, 0.45f, 0.06f, 0.60f });
+	// 左側接続ステータス
 	tr->Print(
 		"HackGenRegular",
 		"ROOT@TACTICAL_OS: ONLINE",
-		cardX + 16.0f,
-		sbCenterY,
-		sbFontSize,
-		{ 0.46f, 0.82f, 0.49f, 0.95f },
+		cardX + 24.0f,
+		footY + footH * 0.5f,
+		11.5f,
+		isActive ? Vector4{ 0.0f, 1.0f, 0.12f, 0.95f } : Vector4{ 0.0f, 0.50f, 0.06f, 0.60f },
 		{ 0.0f, 0.5f }
 	);
+	// 右側ポート・文字コード情報
 	tr->Print(
 		"HackGenRegular",
 		"PORT: 115200 BAUD // UTF-8",
 		cardX + cardWidth - 16.0f,
-		sbCenterY,
-		sbFontSize,
-		{ 0.42f, 0.78f, 0.45f, 0.90f },
+		footY + footH * 0.5f,
+		11.5f,
+		isActive ? Vector4{ 0.0f, 0.85f, 0.10f, 0.90f } : Vector4{ 0.0f, 0.40f, 0.05f, 0.50f },
 		{ 1.0f, 0.5f }
 	);
 
 	if (isActive) {
-		// アクティブウィンドウ強調: 外周ネオン発光ボーダー ＆ 四隅コーナーブラケット輝度ブースト
-		DrawOSBorder({ cardX, cardY }, { cardWidth, cardHeight }, { 0.53f, 0.88f, 0.55f, 0.95f }, 1.5f);
+		// アクティブウィンドウ強調: 外周白ボーダー ＆ 四隅コーナーブラケット白
+		DrawOSBorder({ cardX, cardY }, { cardWidth, cardHeight }, { 1.0f, 1.0f, 1.0f, 0.95f }, 1.5f);
 		const float cLen = 22.0f;
 		const float cThick = 3.0f;
-		const Vector4 cCol = { 0.78f, 0.95f, 0.80f, 1.0f };
+		const Vector4 cCol = { 1.0f, 1.0f, 1.0f, 1.0f };
 		DrawOSRect({ cardX, cardY }, { cLen, cThick }, cCol);
 		DrawOSRect({ cardX, cardY }, { cThick, cLen }, cCol);
 		DrawOSRect({ cardX + cardWidth - cLen, cardY }, { cLen, cThick }, cCol);
@@ -1178,7 +1237,7 @@ void TitleScene::DrawWindowClose() {
 
 		TextRenderer* tr = TextRenderer::GetInstance();
 		const std::string line1 = "/// VIDEO LINK DISENGAGED ///";
-		const std::string line2 = "/// BOOTING DAWN TERMINAL ///";
+		const std::string line2 = "/// BOOTING SOVI TERMINAL ///";
 		const float baseFontSize = 13.5f;
 
 		Vector2 size1 = tr->CalculateTextSize("HackGenRegular", line1, baseFontSize);
@@ -1379,7 +1438,7 @@ void TitleScene::DrawConsoleBoot() {
 			centerX, panelY + 16.0f, 12.0f,
 			{ 0.95f, 0.90f, 0.30f, 0.98f * (1.0f - exitT * 0.4f) }, { 0.5f, 0.0f });
 	} else {
-		tr->Print("HackGen", "DAWN_OS TACTICAL TERMINAL [v4.12.0] // SECURE SESSION",
+		tr->Print("HackGen", "SOVI_OS TACTICAL TERMINAL [v4.12.0] // SECURE SESSION",
 			centerX, panelY + 16.0f, 12.0f,
 			{ 0.45f, 0.85f, 0.95f, 0.90f * textAlpha }, { 0.5f, 0.0f });
 	}
@@ -1389,8 +1448,8 @@ void TitleScene::DrawConsoleBoot() {
 
 	// 1. コマンド行演出（コマンドのやつ）
 	std::string fullCmd = isRebootLog_
-		? "root@dawn-core:~$ ./emergency_recovery --restore-desktop"
-		: "root@dawn-core:~$ ./authenticate_sortie --launch-system";
+		? "root@sovi-core:~$ ./emergency_recovery --restore-desktop"
+		: "root@sovi-core:~$ ./authenticate_sortie --launch-system";
 
 	float typingProg = std::clamp(consoleBootTimer_ / 0.38f, 0.0f, 1.0f);
 	int showChars = static_cast<int>(typingProg * fullCmd.size());
@@ -1451,11 +1510,11 @@ void TitleScene::DrawConsoleBoot() {
 				};
 
 				static const BootLogEntry kNormalLogs[] = {
-					{ 0.04f, "[  OK  ]", "CORE: DAWN Kernel v4.12.0-TAC (SMP x86_64, 16 Cores Online)" },
+					{ 0.04f, "[  OK  ]", "CORE: SOVI Kernel v4.12.0-TAC (SMP x86_64, 16 Cores Online)" },
 					{ 0.10f, "[  OK  ]", "VRAM: Direct3D 12.2 GPU Pipeline // Descriptor Heap Ready" },
 					{ 0.16f, "[  OK  ]", "LINK: Secure Optical Drone Carrier [bay4_cam01: 60FPS LOCKED]" },
 					{ 0.22f, "[  OK  ]", "BUS: MIL-STD-1553B Avionics Bus Synced // Telemetry Active" },
-					{ 0.28f, "[  OK  ]", "WM: Starting Tactical Multi-Window Compositor (DAWN_WM v4.12)" },
+					{ 0.28f, "[  OK  ]", "WM: Starting Tactical Multi-Window Compositor (SOVI_WM v4.12)" },
 					{ 0.34f, "[  OK  ]", "WORKSPACES: Spawning [01:MAIN_TERM, 02:CAM_FEED, 03:TELEMETRY]" },
 					{ 0.40f, ">>",      "LAUNCHING SECURE DESKTOP GUI ENVIRONMENT..." }
 				};
@@ -1465,7 +1524,7 @@ void TitleScene::DrawConsoleBoot() {
 					{ 0.10f, "[  OK  ]", "REPAIR: Journal verified clean // Memory pages zeroed" },
 					{ 0.16f, "[  OK  ]", "VRAM: Rebinding D3D12 device & swapchain descriptors" },
 					{ 0.22f, "[  OK  ]", "NET: Optical drone carrier telemetry re-synchronized" },
-					{ 0.28f, "[  OK  ]", "WM: Re-launching DAWN_WM desktop compositor daemon" },
+					{ 0.28f, "[  OK  ]", "WM: Re-launching SOVI_WM desktop compositor daemon" },
 					{ 0.34f, "[  OK  ]", "SESSION: Restoring operational mission workspaces" },
 					{ 0.40f, ">>",      "DESKTOP SESSION RESTORED // READY FOR COMMAND..." }
 				};

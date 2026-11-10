@@ -182,35 +182,40 @@ void TutorialMissionDirector::Initialize(SpriteCommon* spriteCommon) {
 	coraxModel_.SetMaterialProperties(kCoraxMaterialShininess, kCoraxMaterialSpecular, kCoraxMaterialEnv);
 	coraxModel_.SetupCanopyMaterial();
 
+	// 隊長機『Corax』アフターバーナーのセットアップ
+	coraxAfterburner_ = std::make_unique<Afterburner>();
+	coraxAfterburner_->Initialize();
+	coraxAfterburner_->SetTwinEngine(false);
+	coraxAfterburner_->SetSingleNozzleOffset({ 0.0f, 0.011f, 7.60f });
+	coraxAfterburner_->SetFlameRadius(0.38f);
+	coraxAfterburner_->SetFlameLength(5.8f);
+	coraxAfterburner_->SetShockDiamondCount(4);
+	coraxAfterburner_->SetFlameColor({ 0.28f, 0.65f, 1.0f });
+	coraxAfterburner_->SetCoreColor({ 0.88f, 0.95f, 1.0f });
+	coraxAfterburner_->SetIntensity(0.85f);
+	coraxAfterburner_->LoadConfig("assets/configs/afterburner_m21.json");
+
 	// 2. 西側ジェット戦闘機 (M-15 後退翼機・部位破壊対応) のセットアップ（glTF本来のマテリアル色とキャノピー色を保持）
 	westernModel_.Initialize(Object3dCommon::GetInstance(), activeCam);
 	westernModel_.SetupFromSingleModel(kWesternFighterModelPath);
 	westernModel_.SetMaterialProperties(kWesternMaterialShininess, kWesternMaterialSpecular, kWesternMaterialEnv);
 	westernModel_.SetupCanopyMaterial();
 
-	// 3. 訓練用自動ドローン (ORANGE) のセットアップ
-	// ※自機(m21.gltf)とModel*インスタンスを共有すると自機までオレンジ色に変色するため、ドローン専用のModel複製を生成して登録する
-	if (!ModelManager::GetInstance()->FindModel(kDroneModelCloneKey)) {
-		Model* baseM21 = ModelManager::GetInstance()->FindModel(kCoraxModelPath);
-		if (baseM21 && ModelManager::GetInstance()->GetModelCommon()) {
-			auto droneClone = std::make_unique<Model>();
-			droneClone->InitializeFromModelData(ModelManager::GetInstance()->GetModelCommon(), baseM21->GetModelData());
-			ModelManager::GetInstance()->RegisterModel(kDroneModelCloneKey, std::move(droneClone));
-		}
-	}
+	// 3. 峡谷監視塔 (tower.obj) の事前ロード
+	ModelManager::GetInstance()->LoadModel(kWatchtowerModelPath);
+
+	// 4. 訓練用自動クアッドコプタードローン (ORANGE) のセットアップ
+	ModelManager::GetInstance()->LoadModel(kDroneModelPath);
 	droneObject_ = std::make_unique<Object3d>();
 	droneObject_->Initialize(Object3dCommon::GetInstance());
 	droneObject_->SetCamera(activeCam);
-	droneObject_->SetModel(
-		ModelManager::GetInstance()->FindModel(kDroneModelCloneKey) ? kDroneModelCloneKey : kCoraxModelPath);
+	droneObject_->SetModel(kDroneModelPath);
 	droneObject_->SetScale({ kDroneScale, kDroneScale, kDroneScale });
-	if (ModelManager::GetInstance()->FindModel(kDroneModelCloneKey)) {
-		droneObject_->SetMaterialColor(kPrimaryMaterialIndex, kDroneOrangeColor);
-		droneObject_->SetMaterialEmissive(
-			kPrimaryMaterialIndex,
-			{ kDroneOrangeColor.x, kDroneOrangeColor.y, kDroneOrangeColor.z },
-			kDroneEmissiveIntensity);
-	}
+	droneObject_->SetMaterialColor(kPrimaryMaterialIndex, kDroneOrangeColor);
+	droneObject_->SetMaterialEmissive(
+		kPrimaryMaterialIndex,
+		{ kDroneOrangeColor.x, kDroneOrangeColor.y, kDroneOrangeColor.z },
+		kDroneEmissiveIntensity);
 
 	// 4. DirectX12 安全描画用2Dスプライトプール生成
 	rectSpritePool_.clear();
@@ -340,6 +345,10 @@ void TutorialMissionDirector::ResetForMission(
 	westernPos_ = {};
 	westernVel_ = {};
 	westernCruiseZ_ = kZero;
+	westernCurrentSpeed_ = kCoraxMinSpeed;
+	westernWeavePhaseX_ = kZero;
+	westernWeavePhaseY_ = kZero;
+	westernSmoothedGroundY_ = kFallbackCanyonFloorY;
 	westernStrafeTimer_ = kZero;
 	portWingHp_ = kWesternWingPartMaxHp;
 	stbdWingHp_ = kWesternWingPartMaxHp;
@@ -448,6 +457,7 @@ void TutorialMissionDirector::InitializeWatchtowers(
 
 	watchtowersGrounded_ = false;
 	GroundWatchtowersToTerrain(terrain);
+	SyncWatchtowerObjects(nullptr);
 }
 
 void TutorialMissionDirector::GroundWatchtowersToTerrain(const TerrainChunkManager* terrain) {
@@ -455,13 +465,58 @@ void TutorialMissionDirector::GroundWatchtowersToTerrain(const TerrainChunkManag
 		return;
 	}
 	for (auto& pos : outpostPositions_) {
-		pos.y = QueryTerrainY(terrain, pos.x, pos.z);
+		const float groundY = QueryTerrainY(terrain, pos.x, pos.z);
+		// 地中に埋没しないよう、最低地表高度 -472.0f と比較して高い方を採用
+		pos.y = std::max(groundY, -472.0f);
 	}
-	outpostPos_.y = QueryTerrainY(terrain, outpostPos_.x, outpostPos_.z);
+	outpostPos_.y = std::max(QueryTerrainY(terrain, outpostPos_.x, outpostPos_.z), -472.0f);
 	if (!outpostPositions_.empty()) {
 		outpostPositions_.back() = outpostPos_;
 	}
 	watchtowersGrounded_ = true;
+	SyncWatchtowerObjects(nullptr);
+}
+
+void TutorialMissionDirector::SyncWatchtowerObjects(Camera* camera) {
+	Camera* activeCam = camera;
+	if (!activeCam && CameraManager::GetInstance()) {
+		activeCam = CameraManager::GetInstance()->GetActiveCamera();
+	}
+
+	if (watchtowerObjects_.size() != outpostPositions_.size()) {
+		watchtowerObjects_.clear();
+		watchtowerObjects_.reserve(outpostPositions_.size());
+		for (size_t i = kZeroIndex; i < outpostPositions_.size(); ++i) {
+			auto obj = std::make_unique<Object3d>();
+			obj->Initialize(Object3dCommon::GetInstance());
+			obj->SetModel(kWatchtowerModelPath);
+			obj->SetScale({ kWatchtowerModelScale, kWatchtowerModelScale, kWatchtowerModelScale });
+			// 暗い極夜でも黒潰れせず立体感が出るようマテリアル色を設定（スチール支柱＋デッキ・屋根）
+			obj->SetMaterialColor(0, { 0.40f, 0.44f, 0.50f, 1.0f });
+			obj->SetMaterialColor(1, { 0.60f, 0.58f, 0.54f, 1.0f });
+			if (activeCam) {
+				obj->SetCamera(activeCam);
+			}
+			watchtowerObjects_.push_back(std::move(obj));
+		}
+	}
+
+	for (size_t i = kZeroIndex; i < outpostPositions_.size() && i < watchtowerObjects_.size(); ++i) {
+		auto& obj = watchtowerObjects_[i];
+		if (!obj) {
+			continue;
+		}
+		if (activeCam) {
+			obj->SetCamera(activeCam);
+		}
+		obj->SetScale({ kWatchtowerModelScale, kWatchtowerModelScale, kWatchtowerModelScale });
+		obj->SetMaterialColor(0, { 0.40f, 0.44f, 0.50f, 1.0f });
+		obj->SetMaterialColor(1, { 0.60f, 0.58f, 0.54f, 1.0f });
+		obj->SetTranslate(outpostPositions_[i]);
+		const float rotY = static_cast<float>(i) * 0.785398f;
+		obj->SetRotate({ kZero, rotY, kZero });
+		obj->Update();
+	}
 }
 
 float TutorialMissionDirector::QueryTerrainY(
@@ -579,6 +634,9 @@ void TutorialMissionDirector::Update(const TutorialUpdateContext& ctx) {
 		MyMath::Vector3 right{}, up{}, fwd{};
 		BuildAircraftBasis(coraxForward_, coraxRollRad_, right, up, fwd);
 		coraxModel_.Update(BuildWorldMatrixFromBasis(right, up, fwd, coraxPos_), dt);
+		if (coraxAfterburner_) {
+			coraxAfterburner_->Update(dt, 0.75f);
+		}
 		return;
 	}
 
@@ -650,6 +708,9 @@ void TutorialMissionDirector::Update(const TutorialUpdateContext& ctx) {
 	while (!sysLogs_.empty() && sysLogs_.front().ageSeconds >= kSysLogLifetimeSeconds) {
 		sysLogs_.pop_front();
 	}
+
+	// 監視塔の当たり判定処理（自機の激突衝突 ＆ 機銃弾の着弾消滅）
+	CheckWatchtowerCollisions(ctx);
 }
 
 void TutorialMissionDirector::UpdateCoraxWingman(const TutorialUpdateContext& ctx) {
@@ -679,15 +740,19 @@ void TutorialMissionDirector::UpdateCoraxWingman(const TutorialUpdateContext& ct
 		const float canyonCenterX = EvaluateCanyonCenterX(targetZ);
 		const float desiredX = canyonCenterX + kCoraxLateralOffsetX;
 		const float floorY = QueryTerrainY(ctx.terrain, desiredX, targetZ);
+		// 自機との編隊高度（自機の少し上空 +14m）を基準とし、最低地上安全高度も保証して急降下を防ぐ
+		const float safeFormationY = std::max(cachedPlayerPos_.y + 14.0f, floorY + kCoraxPatrolAglMeters);
 		desiredPos = {
 			desiredX,
-			floorY + kCoraxPatrolAglMeters,
+			safeFormationY,
 			targetZ
 		};
 	}
 
 	const MyMath::Vector3 toTarget = MyMath::Subtract(desiredPos, coraxPos_);
 	MyMath::Vector3 desiredVel = MyMath::Multiply(kCoraxFollowStiffness, toTarget);
+	// 垂直昇降速度を穏やかな範囲（最大±20m/s）に制限し、スタート直後の急降下ダイブを完全に抑止
+	desiredVel.y = std::clamp(desiredVel.y, -20.0f, 25.0f);
 	desiredVel.z = std::max(desiredVel.z, playerSpeed);
 	const float desiredSpeed = MyMath::Length(desiredVel);
 	if (desiredSpeed > kCoraxMaxSpeed) {
@@ -707,7 +772,10 @@ void TutorialMissionDirector::UpdateCoraxWingman(const TutorialUpdateContext& ct
 
 	const float speedNow = MyMath::Length(coraxVel_);
 	if (speedNow > kEpsilon) {
-		const MyMath::Vector3 nextFwd = MyMath::Multiply(kUnit / speedNow, coraxVel_);
+		MyMath::Vector3 nextFwd = MyMath::Multiply(kUnit / speedNow, coraxVel_);
+		// 下向きピッチ角（ダイブ）を最大 -15度（sin -0.26f）に制限して、不自然な真下ダイブを防ぐ
+		nextFwd.y = std::clamp(nextFwd.y, -0.26f, 0.35f);
+		nextFwd = MyMath::Normalize(nextFwd);
 		const float lateralTurn = nextFwd.x - coraxForward_.x;
 		const float targetRoll = std::clamp(-lateralTurn * (kCoraxBankGain / std::max(dt, kEpsilon)) * dt, -kCoraxMaxBankRad, kCoraxMaxBankRad);
 		coraxRollRad_ = coraxRollRad_ + (targetRoll - coraxRollRad_) * std::clamp(kCoraxRollSmoothRate * dt, kZero, kUnit);
@@ -734,6 +802,60 @@ void TutorialMissionDirector::UpdateCoraxWingman(const TutorialUpdateContext& ct
 	MyMath::Vector3 right{}, up{}, fwd{};
 	BuildAircraftBasis(coraxForward_, coraxRollRad_, right, up, fwd);
 	coraxModel_.Update(BuildWorldMatrixFromBasis(right, up, fwd, coraxPos_), dt);
+
+	// 隊長機『Corax』アフターバーナーの更新（速度に応じた推力炎のリアルタイム調整）
+	if (coraxAfterburner_) {
+		const float coraxThrottle = std::clamp(speedNow / 110.0f, 0.70f, 1.0f);
+		coraxAfterburner_->Update(dt, coraxThrottle);
+	}
+
+	// 隊長機『Corax』翼端渦（ベイパートレイル）の発生演出
+	// 翼端から連続する細いベイパーを引かせ、追従先としての誘導視認性を高める
+	const MyMath::Vector3 wingL = MyMath::Add(MyMath::Add(coraxPos_, MyMath::Multiply(-6.0f, right)), MyMath::Multiply(-2.0f, fwd));
+	const MyMath::Vector3 wingR = MyMath::Add(MyMath::Add(coraxPos_, MyMath::Multiply(6.0f, right)), MyMath::Multiply(-2.0f, fwd));
+
+	if (hasLastCoraxWings_) {
+		const MyMath::Vector3 deltaL = MyMath::Subtract(wingL, lastCoraxWingL_);
+		const MyMath::Vector3 deltaR = MyMath::Subtract(wingR, lastCoraxWingR_);
+		const float distL = MyMath::Length(deltaL);
+
+		ParticleParameters params;
+		params.minVelocity = { 0.0f, 0.0f, 0.0f };
+		params.maxVelocity = { 0.0f, 0.0f, 0.0f };
+		params.randomPositionRange = 0.0f;
+		params.minColor = { 0.92f, 0.96f, 1.0f, 0.35f };
+		params.maxColor = { 0.92f, 0.96f, 1.0f, 0.35f };
+		params.minLifeTime = 0.50f;
+		params.maxLifeTime = 0.50f;
+		params.minScale = 0.09f;
+		params.maxScale = 0.09f;
+		params.endScale = 0.14f;
+		params.fadeOut = true;
+		params.isStretched = true;
+		params.stretchFactor = 12.0f;
+
+		int steps = static_cast<int>(std::ceil(distL / 0.35f));
+		if (steps < 1) { steps = 1; }
+		if (steps > 30) { steps = 30; }
+
+		const MyMath::Vector3 stepDeltaL = MyMath::Multiply(1.0f / static_cast<float>(steps), deltaL);
+		const MyMath::Vector3 stepDeltaR = MyMath::Multiply(1.0f / static_cast<float>(steps), deltaR);
+
+		for (int i = 0; i < steps; ++i) {
+			const float t = static_cast<float>(i) / static_cast<float>(steps);
+			const MyMath::Vector3 interpL = MyMath::Lerp(lastCoraxWingL_, wingL, t);
+			const MyMath::Vector3 interpR = MyMath::Lerp(lastCoraxWingR_, wingR, t);
+
+			params.stretchDir = stepDeltaL;
+			ParticleManager::GetInstance()->Emit("Vortex", interpL, params, 1);
+
+			params.stretchDir = stepDeltaR;
+			ParticleManager::GetInstance()->Emit("Vortex", interpR, params, 1);
+		}
+	}
+	lastCoraxWingL_ = wingL;
+	lastCoraxWingR_ = wingR;
+	hasLastCoraxWings_ = true;
 }
 
 void TutorialMissionDirector::UpdatePhase1(const TutorialUpdateContext& ctx) {
@@ -855,9 +977,16 @@ void TutorialMissionDirector::SpawnPhase3Gates(
 			: kZero;
 
 		gates_.assign(customGatePositions_.size(), CanyonGate{});
+		float prevGateZ = playerPos.z;
 		for (size_t i = kZeroIndex; i < customGatePositions_.size(); ++i) {
 			const MyMath::Vector3& src = customGatePositions_[i];
-			const float gz = src.z + zShift;
+			float gz = src.z + zShift;
+			// 前のゲートとの最小間隔を保証
+			if (i > kZeroIndex && gz < prevGateZ + kSubsequentGateSpacingZ) {
+				gz = prevGateZ + kSubsequentGateSpacingZ;
+			}
+			prevGateZ = gz;
+
 			const float minSafeY = QueryTerrainY(terrain, src.x, gz) + kPullUpWarningAglMeters;
 			gates_[i].position = { src.x, std::max(src.y, minSafeY), gz };
 			gates_[i].isPassed = false;
@@ -922,13 +1051,22 @@ void TutorialMissionDirector::UpdatePhase3(const TutorialUpdateContext& ctx) {
 	const MyMath::Vector3 diff = MyMath::Subtract(cachedPlayerPos_, currentGate.position);
 	const float distToCenter = MyMath::Length(diff);
 
+	// 1. ゲートの球判定（リングの中心近傍）
 	const bool insideSphere = (distToCenter <= kGateCaptureSphereRadius);
+
+	// 2. ゲートの通過平面判定（ゲートのZ面を通過した瞬間、かつXYがリング枠内）
+	// ※上限Zチェック（currentGate.position.z + kGatePlaneThicknessZ）により、
+	// はるか後方から一気に複数ゲートを連続誤判定する現象を完全に防止
 	const bool crossedGatePlane =
 		(cachedPlayerPos_.z >= currentGate.position.z) &&
+		(cachedPlayerPos_.z <= currentGate.position.z + kGatePlaneThicknessZ) &&
 		(std::fabs(diff.x) <= kGatePlaneCorridorX) &&
 		(std::fabs(diff.y) <= kGatePlaneCorridorY);
 
-	if (insideSphere || crossedGatePlane) {
+	// 3. ゲートをくぐらずに奥へ大きく通り過ぎてしまった場合（救済スキップ）
+	const bool missedGateOvershoot = (cachedPlayerPos_.z >= currentGate.position.z + kGatePassOvershootToleranceZ);
+
+	if (insideSphere || crossedGatePlane || missedGateOvershoot) {
 		currentGate.isPassed = true;
 		currentGate.passFlashTimer = kGatePassFlashDuration;
 		passedGateCount_ += kOneInt;
@@ -950,34 +1088,29 @@ void TutorialMissionDirector::SpawnOutpost04(
 		InitializeWatchtowers(playerPos, terrain);
 	}
 
-	if (layout_.useCustomLayout) {
-		const MyMath::Vector3 authoredTarget = !outpostPositions_.empty()
-			? outpostPositions_.back()
-			: layout_.outpostPosition;
-		const float targetZ = (authoredTarget.z >= (playerPos.z + kMinForwardSafetyOffsetZ))
-			? authoredTarget.z
-			: (playerPos.z + kOutpostSpawnAheadZ);
-		const float targetX = authoredTarget.x;
-		const float groundY = QueryTerrainY(terrain, targetX, targetZ);
-		outpostPos_ = { targetX, std::max(authoredTarget.y, groundY), targetZ };
-	} else {
-		const float outpostZ = playerPos.z + kOutpostSpawnAheadZ;
-		const float centerX = EvaluateCanyonCenterX(outpostZ);
-		const float outpostX = centerX + kOutpostShelfOffsetX;
-		const float groundY = QueryTerrainY(terrain, outpostX, outpostZ);
-		outpostPos_ = { outpostX, groundY, outpostZ };
-	}
-
+	// 監視塔（第4監視所）の位置：ゲーム開始時から配置されている座標を厳密に維持し、一切ワープさせない
 	if (!outpostPositions_.empty()) {
-		outpostPositions_.back() = outpostPos_;
-	} else {
+		outpostPos_ = outpostPositions_.back();
+	} else if (layout_.useCustomLayout) {
+		outpostPos_ = layout_.outpostPosition;
 		outpostPositions_.push_back(outpostPos_);
 	}
+
+	// 地形接地が未完了の場合は地表高度に合わせる
+	if (terrain && terrain->IsLoaded()) {
+		outpostPos_.y = std::max(QueryTerrainY(terrain, outpostPos_.x, outpostPos_.z), -472.0f);
+		if (!outpostPositions_.empty()) {
+			outpostPositions_.back() = outpostPos_;
+		}
+	}
+
+	// 3Dモデルの位置を同期
+	SyncWatchtowerObjects(nullptr);
 
 	outpostVisible_ = true;
 	outpostIgnited_ = true;
 
-	// 監視塔被弾跡の初期爆炎エフェクト
+	// 監視塔被弾跡の初期大爆炎エフェクト（自然な爆発初速・巨大な火球）
 	const MyMath::Vector3 towerTop = {
 		outpostPos_.x,
 		outpostPos_.y + kOutpostTowerHeight,
@@ -986,17 +1119,187 @@ void TutorialMissionDirector::SpawnOutpost04(
 	if (EffectManager::GetInstance()) {
 		EffectManager::GetInstance()->EmitDestroyEffect(towerTop);
 	}
+	if (ParticleManager::GetInstance()) {
+		ParticleParameters initFire{};
+		initFire.minVelocity = { -0.08f, 0.04f, -0.08f };
+		initFire.maxVelocity = {  0.08f, 0.16f,  0.08f };
+		initFire.randomPositionRange = 3.5f;
+		initFire.minScale = 22.0f;
+		initFire.maxScale = 34.0f;
+		initFire.endScale = 12.0f;
+		initFire.minLifeTime = 0.8f;
+		initFire.maxLifeTime = 1.4f;
+		initFire.fadeOut = true;
+		initFire.minColor = { 1.0f, 0.45f, 0.08f, 1.0f };
+		initFire.maxColor = { 1.0f, 0.88f, 0.32f, 1.0f };
+		ParticleManager::GetInstance()->Emit("ExplosionFire", towerTop, initFire, 12);
+
+		ParticleParameters initSmoke{};
+		initSmoke.minVelocity = { -0.06f, 0.03f, -0.06f };
+		initSmoke.maxVelocity = {  0.06f, 0.12f,  0.06f };
+		initSmoke.randomPositionRange = 4.0f;
+		initSmoke.minScale = 18.0f;
+		initSmoke.maxScale = 28.0f;
+		initSmoke.endScale = 52.0f;
+		initSmoke.minLifeTime = 3.5f;
+		initSmoke.maxLifeTime = 5.5f;
+		initSmoke.fadeOut = true;
+		initSmoke.minColor = { 0.05f, 0.05f, 0.06f, 0.80f };
+		initSmoke.maxColor = { 0.10f, 0.10f, 0.12f, 0.95f };
+		ParticleManager::GetInstance()->Emit("ExplosionSmoke", towerTop, initSmoke, 10);
+	}
 }
 
 void TutorialMissionDirector::UpdateOutpostEffects(float dt) {
-	(void)dt;
-	if (outpostVisible_ && outpostIgnited_ && outpostPlumeEffect_) {
-		const MyMath::Vector3 fireOrigin = {
-			outpostPos_.x,
-			outpostPos_.y + kOutpostTowerHeight,
-			outpostPos_.z
+	if (!outpostVisible_ || !outpostIgnited_) {
+		return;
+	}
+
+	ParticleManager* pm = ParticleManager::GetInstance();
+	if (!pm) {
+		return;
+	}
+
+	const MyMath::Vector3 fireOrigin = {
+		outpostPos_.x,
+		outpostPos_.y + kOutpostTowerHeight - 2.0f,
+		outpostPos_.z
+	};
+
+	// 1. 激しく燃え盛る火炎の塊（ExplosionFire）：
+	// ※ParticleManager::Update は毎フレーム velocity を直足しするため、
+	// 速度は 0.015〜0.045m/frame (秒速0.9〜2.7m) に設定して塔頂部に炎を密集・滞留させる。
+	// 加算合成（kAdd）により多数の炎が重なり合って中心が眩しく白熱し、本物の大火災の火柱を形成する。
+	{
+		ParticleParameters fireParams{};
+		fireParams.minVelocity = { -0.015f, 0.015f, -0.015f };
+		fireParams.maxVelocity = {  0.015f, 0.045f,  0.015f };
+		fireParams.randomPositionRange = 3.2f;
+		fireParams.minScale = 16.0f;
+		fireParams.maxScale = 26.0f;
+		fireParams.endScale = 10.0f;
+		fireParams.scaleEasing = 0.35f;
+		fireParams.minLifeTime = 0.55f;
+		fireParams.maxLifeTime = 0.95f;
+		fireParams.fadeOut = true;
+		fireParams.minColor = { 1.0f, 0.38f, 0.06f, 0.95f };
+		fireParams.maxColor = { 1.0f, 0.88f, 0.30f, 1.0f };
+		fireParams.minRotation = 0.0f;
+		fireParams.maxRotation = kTwoPi;
+		fireParams.minRotationSpeed = -1.0f;
+		fireParams.maxRotationSpeed = 1.0f;
+		pm->Emit("ExplosionFire", fireOrigin, fireParams, 2);
+	}
+
+	// 2. 上空へ巨大に広がる濃黒煙プルーム（ExplosionSmoke）：
+	// 上昇速度 0.05〜0.11m/frame (秒速3.0〜6.6m) でモクモクと上空へ立ち昇り、
+	// 最大直径 48m の巨大な黒煙柱を形成して遠距離（1km以上）からも視認可能にする。
+	static float smokeAccumTimer = 0.0f;
+	smokeAccumTimer += dt;
+	if (smokeAccumTimer >= 0.045f) {
+		smokeAccumTimer = 0.0f;
+		const MyMath::Vector3 smokeOrigin = {
+			fireOrigin.x + static_cast<float>((rand() % 5) - 2) * 0.8f,
+			fireOrigin.y + 3.0f,
+			fireOrigin.z + static_cast<float>((rand() % 5) - 2) * 0.8f
 		};
-		outpostPlumeEffect_->emit(fireOrigin);
+
+		ParticleParameters smokeParams{};
+		smokeParams.minVelocity = { -0.020f, 0.050f, -0.020f };
+		smokeParams.maxVelocity = {  0.020f, 0.110f,  0.020f };
+		smokeParams.randomPositionRange = 3.5f;
+		smokeParams.minScale = 15.0f;
+		smokeParams.maxScale = 24.0f;
+		smokeParams.endScale = 50.0f;
+		smokeParams.scaleEasing = 0.55f;
+		smokeParams.minLifeTime = 4.2f;
+		smokeParams.maxLifeTime = 6.5f;
+		smokeParams.fadeOut = true;
+		smokeParams.minColor = { 0.04f, 0.04f, 0.05f, 0.75f };
+		smokeParams.maxColor = { 0.09f, 0.09f, 0.11f, 0.90f };
+		smokeParams.minRotation = 0.0f;
+		smokeParams.maxRotation = kTwoPi;
+		smokeParams.minRotationSpeed = -0.15f;
+		smokeParams.maxRotationSpeed = 0.15f;
+		pm->Emit("ExplosionSmoke", smokeOrigin, smokeParams, 1);
+	}
+
+	// 3. 塔頂近傍でパチパチと小さく弾ける火の粉（ExplosionSpark）：
+	// ※空中に遠く舞い散って星屑のように見えないよう、速度を 0.03〜0.07m/frame に抑え、
+	// 発生源の火炎周辺でのみ短寿命（0.35〜0.65秒）で小さく弾けさせる。
+	if ((rand() % 2) == 0) {
+		ParticleParameters sparkParams{};
+		sparkParams.minVelocity = { -0.035f, 0.030f, -0.035f };
+		sparkParams.maxVelocity = {  0.035f, 0.075f,  0.035f };
+		sparkParams.randomPositionRange = 2.0f;
+		sparkParams.minScale = 0.40f;
+		sparkParams.maxScale = 0.85f;
+		sparkParams.endScale = 0.05f;
+		sparkParams.minLifeTime = 0.35f;
+		sparkParams.maxLifeTime = 0.65f;
+		sparkParams.fadeOut = true;
+		sparkParams.minColor = { 1.0f, 0.55f, 0.10f, 1.0f };
+		sparkParams.maxColor = { 1.0f, 0.95f, 0.40f, 1.0f };
+		pm->Emit("ExplosionSpark", fireOrigin, sparkParams, 1);
+	}
+}
+
+void TutorialMissionDirector::CheckWatchtowerCollisions(const TutorialUpdateContext& ctx) {
+	if (!outpostVisible_ || outpostPositions_.empty()) {
+		return;
+	}
+
+	const float radiusSq = kOutpostColliderRadius * kOutpostColliderRadius;
+
+	// 1. 自機との激突衝突判定
+	if (ctx.playerFlight) {
+		const MyMath::Vector3& pPos = ctx.playerFlight->GetPosition();
+		for (const auto& towerPos : outpostPositions_) {
+			const float dx = pPos.x - towerPos.x;
+			const float dz = pPos.z - towerPos.z;
+			const float horizDistSq = dx * dx + dz * dz;
+
+			if (horizDistSq <= radiusSq) {
+				const float towerBaseY = towerPos.y;
+				const float towerTopY = towerPos.y + kOutpostTotalHeight;
+				if (pPos.y >= towerBaseY - 5.0f && pPos.y <= towerTopY + 5.0f) {
+					// 監視塔への自機激突：大ダメージ＆爆炎発生
+					ctx.playerFlight->GetDamageModel().ProcessHit(DamagePart::Fuse, 150.0f);
+					if (EffectManager::GetInstance()) {
+						EffectManager::GetInstance()->EmitDestroyEffect(pPos);
+					}
+					break;
+				}
+			}
+		}
+	}
+
+	// 2. 機銃弾（自機弾）と監視塔の着弾・遮蔽判定
+	if (ctx.bulletManager) {
+		for (auto& bullet : ctx.bulletManager->GetBullets()) {
+			if (!bullet.IsAlive() || bullet.IsEnemyBullet()) {
+				continue;
+			}
+			const MyMath::Vector3& bPos = bullet.GetPosition();
+			for (const auto& towerPos : outpostPositions_) {
+				const float dx = bPos.x - towerPos.x;
+				const float dz = bPos.z - towerPos.z;
+				const float horizDistSq = dx * dx + dz * dz;
+
+				if (horizDistSq <= radiusSq) {
+					const float towerBaseY = towerPos.y;
+					const float towerTopY = towerPos.y + kOutpostTotalHeight;
+					if (bPos.y >= towerBaseY && bPos.y <= towerTopY) {
+						// 監視塔に着弾：火花発生＆弾丸消滅
+						if (EffectManager::GetInstance()) {
+							EffectManager::GetInstance()->EmitHitEffect(bPos);
+						}
+						bullet.Kill();
+						break;
+					}
+				}
+			}
+		}
 	}
 }
 
@@ -1052,7 +1355,7 @@ void TutorialMissionDirector::SpawnTrainingDrone(
 
 	if (droneObject_) {
 		droneObject_->SetTranslate(dronePos_);
-		droneObject_->SetRotate({ kZero, kPi, kZero });
+		droneObject_->SetRotate({ kZero, kZero, kZero });
 		droneObject_->Update();
 	}
 }
@@ -1077,12 +1380,15 @@ void TutorialMissionDirector::UpdatePhase5(const TutorialUpdateContext& ctx) {
 		return;
 	}
 
-	// ドローンが常にプレイヤーの前方射程帯（220m〜470m）を滑らかに蛇行飛行するよう制御（明確な偏差リード角を発生させる）
+	// 4基のローターブレードの高速自転アニメーション
+	droneRotorAngle_ += dt * 52.0f;
+
+	// クアッドコプタードローンが前方でゆっくりとホバリング・蛇行飛行（落ち着いて偏差照準・射撃できる速度）
 	const float playerSpeed = MyMath::Length(cachedPlayerVel_);
 	float forwardSpeed = std::clamp(playerSpeed * kDroneSpeedMatchRatio, kDroneMinSpeed, kDroneMaxSpeed);
 	const float distAheadZ = droneCruiseZ_ - cachedPlayerPos_.z;
 	if (distAheadZ < kDroneMinDistanceAheadZ) {
-		forwardSpeed = std::max(forwardSpeed, playerSpeed + kDroneMinSpeed * kHalf);
+		forwardSpeed = std::max(forwardSpeed, playerSpeed * 0.70f);
 	} else if (distAheadZ > kDroneMaxDistanceAheadZ) {
 		forwardSpeed = kDroneMinSpeed;
 	}
@@ -1105,9 +1411,9 @@ void TutorialMissionDirector::UpdatePhase5(const TutorialUpdateContext& ctx) {
 		if (cam) {
 			droneObject_->SetCamera(cam);
 		}
-		const float yawAngle = std::atan2(droneVel_.x, std::max(kUnit, droneVel_.z)) + kPi;
-		const float pitchAngle = -std::atan2(droneVel_.y, std::max(kUnit, std::hypot(droneVel_.x, droneVel_.z)));
-		const float bankAngle = -droneVel_.x * kDroneBankGain;
+		const float yawAngle = std::atan2(droneVel_.x, std::max(kUnit, droneVel_.z));
+		const float pitchAngle = -std::atan2(droneVel_.y, std::max(kUnit, std::hypot(droneVel_.x, droneVel_.z))) * 0.45f;
+		const float bankAngle = -droneVel_.x * 0.012f;
 		droneObject_->SetTranslate(dronePos_);
 		droneObject_->SetRotate({ pitchAngle, yawAngle, bankAngle });
 		droneObject_->Update();
@@ -1184,10 +1490,11 @@ void TutorialMissionDirector::StartPhase6Ambush(const TutorialUpdateContext& ctx
 			layout_.westernDiveMid.z + zDelta
 		};
 		const float pullUpZ = layout_.westernPullUp.z + zDelta;
-		const float pullUpFloorY = QueryTerrainY(ctx.terrain, layout_.westernPullUp.x, pullUpZ);
+		const float pullUpCenterX = EvaluateCanyonCenterX(pullUpZ);
+		const float pullUpFloorY = QueryTerrainY(ctx.terrain, pullUpCenterX, pullUpZ);
 		westernDiveEndPos_ = {
-			layout_.westernPullUp.x,
-			std::max(layout_.westernPullUp.y, pullUpFloorY + kPullUpWarningAglMeters),
+			pullUpCenterX,
+			std::max(layout_.westernPullUp.y, pullUpFloorY + kWesternBaseAglMeters),
 			pullUpZ
 		};
 	} else {
@@ -1197,7 +1504,7 @@ void TutorialMissionDirector::StartPhase6Ambush(const TutorialUpdateContext& ctx
 		const float pullUpCenterX = EvaluateCanyonCenterX(pullUpZ);
 		const float pullUpFloorY = QueryTerrainY(ctx.terrain, pullUpCenterX, pullUpZ);
 		westernDiveEndPos_ = {
-			pullUpCenterX + kWesternPullUpOffset.x,
+			pullUpCenterX,
 			std::max(cachedPlayerPos_.y + kWesternPullUpOffset.y, pullUpFloorY + kWesternBaseAglMeters),
 			pullUpZ
 		};
@@ -1206,6 +1513,10 @@ void TutorialMissionDirector::StartPhase6Ambush(const TutorialUpdateContext& ctx
 	westernPos_ = westernDiveStartPos_;
 	westernVel_ = { kZero, -kCoraxMaxSpeed, kCoraxMaxSpeed };
 	westernCruiseZ_ = westernDiveEndPos_.z;
+	westernCurrentSpeed_ = kCoraxMaxSpeed * 0.85f;
+	westernWeavePhaseX_ = kZero;
+	westernWeavePhaseY_ = kZero;
+	westernSmoothedGroundY_ = westernDiveEndPos_.y - kWesternBaseAglMeters;
 
 	// 急襲開始時のRWR警報ログ＆Corax緊急割り込み無線
 	PushSystemLog(SysLogCategory::Alr, kPhase6LogAlr, false);
@@ -1266,7 +1577,13 @@ void TutorialMissionDirector::UpdatePhase6(const TutorialUpdateContext& ctx) {
 
 		if (t >= kUnit) {
 			westernInDivePass_ = false;
-			westernCruiseZ_ = westernPos_.z;
+			westernPos_ = westernDiveEndPos_;
+			westernCruiseZ_ = westernDiveEndPos_.z;
+			westernCurrentSpeed_ = std::max(kDroneMinSpeed, MyMath::Length(cachedPlayerVel_) * kWesternSpeedMatchRatio);
+			westernWeavePhaseX_ = kZero;
+			westernWeavePhaseY_ = kZero;
+			westernSmoothedGroundY_ = westernDiveEndPos_.y - kWesternBaseAglMeters;
+
 			if (!p6EngageRadioSent_ && ctx.radio) {
 				p6EngageRadioSent_ = true;
 				ctx.radio->Enqueue(kCoraxSpeakerName, kPhase6RadioIdentify, RadioFaction::Ally, kPhase6IdRadioHold);
@@ -1295,39 +1612,54 @@ void TutorialMissionDirector::UpdatePhase6(const TutorialUpdateContext& ctx) {
 	const bool isWingDamaged = (minWingRatio < kWesternDamagedThresholdRatio);
 	const bool isEngineDamaged = (engRatio < kWesternDamagedThresholdRatio);
 
-	// 部位損傷が蓄積すると旋回振幅・周波数・推力が明確に低下（「部位へ弾を集中させて運動性を奪え」の体現）
+	// 部位損傷が蓄積すると旋回振幅・周波数・推力が低下
 	const float currentWeaveAmpX = isWingDamaged ? kWesternWeaveDegradedAmpX : kWesternWeaveBaseAmpX;
 	const float currentWeaveFreq = isWingDamaged ? kWesternWeaveDegradedFreq : kWesternWeaveBaseFreq;
 	const float engineSpeedFactor = isEngineDamaged ? kWesternDamagedSpeedPenalty : kUnit;
 
+	// 位相の積分（周波数が変化しても位相ジャンプによる瞬間移動が絶対に起きない）
+	westernWeavePhaseX_ += currentWeaveFreq * dt;
+	westernWeavePhaseY_ += kWesternWeaveFreqY * dt;
+
+	// 前後目標速度の滑らかな補間（急激な速度切り替えの防止）
 	const float playerSpeed = MyMath::Length(cachedPlayerVel_);
-	float targetForwardSpeed = std::clamp(
+	float desiredForwardSpeed = std::clamp(
 		playerSpeed * kWesternSpeedMatchRatio * engineSpeedFactor,
 		kDroneMinSpeed,
 		kCoraxMaxSpeed);
 
 	const float distAheadZ = westernCruiseZ_ - cachedPlayerPos_.z;
 	if (distAheadZ < kWesternMinAheadZ) {
-		targetForwardSpeed = std::max(targetForwardSpeed, playerSpeed + kCoraxLateralOffsetX);
+		desiredForwardSpeed = std::min(kCoraxMaxSpeed, playerSpeed * 1.12f);
 	} else if (distAheadZ > kWesternMaxAheadZ) {
-		targetForwardSpeed = kDroneMinSpeed;
+		desiredForwardSpeed = std::max(kDroneMinSpeed, playerSpeed * 0.78f);
 	}
 
-	const MyMath::Vector3 prevPos = westernPos_;
-	westernCruiseZ_ += targetForwardSpeed * dt;
+	westernCurrentSpeed_ += (desiredForwardSpeed - westernCurrentSpeed_) * std::clamp(dt * 3.0f, kZero, kUnit);
+	westernCruiseZ_ += westernCurrentSpeed_ * dt;
 
-	const float dogfightTime = std::max(kZero, phaseTimer_ - kPhase6DivePassDuration);
-	const float centerX = EvaluateCanyonCenterX(westernCruiseZ_);
-	const float desiredX = centerX + std::sin(dogfightTime * currentWeaveFreq) * currentWeaveAmpX;
-	const float floorY = QueryTerrainY(ctx.terrain, desiredX, westernCruiseZ_);
-	const float desiredY = std::max(
-		floorY + kPullUpWarningAglMeters,
-		floorY + kWesternBaseAglMeters + std::sin(dogfightTime * kWesternWeaveFreqY) * kWesternWeaveAmpY);
+	// 峡谷中心線および地形高度の滑らかな追従（断崖絶壁による上下瞬間移動を完全に排除）
+	const float canyonCenterX = EvaluateCanyonCenterX(westernCruiseZ_);
+	const float rawFloorY = QueryTerrainY(ctx.terrain, canyonCenterX, westernCruiseZ_);
+	// 地形高度のローパスフィルター平滑化（崖の急激な段差を吸収）
+	westernSmoothedGroundY_ += (rawFloorY - westernSmoothedGroundY_) * std::clamp(dt * 2.2f, kZero, kUnit);
 
-	westernPos_ = { desiredX, desiredY, westernCruiseZ_ };
-	westernVel_ = MyMath::Multiply(kUnit / dt, MyMath::Subtract(westernPos_, prevPos));
+	// 峡谷の安全回廊内に収まるよう振幅を制限（最大42m：岩壁へのめり込み防止）
+	const float effectiveAmpX = std::min(currentWeaveAmpX, 42.0f);
+	const float targetX = canyonCenterX + std::sin(westernWeavePhaseX_) * effectiveAmpX;
+	const float targetY = westernSmoothedGroundY_ + kWesternBaseAglMeters + std::sin(westernWeavePhaseY_) * kWesternWeaveAmpY;
+	const MyMath::Vector3 targetPos = { targetX, targetY, westernCruiseZ_ };
 
-	const float bankRoll = -westernVel_.x * kWesternBankGain;
+	// 目標位置への滑らかな物理追従（PD追従制御：テレポートを根絶し、滑らかな飛行軌道を実現）
+	const MyMath::Vector3 toTarget = MyMath::Subtract(targetPos, westernPos_);
+	westernVel_ = {
+		toTarget.x * 4.2f,
+		toTarget.y * 3.2f,
+		westernCurrentSpeed_
+	};
+	westernPos_ = MyMath::Add(westernPos_, MyMath::Multiply(dt, westernVel_));
+
+	const float bankRoll = -std::clamp(westernVel_.x * 0.015f, -0.65f, 0.65f);
 	MyMath::Vector3 right{}, up{}, fwd{};
 	BuildAircraftBasis(westernVel_, bankRoll, right, up, fwd);
 	const MyMath::Matrix4x4 westernWorldMat = BuildWorldMatrixFromBasis(right, up, fwd, westernPos_);
@@ -1534,11 +1866,14 @@ void TutorialMissionDirector::UpdatePhase7Exit(const TutorialUpdateContext& ctx)
 		}
 	}
 
-	// 峡谷境界ライン通過、またはCorax最終帰投無線の完了後にフェードアウトへ移行
+	// 峡谷境界ライン通過、およびCorax最終帰投無線「急ぐぞ、これから何かが始まる……！」の完了後にフェードアウトへ移行
+	const bool radioActive = (ctx.radio && ctx.radio->IsActive());
 	const bool crossedBoundary = (cachedPlayerPos_.z >= exitBoundaryPos_.z);
-	const bool autoReturnReady = (phaseTimer_ >= kExitBoundaryAutoTriggerSeconds && (!ctx.radio || !ctx.radio->IsActive()));
+	const bool autoReturnReady = (phaseTimer_ >= kExitBoundaryAutoTriggerSeconds);
 
-	if (crossedBoundary || autoReturnReady) {
+	// ★重要: 峡谷境界ラインを通過していても、最終無線「急ぐぞ、これから何かが始まる……！」が
+	// 画面上に完全に表示され、読み終えて消えるまでは絶対にフェードアウト・ミッション終了しない！
+	if ((crossedBoundary || autoReturnReady) && !radioActive) {
 		PushSystemLog(SysLogCategory::Sys, kSysLogBoundaryCross, false);
 		phase_ = HalcyonPhase::Phase8_DebriefFadeOut;
 		phaseTimer_ = kZero;
@@ -1562,11 +1897,23 @@ void TutorialMissionDirector::Draw3D(Camera* camera) {
 		return;
 	}
 
-	// 1. Object3dパイプライン（隊長機Corax・訓練ドローン・西側ジェット戦闘機）
+	// 1. Object3dパイプライン（隊長機Corax・峡谷監視塔群・訓練ドローン・西側戦闘機）
 	Object3dCommon::GetInstance()->SetupCommonState();
 	Object3dCommon::GetInstance()->SetLightType(kOneInt);
 
 	coraxModel_.Draw();
+
+	// 峡谷監視塔群（Resources/models/tower.obj）の常時描画（最初から常時配置・描画）
+	if (outpostVisible_) {
+		for (size_t i = kZeroIndex; i < watchtowerObjects_.size(); ++i) {
+			auto& obj = watchtowerObjects_[i];
+			if (obj) {
+				obj->SetCamera(camera);
+				obj->Update();
+				obj->Draw();
+			}
+		}
+	}
 
 	if (phase_ == HalcyonPhase::Phase5_DroneLeadSight && droneAlive_ && droneObject_) {
 		droneObject_->Draw();
@@ -1576,10 +1923,24 @@ void TutorialMissionDirector::Draw3D(Camera* camera) {
 		westernModel_.Draw();
 	}
 
-	// 2. PrimitiveModelパイプライン（ウェイポイントリング・炎上監視塔・帰投境界ライン）
+	// 2. PrimitiveModelパイプライン（アフターバーナー・ウェイポイントリング・航空障害灯・帰投境界ライン）
 	PrimitiveModel* prim = PrimitiveModel::GetInstance();
 	if (!prim) {
 		return;
+	}
+
+	// 隊長機『Corax』アフターバーナー（推力噴射炎）の描画
+	// ※PrimitiveModel描画のため、Object3dパイプライン終了後に描画してステート競合を防ぐ
+	if (coraxAfterburner_) {
+		MyMath::Vector3 right{}, up{}, fwd{};
+		BuildAircraftBasis(coraxForward_, coraxRollRad_, right, up, fwd);
+		const MyMath::Matrix4x4 coraxWorld = BuildWorldMatrixFromBasis(right, up, fwd, coraxPos_);
+		const MyMath::Matrix4x4 baseRotate = MyMath::MakeAffineMatrix(
+			MyMath::Vector3{ kUnit, kUnit, kUnit },
+			MyMath::Vector3{ kZero, kPi, kZero },
+			MyMath::Vector3{ kZero, kZero, kZero });
+		const MyMath::Matrix4x4 visualWorld = MyMath::Multiply(baseRotate, coraxWorld);
+		coraxAfterburner_->Draw(visualWorld, camera);
 	}
 
 	// Phase 3: 緑のウェイポイントゲート描画
@@ -1644,78 +2005,111 @@ void TutorialMissionDirector::Draw3D(Camera* camera) {
 					camera);
 			}
 		}
-	}
 
-	// 峡谷監視所群の常時描画（Phase 1から全監視塔を描画し、Phase 4以降は第4監視所に赤熱グローを追加）
-	if (outpostVisible_) {
-		const size_t towerCount = outpostPositions_.empty() ? kIndexStep : outpostPositions_.size();
-		for (size_t i = kZeroIndex; i < towerCount; ++i) {
-			const MyMath::Vector3& towerPos = outpostPositions_.empty() ? outpostPos_ : outpostPositions_[i];
-			const bool isIncidentTower = (i + kIndexStep == towerCount);
-			const bool isBurningNow = outpostIgnited_ && isIncidentTower;
+		// Phase 3: 次のゲートへ向かう誘導パスライン（光のストリーマー・点線誘導）
+		if (passedGateCount_ < static_cast<int>(gates_.size())) {
+			const MyMath::Vector3& targetGatePos = gates_[passedGateCount_].position;
+			MyMath::Vector3 startPos = cachedPlayerPos_;
+			if (passedGateCount_ > kZeroInt) {
+				startPos = gates_[passedGateCount_ - 1].position;
+			}
+			const MyMath::Vector3 delta = MyMath::Subtract(targetGatePos, startPos);
+			const float totalDist = MyMath::Length(delta);
+			if (totalDist > kUnit) {
+				const MyMath::Vector3 dir = MyMath::Multiply(kUnit / totalDist, delta);
+				constexpr float kSegLen = 22.0f;
+				constexpr float kGapLen = 16.0f;
+				constexpr float kCycleLen = kSegLen + kGapLen;
+				const float offset = std::fmod(animTimer_ * 48.0f, kCycleLen);
+				for (float d = offset; d < totalDist; d += kCycleLen) {
+					const float dEnd = std::min(d + kSegLen, totalDist);
+					const MyMath::Vector3 p1 = MyMath::Add(startPos, MyMath::Multiply(d, dir));
+					const MyMath::Vector3 p2 = MyMath::Add(startPos, MyMath::Multiply(dEnd, dir));
+					prim->DrawLine3D(p1, p2, { 0.28f, 0.98f, 0.55f, 0.55f }, camera);
+				}
+			}
 
-			const MyMath::Vector3 towerCenter = {
-				towerPos.x,
-				towerPos.y + kOutpostTowerHeight * kHalf,
-				towerPos.z
-			};
-			const MyMath::Vector3 deckCenter = {
-				towerPos.x,
-				towerPos.y + kOutpostTowerHeight + kOutpostDeckHeight * kHalf,
-				towerPos.z
-			};
-			const MyMath::Vector3 mastBase = {
-				towerPos.x,
-				towerPos.y + kOutpostTowerHeight + kOutpostDeckHeight,
-				towerPos.z
-			};
-			const MyMath::Vector3 mastTop = {
-				towerPos.x + (isBurningNow ? kGateCylinderThickness : kZero),
-				mastBase.y + kOutpostMastHeight,
-				towerPos.z
-			};
-
-			prim->DrawCylinder(
-				{ kOutpostTowerRadius, kOutpostTowerHeight, kOutpostTowerRadius },
-				{ kZero, kZero, kZero },
-				towerCenter,
-				kOutpostConcreteColor,
-				whiteTexIndex_,
-				camera,
-				BlendMode::kNormal);
-
-			prim->DrawCylinder(
-				{ kOutpostDeckRadius, kOutpostDeckHeight, kOutpostDeckRadius },
-				{ kZero, kZero, kZero },
-				deckCenter,
-				kOutpostDeckColor,
-				whiteTexIndex_,
-				camera,
-				BlendMode::kNormal);
-
-			prim->DrawLine3D(
-				mastBase,
-				mastTop,
-				isBurningNow ? kOutpostEmberColor : kOutpostIntactMastColor,
-				camera);
-
-			if (isBurningNow) {
-				const float flicker = kBlinkMinAlpha + kBlinkAmpAlpha * (kHalf + kHalf * std::sin(animTimer_ * kAlertBlinkFrequency));
-				MyMath::Vector4 emberCol = kOutpostEmberColor;
-				emberCol.w *= flicker;
-				prim->DrawRing(
-					{ kOutpostFireGlowRadius, kOutpostFireGlowRadius, kGateRingDepthScale },
-					{ kHalfPi, kZero, animTimer_ },
-					mastBase,
-					emberCol,
-					ringTexIndex_,
-					camera,
-					BlendMode::kAdd);
+			// さらにその次のゲート（passedGateCount_ + 1）への先行誘導ラインも薄く描画
+			if (passedGateCount_ + 1 < static_cast<int>(gates_.size())) {
+				const MyMath::Vector3& nextGatePos = gates_[passedGateCount_ + 1].position;
+				const MyMath::Vector3 deltaNext = MyMath::Subtract(nextGatePos, targetGatePos);
+				const float distNext = MyMath::Length(deltaNext);
+				if (distNext > kUnit) {
+					const MyMath::Vector3 dirNext = MyMath::Multiply(kUnit / distNext, deltaNext);
+					constexpr float kSegLen = 22.0f;
+					constexpr float kGapLen = 22.0f;
+					constexpr float kCycleLen = kSegLen + kGapLen;
+					for (float d = kZero; d < distNext; d += kCycleLen) {
+						const float dEnd = std::min(d + kSegLen, distNext);
+						const MyMath::Vector3 p1 = MyMath::Add(targetGatePos, MyMath::Multiply(d, dirNext));
+						const MyMath::Vector3 p2 = MyMath::Add(targetGatePos, MyMath::Multiply(dEnd, dirNext));
+						prim->DrawLine3D(p1, p2, { 0.18f, 0.72f, 0.38f, 0.30f }, camera);
+					}
+				}
 			}
 		}
 	}
 
-	// Phase 5: オレンジドローン視認補助ビーコンリング
+	// 峡谷監視塔群の航空障害灯（夜間衝突防止ビーコン）
+	// ※ミッション開始時から全基の塔頂に赤色点滅ビーコンを常時点灯し、遠方からの視認性を確保
+	if (outpostVisible_ && !outpostPositions_.empty()) {
+		const size_t towerCount = outpostPositions_.size();
+		for (size_t i = kZeroIndex; i < towerCount; ++i) {
+			const bool isIncidentTower = (i + kIndexStep == towerCount);
+			const MyMath::Vector3& towerPos = outpostPositions_[i];
+			const MyMath::Vector3 beaconPos = {
+				towerPos.x,
+				towerPos.y + kOutpostTowerHeight,
+				towerPos.z
+			};
+
+			if (isIncidentTower && outpostIgnited_) {
+				// 被弾炎上後は電気系統ショートにより激しく不規則に明滅
+				const float shortFlicker = (std::sin(animTimer_ * 22.0f) > 0.1f) ? 0.85f : 0.15f;
+				MyMath::Vector4 shortCol = kObstacleBeaconColor;
+				shortCol.w *= shortFlicker;
+				prim->DrawRing(
+					{ kObstacleBeaconRadius * 0.9f, kObstacleBeaconRadius * 0.9f, kGateRingDepthScale },
+					{ kHalfPi, kZero, animTimer_ },
+					beaconPos,
+					shortCol,
+					ringTexIndex_,
+					camera,
+					BlendMode::kAdd);
+			} else {
+				// 平常時：夜間航空安全のための赤色点滅ビーコン（1.5Hzパルス明滅）
+				const float pulse = std::max(0.0f, std::sin(animTimer_ * kObstacleBeaconBlinkRate));
+				const float beaconAlpha = std::pow(pulse, 3.0f); // 鋭いパルス点灯
+				if (beaconAlpha > 0.05f) {
+					MyMath::Vector4 beaconCol = kObstacleBeaconColor;
+					beaconCol.w *= beaconAlpha;
+					prim->DrawRing(
+						{ kObstacleBeaconRadius, kObstacleBeaconRadius, kGateRingDepthScale },
+						{ kHalfPi, kZero, kZero },
+						beaconPos,
+						beaconCol,
+						ringTexIndex_,
+						camera,
+						BlendMode::kAdd);
+
+					// 遠距離からの視認性を高める十字クロス光
+					constexpr float kCrossLen = 2.2f;
+					prim->DrawLine3D(
+						{ beaconPos.x - kCrossLen, beaconPos.y, beaconPos.z },
+						{ beaconPos.x + kCrossLen, beaconPos.y, beaconPos.z },
+						beaconCol,
+						camera);
+					prim->DrawLine3D(
+						{ beaconPos.x, beaconPos.y, beaconPos.z - kCrossLen },
+						{ beaconPos.x, beaconPos.y, beaconPos.z + kCrossLen },
+						beaconCol,
+						camera);
+				}
+			}
+		}
+	}
+
+	// Phase 5: 4ローター・クアッドコプタードローン視認補助ビーコン＆回転ローター光輪
 	if (phase_ == HalcyonPhase::Phase5_DroneLeadSight && droneAlive_) {
 		prim->DrawRing(
 			{ kDroneBeaconRadius, kDroneBeaconRadius, kUnit },
@@ -1725,6 +2119,26 @@ void TutorialMissionDirector::Draw3D(Camera* camera) {
 			ringTexIndex_,
 			camera,
 			BlendMode::kAdd);
+
+		// クアッドコプターの4基の高速回転ローターブレード光輪を描画
+		static constexpr MyMath::Vector3 kRotorOffsets[4] = {
+			{ -1.60f * kDroneScale, 0.35f * kDroneScale,  1.60f * kDroneScale }, // FL
+			{  1.60f * kDroneScale, 0.35f * kDroneScale,  1.60f * kDroneScale }, // FR
+			{ -1.60f * kDroneScale, 0.35f * kDroneScale, -1.60f * kDroneScale }, // RL
+			{  1.60f * kDroneScale, 0.35f * kDroneScale, -1.60f * kDroneScale }, // RR
+		};
+		const MyMath::Vector4 rotorCol = { 0.30f, 0.80f, 1.00f, 0.60f };
+		for (int r = 0; r < 4; ++r) {
+			const MyMath::Vector3 rotorWorldPos = MyMath::Add(dronePos_, kRotorOffsets[r]);
+			prim->DrawRing(
+				{ kDroneRotorVisualRadius, kDroneRotorVisualRadius, 1.0f },
+				{ kHalfPi, kZero, droneRotorAngle_ * ((r % 2 == 0) ? 1.0f : -1.0f) },
+				rotorWorldPos,
+				rotorCol,
+				ringTexIndex_,
+				camera,
+				BlendMode::kAdd);
+		}
 	}
 
 	// Phase 7: 峡谷帰投境界ライン（シアンゲート＆境界ライン）
@@ -1925,10 +2339,81 @@ void TutorialMissionDirector::DrawSystemLogsHUD(float hudScale) {
 	}
 }
 
+bool TutorialMissionDirector::IsGuideDialogVisible() const {
+	if (!isActive_ || !isInitialized_ || phase_ == HalcyonPhase::Inactive) {
+		return false;
+	}
+
+	switch (phase_) {
+	case HalcyonPhase::Phase1_BasicControls:
+		// 00:13の操作案内出現〜動翼点検クリアまで表示（ミッション開始直後の会話中やクリア待機中は非表示）
+		return (missionClock_ >= kPhase1UiAppearTime) && !p1CompletedWaitingDelay_;
+
+	case HalcyonPhase::Phase2_ThrottleCruise:
+		return true;
+
+	case HalcyonPhase::Phase3_CanyonWaypoints:
+		// 全ゲート通過後の待機遅延中（4.2秒）は非表示
+		return !p3CompletedWaitingDelay_;
+
+	case HalcyonPhase::Phase4_OutpostIncident:
+		return true;
+
+	case HalcyonPhase::Phase5_DroneLeadSight:
+		// ドローン生存中のみ表示（撃破後は非表示）
+		return droneAlive_ && !p5CompletedWaitingDelay_;
+
+	case HalcyonPhase::Phase6_WesternAmbush:
+		// 急襲フライバイ中（westernInDivePass_）および撃墜きりもみ中（westernDownedSpiral_）は非表示
+		return !westernInDivePass_ && !westernDownedSpiral_;
+
+	case HalcyonPhase::Phase7_ExitBoundary:
+		// 帰投境界通過前のみガイド表示（境界通過後はガイドを消して最終無線字幕に集中）
+		return exitBoundaryVisible_ && (cachedPlayerPos_.z < exitBoundaryPos_.z);
+
+	case HalcyonPhase::Phase8_DebriefFadeOut:
+	default:
+		return false;
+	}
+}
+
+bool TutorialMissionDirector::IsPlayerSteeringAllowed() const {
+	if (!isActive_) {
+		return true;
+	}
+	return IsGuideDialogVisible();
+}
+
+bool TutorialMissionDirector::IsPlayerThrottleAllowed() const {
+	if (!isActive_) {
+		return true;
+	}
+	// Phase 1 では基礎姿勢制御の訓練のためスロットルは自動巡航固定
+	if (phase_ == HalcyonPhase::Phase1_BasicControls) {
+		return false;
+	}
+	return IsGuideDialogVisible();
+}
+
+bool TutorialMissionDirector::IsPlayerWeaponAllowed() const {
+	if (!isActive_) {
+		return true;
+	}
+	// 射撃はドローン迎撃（Phase 5）および西側機ドッグファイト（Phase 6）かつガイド表示中のみ許可
+	const bool combatPhase =
+		(phase_ == HalcyonPhase::Phase5_DroneLeadSight) ||
+		(phase_ == HalcyonPhase::Phase6_WesternAmbush);
+	return combatPhase && IsGuideDialogVisible();
+}
+
 void TutorialMissionDirector::DrawTutorialGuideHUD(
 	float screenWidth,
 	float screenHeight,
 	float hudScale) {
+	if (!IsGuideDialogVisible()) {
+		return;
+	}
+
 	std::string titleText;
 	std::string subText;
 	bool showProgressBar = false;
@@ -1936,9 +2421,6 @@ void TutorialMissionDirector::DrawTutorialGuideHUD(
 
 	switch (phase_) {
 	case HalcyonPhase::Phase1_BasicControls:
-		if (missionClock_ < kPhase1UiAppearTime) {
-			return;
-		}
 		titleText = kPhase1GuideTitle;
 		subText = kPhase1GuideSub;
 		showProgressBar = true;
@@ -1994,9 +2476,6 @@ void TutorialMissionDirector::DrawTutorialGuideHUD(
 		break;
 
 	case HalcyonPhase::Phase6_WesternAmbush:
-		if (westernInDivePass_) {
-			return;
-		}
 		titleText = kPhase6GuideTitle;
 		subText = kPhase6GuideSub;
 		break;
@@ -2167,14 +2646,18 @@ void TutorialMissionDirector::DrawWorldMarkersAndLeadSightHUD(
 		drawWorldMarker(activeGate.position, wpLabel, kGateActiveColor);
 	}
 
-	// 3. Phase 4: 炎上中の第4監視所マーカー
-	if (phase_ == HalcyonPhase::Phase4_OutpostIncident && outpostVisible_) {
+	// 3. 峡谷監視所HUDマーカー（ミッション開始時から常時表示し、Phase 4で緊急警報マーカーへ変化）
+	if (outpostVisible_ && !outpostPositions_.empty()) {
 		const MyMath::Vector3 outpostTop = {
 			outpostPos_.x,
 			outpostPos_.y + kOutpostTowerHeight,
 			outpostPos_.z
 		};
-		drawWorldMarker(outpostTop, kOutpostHudLabel, kWrnTagColor);
+		if (phase_ == HalcyonPhase::Phase4_OutpostIncident || outpostIgnited_) {
+			drawWorldMarker(outpostTop, kOutpostHudLabel, kWrnTagColor);
+		} else if (phase_ <= HalcyonPhase::Phase4_OutpostIncident) {
+			drawWorldMarker(outpostTop, kOutpostIntactHudLabel, kOutpostIntactColor);
+		}
 	}
 
 	// 4. Phase 5: 訓練ドローン ＆ リードコンピューティングサイト（偏差射撃マーカー ○）

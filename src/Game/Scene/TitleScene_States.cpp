@@ -407,8 +407,8 @@ void TitleScene::UpdateMenuState(float dt) {
 	// 現在のロケーションをゆっくりOrbitする
 	UpdateLocationCamera(CurrentLocation(), dt, true);
 
-	// 背景オーバーレイ（背景の3D映像が美しく透ける半透明ダークガラス：圧倒的なOSデスクトップ感）
-	float bgAlpha = (std::min)(stateTimer_ * 2.5f, 0.78f);
+	// 背景オーバーレイ（背景の3D映像が美しく透ける半透明ダークガラス：約10%暗く抑えてUIを鮮明化）
+	float bgAlpha = (std::min)(stateTimer_ * 2.5f, 0.85f);
 	backgroundPanel_.SetBackgroundColor({ 0.0f, 0.0f, 0.0f, bgAlpha });
 	backgroundPanel_.Update();
 
@@ -416,11 +416,11 @@ void TitleScene::UpdateMenuState(float dt) {
 	PostEffect* postEffect = PostEffect::GetInstance();
 	postEffect->ClearActiveEffects();
 
-	// 項目6: 背景（格納庫）の被写界深度（ブラー）- 手前UI視認性向上のため背景に軽いブラーを適用
+	// 項目6: 背景（格納庫）の被写界深度（デフォーカス・ガウスブラー）- 手前UI視認性向上のため滑らかな被写界深度ブラーを適用
 	ActivePostEffect bgBlur;
 	bgBlur.type = PostEffectType::kKawaseBlur;
-	bgBlur.intensity = 1.8f;
-	bgBlur.kernelSize = 1;
+	bgBlur.intensity = 2.8f;
+	bgBlur.kernelSize = 2;
 	postEffect->AddActiveEffect(bgBlur);
 
 	// 高輝度部を光らせるブルーム（1パスで軽量＆鮮やか）

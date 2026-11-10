@@ -44,15 +44,25 @@ void StageScene::UpdateFlightControls(float gameDeltaTime) {
 	}
 
 	if (!isGameOver_) {
+		const bool isTutorial = tutorialDirector_.IsTutorialActive();
+		const bool allowSteering = !isTutorial || tutorialDirector_.IsPlayerSteeringAllowed();
+		const bool allowThrottle = !isTutorial || tutorialDirector_.IsPlayerThrottleAllowed();
+
 		// --- スロットル ---
-		if (input->PushKey(DIK_W)) {
-			throttle_ += 0.8f * gameDeltaTime;
+		if (allowThrottle) {
+			if (input->PushKey(DIK_W)) {
+				throttle_ += 0.8f * gameDeltaTime;
+			}
+			if (input->PushKey(DIK_S)) {
+				throttle_ -= 0.8f * gameDeltaTime;
+			}
+			if (throttle_ < 0.0f) { throttle_ = 0.0f; }
+			if (throttle_ > 1.0f) { throttle_ = 1.0f; }
+		} else if (isTutorial) {
+			// チュートリアル中・操作ロック時は安全な巡航開度（65% = 約185m/s）を自動維持
+			constexpr float kTutorialAutoCruiseThrottle = 0.65f;
+			throttle_ += (kTutorialAutoCruiseThrottle - throttle_) * std::clamp(gameDeltaTime * 2.5f, 0.0f, 1.0f);
 		}
-		if (input->PushKey(DIK_S)) {
-			throttle_ -= 0.8f * gameDeltaTime;
-		}
-		if (throttle_ < 0.0f) { throttle_ = 0.0f; }
-		if (throttle_ > 1.0f) { throttle_ = 1.0f; }
 		flightModel_.SetThrottleInput(throttle_);
 
 		// --- マウスエイム ON/OFF トグル (M キー) ---
@@ -144,37 +154,54 @@ void StageScene::UpdateFlightControls(float gameDeltaTime) {
 			mouseAimController_.ResetToDirection(newTarget);
 		}
 
-		if (mouseAimEnabled_ && !hasManualInput && !pauseMouseAim) {
-			// === マウスエイムモード ===
-			mouseAimController_.CalculateSteeringInput(
+		if (allowSteering) {
+			if (mouseAimEnabled_ && !hasManualInput && !pauseMouseAim) {
+				// === マウスエイムモード ===
+				mouseAimController_.CalculateSteeringInput(
+					flightModel_.GetOrientation(),
+					kDeltaTime,
+					finalPitch, finalRoll, finalYaw
+				);
+			} else {
+				// === 手動操縦モード ===
+				if (mouseAimEnabled_ && playerCamera_.GetFreeViewActive() && hasManualInput) {
+					mouseAimController_.ResetToDirection(flightModel_.GetForwardDirection());
+				}
+
+				// インストラクター ON/OFF (I キー)
+				if (input->TriggerKey(DIK_I)) {
+					flightInstructor_.ToggleEnabled();
+				}
+
+				// インストラクターによる補正（無入力時に自動水平復帰）
+				flightInstructor_.ApplyCorrection(
+					manualPitch, manualRoll, manualYaw,
+					flightModel_.GetOrientation(),
+					finalPitch, finalRoll, finalYaw
+				);
+			}
+		} else {
+			// 操作ガイド非表示時（無線中や演出待機中）：自動水平復帰を作動させ、安全に直進水平巡航を維持
+			flightInstructor_.ApplyCorrection(
+				0.0f, 0.0f, 0.0f,
 				flightModel_.GetOrientation(),
-				kDeltaTime,
 				finalPitch, finalRoll, finalYaw
 			);
-		} else {
-			// === 手動操縦モード ===
-			if (mouseAimEnabled_ && playerCamera_.GetFreeViewActive() && hasManualInput) {
+			if (mouseAimEnabled_) {
 				mouseAimController_.ResetToDirection(flightModel_.GetForwardDirection());
 			}
-
-			// インストラクター ON/OFF (I キー)
-			if (input->TriggerKey(DIK_I)) {
-				flightInstructor_.ToggleEnabled();
-			}
-
-			// インストラクターによる補正（無入力時に自動水平復帰）
-			flightInstructor_.ApplyCorrection(
-				manualPitch, manualRoll, manualYaw,
-				flightModel_.GetOrientation(),
-				finalPitch, finalRoll, finalYaw
-			);
 		}
 
 		flightModel_.SetControlInput(finalPitch, finalRoll, finalYaw);
 
 		// --- フラップ / エアブレーキ ---
-		flightModel_.SetFlapInput(input->PushKey(DIK_F));
-		flightModel_.SetAirBrakeInput(input->PushKey(DIK_B));
+		if (allowThrottle) {
+			flightModel_.SetFlapInput(input->PushKey(DIK_F));
+			flightModel_.SetAirBrakeInput(input->PushKey(DIK_B));
+		} else {
+			flightModel_.SetFlapInput(false);
+			flightModel_.SetAirBrakeInput(false);
+		}
 	} else {
 		flightModel_.SetControlInput(0.0f, 0.0f, 0.0f);
 		flightModel_.SetThrottleInput(0.0f);
@@ -188,7 +215,10 @@ void StageScene::UpdateCombatFiring(float gameDeltaTime) {
 	Input* input = Input::GetInstance();
 	isFiringThisFrame_ = false;
 
-	if (input && input->PushMouse(0) && !isMissionCleared_ && !isMissionFailed_ && sortieIntroTimer_ >= sortieIntroDuration_) {
+	const bool isTutorial = tutorialDirector_.IsTutorialActive();
+	const bool allowWeapon = !isTutorial || tutorialDirector_.IsPlayerWeaponAllowed();
+
+	if (allowWeapon && input && input->PushMouse(0) && !isMissionCleared_ && !isMissionFailed_ && sortieIntroTimer_ >= sortieIntroDuration_) {
 		int ammoBefore = gunpod_.GetCurrentAmmo();
 		gunpod_.Fire();
 		if (gunpod_.GetCurrentAmmo() < ammoBefore) {
@@ -303,8 +333,23 @@ void StageScene::UpdateFlightAndEffects(float gameDeltaTime) {
 	// ビジュアルモデルの更新
 	aircraftVisualModel_.Update(flightModel_.GetWorldMatrix(), gameDeltaTime);
 
+	// 自機アフターバーナーの更新（スロットル40%以上で点火、100%〜WEPで最大発光）
+	if (afterburner_) {
+		float abIntensity = 0.0f;
+		if (throttle_ > 0.40f) {
+			abIntensity = (throttle_ - 0.40f) / 0.60f;
+			if (throttle_ > 1.0f) {
+				abIntensity += (throttle_ - 1.0f) * 2.5f;
+			}
+		}
+		afterburner_->Update(gameDeltaTime, abIntensity);
+	}
+
 	// 破片オブジェクト群の物理シミュレーション更新
 	DebrisManager::GetInstance()->Update(gameDeltaTime);
+
+	// エフェクトマネージャー（爆発・炎・煙・破片・マズルフラッシュ）の更新
+	EffectManager::GetInstance()->Update();
 
 	// Blender MCP リアルタイム同期の更新
 	TerrainSyncManager::GetInstance()->Update();
@@ -379,6 +424,38 @@ void StageScene::UpdateFlightAndEffects(float gameDeltaTime) {
 	} else {
 		hasLastWingTips_ = false;
 	}
+
+	// --- 高速飛行時のスピード感演出（微細風圧シェイク ＆ 通り過ぎる空気粉塵・流線パーティクル） ---
+	float curSpeed = flightModel_.GetSpeed();
+	if (curSpeed > 135.0f && !isGameOver_) { // 約480km/h以上
+		float shakeFactor = std::clamp((curSpeed - 135.0f) / 100.0f, 0.0f, 1.0f);
+		if (CameraManager::GetInstance()->GetActiveCamera()) {
+			CameraManager::GetInstance()->GetActiveCamera()->Shake(0.04f, 0.06f * shakeFactor);
+		}
+
+		// 自機前方の空間を高速で後方へ通り過ぎるスピードダスト（流線パーティクル）
+		if ((rand() % 100) < static_cast<int>(40 * shakeFactor)) {
+			Vector3 streamSpawn = Add(aircraftPos, Multiply(16.0f + (rand() % 14), forward));
+			streamSpawn = Add(streamSpawn, Multiply((rand() % 24 - 12) * 1.0f, right));
+			streamSpawn = Add(streamSpawn, Multiply((rand() % 16 - 8) * 1.0f, flightModel_.GetUpDirection()));
+
+			ParticleParameters streamParams;
+			streamParams.minVelocity = Multiply(-0.95f * curSpeed, forward);
+			streamParams.maxVelocity = Multiply(-1.05f * curSpeed, forward);
+			streamParams.minColor = { 0.85f, 0.95f, 1.0f, 0.35f };
+			streamParams.maxColor = { 0.95f, 1.0f, 1.0f, 0.65f };
+			streamParams.minLifeTime = 0.20f;
+			streamParams.maxLifeTime = 0.35f;
+			streamParams.minScale = 0.06f;
+			streamParams.maxScale = 0.12f;
+			streamParams.endScale = 0.02f;
+			streamParams.fadeOut = true;
+			streamParams.isStretched = true;
+			streamParams.stretchFactor = 16.0f;
+			streamParams.stretchDir = Multiply(-1.0f, forward);
+			ParticleManager::GetInstance()->Emit("Vortex", streamSpawn, streamParams, 1);
+		}
+	}
 }
 
 // ============================================================
@@ -448,31 +525,39 @@ void StageScene::UpdateCombatAndMission(float gameDeltaTime) {
 	EffectManager::GetInstance()->Update();
 
 	// ミッション目標 & トリガー評価
+	// ※チュートリアル（ZADANIE 00）実行中はTutorialMissionDirectorが一元制御するため、
+	// MissionManagerの古いトリガーによる意図しない早期敵スポーンや無線重複を抑止する
 	auto& missionManager = MissionManager::GetInstance();
-	missionManager.EvaluateObjectives(
-		flightModel_.GetPosition(),
-		playerHP_,
-		enemyManager_.GetDestroyedCount(),
-		enemyManager_.IsAllDestroyed(),
-		totalTime_
-	);
-	missionManager.EvaluateTriggers(
-		flightModel_.GetPosition(),
-		playerHP_,
-		enemyManager_.GetDestroyedCount(),
-		totalTime_
-	);
-	missionManager.UpdateMessages(gameDeltaTime);
-	if (enableEnemies_) {
-		const std::vector<EnemySpawnData> pendingAir = missionManager.PopPendingEnemySpawns();
-		if (!pendingAir.empty()) {
-			enemyManager_.SpawnAirEnemies(pendingAir);
-		}
-		const std::vector<GroundEnemySpawnData> pendingGround = missionManager.PopPendingGroundEnemySpawns();
-		if (!pendingGround.empty()) {
-			enemyManager_.SpawnGroundEnemies(pendingGround);
+	if (!tutorialDirector_.IsTutorialActive()) {
+		missionManager.EvaluateObjectives(
+			flightModel_.GetPosition(),
+			playerHP_,
+			enemyManager_.GetDestroyedCount(),
+			enemyManager_.IsAllDestroyed(),
+			totalTime_
+		);
+		missionManager.EvaluateTriggers(
+			flightModel_.GetPosition(),
+			playerHP_,
+			enemyManager_.GetDestroyedCount(),
+			totalTime_
+		);
+		missionManager.UpdateMessages(gameDeltaTime);
+		if (enableEnemies_) {
+			const std::vector<EnemySpawnData> pendingAir = missionManager.PopPendingEnemySpawns();
+			if (!pendingAir.empty()) {
+				enemyManager_.SpawnAirEnemies(pendingAir);
+			}
+			const std::vector<GroundEnemySpawnData> pendingGround = missionManager.PopPendingGroundEnemySpawns();
+			if (!pendingGround.empty()) {
+				enemyManager_.SpawnGroundEnemies(pendingGround);
+			}
+		} else {
+			(void)missionManager.PopPendingEnemySpawns();
+			(void)missionManager.PopPendingGroundEnemySpawns();
 		}
 	} else {
+		// チュートリアル中はMissionManagerの保留敵スポーンを安全に破棄
 		(void)missionManager.PopPendingEnemySpawns();
 		(void)missionManager.PopPendingGroundEnemySpawns();
 	}
@@ -1196,6 +1281,26 @@ void StageScene::UpdatePostEffects(float deltaTime) {
 		vig.type = PostEffectType::kVignette;
 		vig.intensity = bootVignette;
 		postEffect->AddActiveEffect(vig);
+
+		// 高速飛行時のスピード感演出（時速500km/h以上で画面周辺に微小な流線ラジアルブラー）
+		float speed = flightModel_.GetSpeed();
+		if (speed > 140.0f && !combatBootSequence_.IsWaitingForSpace()) {
+			float speedFactor = std::clamp((speed - 140.0f) / 120.0f, 0.0f, 1.0f);
+			ActivePostEffect speedBlur;
+			speedBlur.type = PostEffectType::kRadialBlur;
+			speedBlur.kernelSize = 3;
+			speedBlur.intensity = 0.012f * speedFactor;
+			postEffect->AddActiveEffect(speedBlur);
+		}
+
+		// 作戦ブリーフィング中：奥の3D景観に被写界深度（ガウス・川瀬ブラー）をかけて手前のUIを際立たせる
+		if (combatBootSequence_.IsWaitingForSpace()) {
+			ActivePostEffect bgBlur;
+			bgBlur.type = PostEffectType::kKawaseBlur;
+			bgBlur.intensity = 2.4f;
+			bgBlur.kernelSize = 2;
+			postEffect->AddActiveEffect(bgBlur);
+		}
 	}
 
 	// 2. 環境の更新

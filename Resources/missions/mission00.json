@@ -18,7 +18,7 @@
         {
             "position": {
                 "x": -52.0,
-                "y": -510.1,
+                "y": -472.0,
                 "z": 4950.0
             },
             "aiType": "Structure",
@@ -44,7 +44,7 @@
     "objectives": [
         {
             "name": "峡谷哨戒：第1ゲート通過",
-            "description": "飛行隊長Coraxに続き、峡谷低空のガイドマーカー（第1ゲート）を通過せよ。",
+            "description": "飛行隊長Coraxに続き、峡谷低空のガイドマーカー（第1ゲート）を通過せよ",
             "type": "ReachArea",
             "status": "Active",
             "isPrimary": true,
@@ -62,7 +62,7 @@
         },
         {
             "name": "峡谷哨戒：第2ゲート通過",
-            "description": "峡谷の蛇行ルートに沿って高度を保ち、第2ゲートを通過せよ。",
+            "description": "峡谷の蛇行ルートに沿って高度を保ち、第2ゲートを通過せよ",
             "type": "ReachArea",
             "status": "Inactive",
             "isPrimary": true,
@@ -563,7 +563,7 @@
         },
         "outpostPosition": {
             "x": -52.0,
-            "y": -510.1,
+            "y": -472.0,
             "z": 4950.0
         },
         "outpostPositions": [
@@ -584,7 +584,7 @@
             },
             {
                 "x": -52.0,
-                "y": -510.1,
+                "y": -472.0,
                 "z": 4950.0
             }
         ],
