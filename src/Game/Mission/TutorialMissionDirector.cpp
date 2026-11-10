@@ -252,8 +252,10 @@ void TutorialMissionDirector::ResetForMission(
 	const bool matchByName =
 		(mission.name == kMissionTitle) ||
 		(mission.name == kObuchenieTitle) ||
+		(mission.name.find("Obuchenie") != std::string::npos) ||
+		(mission.difficulty == "TUTORIAL") ||
 		(mission.aliasName == kZadanie00Alias);
-	const bool matchByFile = EndsWithString(missionFilePath, kMissionFileSuffix);
+	const bool matchByFile = EndsWithString(missionFilePath, kMissionFileSuffix) || (missionFilePath.find("mission00") != std::string::npos);
 	isActive_ = (matchByName || matchByFile);
 
 	if (!isActive_) {

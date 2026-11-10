@@ -762,7 +762,8 @@ void StageScene::UpdateEndSequence(float dt) {
 			// クリアリザルトへ記録を保存して遷移
 			auto& res = GameResult::GetInstance();
 			res.missionCleared = true;
-			res.isHalcyonDaysTutorial = tutorialDirector_.IsTutorialActive();
+			const auto& curMission = MissionManager::GetInstance().GetCurrentMission();
+			res.isHalcyonDaysTutorial = tutorialDirector_.IsTutorialActive() || (res.isHalcyonDaysTutorial || curMission.difficulty == "TUTORIAL" || curMission.aliasName == "ZADANIE 00");
 			res.clearTimeSeconds = missionElapsedTime_;
 			res.playerHPRemaining = playerHP_;
 			res.playerMaxHP = playerMaxHP_;
@@ -1124,9 +1125,9 @@ void StageScene::DrawEndSequenceUI() {
 
 		// 発光バックグラウンド
 		float pulseAlpha = 0.88f + 0.12f * std::sin(endSeqTimer_ * 15.0f);
-		DrawSolidRect({ bannerX, bannerY }, { bannerW, bannerH }, { 0.02f, 0.12f, 0.06f, 0.92f });
-		DrawHollowBorder({ bannerX, bannerY }, { bannerW, bannerH }, { 0.30f, 1.0f, 0.60f, pulseAlpha }, 3.0f);
-		DrawSolidRect({ bannerX, bannerY }, { bannerW, 4.0f }, { 0.60f, 1.0f, 0.80f, 1.0f });
+		DrawSolidRect({ bannerX, bannerY }, { bannerW, bannerH }, { 0.02f, 0.11f, 0.03f, 0.92f });
+		DrawHollowBorder({ bannerX, bannerY }, { bannerW, bannerH }, { 0.45f, 0.82f, 0.48f, pulseAlpha }, 3.0f);
+		DrawSolidRect({ bannerX, bannerY }, { bannerW, 4.0f }, { 0.68f, 0.92f, 0.70f, 1.0f });
 
 		// 巨大な "OPERATION CLEARED" スタンプ
 		TextRenderer::GetInstance()->Print(
@@ -1135,7 +1136,7 @@ void StageScene::DrawEndSequenceUI() {
 			screenW * 0.5f,
 			bannerY + 14.0f,
 			48.0f,
-			{ 0.35f, 1.0f, 0.60f, 1.0f },
+			{ 0.48f, 0.84f, 0.50f, 1.0f },
 			{ 0.5f, 0.0f }
 		);
 
@@ -1145,7 +1146,7 @@ void StageScene::DrawEndSequenceUI() {
 			screenW * 0.5f,
 			bannerY + 74.0f,
 			20.0f,
-			{ 0.80f, 1.0f, 0.90f, 0.95f },
+			{ 0.76f, 0.94f, 0.78f, 0.95f },
 			{ 0.5f, 0.0f }
 		);
 	}
@@ -1159,8 +1160,8 @@ void StageScene::DrawEndSequenceUI() {
 		float bannerX = (screenW - bannerW) * 0.5f;
 		float bannerY = screenH * 0.5f + 80.0f;
 
-		DrawSolidRect({ bannerX, bannerY }, { bannerW, bannerH }, { 0.02f, 0.08f, 0.04f, 0.85f });
-		DrawHollowBorder({ bannerX, bannerY }, { bannerW, bannerH }, { 0.25f, 0.95f, 0.55f, 0.90f }, 1.5f);
+		DrawSolidRect({ bannerX, bannerY }, { bannerW, bannerH }, { 0.02f, 0.08f, 0.025f, 0.85f });
+		DrawHollowBorder({ bannerX, bannerY }, { bannerW, bannerH }, { 0.42f, 0.78f, 0.45f, 0.90f }, 1.5f);
 
 		TextRenderer::GetInstance()->Print(
 			"HackGen",
@@ -1168,7 +1169,7 @@ void StageScene::DrawEndSequenceUI() {
 			screenW * 0.5f,
 			bannerY + 14.0f,
 			24.0f,
-			{ 0.40f, 1.0f, 0.70f, 1.0f },
+			{ 0.50f, 0.86f, 0.53f, 1.0f },
 			{ 0.5f, 0.0f }
 		);
 
@@ -1178,7 +1179,7 @@ void StageScene::DrawEndSequenceUI() {
 			screenW * 0.5f,
 			bannerY + 46.0f,
 			18.0f,
-			{ 0.80f, 0.95f, 0.85f, 0.90f },
+			{ 0.72f, 0.90f, 0.74f, 0.90f },
 			{ 0.5f, 0.0f }
 		);
 	}
@@ -1192,7 +1193,7 @@ void StageScene::DrawEndSequenceUI() {
 		const float gridSpacing = 64.0f;
 		float gridScrollX = std::fmod(endSeqTimer_ * 32.0f, gridSpacing);
 		float gridScrollY = std::fmod(endSeqTimer_ * 20.0f, gridSpacing);
-		Vector4 gridLineCol = { 0.15f, 0.45f, 0.30f, 0.22f };
+		Vector4 gridLineCol = { 0.22f, 0.44f, 0.25f, 0.22f };
 
 		for (float gx = -gridSpacing + gridScrollX; gx < screenW + gridSpacing; gx += gridSpacing) {
 			DrawSolidRect({ gx, 0.0f }, { 1.0f, screenH }, gridLineCol);
@@ -1203,12 +1204,12 @@ void StageScene::DrawEndSequenceUI() {
 
 		// 戦術マップ走査ライングリッド風オーバーレイ
 		float scanPulse = 0.18f + 0.06f * std::sin(endSeqTimer_ * 12.0f);
-		DrawSolidRect({ 0.0f, 0.0f }, { screenW, screenH }, { 0.01f, 0.08f, 0.04f, scanPulse });
+		DrawSolidRect({ 0.0f, 0.0f }, { screenW, screenH }, { 0.01f, 0.07f, 0.02f, scanPulse });
 
 		// 四隅の戦術座標ブラケット
 		float bracketLen = 50.0f;
 		float margin = 40.0f;
-		Vector4 tactCol = { 0.25f, 0.90f, 0.55f, 0.85f };
+		Vector4 tactCol = { 0.42f, 0.78f, 0.45f, 0.85f };
 		DrawSolidRect({ margin, margin }, { bracketLen, 2.0f }, tactCol);
 		DrawSolidRect({ margin, margin }, { 2.0f, bracketLen }, tactCol);
 		DrawSolidRect({ screenW - margin - bracketLen, margin }, { bracketLen, 2.0f }, tactCol);
@@ -1237,7 +1238,7 @@ void StageScene::DrawEndSequenceUI() {
 			margin + 10.0f,
 			margin + 28.0f,
 			12.0f,
-			{ 0.35f, 0.85f, 0.60f, 0.75f }
+			{ 0.46f, 0.80f, 0.49f, 0.75f }
 		);
 
 		// 自機アイコン（画面中央）と円形走査レーダー波
@@ -1248,12 +1249,12 @@ void StageScene::DrawEndSequenceUI() {
 		float pulseCycle = std::fmod(endSeqTimer_ * 1.5f, 1.0f);
 		float ringRad = 20.0f + pulseCycle * 140.0f;
 		float ringAlpha = (1.0f - pulseCycle) * 0.70f;
-		DrawHollowBorder({ pX - ringRad, pY - ringRad }, { ringRad * 2.0f, ringRad * 2.0f }, { 0.20f, 0.95f, 0.55f, ringAlpha }, 1.5f);
+		DrawHollowBorder({ pX - ringRad, pY - ringRad }, { ringRad * 2.0f, ringRad * 2.0f }, { 0.40f, 0.78f, 0.43f, ringAlpha }, 1.5f);
 
 		// 自機アイコンシンボル
-		DrawSolidRect({ pX - 12.0f, pY - 1.0f }, { 24.0f, 2.0f }, { 0.40f, 1.0f, 0.70f, 0.95f });
-		DrawSolidRect({ pX - 1.0f, pY - 12.0f }, { 2.0f, 24.0f }, { 0.40f, 1.0f, 0.70f, 0.95f });
-		DrawHollowBorder({ pX - 8.0f, pY - 8.0f }, { 16.0f, 16.0f }, { 0.40f, 1.0f, 0.70f, 0.95f }, 1.5f);
+		DrawSolidRect({ pX - 12.0f, pY - 1.0f }, { 24.0f, 2.0f }, { 0.50f, 0.86f, 0.53f, 0.95f });
+		DrawSolidRect({ pX - 1.0f, pY - 12.0f }, { 2.0f, 24.0f }, { 0.50f, 0.86f, 0.53f, 0.95f });
+		DrawHollowBorder({ pX - 8.0f, pY - 8.0f }, { 16.0f, 16.0f }, { 0.50f, 0.86f, 0.53f, 0.95f }, 1.5f);
 
 		// 自機コールサイン
 		TextRenderer::GetInstance()->Print(
@@ -1262,7 +1263,7 @@ void StageScene::DrawEndSequenceUI() {
 			pX + 16.0f,
 			pY - 14.0f,
 			12.5f,
-			{ 0.40f, 1.0f, 0.70f, 0.90f }
+			{ 0.50f, 0.86f, 0.53f, 0.90f }
 		);
 
 		// 項目10: 移行直後（0.0s〜0.26s）の鋭利な垂直急ズーム＋走査デジタルワイプ
@@ -1270,8 +1271,8 @@ void StageScene::DrawEndSequenceUI() {
 			float wipeProg = mapTimer / 0.26f;
 			float bandH = screenH * 0.25f;
 			float bandY = wipeProg * (screenH + bandH) - bandH;
-			DrawSolidRect({ 0.0f, bandY }, { screenW, bandH }, { 0.25f, 1.0f, 0.60f, (1.0f - wipeProg) * 0.75f }, BlendMode::kAdd);
-			DrawSolidRect({ 0.0f, bandY + bandH * 0.5f }, { screenW, 4.0f }, { 0.90f, 1.0f, 0.95f, (1.0f - wipeProg) * 0.95f }, BlendMode::kAdd);
+			DrawSolidRect({ 0.0f, bandY }, { screenW, bandH }, { 0.42f, 0.82f, 0.45f, (1.0f - wipeProg) * 0.75f }, BlendMode::kAdd);
+			DrawSolidRect({ 0.0f, bandY + bandH * 0.5f }, { screenW, 4.0f }, { 0.78f, 0.95f, 0.80f, (1.0f - wipeProg) * 0.95f }, BlendMode::kAdd);
 		}
 
 		// 3.5s に達した瞬間、SECTOR CLEARED のスタンプがドンッと押される！

@@ -1,5 +1,6 @@
 #include "Enemy.h"
 #include <algorithm>
+#include "BehaviorTree/EnemyBehaviorNodes.h"
 #include "../../engine/Graphics/Model/Object3d.h"
 #include "../../engine/Graphics/Model/Object3dCommon.h"
 #include "../../engine/Graphics/Camera/CameraManager.h"
@@ -7,6 +8,9 @@
 #include "../../engine/Graphics/Particle/EffectManager.h"
 #include "../../engine/Graphics/Particle/ParticleManager.h"
 #include "../../engine/base/logger.h"
+
+Enemy::Enemy() = default;
+Enemy::~Enemy() = default;
 
 void Enemy::Initialize(
 	const MyMath::Vector3& position,
@@ -17,7 +21,8 @@ void Enemy::Initialize(
 	const GunPodData& gunpodData,
 	FlightModel* playerFlightModel,
 	BulletManager* bulletManager,
-	AIType aiType
+	AIType aiType,
+	const std::string& behaviorTreeJson
 ) {
 	maxHealth_ = maxHealth;
 	health_ = maxHealth;
@@ -25,6 +30,7 @@ void Enemy::Initialize(
 	playerFlightModel_ = playerFlightModel;
 	bulletManager_ = bulletManager;
 	aiType_ = aiType;
+	behaviorTreeJson_ = behaviorTreeJson;
 	typeBState_ = TypeBState::Cruising;
 
 	// フライトモデルと武装の初期化
@@ -60,6 +66,9 @@ void Enemy::Initialize(
 
 	// スケール
 	object3d_->SetScale({ 1.0f, 1.0f, 1.0f });
+
+	// ビヘイビアツリー構築
+	RebuildBehaviorTree();
 }
 
 void Enemy::SetWaypointPath(const WaypointPath& path) {
@@ -100,201 +109,94 @@ static MyMath::Vector3 QuaternionToEuler(const MyMath::Quaternion& q) {
 	return euler;
 }
 
-void Enemy::UpdateAI(float deltaTime) {
-	if (!playerFlightModel_) return;
+void Enemy::SetBehaviorTreeJson(const std::string& json) {
+	behaviorTreeJson_ = json;
+	RebuildBehaviorTree();
+}
 
-	MyMath::Vector3 playerPos = playerFlightModel_->GetPosition();
-	MyMath::Vector3 myPos = flightModel_.GetPosition();
-	
-	MyMath::Vector3 toPlayer = MyMath::Subtract(playerPos, myPos);
-	float distance = MyMath::Length(toPlayer);
+void Enemy::RebuildBehaviorTree() {
+	if (!behaviorTreeJson_.empty()) {
+		behaviorTree_ = AI::EnemyBehaviorTreeBuilder::BuildFromJson(behaviorTreeJson_, aiType_);
+	} else {
+		behaviorTree_ = AI::EnemyBehaviorTreeBuilder::CreateEnemyTree(aiType_);
+	}
+}
 
-	if (aiType_ == AIType::ChaseAttack) {
-		// 偏差射撃（リード）の計算：弾速と相手の速度から未来位置を予測する
-		float bulletSpeed = flightModel_.GetSpeed() + 500.0f; // 弾速
-		MyMath::Vector3 targetVel = playerFlightModel_->GetVelocity();
-		
-		// 1次予測
-		float timeToHit = distance / bulletSpeed;
-		MyMath::Vector3 futurePos = MyMath::Add(playerPos, MyMath::Multiply(timeToHit, targetVel));
-		
-		// 2次予測（より正確な着弾点）
-		float distance2 = MyMath::Length(MyMath::Subtract(futurePos, myPos));
-		timeToHit = distance2 / bulletSpeed;
-		futurePos = MyMath::Add(playerPos, MyMath::Multiply(timeToHit, targetVel));
+MyMath::Vector3 Enemy::GetPlayerPosition() const {
+	return playerFlightModel_ ? playerFlightModel_->GetPosition() : MyMath::Vector3{};
+}
 
-		MyMath::Vector3 toFuture = MyMath::Subtract(futurePos, myPos);
+MyMath::Vector3 Enemy::GetPlayerVelocity() const {
+	return playerFlightModel_ ? playerFlightModel_->GetVelocity() : MyMath::Vector3{};
+}
 
-		// 目標方向を未来位置へセット
-		if (distance > 1.0f) {
-			MyMath::Vector3 targetDir = MyMath::Normalize(toFuture);
-			aimController_.ResetToDirection(targetDir);
-		}
+float Enemy::GetDistanceToPlayer() const {
+	if (!playerFlightModel_) return 0.0f;
+	return MyMath::Length(MyMath::Subtract(playerFlightModel_->GetPosition(), flightModel_.GetPosition()));
+}
 
-		// 操舵入力の計算
-		float finalPitch = 0.0f, finalRoll = 0.0f, finalYaw = 0.0f;
-		aimController_.CalculateSteeringInput(flightModel_.GetOrientation(), deltaTime, finalPitch, finalRoll, finalYaw);
-		flightModel_.SetControlInput(finalPitch, finalRoll, finalYaw);
+MyMath::Vector3 Enemy::GetDirectionToPlayer() const {
+	if (!playerFlightModel_) return flightModel_.GetForwardDirection();
+	const MyMath::Vector3 toPlayer = MyMath::Subtract(playerFlightModel_->GetPosition(), flightModel_.GetPosition());
+	const float len = MyMath::Length(toPlayer);
+	return (len > 0.001f) ? MyMath::Multiply(1.0f / len, toPlayer) : flightModel_.GetForwardDirection();
+}
 
-		// スロットル調整 (遠ければ加速、近ければ減速)
-		if (distance > 1000.0f) {
-			flightModel_.SetThrottleInput(1.0f);
-		} else if (distance < 300.0f) {
-			flightModel_.SetThrottleInput(0.4f);
+void Enemy::SetAimTargetDirection(const MyMath::Vector3& targetDir, float deltaTime) {
+	aimController_.ResetToDirection(targetDir);
+	float finalPitch = 0.0f;
+	float finalRoll = 0.0f;
+	float finalYaw = 0.0f;
+	aimController_.CalculateSteeringInput(flightModel_.GetOrientation(), deltaTime, finalPitch, finalRoll, finalYaw);
+	flightModel_.SetControlInput(finalPitch, finalRoll, finalYaw);
+}
+
+bool Enemy::TryFireGunpod(const MyMath::Vector3& targetLeadDir, float maxDistance) {
+	if (!bulletManager_) return false;
+	const float dist = GetDistanceToPlayer();
+	if (dist > maxDistance) return false;
+
+	const MyMath::Vector3 forward = flightModel_.GetForwardDirection();
+	const float dot = MyMath::Dot(forward, targetLeadDir);
+	if (dot <= EnemyWaypointDefaults::kOpportunisticFireDotThreshold) return false;
+
+	const int ammoBefore = gunpod_.GetCurrentAmmo();
+	gunpod_.Fire();
+	if (gunpod_.GetCurrentAmmo() >= ammoBefore) return false;
+
+	const MyMath::Vector3 firePos = MyMath::Add(
+		flightModel_.GetPosition(),
+		MyMath::Multiply(EnemyWaypointDefaults::kMuzzleForwardOffset, forward));
+	const MyMath::Vector3 muzzleVel = MyMath::Multiply(EnemyWaypointDefaults::kBulletMuzzleSpeed, forward);
+	const MyMath::Vector3 bulletVel = MyMath::Add(flightModel_.GetVelocity(), muzzleVel);
+
+	bulletManager_->SpawnBullet(firePos, bulletVel, EnemyWaypointDefaults::kBulletDamage, true);
+
+	muzzleFlashCount_++;
+	if ((muzzleFlashCount_ % EnemyWaypointDefaults::kMuzzleFlashSkipModulo) == EnemyWaypointDefaults::kEvenRemainder) {
+		EffectManager::GetInstance()->EmitMuzzleFlash(firePos, forward);
+		muzzleFlashTimer_ = EnemyWaypointDefaults::kMuzzleFlashDuration;
+	}
+	return true;
+}
+
+void Enemy::AdvanceWaypoint() {
+	if (waypointPoints_.empty()) return;
+	currentWaypointIndex_ += EnemyWaypointDefaults::kWaypointStep;
+	if (currentWaypointIndex_ >= waypointPoints_.size()) {
+		if (waypointIsLoop_) {
+			currentWaypointIndex_ = EnemyWaypointDefaults::kInitialWaypointIndex;
 		} else {
-			flightModel_.SetThrottleInput(0.7f);
-		}
-
-		// 攻撃判定
-		MyMath::Vector3 forward = flightModel_.GetForwardDirection();
-		// 予測位置(toFuture)に対して正面を向いているかで射撃判定を行う
-		float dot = MyMath::Dot(forward, MyMath::Normalize(toFuture));
-		// プレイヤー（の未来位置）が正面(約5度以内)におり、かつ距離が1000m以下なら射撃
-		if (dot > 0.996f && distance < 1000.0f) {
-			int ammoBefore = gunpod_.GetCurrentAmmo();
-			gunpod_.Fire();
-			
-			if (gunpod_.GetCurrentAmmo() < ammoBefore) { // 発射できた場合
-				MyMath::Vector3 firePos = flightModel_.GetPosition();
-				MyMath::Vector3 aircraftVelocity = flightModel_.GetVelocity();
-				
-				// 機首から発射
-				firePos = MyMath::Add(firePos, MyMath::Multiply(8.0f, forward));
-				
-				// 弾丸初速ベクトル ＝ 機体速度 ＋ (射出方向 × 射出速度)
-				float muzzleSpeed = 500.0f;
-				MyMath::Vector3 muzzleVelocity = MyMath::Multiply(muzzleSpeed, forward);
-				MyMath::Vector3 bulletVelocity = MyMath::Add(aircraftVelocity, muzzleVelocity);
-
-				if (bulletManager_) {
-					bulletManager_->SpawnBullet(firePos, bulletVelocity, 10.0f, true);
-				}
-
-				// マズルフラッシュ
-				muzzleFlashCount_++;
-				if (muzzleFlashCount_ % 2 == 0) {
-					EffectManager::GetInstance()->EmitMuzzleFlash(firePos, forward);
-					muzzleFlashTimer_ = 0.08f;
-				}
-			}
+			currentWaypointIndex_ = waypointPoints_.size() - 1;
 		}
 	}
-	else if (aiType_ == AIType::CruiseEvade) {
-		// ステートの切り替え条件
-		if (typeBState_ == TypeBState::Cruising) {
-			// プレイヤーが接近した時（例：500m以内）
-			if (distance < 500.0f) {
-				typeBState_ = TypeBState::Evading;
-				logger::Log("[Enemy AI Type B] Switched to EVADING state. Distance to player: " + std::to_string(distance) + "\n");
-			}
-		} else if (typeBState_ == TypeBState::Evading) {
-			// プレイヤーから離れた時（例：800m以上）
-			if (distance > 800.0f) {
-				typeBState_ = TypeBState::Cruising;
-				logger::Log("[Enemy AI Type B] Switched to CRUISING state. Distance to player: " + std::to_string(distance) + "\n");
-			}
-		}
+}
 
-		MyMath::Vector3 targetDir = cruiseDirection_;
-		float targetThrottle = 0.2f;
+void Enemy::UpdateAI(float deltaTime) {
+	if (!isAlive_) return;
 
-		if (typeBState_ == TypeBState::Evading) {
-			// プレイヤーから離れるように進路を変更（回避行動）
-			MyMath::Vector3 awayFromPlayer = MyMath::Subtract(myPos, playerPos);
-			if (MyMath::Length(awayFromPlayer) > 0.001f) {
-				targetDir = MyMath::Normalize(awayFromPlayer);
-			}
-			targetThrottle = 1.0f; // 回避時は加速（全力）
-		}
-
-		aimController_.ResetToDirection(targetDir);
-
-		// 操舵入力の計算
-		float finalPitch = 0.0f, finalRoll = 0.0f, finalYaw = 0.0f;
-		aimController_.CalculateSteeringInput(flightModel_.GetOrientation(), deltaTime, finalPitch, finalRoll, finalYaw);
-		flightModel_.SetControlInput(finalPitch, finalRoll, finalYaw);
-		flightModel_.SetThrottleInput(targetThrottle);
-	}
-	else if (aiType_ == AIType::FollowWaypoint) {
-		using namespace EnemyWaypointDefaults;
-		if (waypointPoints_.empty()) {
-			aimController_.ResetToDirection(cruiseDirection_);
-			float finalPitch = kZero;
-			float finalRoll = kZero;
-			float finalYaw = kZero;
-			aimController_.CalculateSteeringInput(flightModel_.GetOrientation(), deltaTime, finalPitch, finalRoll, finalYaw);
-			flightModel_.SetControlInput(finalPitch, finalRoll, finalYaw);
-			flightModel_.SetThrottleInput(kBaseCruiseThrottle);
-			return;
-		}
-
-		if (currentWaypointIndex_ >= waypointPoints_.size()) {
-			currentWaypointIndex_ = kInitialWaypointIndex;
-		}
-
-		const Waypoint& targetWp = waypointPoints_[currentWaypointIndex_];
-		MyMath::Vector3 toWp = MyMath::Subtract(targetWp.position, myPos);
-		const float distToWp = MyMath::Length(toWp);
-
-		if (distToWp <= kWaypointCaptureRadiusMeters) {
-			currentWaypointIndex_ += kWaypointStep;
-			if (currentWaypointIndex_ >= waypointPoints_.size()) {
-				if (waypointIsLoop_) {
-					currentWaypointIndex_ = kInitialWaypointIndex;
-				} else {
-					aiType_ = AIType::ChaseAttack;
-					return;
-				}
-			}
-		}
-
-		const Waypoint& activeWp = waypointPoints_[currentWaypointIndex_];
-		const MyMath::Vector3 activeToWp = MyMath::Subtract(activeWp.position, myPos);
-		MyMath::Vector3 targetDir = cruiseDirection_;
-		if (MyMath::Length(activeToWp) > kMinTargetDirectionLength) {
-			targetDir = MyMath::Normalize(activeToWp);
-			cruiseDirection_ = targetDir;
-		}
-
-		aimController_.ResetToDirection(targetDir);
-		float finalPitch = kZero;
-		float finalRoll = kZero;
-		float finalYaw = kZero;
-		aimController_.CalculateSteeringInput(flightModel_.GetOrientation(), deltaTime, finalPitch, finalRoll, finalYaw);
-		flightModel_.SetControlInput(finalPitch, finalRoll, finalYaw);
-
-		const float desiredSpeedKmh = (activeWp.speed > kZero) ? activeWp.speed : kDefaultWaypointSpeedKmh;
-		const float desiredSpeedMps = desiredSpeedKmh / kKmhPerMeterPerSec;
-		const float speedError = desiredSpeedMps - flightModel_.GetSpeed();
-		const float desiredThrottle = std::clamp(
-			kBaseCruiseThrottle + speedError * kThrottleSpeedErrorGain,
-			kMinThrottle,
-			kMaxThrottle);
-		flightModel_.SetThrottleInput(desiredThrottle);
-
-		if (distance > kMinTargetDirectionLength && distance < kOpportunisticFireRangeMeters) {
-			const MyMath::Vector3 forward = flightModel_.GetForwardDirection();
-			const float dotToPlayer = MyMath::Dot(forward, MyMath::Normalize(toPlayer));
-			if (dotToPlayer > kOpportunisticFireDotThreshold) {
-				const int ammoBefore = gunpod_.GetCurrentAmmo();
-				gunpod_.Fire();
-				if (gunpod_.GetCurrentAmmo() < ammoBefore) {
-					const MyMath::Vector3 firePos = MyMath::Add(
-						flightModel_.GetPosition(),
-						MyMath::Multiply(kMuzzleForwardOffset, forward));
-					const MyMath::Vector3 muzzleVel = MyMath::Multiply(kBulletMuzzleSpeed, forward);
-					const MyMath::Vector3 bulletVel = MyMath::Add(flightModel_.GetVelocity(), muzzleVel);
-					if (bulletManager_) {
-						bulletManager_->SpawnBullet(firePos, bulletVel, kBulletDamage, true);
-					}
-					muzzleFlashCount_++;
-					if ((muzzleFlashCount_ % kMuzzleFlashSkipModulo) == kEvenRemainder) {
-						EffectManager::GetInstance()->EmitMuzzleFlash(firePos, forward);
-						muzzleFlashTimer_ = kMuzzleFlashDuration;
-					}
-				}
-			}
-		}
+	if (behaviorTree_) {
+		behaviorTree_->Tick(deltaTime, *this);
 	}
 }
 

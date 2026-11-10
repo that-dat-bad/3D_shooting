@@ -19,6 +19,7 @@ struct EnemySpawnData {
 	float health;
 	AIType aiType = AIType::ChaseAttack;
 	std::string waypointPathName = ""; // Phase 2: ウェイポイントパス名
+	std::string behaviorTreeJson = ""; // ビヘイビアツリー定義 (Blender Live Sync / JSON)
 };
 
 /// @brief 地上敵の配置データ

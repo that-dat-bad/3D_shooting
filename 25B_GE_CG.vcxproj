@@ -349,6 +349,8 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="src\engine\Physics\CollisionConfig.h" />
     <ClInclude Include="src\engine\Physics\ICollisionBody.h" />
     <ClInclude Include="src\Game\Enemy\Enemy.h" />
+    <ClInclude Include="src\Game\Enemy\BehaviorTree\BehaviorTree.h" />
+    <ClInclude Include="src\Game\Enemy\BehaviorTree\EnemyBehaviorNodes.h" />
     <ClInclude Include="src\Game\Enemy\EnemyManager.h" />
     <ClInclude Include="src\Game\Enemy\GroundEnemy.h" />
     <ClInclude Include="src\Game\Bullet\Bullet.h" />
@@ -376,6 +378,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="src\Game\System\AsyncPreloadManager.h" />
     <ClInclude Include="src\Game\UI\RadioCommunicator.h" />
     <ClInclude Include="src\Game\Mission\TutorialMissionDirector.h" />
+    <ClInclude Include="src\Game\UI\InfoUI.h" />
     <ClInclude Include="src\Game\Mission\MissionSyncManager.h" />
     <ClInclude Include="src\Game\Scene\EffectEditorScene.h" />
   </ItemGroup>
@@ -498,6 +501,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="src\engine\Physics\Collision2DManager.cpp" />
     <ClCompile Include="src\engine\Physics\CollisionSystem.cpp" />
     <ClCompile Include="src\Game\Enemy\Enemy.cpp" />
+    <ClCompile Include="src\Game\Enemy\BehaviorTree\EnemyBehaviorNodes.cpp" />
     <ClCompile Include="src\Game\Enemy\EnemyManager.cpp" />
     <ClCompile Include="src\Game\Enemy\GroundEnemy.cpp" />
     <ClCompile Include="src\Game\Bullet\Bullet.cpp" />
@@ -518,6 +522,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="src\Game\System\AsyncPreloadManager.cpp" />
     <ClCompile Include="src\Game\UI\RadioCommunicator.cpp" />
     <ClCompile Include="src\Game\Mission\TutorialMissionDirector.cpp" />
+    <ClCompile Include="src\Game\UI\InfoUI.cpp" />
     <ClCompile Include="src\Game\Mission\MissionSyncManager.cpp" />
     <ClCompile Include="src\Game\Scene\EffectEditorScene.cpp" />
   </ItemGroup>

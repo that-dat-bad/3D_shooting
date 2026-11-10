@@ -29,7 +29,7 @@ void TitleScene::InitializeEntryState() {
 		isRebootLog_ = false;
 		currentConsoleDuration_ = 1.40f;
 		previousSortieLog_ = "PREVIOUS SORTIE: MISSION ACCOMPLISHED // FLIGHT LOG ARCHIVED";
-		previousSortieColor_ = { 0.35f, 1.0f, 0.65f, 0.90f };
+		previousSortieColor_ = { 0.48f, 0.84f, 0.50f, 0.90f };
 	} else {
 		state_ = TitleState::DroneView;
 		isRebootLog_ = false;

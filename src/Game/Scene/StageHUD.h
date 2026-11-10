@@ -88,7 +88,6 @@ private:
 
 	// --- 各HUD要素の描画 ---
 	void DrawTimer();
-	void DrawAmmo();
 	void DrawBailoutGuide();
 	void DrawReticles();
 	void DrawLeadGuidanceLine(const Vector2& noseScreen, const Vector2& aimScreen, float alpha);

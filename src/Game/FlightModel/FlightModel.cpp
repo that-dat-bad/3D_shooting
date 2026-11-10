@@ -9,9 +9,9 @@ namespace {
 	constexpr float kScaleHeight = 8500.0f;      // 大気のスケールハイト (m)
 	constexpr float kPi = 3.14159265358979f;
 
-	constexpr float kPitchRate = 1.5f;           // ピッチ角速度 (rad/s)
-	constexpr float kRollRate = 2.5f;            // ロール角速度 (rad/s)
-	constexpr float kYawRate = 0.8f;             // ヨー角速度 (rad/s)
+	constexpr float kPitchRate = 1.8f;           // ピッチ角速度 (rad/s) ≈ 103 deg/s (War Thunderジェット機急旋回)
+	constexpr float kRollRate = 3.6f;            // ロール角速度 (rad/s) ≈ 206 deg/s (高速バンク＆プル)
+	constexpr float kYawRate = 0.9f;             // ヨー角速度 (rad/s)
 
 	constexpr float kGDamageRate = 0.05f;        // G超過時の翼ダメージレート
 	constexpr float kBlackoutOnsetG = 5.0f;      // ブラックアウト開始G

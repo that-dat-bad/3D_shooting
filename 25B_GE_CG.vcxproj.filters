@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="4.0">
   <ItemGroup>
     <Filter Include="驛｢・ｧ繝ｻ・ｽ驛｢譎｢・ｽ・ｼ驛｢・ｧ繝ｻ・ｹ 驛｢譎・ｽｼ譁撰ｼ憺Δ・ｧ繝ｻ・､驛｢譎｢・ｽ・ｫ">
@@ -267,7 +267,13 @@
     <ClInclude Include="src\engine\Physics\Collider.h">
       <Filter>驛｢譎渉・･郢晢ｽ｣驛｢謨鳴驛｢譎｢・ｽ・ｼ 驛｢譎・ｽｼ譁撰ｼ憺Δ・ｧ繝ｻ・､驛｢譎｢・ｽ・ｫ</Filter>
     </ClInclude>
-    <ClInclude Include="src\Game\Enemy\Enemy.h">
+        <ClInclude Include="src\Game\Enemy\BehaviorTree\BehaviorTree.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Game\Enemy\BehaviorTree\EnemyBehaviorNodes.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+<ClInclude Include="src\Game\Enemy\Enemy.h">
       <Filter>驛｢譎渉・･郢晢ｽ｣驛｢謨鳴驛｢譎｢・ｽ・ｼ 驛｢譎・ｽｼ譁撰ｼ憺Δ・ｧ繝ｻ・､驛｢譎｢・ｽ・ｫ</Filter>
     </ClInclude>
     <ClInclude Include="src\Game\Enemy\EnemyManager.h">
@@ -374,6 +380,12 @@
     </ClInclude>
     <ClInclude Include="src\engine\Graphics\UI\UITextRegistry.h">
       <Filter>engine\Graphics\UI</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Game\Mission\TutorialMissionDirector.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Game\UI\InfoUI.h">
+      <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -596,7 +608,10 @@
     <ClCompile Include="src\Game\FlightModel\MouseAimController.cpp">
       <Filter>驛｢・ｧ繝ｻ・ｽ驛｢譎｢・ｽ・ｼ驛｢・ｧ繝ｻ・ｹ 驛｢譎・ｽｼ譁撰ｼ憺Δ・ｧ繝ｻ・､驛｢譎｢・ｽ・ｫ</Filter>
     </ClCompile>
-    <ClCompile Include="src\Game\Enemy\Enemy.cpp">
+        <ClCompile Include="src\Game\Enemy\BehaviorTree\EnemyBehaviorNodes.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+<ClCompile Include="src\Game\Enemy\Enemy.cpp">
       <Filter>驛｢・ｧ繝ｻ・ｽ驛｢譎｢・ｽ・ｼ驛｢・ｧ繝ｻ・ｹ 驛｢譎・ｽｼ譁撰ｼ憺Δ・ｧ繝ｻ・､驛｢譎｢・ｽ・ｫ</Filter>
     </ClCompile>
     <ClCompile Include="src\Game\Enemy\EnemyManager.cpp">
@@ -667,6 +682,12 @@
     </ClCompile>
     <ClCompile Include="src\engine\Graphics\UI\UITextRegistry.cpp">
       <Filter>engine\Graphics\UI</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Game\Mission\TutorialMissionDirector.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Game\UI\InfoUI.cpp">
+      <Filter>ソース ファイル</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

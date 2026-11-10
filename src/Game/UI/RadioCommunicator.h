@@ -100,7 +100,7 @@ namespace RadioDefaults {
 	inline constexpr MyMath::Vector4 kDialogueBodyColor = { 0.97f, 0.98f, 1.00f, 1.00f };
 
 	// 味方 (Ally): AC7 "Joker 2 Coster" 準拠のペールミントグリーン
-	inline constexpr MyMath::Vector4 kAllySpeakerColor = { 0.76f, 0.98f, 0.87f, 1.00f };
+	inline constexpr MyMath::Vector4 kAllySpeakerColor = { 0.62f, 0.90f, 0.65f, 1.00f };
 
 	// 管制 (Awacs): AC7 管制官準拠のペールスカイシアン
 	inline constexpr MyMath::Vector4 kAwacsSpeakerColor = { 0.68f, 0.93f, 1.00f, 1.00f };

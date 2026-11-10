@@ -292,7 +292,7 @@ void StageScene::UpdateFlightAndEffects(float gameDeltaTime) {
 		const float terrainGroundY = terrainChunkManager_->GetTerrainHeightAt(
 			curPos.x,
 			curPos.z,
-			HalcyonDefaults::kZero);
+			0.0f);
 		flightModel_.SetGroundElevation(terrainGroundY);
 	}
 	flightModel_.Update(gameDeltaTime);
@@ -552,9 +552,11 @@ void StageScene::UpdateRadioCommunications(float gameDeltaTime) {
 		return;
 	}
 
+	const auto& currentMission = missionManager.GetCurrentMission();
+	const bool isTutorial = (currentMission.difficulty == "TUTORIAL" || currentMission.aliasName == "ZADANIE 00");
 	if (!hasSentSortieRadio_) {
 		hasSentSortieRadio_ = true;
-		if (!radioCommunicator_.IsActive()) {
+		if (!isTutorial && !radioCommunicator_.IsActive()) {
 			radioCommunicator_.Enqueue(
 				StageRadioDefaults::kAwacsName,
 				StageRadioDefaults::kSortieDialogue,
@@ -866,8 +868,8 @@ void StageScene::UpdateDebugAndStatusUI(float gameDeltaTime) {
 			{
 				float crossSize = 15.0f;
 				float dotRadius = 3.0f;
-				ImU32 reticleColor = IM_COL32(0, 255, 100, 220);
-				ImU32 reticleColorDark = IM_COL32(0, 180, 70, 150);
+				ImU32 reticleColor = IM_COL32(118, 204, 125, 220);
+				ImU32 reticleColorDark = IM_COL32(85, 160, 92, 150);
 
 				drawList->AddLine(ImVec2(cx - crossSize, cy), ImVec2(cx - 5.0f, cy), reticleColor, 2.0f);
 				drawList->AddLine(ImVec2(cx + 5.0f, cy), ImVec2(cx + crossSize, cy), reticleColor, 2.0f);
@@ -1240,4 +1242,20 @@ void StageScene::UpdatePostEffects(float deltaTime) {
 	hudData.screenHeight = static_cast<float>(WinApp::kClientHeight);
 
 	hud_.Update(deltaTime, hudData);
+
+	// 5. War Thunder風フライト計器UI（InfoUI）の更新
+	FlightInfoUIData infoData{};
+	infoData.throttle = throttle_;
+	infoData.speed = flightModel_.GetSpeed();
+	infoData.currentAmmo = gunpod_.GetCurrentAmmo();
+	infoData.maxAmmo = gunpod_.GetMaxAmmo();
+	infoData.absoluteAltitude = flightModel_.GetPosition().y;
+	const float groundY = (terrainChunkManager_ && terrainChunkManager_->IsLoaded())
+		? terrainChunkManager_->GetTerrainHeightAt(flightModel_.GetPosition().x, flightModel_.GetPosition().z, 0.0f)
+		: flightModel_.GetGroundElevation();
+	infoData.relativeAltitude = (std::max)(0.0f, flightModel_.GetPosition().y - groundY);
+	infoData.screenWidth = static_cast<float>(WinApp::kClientWidth);
+	infoData.screenHeight = static_cast<float>(WinApp::kClientHeight);
+	infoData.alpha = 1.0f;
+	infoUI_.Update(deltaTime, infoData);
 }

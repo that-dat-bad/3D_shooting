@@ -155,6 +155,7 @@ void StageScene::InitializeAssets() {
 	hud_.Initialize(spriteCommon);
 	radioCommunicator_.Initialize(spriteCommon);
 	tutorialDirector_.Initialize(spriteCommon);
+	infoUI_.Initialize(spriteCommon);
 
 	seqOverlaySprite_ = std::make_unique<Sprite>();
 	seqOverlaySprite_->Initialize(spriteCommon, "assets/textures/white1x1.png");
@@ -287,11 +288,12 @@ void StageScene::ResetGameplayState() {
 		flightModel_.SetGroundElevation(terrainChunkManager_->GetTerrainHeightAt(
 			mission.playerPosition.x,
 			mission.playerPosition.z,
-			HalcyonDefaults::kFallbackCanyonFloorY));
+			-485.0f));
 	}
 	playerCamera_.Initialize(mission.playerPosition, flightModel_.GetForwardDirection());
 	tutorialDirector_.ResetForMission(mission, loadPath, mission.playerPosition);
-	GameResult::GetInstance().isHalcyonDaysTutorial = tutorialDirector_.IsTutorialActive();
+	const bool isTutorial = tutorialDirector_.IsTutorialActive() || (mission.difficulty == "TUTORIAL" || mission.aliasName == "ZADANIE 00" || loadPath.find("mission00") != std::string::npos);
+	GameResult::GetInstance().isHalcyonDaysTutorial = isTutorial;
 
 	static const std::vector<EnemySpawnData> kEmptyAirEnemies = {};
 	static const std::vector<GroundEnemySpawnData> kEmptyGroundEnemies = {};
@@ -452,8 +454,9 @@ void StageScene::Update() {
 		}
 
 		const float displayClockSeconds = hasMissionTimeLimit ? remainingTime_ : missionElapsedTime_;
-		int minutes = static_cast<int>(displayClockSeconds) / HalcyonDefaults::kSecondsPerMinute;
-		int seconds = static_cast<int>(displayClockSeconds) % HalcyonDefaults::kSecondsPerMinute;
+		constexpr int kSecondsPerMinute = 60;
+		int minutes = static_cast<int>(displayClockSeconds) / kSecondsPerMinute;
+		int seconds = static_cast<int>(displayClockSeconds) % kSecondsPerMinute;
 		char timeStr[32];
 		snprintf(timeStr, sizeof(timeStr), "TIME %02d:%02d", minutes, seconds);
 		timeText_.SetText(timeStr);
@@ -613,6 +616,7 @@ void StageScene::DrawUI() {
 	if (sortieIntroTimer_ >= hudThreshold) {
 		hud_.Draw();
 		if (endSequence_ == StageEndSequence::None) {
+			infoUI_.Draw();
 			const float screenW = static_cast<float>(WinApp::kClientWidth);
 			const float screenH = static_cast<float>(WinApp::kClientHeight);
 			radioCommunicator_.Draw(screenW, screenH);
@@ -982,7 +986,7 @@ void StageScene::DrawPauseCustomCursor() {
 		float rp = 1.0f - (cursorRippleTimer_ / 0.30f);
 		float rRad = 4.0f + 24.0f * rp;
 		float rAlpha = (1.0f - rp) * 0.90f;
-		Vector4 ringCol = { 0.35f, 1.0f, 0.65f, rAlpha };
+		Vector4 ringCol = { 0.48f, 0.84f, 0.50f, rAlpha };
 		DrawPauseSolidRect({ cursorRipplePos_.x - rRad, cursorRipplePos_.y - rRad }, { rRad * 2.0f, 1.5f }, ringCol);
 		DrawPauseSolidRect({ cursorRipplePos_.x - rRad, cursorRipplePos_.y + rRad - 1.5f }, { rRad * 2.0f, 1.5f }, ringCol);
 		DrawPauseSolidRect({ cursorRipplePos_.x - rRad, cursorRipplePos_.y - rRad }, { 1.5f, rRad * 2.0f }, ringCol);
@@ -994,9 +998,9 @@ void StageScene::DrawPauseCustomCursor() {
 	// P1: (mx + 7.0f, my + 22.0f) 下端頂点
 	// P2: (mx + 22.0f, my + 7.0f) 右端頂点
 	const Vector4 kBlackEdge = { 0.0f, 0.0f, 0.0f, 0.95f };
-	const Vector4 kGreenBody = { 0.16f, 0.92f, 0.48f, 0.98f };
-	const Vector4 kGreenEdge = { 0.35f, 1.0f, 0.65f, 1.00f };
-	const Vector4 kGreenCore = { 0.88f, 1.0f, 0.92f, 1.00f };
+	const Vector4 kGreenBody = { 0.38f, 0.74f, 0.41f, 0.98f };
+	const Vector4 kGreenEdge = { 0.53f, 0.88f, 0.55f, 1.00f };
+	const Vector4 kGreenCore = { 0.78f, 0.95f, 0.80f, 1.00f };
 
 	// 2.1 外側黒アウトライン
 	DrawPauseLine({ mx - 0.5f, my - 0.5f }, { mx + 22.5f, my + 6.5f }, 3.5f, kBlackEdge);
@@ -1039,9 +1043,9 @@ void StageScene::DrawPauseMenuUI() {
 	Vector2 curPos = pauseWinPos_;
 	Vector2 curSize = { winW, winH };
 
-	const Vector4 borderCol   = { 0.18f, 0.82f, 0.45f, 0.85f }; // TitleSceneメインウィンドウのミリタリー枠線色
-	const Vector4 titleBarBg  = { 0.03f, 0.10f, 0.06f, 1.0f };  // TitleSceneヘッダー色
-	const Vector4 cornerColor = { 0.35f, 1.00f, 0.65f, 1.00f }; // コーナーブラケット色
+	const Vector4 borderCol   = { 0.38f, 0.74f, 0.41f, 0.85f }; // TitleSceneメインウィンドウのミリタリー枠線色
+	const Vector4 titleBarBg  = { 0.03f, 0.10f, 0.035f, 1.0f };  // TitleSceneヘッダー色
+	const Vector4 cornerColor = { 0.48f, 0.84f, 0.50f, 1.00f }; // コーナーブラケット色
 
 	// 1. ドロップシャドウ
 	DrawPauseSolidRect({ curPos.x + 8.0f, curPos.y + 10.0f }, curSize, { 0.0f, 0.0f, 0.0f, 0.70f });
@@ -1051,18 +1055,18 @@ void StageScene::DrawPauseMenuUI() {
 
 	// 3. タイトルバー
 	DrawPauseSolidRect(curPos, { curSize.x, 34.0f }, titleBarBg);
-	DrawPauseSolidRect(curPos, { curSize.x, 2.0f }, { 0.70f, 1.0f, 0.88f, 1.0f }); // 上端ネオンアクセントライン
-	DrawPauseSolidRect({ curPos.x, curPos.y + 32.0f }, { curSize.x, 2.0f }, { 0.20f, 0.85f, 0.50f, 0.80f }); // 下部区切り線
-	DrawPauseSolidRect({ curPos.x + 14.0f, curPos.y + 13.0f }, { 8.0f, 8.0f }, { 0.40f, 1.0f, 0.70f, 1.0f }); // 高輝度LED
-	tr->Print("HackGen", "[PAUSE] TERMINAL : DAWN_OS [v4.12]", curPos.x + 28.0f, curPos.y + 9.0f, 13.0f, { 0.80f, 1.0f, 0.92f, 1.0f });
+	DrawPauseSolidRect(curPos, { curSize.x, 2.0f }, { 0.72f, 0.94f, 0.75f, 1.0f }); // 上端ネオンアクセントライン
+	DrawPauseSolidRect({ curPos.x, curPos.y + 32.0f }, { curSize.x, 2.0f }, { 0.38f, 0.74f, 0.41f, 0.80f }); // 下部区切り線
+	DrawPauseSolidRect({ curPos.x + 14.0f, curPos.y + 13.0f }, { 8.0f, 8.0f }, { 0.50f, 0.86f, 0.53f, 1.0f }); // 高輝度LED
+	tr->Print("HackGen", "[PAUSE] TERMINAL : DAWN_OS [v4.12]", curPos.x + 28.0f, curPos.y + 9.0f, 13.0f, { 0.76f, 0.94f, 0.78f, 1.0f });
 
 	// タイトルバー右側のステータスバッジ
 	const float badgeX = curPos.x + curSize.x - 145.0f;
 	const float badgeY = curPos.y + 8.0f;
 	bool secBlink = (std::fmod(pauseAnimTimer_, 1.2f) < 0.6f);
-	Vector4 ledColor = secBlink ? Vector4{ 0.35f, 1.0f, 0.65f, 1.0f } : Vector4{ 0.15f, 0.70f, 0.35f, 0.75f };
+	Vector4 ledColor = secBlink ? Vector4{ 0.48f, 0.84f, 0.50f, 1.0f } : Vector4{ 0.30f, 0.58f, 0.33f, 0.75f };
 	DrawPauseSolidRect({ badgeX + 7.0f, badgeY + 5.0f }, { 6.0f, 6.0f }, ledColor);
-	tr->Print("HackGen", "SEC:LV5 [OK]", badgeX + 18.0f, badgeY + 2.0f, 10.5f, { 0.45f, 1.0f, 0.70f, 0.95f });
+	tr->Print("HackGen", "SEC:LV5 [OK]", badgeX + 18.0f, badgeY + 2.0f, 10.5f, { 0.53f, 0.88f, 0.55f, 0.95f });
 
 	// 右上の [X] 戻る/閉じるボタン (ミッション選択ウィンドウと完全に同一の仕様)
 	const float closeX = curPos.x + curSize.x - 32.0f;
@@ -1074,21 +1078,21 @@ void StageScene::DrawPauseMenuUI() {
 	if (isCloseHover) {
 		DrawPauseSolidRect({ closeX, closeY }, { closeW, closeH }, { 0.88f, 0.15f, 0.18f, 0.95f });
 	} else {
-		DrawPausePanel({ closeX, closeY }, { closeW, closeH }, { 0.05f, 0.15f, 0.08f, 0.80f }, { 0.20f, 0.75f, 0.40f, 0.70f }, 1.0f);
+		DrawPausePanel({ closeX, closeY }, { closeW, closeH }, { 0.06f, 0.15f, 0.07f, 0.80f }, { 0.35f, 0.68f, 0.38f, 0.70f }, 1.0f);
 	}
-	tr->Print("HackGen", "X", closeX + closeW * 0.5f, closeY + 4.0f, 12.0f, isCloseHover ? Vector4{ 1.0f, 1.0f, 1.0f, 1.0f } : Vector4{ 0.45f, 1.0f, 0.70f, 0.95f }, { 0.5f, 0.0f });
+	tr->Print("HackGen", "X", closeX + closeW * 0.5f, closeY + 4.0f, 12.0f, isCloseHover ? Vector4{ 1.0f, 1.0f, 1.0f, 1.0f } : Vector4{ 0.53f, 0.88f, 0.55f, 0.95f }, { 0.5f, 0.0f });
 
 	// 4. 四隅のコーナーブラケット（太さ 2.5px）
 	DrawPauseCornerBrackets(curPos, curSize, 22.0f, 2.5f, cornerColor);
 
 	// 5. サブヘッダー
-	tr->Print("HackGenRegular", "/// MISSION PAUSED : PILOT DIRECTIVE ///", curPos.x + curSize.x * 0.5f, curPos.y + 44.0f, 11.5f, { 0.35f, 0.95f, 0.60f, 0.90f }, { 0.5f, 0.0f });
+	tr->Print("HackGenRegular", "/// MISSION PAUSED : PILOT DIRECTIVE ///", curPos.x + curSize.x * 0.5f, curPos.y + 44.0f, 11.5f, { 0.46f, 0.82f, 0.49f, 0.90f }, { 0.5f, 0.0f });
 
 	// 認証ステータス行（水平区切り線 ＆ 黒ベタマスク）
 	const float authY = curPos.y + 68.0f;
-	DrawPauseSolidRect({ curPos.x + 24.0f, authY }, { curSize.x - 48.0f, 1.0f }, { 0.20f, 0.75f, 0.45f, 0.60f });
+	DrawPauseSolidRect({ curPos.x + 24.0f, authY }, { curSize.x - 48.0f, 1.0f }, { 0.35f, 0.68f, 0.38f, 0.60f });
 	DrawPauseSolidRect({ curPos.x + curSize.x * 0.5f - 160.0f, authY - 8.0f }, { 320.0f, 16.0f }, { 0.0f, 0.0f, 0.0f, 1.0f });
-	tr->Print("HackGenRegular", "AUTH LEVEL 5 GRANTED // READY FOR COMMAND", curPos.x + curSize.x * 0.5f, authY - 6.0f, 11.0f, { 0.28f, 0.88f, 0.52f, 0.90f }, { 0.5f, 0.0f });
+	tr->Print("HackGenRegular", "AUTH LEVEL 5 GRANTED // READY FOR COMMAND", curPos.x + curSize.x * 0.5f, authY - 6.0f, 11.0f, { 0.42f, 0.78f, 0.45f, 0.90f }, { 0.5f, 0.0f });
 
 	// 6. メニューボタン (4つ)
 	const float buttonWidth = 380.0f;
@@ -1110,33 +1114,33 @@ void StageScene::DrawPauseMenuUI() {
 
 		if (isSelected) {
 			// 選択中ハイライト（TitleSceneと完全に同一）
-			DrawPauseSolidRect({ buttonX, btnY }, { buttonWidth, buttonHeight }, { 0.12f, 0.38f, 0.22f, 0.85f });
-			DrawPauseSolidRect({ buttonX, btnY }, { 4.0f, buttonHeight }, { 0.50f, 1.0f, 0.75f, 1.0f });
-			DrawPauseBorder({ buttonX, btnY }, { buttonWidth, buttonHeight }, { 0.45f, 1.0f, 0.70f, 0.95f }, 1.5f);
-			DrawPauseCornerBrackets({ buttonX, btnY }, { buttonWidth, buttonHeight }, 8.0f, 1.5f, { 0.85f, 1.0f, 0.90f, 1.0f });
+			DrawPauseSolidRect({ buttonX, btnY }, { buttonWidth, buttonHeight }, { 0.14f, 0.34f, 0.16f, 0.85f });
+			DrawPauseSolidRect({ buttonX, btnY }, { 4.0f, buttonHeight }, { 0.58f, 0.90f, 0.60f, 1.0f });
+			DrawPauseBorder({ buttonX, btnY }, { buttonWidth, buttonHeight }, { 0.53f, 0.88f, 0.55f, 0.95f }, 1.5f);
+			DrawPauseCornerBrackets({ buttonX, btnY }, { buttonWidth, buttonHeight }, 8.0f, 1.5f, { 0.76f, 0.94f, 0.78f, 1.0f });
 
 			std::string selText = ">> " + std::string(kLabels[i]);
-			tr->Print("HackGen", selText, buttonX + 24.0f, btnY + 11.0f, 20.0f, { 0.85f, 1.00f, 0.90f, 1.00f });
+			tr->Print("HackGen", selText, buttonX + 24.0f, btnY + 11.0f, 20.0f, { 0.76f, 0.94f, 0.78f, 1.00f });
 		} else {
 			// 非選択（完全純黒背景）
 			DrawPauseSolidRect({ buttonX, btnY }, { buttonWidth, buttonHeight }, { 0.0f, 0.0f, 0.0f, 1.0f });
-			DrawPauseBorder({ buttonX, btnY }, { buttonWidth, buttonHeight }, { 0.18f, 0.50f, 0.30f, 0.55f }, 1.0f);
-			DrawPauseCornerBrackets({ buttonX, btnY }, { buttonWidth, buttonHeight }, 8.0f, 1.5f, { 0.25f, 0.70f, 0.40f, 0.70f });
-			tr->Print("HackGen", kLabels[i], buttonX + 24.0f, btnY + 11.0f, 20.0f, { 0.35f, 0.92f, 0.55f, 0.95f });
+			DrawPauseBorder({ buttonX, btnY }, { buttonWidth, buttonHeight }, { 0.25f, 0.48f, 0.28f, 0.55f }, 1.0f);
+			DrawPauseCornerBrackets({ buttonX, btnY }, { buttonWidth, buttonHeight }, 8.0f, 1.5f, { 0.33f, 0.64f, 0.36f, 0.70f });
+			tr->Print("HackGen", kLabels[i], buttonX + 24.0f, btnY + 11.0f, 20.0f, { 0.46f, 0.82f, 0.49f, 0.95f });
 		}
 	}
 
 	// 7. 操作ガイド枠（完全純黒背景）
 	const float guideY = curPos.y + 322.0f;
 	const float guideH = 34.0f;
-	DrawPausePanel({ curPos.x + 24.0f, guideY }, { curSize.x - 48.0f, guideH }, { 0.0f, 0.0f, 0.0f, 1.0f }, { 0.15f, 0.50f, 0.28f, 0.50f }, 1.0f);
-	DrawPauseCornerBrackets({ curPos.x + 24.0f, guideY }, { curSize.x - 48.0f, guideH }, 10.0f, 1.5f, { 0.25f, 0.75f, 0.45f, 0.65f });
-	tr->Print("HackGen", "[ UP / DOWN ] SELECT     [ ENTER / CLICK ] EXECUTE     [ ESC ] RESUME", curPos.x + curSize.x * 0.5f, guideY + 9.0f, 11.5f, { 0.35f, 0.95f, 0.55f, 0.95f }, { 0.5f, 0.0f });
+	DrawPausePanel({ curPos.x + 24.0f, guideY }, { curSize.x - 48.0f, guideH }, { 0.0f, 0.0f, 0.0f, 1.0f }, { 0.22f, 0.46f, 0.25f, 0.50f }, 1.0f);
+	DrawPauseCornerBrackets({ curPos.x + 24.0f, guideY }, { curSize.x - 48.0f, guideH }, 10.0f, 1.5f, { 0.35f, 0.68f, 0.38f, 0.65f });
+	tr->Print("HackGen", "[ UP / DOWN ] SELECT     [ ENTER / CLICK ] EXECUTE     [ ESC ] RESUME", curPos.x + curSize.x * 0.5f, guideY + 9.0f, 11.5f, { 0.46f, 0.82f, 0.49f, 0.95f }, { 0.5f, 0.0f });
 
 	// 8. ウィンドウ最下部ステータスバー
 	const float sbY = curPos.y + curSize.y - 14.0f;
-	tr->Print("HackGenRegular", "ROOT@TACTICAL_OS: ONLINE", curPos.x + 16.0f, sbY, 11.5f, { 0.35f, 0.95f, 0.60f, 0.95f }, { 0.0f, 0.5f });
-	tr->Print("HackGenRegular", "PORT: 115200 BAUD // UTF-8", curPos.x + curSize.x - 16.0f, sbY, 11.5f, { 0.30f, 0.90f, 0.55f, 0.90f }, { 1.0f, 0.5f });
+	tr->Print("HackGenRegular", "ROOT@TACTICAL_OS: ONLINE", curPos.x + 16.0f, sbY, 11.5f, { 0.46f, 0.82f, 0.49f, 0.95f }, { 0.0f, 0.5f });
+	tr->Print("HackGenRegular", "PORT: 115200 BAUD // UTF-8", curPos.x + curSize.x - 16.0f, sbY, 11.5f, { 0.42f, 0.78f, 0.45f, 0.90f }, { 1.0f, 0.5f });
 
 	// ウィンドウテキストを描画フラッシュ
 	tr->Flush();

@@ -173,6 +173,14 @@ inline void to_json(nlohmann::json& j, const EnemySpawnData& e) {
 		{"aiType", aiStr},
 		{"waypointPathName", e.waypointPathName}
 	};
+
+	if (!e.behaviorTreeJson.empty()) {
+		try {
+			j["behaviorTree"] = nlohmann::json::parse(e.behaviorTreeJson);
+		} catch (...) {
+			j["behaviorTree"] = nullptr;
+		}
+	}
 }
 
 inline void from_json(const nlohmann::json& j, EnemySpawnData& e) {
@@ -191,6 +199,16 @@ inline void from_json(const nlohmann::json& j, EnemySpawnData& e) {
 		e.aiType = AIType::ChaseAttack;
 	}
 	if (j.contains("waypointPathName")) j.at("waypointPathName").get_to(e.waypointPathName);
+
+	if (j.contains("behaviorTree") && !j.at("behaviorTree").is_null()) {
+		try {
+			e.behaviorTreeJson = j.at("behaviorTree").dump();
+		} catch (...) {
+			e.behaviorTreeJson = "";
+		}
+	} else {
+		e.behaviorTreeJson = "";
+	}
 }
 
 inline void to_json(nlohmann::json& j, const GroundEnemyParam& p) {

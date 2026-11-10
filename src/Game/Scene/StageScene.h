@@ -25,6 +25,7 @@
 #include "../System/MissionManager.h"
 #include "../System/MissionMapView.h"
 #include "../UI/RadioCommunicator.h"
+#include "../UI/InfoUI.h"
 #include "../Mission/TutorialMissionDirector.h"
 
 namespace StageRadioDefaults {
@@ -55,7 +56,7 @@ namespace StageRadioDefaults {
 	inline constexpr float kReachAreaRingDepthScale = 3.5f;
 	inline constexpr float kReachAreaRingSpinSpeed = 0.45f;
 	inline constexpr const char* kRingTexPath = "assets/textures/circle2.png";
-	inline constexpr MyMath::Vector4 kReachAreaRingColor = { 0.22f, 0.96f, 0.72f, 0.88f };
+	inline constexpr MyMath::Vector4 kReachAreaRingColor = { 0.42f, 0.82f, 0.45f, 0.88f };
 }
 
 class TerrainChunkManager;
@@ -210,6 +211,7 @@ private:
 	StageHUD hud_;
 	RadioCommunicator radioCommunicator_;
 	TutorialMissionDirector tutorialDirector_;
+	InfoUI infoUI_;
 	bool hasSentSortieRadio_ = false;
 	bool hasSentDamageWarningRadio_ = false;
 	int lastRadioKillCount_ = StageRadioDefaults::kInitialKillCount;

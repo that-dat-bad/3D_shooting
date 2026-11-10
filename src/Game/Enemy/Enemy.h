@@ -1,6 +1,7 @@
 #pragma once
 #include <memory>
 #include <string>
+#include "BehaviorTree/BehaviorTree.h"
 #include "../../engine/base/Math/MyMath.h"
 #include "../../engine/Graphics/Model/Object3d.h"
 #include "../../engine/Physics/ICollisionBody.h"
@@ -37,6 +38,10 @@ namespace EnemyWaypointDefaults {
 class Object3dCommon;
 class Camera;
 
+namespace AI {
+	class BehaviorTree;
+}
+
 enum class AIType {
 	ChaseAttack,
 	CruiseEvade,
@@ -53,8 +58,8 @@ enum class TypeBState {
 /// </summary>
 class Enemy : public ICollisionBody3D {
 public:
-	Enemy() = default;
-	~Enemy() = default;
+	Enemy();
+	~Enemy();
 
 	/// <summary>
 	/// 初期化
@@ -68,6 +73,7 @@ public:
 	/// <param name="playerFlightModel">自機のフライトモデルへのポインタ</param>
 	/// <param name="bulletManager">弾丸マネージャーへのポインタ</param>
 	/// <param name="aiType">AI挙動タイプ</param>
+	/// <param name="behaviorTreeJson">ビヘイビアツリー定義JSON（任意）</param>
 	void Initialize(
 		const MyMath::Vector3& position, 
 		const std::string& modelPath, 
@@ -77,7 +83,8 @@ public:
 		const GunPodData& gunpodData,
 		FlightModel* playerFlightModel,
 		BulletManager* bulletManager,
-		AIType aiType = AIType::ChaseAttack
+		AIType aiType = AIType::ChaseAttack,
+		const std::string& behaviorTreeJson = ""
 	);
 
 	/// <summary>
@@ -112,6 +119,39 @@ public:
 	const char* GetTypeBStateString() const {
 		return typeBState_ == TypeBState::Cruising ? "Cruising" : "Evading";
 	}
+
+	// === ビヘイビアツリー連携・状況取得ヘルパー ===
+	float GetHealthRatio() const { return (maxHealth_ > 0.0f) ? (health_ / maxHealth_) : 0.0f; }
+	bool IsPlayerValid() const { return playerFlightModel_ != nullptr; }
+	MyMath::Vector3 GetPlayerPosition() const;
+	MyMath::Vector3 GetPlayerVelocity() const;
+	float GetDistanceToPlayer() const;
+	MyMath::Vector3 GetDirectionToPlayer() const;
+	MyMath::Vector3 GetVelocity() const { return flightModel_.GetVelocity(); }
+	MyMath::Vector3 GetForward() const { return flightModel_.GetForwardDirection(); }
+	float GetSpeed() const { return flightModel_.GetSpeed(); }
+
+	// === ビヘイビアツリー操縦・射撃インターフェース ===
+	void SetAimTargetDirection(const MyMath::Vector3& targetDir, float deltaTime);
+	void SetThrottleInput(float throttle) { flightModel_.SetThrottleInput(throttle); }
+	bool TryFireGunpod(const MyMath::Vector3& targetLeadDir, float maxDistance = 1000.0f);
+
+	// === ウェイポイント・巡航関連 ===
+	const std::vector<Waypoint>& GetWaypointPoints() const { return waypointPoints_; }
+	bool GetWaypointIsLoop() const { return waypointIsLoop_; }
+	size_t GetCurrentWaypointIndex() const { return currentWaypointIndex_; }
+	void SetCurrentWaypointIndex(size_t index) { currentWaypointIndex_ = index; }
+	void AdvanceWaypoint();
+	const MyMath::Vector3& GetCruiseDirection() const { return cruiseDirection_; }
+	void SetCruiseDirection(const MyMath::Vector3& dir) { cruiseDirection_ = dir; }
+
+	// === 実行中ビヘイビア名 ===
+	const char* GetActiveBehaviorName() const { return activeBehaviorName_; }
+	void SetActiveBehaviorName(const char* name) { activeBehaviorName_ = name; }
+	AI::BehaviorTree* GetBehaviorTree() { return behaviorTree_.get(); }
+	const std::string& GetBehaviorTreeJson() const { return behaviorTreeJson_; }
+	void SetBehaviorTreeJson(const std::string& json);
+	void RebuildBehaviorTree();
 
 	// === ICollisionBody3D 実装 ===
 	SphereCollider GetSphereCollider() const override {
@@ -156,4 +196,9 @@ private:
 	std::vector<Waypoint> waypointPoints_;
 	bool waypointIsLoop_ = false;
 	size_t currentWaypointIndex_ = EnemyWaypointDefaults::kInitialWaypointIndex;
+
+	// ビヘイビアツリー管理
+	std::string behaviorTreeJson_ = "";
+	std::unique_ptr<AI::BehaviorTree> behaviorTree_;
+	const char* activeBehaviorName_ = "WaitPatrol";
 };

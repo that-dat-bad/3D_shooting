@@ -83,14 +83,14 @@ void PseudoOS::ApplyThemePalette() {
 
 	case Theme::TerminalGreen:
 	default:
-		colPrimary_        = { 0.35f, 1.00f, 0.60f, 1.00f };
-		colSecondary_      = { 0.15f, 0.55f, 0.30f, 0.85f };
-		colHighlight_      = { 0.90f, 1.00f, 0.95f, 1.00f };
-		colPanelBg_        = { 0.01f, 0.04f, 0.02f, 0.98f };
-		colTaskbarBg_      = { 0.01f, 0.04f, 0.02f, 0.98f };
-		colBorderActive_   = { 0.45f, 1.00f, 0.70f, 0.98f };
-		colBorderInactive_ = { 0.12f, 0.35f, 0.20f, 0.50f };
-		colLedActive_      = { 0.40f, 1.00f, 0.70f, 1.00f };
+		colPrimary_        = { 0.48f, 0.84f, 0.50f, 1.00f };
+		colSecondary_      = { 0.30f, 0.58f, 0.33f, 0.85f };
+		colHighlight_      = { 0.78f, 0.95f, 0.80f, 1.00f };
+		colPanelBg_        = { 0.01f, 0.04f, 0.015f, 0.98f };
+		colTaskbarBg_      = { 0.01f, 0.04f, 0.015f, 0.98f };
+		colBorderActive_   = { 0.53f, 0.88f, 0.55f, 0.98f };
+		colBorderInactive_ = { 0.18f, 0.36f, 0.20f, 0.50f };
+		colLedActive_      = { 0.50f, 0.86f, 0.53f, 1.00f };
 		break;
 	}
 }
@@ -459,7 +459,7 @@ void PseudoOS::DrawWindowFrame(Window& win) {
 	if (isCloseHover) {
 		DrawRect({ closeX, closeY }, { closeW, closeH }, { 0.88f, 0.15f, 0.18f, 0.95f });
 	} else {
-		DrawPanel({ closeX, closeY }, { closeW, closeH }, { 0.05f, 0.15f, 0.08f, 0.80f }, { 0.20f, 0.75f, 0.40f, 0.70f }, 1.0f);
+		DrawPanel({ closeX, closeY }, { closeW, closeH }, { 0.06f, 0.15f, 0.07f, 0.80f }, { 0.35f, 0.68f, 0.38f, 0.70f }, 1.0f);
 	}
 	tr->Print("HackGen", "X", closeX + closeW * 0.5f, closeY + 4.0f, 12.0f, isCloseHover ? Vector4{ 1.0f, 1.0f, 1.0f, 1.0f } : colHighlight_, { 0.5f, 0.0f });
 

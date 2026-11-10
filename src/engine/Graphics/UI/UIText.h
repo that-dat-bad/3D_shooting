@@ -32,10 +32,26 @@ public:
 		hasDropShadow_ = enable;
 		shadowOffset_ = offset;
 		shadowColor_ = color;
+		hasOuterShadow_ = false;
+	}
+	/// @brief 会話UI風 2層ソフトドロップシャドウ（外側ぼかし＋内側引き締め）を設定
+	void SetDualDropShadow(bool enable,
+		const Vector2& innerOffset = { 1.2f, 1.5f }, const Vector4& innerColor = { 0.02f, 0.04f, 0.08f, 0.62f },
+		const Vector2& outerOffset = { 2.2f, 2.8f }, const Vector4& outerColor = { 0.02f, 0.04f, 0.08f, 0.34f })
+	{
+		hasDropShadow_ = enable;
+		shadowOffset_ = innerOffset;
+		shadowColor_ = innerColor;
+		hasOuterShadow_ = enable;
+		outerShadowOffset_ = outerOffset;
+		outerShadowColor_ = outerColor;
 	}
 	bool HasDropShadow() const { return hasDropShadow_; }
 	Vector2 GetShadowOffset() const { return shadowOffset_; }
 	Vector4 GetShadowColor() const { return shadowColor_; }
+	bool HasOuterShadow() const { return hasOuterShadow_; }
+	Vector2 GetOuterShadowOffset() const { return outerShadowOffset_; }
+	Vector4 GetOuterShadowColor() const { return outerShadowColor_; }
 
 	// --- 装飾（アウトライン） ---
 	void SetOutline(bool enable, float thickness = 1.0f, const Vector4& color = {0.0f, 0.0f, 0.0f, 1.0f}) {
@@ -55,6 +71,10 @@ private:
 	bool hasDropShadow_ = false;
 	Vector2 shadowOffset_ = {2.0f, 2.0f};
 	Vector4 shadowColor_ = {0.0f, 0.0f, 0.0f, 1.0f};
+
+	bool hasOuterShadow_ = false;
+	Vector2 outerShadowOffset_ = {2.2f, 2.8f};
+	Vector4 outerShadowColor_ = {0.02f, 0.04f, 0.08f, 0.34f};
 
 	bool hasOutline_ = false;
 	float outlineThickness_ = 1.0f;

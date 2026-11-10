@@ -19,13 +19,24 @@ void UIText::Draw() {
 	float renderSize = fontSize_ * GetRenderScale();
 	Vector4 renderColor = GetRenderColor();
 
-	// 1. ドロップシャドウ
+	// 0. 外側ドロップシャドウ（2層ソフトシャドウ用）
+	if (hasOuterShadow_) {
+		Vector4 outerCol = { outerShadowColor_.x, outerShadowColor_.y, outerShadowColor_.z, outerShadowColor_.w * renderColor.w };
+		TextRenderer::GetInstance()->Print(
+			fontName_, text_,
+			renderPos.x + outerShadowOffset_.x * GetRenderScale(),
+			renderPos.y + outerShadowOffset_.y * GetRenderScale(),
+			renderSize, outerCol, anchorPoint_
+		);
+	}
+
+	// 1. ドロップシャドウ（内側引き締めシャドウ）
 	if (hasDropShadow_) {
 		Vector4 shadowCol = { shadowColor_.x, shadowColor_.y, shadowColor_.z, shadowColor_.w * renderColor.w };
 		TextRenderer::GetInstance()->Print(
 			fontName_, text_,
-			renderPos.x + shadowOffset_.x,
-			renderPos.y + shadowOffset_.y,
+			renderPos.x + shadowOffset_.x * GetRenderScale(),
+			renderPos.y + shadowOffset_.y * GetRenderScale(),
 			renderSize, shadowCol, anchorPoint_
 		);
 	}

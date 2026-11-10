@@ -85,7 +85,7 @@ void StageScene::DrawGround() {
 }
 
 void StageScene::DrawMissionReachAreaRings(Camera* cam) {
-	if (!cam || tutorialDirector_.IsTutorialActive()) {
+	if (!cam) {
 		return;
 	}
 	PrimitiveModel* prim = PrimitiveModel::GetInstance();

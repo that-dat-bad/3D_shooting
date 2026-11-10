@@ -1,4 +1,6 @@
 #include "MissionSyncManager.h"
+#include <filesystem>
+#include <algorithm>
 
 MissionSyncManager* MissionSyncManager::GetInstance() {
 	static MissionSyncManager instance;
@@ -28,10 +30,28 @@ void MissionSyncManager::SetActiveMissionFilePath(const std::string& filePath) {
 }
 
 std::string MissionSyncManager::BuildLiveEndpoint() const {
-	if (activeMissionFilePath_.empty()) {
-		return MissionSyncDefaults::kLiveMissionEndpoint;
+	namespace fs = std::filesystem;
+
+	// プロジェクトルート（ゲームプロセスのカレントパス）
+	fs::path rootPath = fs::current_path();
+	std::string rootStr = rootPath.generic_string();
+
+	std::string targetRel = activeMissionFilePath_.empty()
+		? MissionSyncDefaults::kDefaultMissionFilePath
+		: activeMissionFilePath_;
+
+	fs::path fullJsonPath(targetRel);
+	if (!fullJsonPath.is_absolute()) {
+		fullJsonPath = rootPath / fullJsonPath;
 	}
-	return std::string(MissionSyncDefaults::kLiveMissionFileQueryPrefix) + activeMissionFilePath_;
+	std::string fullJsonStr = fullJsonPath.generic_string();
+
+	// /mission/live?file=<FullPath>&projectRoot=<ProjectRoot>
+	std::string endpoint = std::string(MissionSyncDefaults::kLiveMissionFileQueryPrefix)
+		+ fullJsonStr
+		+ "&projectRoot=" + rootStr;
+
+	return endpoint;
 }
 
 void MissionSyncManager::StartSync() {

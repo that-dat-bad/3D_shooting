@@ -215,14 +215,14 @@ private:
 	float animTimer_ = 0.0f;
 
 	// テーマカラーパレット
-	Vector4 colPrimary_        = { 0.35f, 1.00f, 0.60f, 1.0f };
-	Vector4 colSecondary_      = { 0.15f, 0.55f, 0.30f, 0.85f };
-	Vector4 colHighlight_      = { 0.90f, 1.00f, 0.95f, 1.0f };
-	Vector4 colPanelBg_        = { 0.01f, 0.04f, 0.02f, 0.98f };
-	Vector4 colTaskbarBg_      = { 0.01f, 0.04f, 0.02f, 0.98f };
-	Vector4 colBorderActive_   = { 0.45f, 1.00f, 0.70f, 0.98f };
-	Vector4 colBorderInactive_ = { 0.12f, 0.35f, 0.20f, 0.50f };
-	Vector4 colLedActive_      = { 0.40f, 1.00f, 0.70f, 1.0f };
+	Vector4 colPrimary_        = { 0.48f, 0.84f, 0.50f, 1.0f };
+	Vector4 colSecondary_      = { 0.30f, 0.58f, 0.33f, 0.85f };
+	Vector4 colHighlight_      = { 0.78f, 0.95f, 0.80f, 1.0f };
+	Vector4 colPanelBg_        = { 0.01f, 0.04f, 0.015f, 0.98f };
+	Vector4 colTaskbarBg_      = { 0.01f, 0.04f, 0.015f, 0.98f };
+	Vector4 colBorderActive_   = { 0.53f, 0.88f, 0.55f, 0.98f };
+	Vector4 colBorderInactive_ = { 0.18f, 0.36f, 0.20f, 0.50f };
+	Vector4 colLedActive_      = { 0.50f, 0.86f, 0.53f, 1.0f };
 
 	// ウィンドウアニメーション状態
 	WindowAnimState windowAnimState_ = WindowAnimState::None;
