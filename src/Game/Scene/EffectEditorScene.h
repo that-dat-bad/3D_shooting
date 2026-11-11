@@ -8,10 +8,7 @@
 #include "../../engine/Graphics/Model/Skybox.h"
 #include "../../engine/Graphics/Particle/EffectManager.h"
 
-/// <summary>
-/// Debugビルド専用の独立エフェクトエディタシーン
-/// .effect 外部設定ファイルのリアルタイム編集および emit() / stop() / Delete() の動作検証を行う
-/// </summary>
+// エフェクトエディタシーン
 class EffectEditorScene : public IScene {
 public:
 	void Initialize() override;

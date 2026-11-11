@@ -40,7 +40,7 @@ namespace {
         };
     }
 
-    /// 180度反転特異点でも破綻しない球面線形補間 (Slerp on S^2)
+    // 球面線形補間
     Vector3 SlerpDirection(const Vector3& from, const Vector3& to, float t, const Vector3& fallbackUp) {
         t = std::clamp(t, 0.0f, 1.0f);
         float d = std::clamp(Dot(from, to), -1.0f, 1.0f);
@@ -62,8 +62,7 @@ namespace {
         return SafeNormalize(RotateAroundAxis(from, axis, theta * t), to);
     }
 
-    /// 球面 S^2 上の無条件安定・過減衰2次バネダンパ積分器
-    /// ハードクランプ壁を一切持たず、0°〜180°の全域で均一かつ滑らかな追従角速度を生成する
+    // 2次バネダンパ積分
     Vector3 StepSphericalSpringDamper(
         const Vector3& dir,
         const Vector3& target,

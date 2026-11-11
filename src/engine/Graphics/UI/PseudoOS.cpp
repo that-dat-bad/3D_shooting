@@ -416,7 +416,7 @@ void PseudoOS::DrawWindowFrame(Window& win) {
 	Vector4 titleBarBg = isActive ? Vector4{ colBorderActive_.x * 0.15f, colBorderActive_.y * 0.15f, colBorderActive_.z * 0.15f, 0.98f }
 	                              : Vector4{ colPanelBg_.x * 1.5f, colPanelBg_.y * 1.5f, colPanelBg_.z * 1.5f, 0.85f };
 
-	// 0. ウィンドウ背面の多層ドロップシャドウ（項目9: デスクトップ空間としての明確な奥行き・立体感）
+	// 0. ウィンドウ背面の多層ドロップシャドウ
 	const float shadowOffset1 = 6.0f * smoothS;
 	const float shadowOffset2 = 12.0f * smoothS;
 	DrawRect({ curPos.x + shadowOffset1, curPos.y + shadowOffset1 }, curSize, { 0.0f, 0.0f, 0.0f, 0.40f * smoothS });

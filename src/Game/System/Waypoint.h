@@ -19,7 +19,7 @@ namespace MyMath {
 }
 #endif
 
-/// @brief 単一のウェイポイント情報
+// 単一のウェイポイント情報
 struct Waypoint {
 	MyMath::Vector3 position;
 	float speed = 300.0f; // 目標通過速度 (km/h 等)
@@ -37,7 +37,7 @@ inline void from_json(const nlohmann::json& j, Waypoint& wp) {
 	if (j.contains("speed")) j.at("speed").get_to(wp.speed);
 }
 
-/// @brief 一連のウェイポイントからなるパス（経路）
+// 一連のウェイポイントからなるパス（経路）
 struct WaypointPath {
 	std::string name;
 	std::vector<Waypoint> points;

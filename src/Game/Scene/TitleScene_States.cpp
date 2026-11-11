@@ -8,7 +8,7 @@ void TitleScene::InitializeEntryState() {
 	isStartMenuOpen_ = false;
 	TitleEntryReason entryReason = GameResult::GetInstance().titleEntryReason;
 	if (entryReason == TitleEntryReason::RebootFromGameOver) {
-		// 項目8: ゲームオーバーからの復帰時、起動コンソール画面に繋がり、再びOSが立ち上がってタイトルメニューに戻る
+		// ゲームオーバーからの復帰時、起動コンソール画面に繋がり、再びOSが立ち上がってタイトルメニューに戻る
 		state_ = TitleState::ConsoleBoot;
 		consoleBootTimer_ = 0.0f;
 		currentConsoleDuration_ = 0.85f; // 緊急リブート: 2.5倍速で切迫感のあるタイピング速度
@@ -23,7 +23,7 @@ void TitleScene::InitializeEntryState() {
 		previousSortieLog_ = "PREVIOUS SORTIE: KERNEL PANIC // EMERGENCY SYSTEM RECOVERY ACTIVE";
 		previousSortieColor_ = { 1.0f, 0.40f, 0.35f, 0.90f };
 	} else if (entryReason == TitleEntryReason::ReturnFromClear) {
-		// 項目10: クリアからの復帰時、セッション終了・再認証セキュリティ演出
+		// クリアからの復帰時、セッション終了・再認証セキュリティ演出
 		state_ = TitleState::ReAuthentication;
 		reauthTimer_ = 0.0f;
 		isRebootLog_ = false;
@@ -45,9 +45,9 @@ void TitleScene::InitializeEntryState() {
 }
 
 void TitleScene::UpdateDroneViewState(float dt) {
-	SetCursorVisible(false); // ドローン画面中はマウスカーソル非表示（項目7）
+	SetCursorVisible(false); // ドローン画面中はマウスカーソル非表示
 
-	// スペースキー、Enterキー、またはマウスクリック（左クリック）でOSウィンドウ最小化演出を経てコンソールへ（項目1）
+	// スペースキー、Enterキー、またはマウスクリック（左クリック）でOSウィンドウ最小化演出を経てコンソールへ
 	Input* input = Input::GetInstance();
 	bool clickTriggered = input->TriggerMouse(0) || ((::GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0 && !wasLButtonDown_);
 	bool enterTriggered = input->TriggerKey(DIK_SPACE) || input->TriggerKey(DIK_RETURN)
@@ -110,7 +110,7 @@ void TitleScene::UpdateDroneViewState(float dt) {
 		postEffect->AddActiveEffect(lens);
 	} else {
 		// 通常ロケーション（Tunnel など）
-		// カメラ切替時の砂嵐ノイズトランジション演出（項目10）
+		// カメラ切替時の砂嵐ノイズトランジション演出
 		if (transitionTimer_ > 0.0f) {
 			float t = transitionTimer_ / kTransitionDuration;
 			ActivePostEffect noise;
@@ -123,14 +123,14 @@ void TitleScene::UpdateDroneViewState(float dt) {
 			glitchScan.intensity = 0.18f * t;
 			postEffect->AddActiveEffect(glitchScan);
 		} else {
-			// 通常時の繊細な走査線（項目9）
+			// 通常時の繊細な走査線
 			ActivePostEffect scanline;
 			scanline.type = PostEffectType::kScanLine;
 			scanline.intensity = 0.045f;
 			postEffect->AddActiveEffect(scanline);
 		}
 
-		// 控えめで上品な色収差（項目1, 9: 残像・過剰ボケを防止）
+		// 控えめで上品な色収差
 		ActivePostEffect chromatic;
 		chromatic.type = PostEffectType::kChromaticAberration;
 		chromatic.intensity = 0.006f;
@@ -284,7 +284,7 @@ void TitleScene::UpdateConsoleBootState(float dt) {
 	PostEffect* postEffect = PostEffect::GetInstance();
 	postEffect->ClearActiveEffects();
 
-	// 切り替えフェードアウト時の短いCRT走査線グリッチ演出（項目3）
+	// 切り替えフェードアウト時の短いCRT走査線グリッチ演出
 	if (consoleExitTimer_ > 0.0f) {
 		float exitRatio = consoleExitTimer_ / kConsoleExitDuration;
 		ActivePostEffect scanline;
@@ -300,7 +300,7 @@ void TitleScene::UpdateConsoleBootState(float dt) {
 }
 
 void TitleScene::UpdateReAuthState(float dt) {
-	// 項目10: セッション終了・再認証セキュリティ演出の更新
+	// セッション終了・再認証セキュリティ演出の更新
 	SetCursorVisible(false);
 	reauthTimer_ += dt;
 
@@ -327,7 +327,7 @@ void TitleScene::UpdateReAuthState(float dt) {
 }
 
 void TitleScene::UpdateMenuState(float dt) {
-	SetCursorVisible(false); // OS標準白カーソルを非表示にし、サイバーグリーンの専用タクティカルポインターを表示（項目5）
+	SetCursorVisible(false); // OS標準白カーソルを非表示にし、サイバーグリーンの専用タクティカルポインターを表示
 	if (menuEnterTimer_ > 0.0f) {
 		menuEnterTimer_ -= dt;
 	}
@@ -416,7 +416,7 @@ void TitleScene::UpdateMenuState(float dt) {
 	PostEffect* postEffect = PostEffect::GetInstance();
 	postEffect->ClearActiveEffects();
 
-	// 項目6: 背景（格納庫）の被写界深度（デフォーカス・ガウスブラー）- 手前UI視認性向上のため滑らかな被写界深度ブラーを適用
+	// 背景（格納庫）の被写界深度（デフォーカス・ガウスブラー）- 手前UI視認性向上のため滑らかな被写界深度ブラーを適用
 	ActivePostEffect bgBlur;
 	bgBlur.type = PostEffectType::kKawaseBlur;
 	bgBlur.intensity = 2.8f;
@@ -443,7 +443,7 @@ void TitleScene::UpdateMenuState(float dt) {
 	vignette.intensity = 0.65f;
 	postEffect->AddActiveEffect(vignette);
 
-	// 項目4: スタートメニュー操作時の暗転・ノイズクッション演出
+	// スタートメニュー操作時の暗転・ノイズクッション演出
 	if (startMenuTransitionTimer_ > 0.0f) {
 		float smRatio = startMenuTransitionTimer_ / kStartMenuTransitionDuration;
 		ActivePostEffect smNoise;
@@ -467,10 +467,10 @@ void TitleScene::UpdateMenuState(float dt) {
 }
 
 void TitleScene::UpdateSortieState(float dt) {
-	SetCursorVisible(false); // OSカーソル非表示を徹底（項目9）
+	SetCursorVisible(false); // OSカーソル非表示を徹底
 	sortieTimer_ += dt;
 	if (sortieTimer_ >= kSortieDuration) {
-		sceneID = SCENE::STAGE; // 出撃演出完了後にステージへシームレス移行（項目1）
+		sceneID = SCENE::STAGE; // 出撃演出完了後にステージへシームレス移行
 	}
 
 	// 出撃シーケンス中もマウスカーソルの自由な移動を維持
@@ -490,14 +490,14 @@ void TitleScene::UpdateSortieState(float dt) {
 	// 背景カメラをゆっくり進める
 	UpdateLocationCamera(CurrentLocation(), dt, true);
 
-	// 出撃シーケンスのポストエフェクト（項目3: ボタンクリック時の波紋グリッチ ＋ アフターバーナー加速感）
+	// 出撃シーケンスのポストエフェクト
 	PostEffect* postEffect = PostEffect::GetInstance();
 	postEffect->ClearActiveEffects();
 
 	float normT = std::clamp(sortieTimer_ / kSortieDuration, 0.0f, 1.0f);
 
 	if (sortieTimer_ < 0.35f) {
-		// クリック直後の一瞬の強烈な波紋グリッチ（項目3）
+		// クリック直後の一瞬の強烈な波紋グリッチ
 		float shock = 1.0f - (sortieTimer_ / 0.35f);
 		ActivePostEffect noise;
 		noise.type = PostEffectType::kRandom;

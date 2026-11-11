@@ -6,13 +6,13 @@
 
 class SpriteCommon;
 
-/// @brief テキスト表示用のUI要素
+// テキストUI要素
 class UIText : public UIElement {
 public:
-	/// @brief 初期化
-	/// @param fontName 使用するフォント名（FontManagerに登録済みのもの）
-	/// @param text 表示テキスト
-	/// @param fontSize フォントサイズ
+	// 初期化
+	// fontName: フォント名
+	// text: 表示テキスト
+	// fontSize: フォントサイズ
 	void Initialize(const std::string& fontName, const std::string& text, float fontSize);
 
 	void Update() override;
@@ -34,7 +34,7 @@ public:
 		shadowColor_ = color;
 		hasOuterShadow_ = false;
 	}
-	/// @brief 会話UI風 2層ソフトドロップシャドウ（外側ぼかし＋内側引き締め）を設定
+	// 2層ドロップシャドウの設定
 	void SetDualDropShadow(bool enable,
 		const Vector2& innerOffset = { 1.2f, 1.5f }, const Vector4& innerColor = { 0.02f, 0.04f, 0.08f, 0.62f },
 		const Vector2& outerOffset = { 2.2f, 2.8f }, const Vector4& outerColor = { 0.02f, 0.04f, 0.08f, 0.34f })

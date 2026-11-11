@@ -13,14 +13,14 @@
 
 using namespace MyMath;
 
-/// @brief エフェクト自動停止条件（stop()手動停止 / 時間指定 / 回数指定）
+// エフェクトの停止条件
 enum class EffectStopCondition : int {
-	Manual = 0,     ///< sample->stop() が呼ばれるまで継続発生
-	ByDuration = 1, ///< 指定時間 (maxDuration [秒]) 経過で自動停止
-	ByCount = 2,    ///< 指定回数 (maxEmitCount [回]) 発生で自動停止
+	Manual = 0,     // 手動停止
+	ByDuration = 1, // 時間指定
+	ByCount = 2,    // 回数指定
 };
 
-/// @brief .effect ファイル内の1パーティクルレイヤー設定
+// パーティクルレイヤー設定
 struct EffectParticleLayer {
 	std::string layerName = "Layer0";
 	std::string groupName = "ExplosionSmoke";
@@ -30,7 +30,7 @@ struct EffectParticleLayer {
 	ParticleParameters params{};
 };
 
-/// @brief 外部ファイル (.effect) から読み込まれるエフェクト設定データ
+// エフェクト設定データ
 struct EffectPreset {
 	std::string name = "default_fire";
 	std::string filePath = "Resources/effects/default_fire.effect";
@@ -40,43 +40,47 @@ struct EffectPreset {
 	uint32_t maxEmitCount = 30u;
 	std::vector<EffectParticleLayer> layers;
 
+	// ファイル読み込み
+	// path: 設定ファイルのパス
 	bool LoadFromEffectFile(const std::string& path);
+	// ファイル保存
+	// path: 設定ファイルのパス
 	bool SaveToEffectFile(const std::string& path) const;
 };
 
-/// @brief コードから `if(条件){ sample->emit(); }` / `sample->stop()` / `sample->Delete()` で扱えるハンドル
+// エフェクトハンドル
 class EffectHandle {
 public:
 	EffectHandle() = default;
 	explicit EffectHandle(const std::string& effectName);
 
-	/// @brief エフェクト発生（if(条件){ sample->emit(); } で呼び出し）
+	// エフェクト発生
 	void emit();
+	// position: 発生座標
 	void emit(const Vector3& position);
 	void Emit() { emit(); }
 	void Emit(const Vector3& position) { emit(position); }
 
-	/// @brief エフェクト停止（sample->stop() で呼び出し）
+	// エフェクト停止
 	void stop();
 	void Stop() { stop(); }
 
-	/// @brief ハンドルの破棄要求（EffectManagerから自動削除される）
+	// 破棄要求
 	void Delete();
 	void destroy() { Delete(); }
 	bool IsPendingDelete() const { return pendingDelete_; }
 
-	/// @brief 毎フレーム更新（EffectManager::Update() から自動呼び出し）
+	// 更新
+	// dt: デルタタイム
 	void Update(float dt);
 
-	/// @brief 発生座標の設定・取得
 	void SetPosition(const Vector3& position) { position_ = position; }
 	const Vector3& GetPosition() const { return position_; }
 
-	/// @brief 参照する .effect 名の設定・取得
 	void SetEffectName(const std::string& effectName) { effectName_ = effectName; }
 	const std::string& GetEffectName() const { return effectName_; }
 
-	/// @brief 停止条件のコード側オーバーライド設定
+	// 停止条件の設定
 	void SetStopCondition(EffectStopCondition condition) {
 		overrideStopCondition_ = true;
 		customStopCondition_ = condition;
@@ -93,7 +97,6 @@ public:
 	}
 	void ClearStopConditionOverride() { overrideStopCondition_ = false; }
 
-	/// @brief 状態取得
 	bool IsEmitting() const { return isEmitting_; }
 	bool IsCompleted() const { return isCompleted_; }
 	float GetElapsedSeconds() const { return elapsedSeconds_; }
@@ -144,9 +147,7 @@ protected:
 	float currentTime_ = 0.0f;
 };
 
-// ============================================
 // リングエフェクト
-// ============================================
 class RingEffect : public IEffect {
 public:
 	RingEffect(const Vector3& pos, const Vector4& color, float lifeTime, float maxRadius);
@@ -160,9 +161,7 @@ private:
 	Vector3 scale_{ 0,0,0 };
 };
 
-// ============================================
-// シリンダー柱エフェクト
-// ============================================
+// シリンダーエフェクト
 class CylinderEffect : public IEffect {
 public:
 	CylinderEffect(const Vector3& pos, const Vector4& color, float lifeTime, float maxScaleY, float maxScaleX);
@@ -176,9 +175,7 @@ private:
 	float maxScaleX_ = 2.0f;
 };
 
-// ============================================
-// 回転するPlane(斬撃)エフェクト
-// ============================================
+// 斬撃エフェクト
 class HitRotPlaneEffect : public IEffect {
 public:
 	HitRotPlaneEffect(const Vector3& pos, const Vector4& color, float lifeTime, float size);
@@ -193,9 +190,7 @@ private:
 	float targetSize_ = 2.0f;
 };
 
-// ============================================
-// ビルボードパーティクルエフェクト (ラッパー)
-// ============================================
+// ビルボードパーティクル
 class BillboardParticleEffect : public IEffect {
 public:
 	BillboardParticleEffect(const Vector3& pos, const std::string& groupName, uint32_t count);
@@ -203,9 +198,7 @@ public:
 	void Draw(Camera* camera) override;
 };
 
-// ============================================
-// 爆発パーティクルエフェクト（火花+炎+煙の複合演出）
-// ============================================
+// 爆発エフェクト
 class ExplosionParticleEffect : public IEffect {
 public:
 	ExplosionParticleEffect(const Vector3& pos);
@@ -228,9 +221,7 @@ private:
 	float lightIntensity_ = 0.0f;
 };
 
-// ============================================
-// マズルフラッシュエフェクト（発砲時の火花+閃光）
-// ============================================
+// マズルフラッシュ
 class MuzzleFlashEffect : public IEffect {
 public:
 	MuzzleFlashEffect(const Vector3& pos, const Vector3& direction);
@@ -240,9 +231,7 @@ private:
 	Vector3 direction_;
 };
 
-/// <summary>
-/// エフェクト管理クラス (外部 .effect ファイル駆動・ハンドル管理・Debug専用GUI)
-/// </summary>
+// エフェクト管理者
 class EffectManager {
 public:
 	static EffectManager* GetInstance();
@@ -250,22 +239,33 @@ public:
 	EffectManager() = default;
 	~EffectManager() = default;
 
+	// 初期化
 	void Initialize();
+	// 更新
 	void Update();
+	// 描画
+	// camera: 描画カメラ
 	void Draw(Camera* camera);
+	// 終了処理
 	void Finalize();
 
 	void AddEffect(std::unique_ptr<IEffect> effect);
 
-	// 既存互換エフェクト発行関数
+	// ヒットエフェクト発生
+	// position: 発生座標
 	void EmitHitEffect(const Vector3& position);
+	// 斬撃エフェクト発生
+	// position: 発生座標
 	void EmitHitPlaneEffect(const Vector3& position);
+	// 破壊エフェクト発生
+	// position: 発生座標
 	void EmitDestroyEffect(const Vector3& position);
+	// マズルフラッシュ発生
+	// position: 発生座標
 	void EmitMuzzleFlash(const Vector3& position, const Vector3& direction);
 
-	// ============================================
-	// 外部 .effect ファイル管理 & ハンドル操作 (emit / stop / delete)
-	// ============================================
+	// エフェクトファイルの読み込み
+	// directory: 読み込み先ディレクトリ
 	void LoadAllEffectsFromDirectory(const std::string& directory = "Resources/effects");
 	static std::vector<std::string> GetAvailableEffectFiles(const std::string& directory = "Resources/effects");
 
@@ -275,11 +275,14 @@ public:
 	std::vector<EffectPreset>& GetPresets() { return presets_; }
 	const std::vector<EffectPreset>& GetPresets() const { return presets_; }
 
-	/// @brief 名前付き共有ハンドルの取得（存在しなければ生成）
+	// ハンドルの取得
+	// handleName: ハンドル名
 	EffectHandle* GetHandle(const std::string& handleName, const std::string& effectName = "");
-	/// @brief 独立ハンドルの生成（不要時に handle->Delete() または DeleteHandle(handle) で破棄可能）
+	// ハンドルの生成
+	// effectName: エフェクト名
 	EffectHandle* CreateHandle(const std::string& effectName);
-	/// @brief ハンドルの明示的削除
+	// ハンドルの削除
+	// handle: 削除するハンドル
 	void DeleteHandle(EffectHandle*& handle);
 	void StopAllHandles();
 
@@ -287,7 +290,7 @@ public:
 	size_t GetActiveEffectCount() const { return effects_.size(); }
 
 #ifdef _DEBUG
-	/// @brief Debugビルド専用のエフェクトパラメータ編集GUI（量・上昇速度・上限高さ・加速度・寿命・停止条件）
+	// デバッグ用GUI
 	void DrawDebugGui(EffectHandle* previewHandle = nullptr);
 #endif
 

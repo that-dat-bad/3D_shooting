@@ -3,7 +3,7 @@
 using namespace ClearSceneInternal;
 
 // ============================================================
-// 項目15: VHSテープのリワインド（巻き戻し）演出
+// VHSテープのリワインド（巻き戻し）演出
 // ============================================================
 void ClearScene::DrawRewindEffectUI() {
 	if (!isRewinding_ || !uploadSprite_) return;
@@ -63,7 +63,7 @@ void ClearScene::DrawRewindEffectUI() {
 }
 
 // ============================================================
-// 項目16, 17, 18: データアップロードと帰還システムログブリッジ演出
+// データアップロードと帰還システムログブリッジ演出
 // ============================================================
 void ClearScene::DrawUploadSequenceUI() {
 	if (!isUploading_ || !uploadSprite_) return;

@@ -4,34 +4,29 @@
 #include "../../engine/io/MCPClient.h"
 #include "../../engine/io/json.hpp"
 
-/// @brief Blender地形ツールとのMCPリアルタイム同期を管理するクラス
-/// MCPClientを使用して地形パラメータを定期的に取得し、
-/// ImGuiウィンドウで表示・編集可能にする。
+// 地形同期管理クラス
 class TerrainSyncManager {
 public:
 	static TerrainSyncManager* GetInstance();
 
-	/// @brief 初期化（MCP接続設定）
-	/// @param host MCPサーバーのホスト名
-	/// @param port MCPサーバーのポート番号
+	// 初期化
+	// host: ホスト名
+	// port: ポート番号
 	void Initialize(const std::string& host = "localhost", int port = 8765);
 
-	/// @brief 終了処理
+	// 終了処理
 	void Finalize();
 
-	/// @brief 毎フレームの更新（ImGuiウィンドウの描画含む）
+	// 更新
 	void Update();
 
-	/// @brief MCP同期の開始
+	// 同期開始
 	void StartSync();
 
-	/// @brief MCP同期の停止
+	// 同期停止
 	void StopSync();
 
-	/// @brief 同期中かどうか
 	bool IsSyncing() const { return mcpClient_.IsPolling(); }
-
-	/// @brief 接続されているかどうか
 	bool IsConnected() const { return mcpClient_.IsConnected(); }
 
 	// --- 地形パラメータアクセサ ---
@@ -52,10 +47,10 @@ private:
 	TerrainSyncManager(const TerrainSyncManager&) = delete;
 	TerrainSyncManager& operator=(const TerrainSyncManager&) = delete;
 
-	/// @brief MCPからの受信コールバック
+	// 受信コールバック
 	void OnTerrainDataReceived(const nlohmann::json& data);
 
-	/// @brief ImGuiウィンドウの描画
+	// ImGui描画
 	void DrawImGui();
 
 	MCPClient mcpClient_;

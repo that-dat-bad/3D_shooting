@@ -12,7 +12,7 @@ namespace StageHUDTimerDefaults {
 	inline constexpr int kSecondsPerMinute = 60;
 }
 
-/// @brief StageSceneのHUD表示用データ構造体
+// HUD表示用データ
 struct StageHUDData {
 	float remainingTime = 300.0f;
 	float elapsedTime = StageHUDTimerDefaults::kDefaultElapsedSeconds;
@@ -31,37 +31,37 @@ struct StageHUDData {
 	float screenHeight = 720.0f;
 };
 
-/// @brief 戦闘ステージ用HUD管理・描画クラス
+// 戦闘ステージ用HUD
 class StageHUD {
 public:
 	StageHUD() = default;
 	~StageHUD() = default;
 
-	/// @brief 初期化処理
-	/// @param spriteCommon SpriteCommonポインタ
+	// 初期化
+	// spriteCommon: SpriteCommon
 	void Initialize(SpriteCommon* spriteCommon);
 
-	/// @brief 更新処理
-	/// @param dt 経過時間（秒）
-	/// @param data HUD描画に必要なゲームデータ
+	// 更新
+	// dt: 経過時間
+	// data: HUDデータ
 	void Update(float dt, const StageHUDData& data);
 
-	/// @brief 2D UIパスでの描画処理
+	// 描画
 	void Draw();
 
-	/// @brief HUD展開アニメーションのリセット（戦闘モード起動時に呼び出し）
+	// HUD展開リセット
 	void ResetDeploy() { deployTimer_ = 0.0f; }
 
-	/// @brief 被弾・撃墜時のテーマカラー反転（緑→赤/オレンジ）設定（項目4）
+	// 警告カラー設定
 	void SetWarningColorMode(bool warn) { isWarningMode_ = warn; }
 	bool IsWarningColorMode() const { return isWarningMode_; }
 
-	/// @brief ステージクリア時のHUD順次シャットダウン開始（項目5）
+	// シャットダウン開始
 	void StartShutdown() { isShuttingDown_ = true; shutdownTimer_ = 0.0f; }
 	void ResetShutdown() { isShuttingDown_ = false; shutdownTimer_ = 0.0f; }
 	bool IsShutdownComplete() const { return isShuttingDown_ && shutdownTimer_ >= 1.2f; }
 
-	/// @brief War Thunder準拠：視野内は厳密透視投影、視野外およびカメラ後方(cW<=0)は画面安全枠上へ連続クランプ投影
+	// スクリーン座標投影
 	static void ProjectToScreenClamped(
 		const Vector3& worldPos,
 		const Matrix4x4& vpMat,
@@ -72,10 +72,10 @@ public:
 		bool& outIsClamped);
 
 private:
-	float deployTimer_ = 0.0f;    ///< HUD順次展開タイマー
-	bool isWarningMode_ = false;  ///< テーマカラー赤反転モード
-	bool isShuttingDown_ = false; ///< クリア時のOFFLINE順次消去モード
-	float shutdownTimer_ = 0.0f;  ///< シャットダウンタイマー
+	float deployTimer_ = 0.0f;
+	bool isWarningMode_ = false;
+	bool isShuttingDown_ = false;
+	float shutdownTimer_ = 0.0f;
 	// --- 2D描画ヘルパー ---
 	void DrawLine(const Vector2& p1, const Vector2& p2, float thickness, const Vector4& color, BlendMode blendMode = BlendMode::kNormal);
 	void DrawRect(const Vector2& pos, const Vector2& size, const Vector4& color, const Vector2& anchor = { 0.0f, 0.0f }, BlendMode blendMode = BlendMode::kNormal);

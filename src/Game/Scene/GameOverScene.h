@@ -8,7 +8,7 @@
 #include <string>
 #include <memory>
 
-/// @brief ゲームオーバー専用シーン（疑似OS環境：ミリタリーOSカーネルパニック、16進数メモリダンプ、OS再起動）
+// ゲームオーバーシーン
 class GameOverScene : public OSSceneBase {
 public:
 	GameOverScene();
@@ -26,14 +26,14 @@ private:
 	UIButton retryButton_;
 	UIButton titleButton_;
 
-	// 項目3: コンソール風ログ展開アニメーション & 高速スクロール16進数メモリダンプ
+	// コンソール風ログ展開アニメーション & 高速スクロール16進数メモリダンプ
 	std::vector<std::string> memoryDumpPool_;
 	int dumpScrollIndex_ = 0;
 	float dumpScrollTimer_ = 0.0f;
-	float logDeployTimer_ = 0.0f;     ///< コンソールのように1行ずつカタカタ打ち出されるタイマー
-	int visibleLogCount_ = 0;         ///< 現在表示されているログ行数
+	float logDeployTimer_ = 0.0f;
+	int visibleLogCount_ = 0;
 
-	// 項目8: システム再起動（リブート）遷移 & ブラウン管電源遮断トランジション
+	// システム再起動演出
 	bool isRebooting_ = false;
 	float rebootTimer_ = 0.0f;
 	std::unique_ptr<Sprite> rebootBlackoutSprite_;

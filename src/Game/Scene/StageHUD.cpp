@@ -204,10 +204,10 @@ void StageHUD::ProjectToScreenClamped(
 // ================================================================
 
 void StageHUD::DrawTimer() {
-	// 項目9: HUD順次展開（0.25s〜0.65s で上からスライドイン＋フェードイン）
+	// HUD順次展開（0.25s〜0.65s で上からスライドイン＋フェードイン）
 	if (deployTimer_ < 0.25f) return;
 
-	// 項目5: ステージクリア時のHUD順次シャットダウン（タイマーは0.60s〜1.00sでOFFLINE化＆消去）
+	// ステージクリア時のHUD順次シャットダウン（タイマーは0.60s〜1.00sでOFFLINE化＆消去）
 	float shutdownAlpha = 1.0f;
 	bool isTimerOffline = false;
 	if (isShuttingDown_) {
@@ -234,13 +234,13 @@ void StageHUD::DrawTimer() {
 	Vector4 textColor = { 0.48f, 0.84f, 0.50f, 0.98f * alpha }; // 通常: 実機HUD蛍光グリーン
 
 	if (isWarningMode_) {
-		// 項目4: 被弾・撃墜時のテーマカラー赤色/オレンジ反転
+		// 被弾・撃墜時のテーマカラー赤色/オレンジ反転
 		float pulse = 0.6f + 0.4f * std::sin(animTimer_ * 18.0f);
 		textColor = { 1.0f, 0.20f, 0.20f, pulse * alpha };
 		borderColor = { 1.0f, 0.35f, 0.10f, pulse * alpha };
 		bgColor = { 0.22f, 0.02f, 0.02f, 0.90f * alpha };
 	} else if (isTimerOffline) {
-		// 項目5: OFFLINE状態
+		// OFFLINE状態
 		textColor = { 1.0f, 0.30f, 0.30f, 0.90f * alpha };
 		borderColor = { 0.60f, 0.20f, 0.20f, 0.70f * alpha };
 		bgColor = { 0.15f, 0.02f, 0.02f, 0.80f * alpha };
@@ -417,7 +417,7 @@ void StageHUD::DrawBoresightReticle(const Vector2& noseScreen, float reticleScal
 }
 
 void StageHUD::DrawReticles() {
-	// 項目5: ステージクリア時のHUD順次シャットダウン（照準は真っ先に0.00s〜0.35sで消滅）
+	// ステージクリア時のHUD順次シャットダウン（照準は真っ先に0.00s〜0.35sで消滅）
 	if (isShuttingDown_ && shutdownTimer_ >= 0.35f) {
 		return;
 	}
@@ -446,13 +446,13 @@ void StageHUD::DrawReticles() {
 		aimVisible = true;
 	}
 
-	// 項目9: HUD順次展開（0.00s〜0.40s でレティクルが拡大から収束しながら点灯展開）
+	// HUD順次展開（0.00s〜0.40s でレティクルが拡大から収束しながら点灯展開）
 	float deployT = std::clamp(deployTimer_ / 0.40f, 0.0f, 1.0f);
 	float shutdownAlpha = isShuttingDown_ ? (1.0f - shutdownTimer_ / 0.35f) : 1.0f;
 	float alpha = deployT * (std::clamp)(shutdownAlpha, 0.0f, 1.0f);
 	float reticleScale = 1.0f + 0.45f * (1.0f - deployT);
 
-	// テーマカラー反転時（項目4）
+	// テーマカラー反転時
 	Vector4 baseAimCol = isWarningMode_
 		? Vector4{ 1.0f, 0.25f, 0.15f, 0.95f * alpha }
 		: Vector4{ 0.42f, 0.78f, 0.45f, 0.85f * alpha };

@@ -5,17 +5,17 @@
 
 class SpriteCommon;
 
-/// @brief 半透明背景パネルのUI要素
+// 背景パネルUI要素
 class UIPanel : public UIElement {
 public:
-	/// @brief 初期化
-	/// @param spriteCommon SpriteCommonのポインタ
+	// 初期化
+	// spriteCommon: SpriteCommonのポインタ
 	void Initialize(SpriteCommon* spriteCommon);
 
 	void Update() override;
 	void Draw() override;
 
-	/// @brief パネルの背景色を設定
+	// 背景色の設定
 	void SetBackgroundColor(const Vector4& color) { SetColor(color); }
 
 private:

@@ -25,14 +25,14 @@ using namespace MyMath;
 void EffectEditorScene::Initialize() {
 	sceneID = SCENE::EFFECT_EDITOR;
 
-	// StageScene等で非表示・ロックされていたマウスカーソルを確実に復元
+	// マウスカーソルを表示
 	if (Input::GetInstance()) {
 		Input::GetInstance()->UnlockCursor();
 	}
 	while (::ShowCursor(TRUE) < 0) {}
 	::SetCursor(::LoadCursor(nullptr, IDC_ARROW));
 
-	// ポストエフェクトをクリアしてパーティクル本来の色・透明度を確認可能にする
+	// ポストエフェクトをクリア
 	if (PostEffect::GetInstance()) {
 		PostEffect::GetInstance()->ClearActiveEffects();
 	}
@@ -57,7 +57,7 @@ void EffectEditorScene::Initialize() {
 	skybox_->SetTextureIndex(skyboxTexIndex);
 	Object3dCommon::GetInstance()->SetDefaultEnvTextureIndex(skyboxTexIndex);
 
-	// 地面リファレンスモデル初期化
+	// 地面モデル初期化
 	ModelManager::GetInstance()->LoadModel("models/terrain.obj");
 	groundObject_ = std::make_unique<Object3d>();
 	groundObject_->Initialize(Object3dCommon::GetInstance());
@@ -66,7 +66,7 @@ void EffectEditorScene::Initialize() {
 	groundObject_->SetTranslate({ 0.0f, -1.0f, 0.0f });
 	groundObject_->Update();
 
-	// EffectManager初期化 & プレビュー用ハンドル生成
+	// エフェクト初期化
 	EffectManager::GetInstance()->Initialize();
 	emitOrigin_ = { 0.0f, 0.0f, 0.0f };
 	simulateConditionTrue_ = true;
@@ -80,7 +80,6 @@ void EffectEditorScene::Initialize() {
 }
 
 void EffectEditorScene::Update() {
-	// カーソルを常に表示維持
 	while (::ShowCursor(TRUE) < 0) {}
 
 	Input* input = Input::GetInstance();
@@ -94,7 +93,7 @@ void EffectEditorScene::Update() {
 	imguiWantsKeyboard = io.WantCaptureKeyboard;
 #endif
 
-	// 3Dビューポートのカメラ操作（右ドラッグ回転 + WASD/QE移動 + Rリセット）
+	// カメラ操作
 	if (camera && input) {
 		Vector3 rotate = camera->GetRotate();
 		Vector3 translate = camera->GetTranslate();
@@ -147,7 +146,7 @@ void EffectEditorScene::Update() {
 		skybox_->Update();
 	}
 
-	// キーボードショートカットによる emit / stop / clear 検証
+	// ショートカットキー操作
 	if (input && !imguiWantsKeyboard) {
 		if (input->TriggerKey(DIK_SPACE) && previewHandle_) {
 			previewHandle_->emit(emitOrigin_);
@@ -161,7 +160,7 @@ void EffectEditorScene::Update() {
 		}
 	}
 
-	// ユーザー指定のコードパターン: if (条件) { sample->emit(); }
+	// エフェクト発生テスト
 	if (simulateConditionTrue_ && previewHandle_) {
 		previewHandle_->emit(emitOrigin_);
 	}
@@ -170,10 +169,10 @@ void EffectEditorScene::Update() {
 	EffectManager::GetInstance()->Update();
 
 #ifdef USE_IMGUI
-	// 1. EffectManager本体のパラメータ編集GUI (.effect ファイルI/O・量・上昇速度・上限高さ・加速度・寿命・停止条件)
+	// エフェクト編集GUI
 	EffectManager::GetInstance()->DrawDebugGui(previewHandle_);
 
-	// 2. シーン操作・ハンドルAPI検証パネル
+	// シーン操作パネル
 	ImGui::Begin("Effect Scene & Handle Tester [DEBUG]");
 	ImGui::TextColored(ImVec4(0.3f, 0.95f, 0.7f, 1.0f), "/// INDEPENDENT EFFECT EDITOR SCENE (DEBUG ONLY) ///");
 	ImGui::Text("Camera: Right-Drag Rotate | WASD+QE Move (Shift: Fast) | R Reset");
@@ -252,7 +251,7 @@ void EffectEditorScene::DrawReferenceGridAndHeightLimit(Camera* camera) {
 		return;
 	}
 
-	// 発生原点周辺の3D基準グリッド描画 (-10m ～ +10m, 2m刻み)
+	// グリッド描画
 	const float baseY = emitOrigin_.y;
 	const Vector4 gridCol = { 0.30f, 0.42f, 0.48f, 0.45f };
 	const Vector4 axisXCol = { 0.90f, 0.28f, 0.28f, 0.80f };
@@ -275,7 +274,7 @@ void EffectEditorScene::DrawReferenceGridAndHeightLimit(Camera* camera) {
 			camera);
 	}
 
-	// 発生中心から上方向の高さ目盛り線 (0m ～ +15m)
+	// 高さ目盛り線
 	prim->DrawLine3D(
 		emitOrigin_,
 		{ emitOrigin_.x, emitOrigin_.y + 15.0f, emitOrigin_.z },
@@ -291,7 +290,7 @@ void EffectEditorScene::DrawReferenceGridAndHeightLimit(Camera* camera) {
 		return;
 	}
 
-	// 各レイヤーに設定されている maxRiseHeight（煙・炎の上昇上限高さ）を3Dリングで可視化
+	// 上昇上限の可視化
 	for (size_t i = 0; i < preset->layers.size(); ++i) {
 		const float limitH = preset->layers[i].params.maxRiseHeight;
 		if (limitH <= 0.0f) {

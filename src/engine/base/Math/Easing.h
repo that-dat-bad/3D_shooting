@@ -7,27 +7,27 @@
 
 namespace Easing {
 
-/// @brief 0.0f〜1.0f の範囲にクランプ
+// 0.0f〜1.0f の範囲にクランプ
 inline float Clamp01(float t) {
 	return (std::max)(0.0f, (std::min)(1.0f, t));
 }
 
-/// @brief 線形補間 (float)
+// 線形補間 (float)
 inline float Lerp(float a, float b, float t) {
 	return a + (b - a) * t;
 }
 
-/// @brief 線形補間 (Vector2)
+// 線形補間 (Vector2)
 inline Vector2 Lerp(const Vector2& a, const Vector2& b, float t) {
 	return { Lerp(a.x, b.x, t), Lerp(a.y, b.y, t) };
 }
 
-/// @brief 線形補間 (Vector3)
+// 線形補間 (Vector3)
 inline Vector3 Lerp(const Vector3& a, const Vector3& b, float t) {
 	return { Lerp(a.x, b.x, t), Lerp(a.y, b.y, t), Lerp(a.z, b.z, t) };
 }
 
-/// @brief 線形補間 (Vector4)
+// 線形補間 (Vector4)
 inline MyMath::Vector4 Lerp(const MyMath::Vector4& a, const MyMath::Vector4& b, float t) {
 	return { Lerp(a.x, b.x, t), Lerp(a.y, b.y, t), Lerp(a.z, b.z, t), Lerp(a.w, b.w, t) };
 }

@@ -6,7 +6,7 @@
 
 namespace AI {
 
-/// @brief 待機アクション：ミッションエディタで設定した経路（WaypointPath）に沿って飛行・巡航する
+// 巡航・待機アクション
 class WaitPatrolAction : public BTNode {
 public:
 	explicit WaitPatrolAction(
@@ -31,7 +31,7 @@ private:
 	const char* name_ = "WaitPatrolAction";
 };
 
-/// @brief アグレッションアクション：プレイヤーへ向けた接近・追従・偏差射撃（ドッグファイト）を行う
+// 攻撃アクション
 class AggressionAction : public BTNode {
 public:
 	explicit AggressionAction(
@@ -56,7 +56,7 @@ private:
 	const char* name_ = "AggressionAction";
 };
 
-/// @brief 撤退アクション：プレイヤーから距離を取って高速離脱・回避運動を行う
+// 撤退アクション
 class RetreatAction : public BTNode {
 public:
 	explicit RetreatAction(
@@ -83,18 +83,15 @@ private:
 	const char* name_ = "RetreatAction";
 };
 
-/// @brief ビヘイビアツリー生成ファクトリ
+// ビヘイビアツリー生成クラス
 class EnemyBehaviorTreeBuilder {
 public:
-	/// @brief 指定したAIタイプに応じた敵ビヘイビアツリーを構築（デフォルト）
-	/// @param aiType ミッションエディタ等で設定されたAIType
-	/// @return 構築済みビヘイビアツリーのunique_ptr
+	// AIタイプに応じたツリー生成
+	// aiType: AIタイプ
 	static std::unique_ptr<BehaviorTree> CreateEnemyTree(AIType aiType);
 
-	/// @brief JSON文字列（Blender Live Sync またはミッションJSON）から敵ビヘイビアツリーを動的構築
-	/// @param jsonStr behaviorTree の JSON文字列
-	/// @param fallbackType パース失敗時またはツリー未定義時のフォールバックAI種別
-	/// @return 構築済みビヘイビアツリーのunique_ptr
+	// JSON文字列からツリーを動的構築
+	// jsonStr: JSON文字列
 	static std::unique_ptr<BehaviorTree> BuildFromJson(const std::string& jsonStr, AIType fallbackType);
 };
 

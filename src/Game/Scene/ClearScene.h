@@ -84,7 +84,7 @@ namespace HalcyonClearDefaults {
 	inline constexpr Vector2 kTopCenterAnchor = { 0.5f, 0.0f };
 }
 
-/// @brief クリアシーン。疑似OS環境によるミッション完了リザルト表示と次のアクション選択。
+// クリアシーン
 class ClearScene : public OSSceneBase {
 public:
     ClearScene();
@@ -98,22 +98,22 @@ public:
 
 private:
     // --- UI要素 ---
-    UIText missionCompleteText_;       ///< 「MISSION COMPLETE」テキスト
-    UIText enemiesDestroyedLabel_;     ///< 「ENEMIES DESTROYED」ラベル
-    UIText enemiesDestroyedValue_;     ///< 撃破数の値
-    UIText clearTimeLabel_;            ///< 「CLEAR TIME」ラベル
-    UIText clearTimeValue_;            ///< クリアタイムの値
-    UIText hpRemainingLabel_;          ///< 「HP REMAINING」ラベル
-    UIText hpRemainingValue_;          ///< 残りHP値
-    UIButton replayButton_;            ///< リプレイボタン
-    UIButton titleButton_;             ///< タイトルへ戻るボタン
+    UIText missionCompleteText_;
+    UIText enemiesDestroyedLabel_;
+    UIText enemiesDestroyedValue_;
+    UIText clearTimeLabel_;
+    UIText clearTimeValue_;
+    UIText hpRemainingLabel_;
+    UIText hpRemainingValue_;
+    UIButton replayButton_;
+    UIButton titleButton_;
 
-    // 項目15: VHSテープのリワインド（巻き戻し）演出
+    // VHSテープの巻き戻し演出
     bool isRewinding_ = false;
     float rewindTimer_ = 0.0f;
     static constexpr float kRewindDuration = 0.90f;
 
-    // 項目16, 17, 18: データアップロードとウィンドウ閉鎖シーケンス
+    // データアップロードとウィンドウ閉鎖シーケンス
     bool isUploading_ = false;
     float uploadTimer_ = 0.0f;
     std::unique_ptr<Sprite> uploadSprite_;

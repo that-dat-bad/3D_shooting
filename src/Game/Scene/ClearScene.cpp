@@ -97,7 +97,7 @@ void ClearScene::PrewarmAssets() {
 		};
 		pseudoOS_.AddWindow(win2);
 
-		// Window 3: 作戦エリア地形図 & BDA機体損害評価（項目5: 右側デッドスペース解消・新設）
+		// Window 3: 作戦エリア地形図 & BDA機体損害評価
 		PseudoOS::Window win3;
 		win3.id = 3;
 		win3.title = "THEATER_RECON : AIRSPACE TOPOGRAPHY & BDA";
@@ -135,7 +135,7 @@ void ClearScene::PrewarmAssets() {
 		pseudoOS_.BringWindowToFront(0);
 
 		// ============================
-		// 「MISSION COMPLETE」テキスト（項目6: シアン系テーマカラーに統一）
+		// 「MISSION COMPLETE」テキスト
 		// ============================
 		missionCompleteText_.Initialize("HackGen", "MISSION COMPLETE // DEBRIEF", 26.0f);
 		missionCompleteText_.SetAnchorPoint({ 0.5f, 0.0f });
@@ -372,7 +372,7 @@ void ClearScene::Update() {
 		selectionManager_.Update();
 		int currIndex = selectionManager_.GetSelectedIndex();
 
-		// キーボード/ゲームパッド操作があった場合、またはメニュー選択時はメインウィンドウ（win0）を最前面フォーカスに維持（項目1, 2）
+		// キーボード/ゲームパッド操作があった場合、またはメニュー選択時はメインウィンドウ（win0）を最前面フォーカスに維持
 		if (input->TriggerKey(DIK_UP) || input->TriggerKey(DIK_DOWN) ||
 		    input->TriggerKey(DIK_LEFT) || input->TriggerKey(DIK_RIGHT) ||
 		    input->TriggerKey(DIK_RETURN) || input->TriggerKey(DIK_SPACE) ||
@@ -410,13 +410,13 @@ void ClearScene::Update() {
 }
 
 void ClearScene::Draw() {
-	// 項目8: CRTモニター感・走査線・ブルーム・微細色収差の適用（指摘1: VHS巻き戻しシェーダー）
+	// CRTモニター感・走査線・ブルーム・微細色収差の適用
 	PostEffect* postEffect = PostEffect::GetInstance();
 	if (postEffect) {
 		postEffect->ClearActiveEffects();
 
 		if (isRewinding_) {
-			// 指摘1: 本物のVHS巻き戻しシェーダー（走査線乱れ＋高速スクロール＋水平ノイズ＋色収差＋湾曲）
+			// 本物のVHS巻き戻しシェーダー（走査線乱れ＋高速スクロール＋水平ノイズ＋色収差＋湾曲）
 			ActivePostEffect scanline;
 			scanline.type = PostEffectType::kScanLine;
 			scanline.intensity = 0.60f;
@@ -492,7 +492,7 @@ void ClearScene::DrawUI() {
 	// 1. 背景パネル
 	backgroundPanel_.Draw();
 
-	// 背景ミリタリーグリッドパターン（項目9: デスクトップ空間の奥行き・立体感）
+	// 背景ミリタリーグリッドパターン
 	const float gridStep = 48.0f;
 	for (float gx = 0.0f; gx < kScreenWidth; gx += gridStep) {
 		DrawRectHelper({ gx, 0.0f }, { 1.0f, kScreenHeight - 32.0f }, { 0.15f, 0.40f, 0.60f, 0.08f });
@@ -501,7 +501,7 @@ void ClearScene::DrawUI() {
 		DrawRectHelper({ 0.0f, gy }, { kScreenWidth, 1.0f }, { 0.15f, 0.40f, 0.60f, 0.08f });
 	}
 
-	// 画面全体のゆっくり動くサイバースキャンビーム（項目8: CRT・走査線質感）
+	// 画面全体のゆっくり動くサイバースキャンビーム
 	float beamY = std::fmod(animTimer_ * 80.0f, kScreenHeight - 32.0f);
 	DrawRectHelper({ 0.0f, beamY }, { kScreenWidth, 2.0f }, { 0.25f, 0.85f, 1.0f, 0.18f }, BlendMode::kAdd);
 
@@ -509,7 +509,7 @@ void ClearScene::DrawUI() {
 	pseudoOS_.Draw();
 
 	// ------------------------------------------------------------
-	// 項目14: ボタン決定フラッシュ＆波紋フィードバック（0.18秒）
+	// ボタン決定フラッシュ＆波紋フィードバック（0.18秒）
 	// ------------------------------------------------------------
 	if (btnClickFlashTimer_ > 0.0f && uploadSprite_) {
 		float flashAlpha = btnClickFlashTimer_ / 0.18f;
@@ -517,12 +517,12 @@ void ClearScene::DrawUI() {
 	}
 
 	// ------------------------------------------------------------
-	// 項目15: VHSテープのリワインド（巻き戻し）演出
+	// VHSテープのリワインド（巻き戻し）演出
 	// ------------------------------------------------------------
 	DrawRewindEffectUI();
 
 	// ------------------------------------------------------------
-	// 項目16, 17, 18: データアップロードと帰還システムログブリッジ演出
+	// データアップロードと帰還システムログブリッジ演出
 	// ------------------------------------------------------------
 	DrawUploadSequenceUI();
 }

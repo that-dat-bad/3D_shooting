@@ -368,7 +368,7 @@ void TitleScene::UpdateOSDesktop(float dt, const Vector2& mousePos, bool isLDown
 	float my = mousePos.y;
 	const float tbY = 688.0f;
 
-	// --- ウィンドウの最小化・復元アニメーション補間（項目3: トランジション追加）---
+	// --- ウィンドウの最小化・復元アニメーション補間---
 	for (auto& win : osWindows_) {
 		float targetScale = (win.isOpen && !win.isMinimized) ? 1.0f : 0.0f;
 		if (win.animScale < targetScale) {
@@ -378,7 +378,7 @@ void TitleScene::UpdateOSDesktop(float dt, const Vector2& mousePos, bool isLDown
 		}
 	}
 
-	// --- スタートメニュー選択時のクッション演出（項目4: ハードカット解消）---
+	// --- スタートメニュー選択時のクッション演出---
 	if (startMenuTransitionTimer_ > 0.0f) {
 		startMenuTransitionTimer_ -= dt;
 		if (startMenuTransitionTimer_ <= 0.0f) {
@@ -465,7 +465,7 @@ void TitleScene::UpdateOSDesktop(float dt, const Vector2& mousePos, bool isLDown
 		}
 	}
 
-	// タスクバーアイテムクリック判定 (項目9: 最小化ウィンドウも常時表示＆クリックで即復元)
+	// タスクバーアイテムクリック判定
 	if (isLTrig && my >= tbY && my <= kScreenHeight) {
 		float tabX = 120.0f;
 		for (auto& win : osWindows_) {
@@ -489,7 +489,7 @@ void TitleScene::UpdateOSDesktop(float dt, const Vector2& mousePos, bool isLDown
 		}
 	}
 
-	// --- 2. ウィンドウドラッグ＆操作判定（項目1: 残像を一切出さず単一位置更新）---
+	// --- 2. ウィンドウドラッグ＆操作判定---
 	for (auto& win : osWindows_) {
 		if (win.isDragging) {
 			if (!isLDown) {
@@ -863,7 +863,7 @@ void TitleScene::DrawOSWindowCam(const OSWindow& win) {
 	if (win.animScale <= 0.01f) { return; } // 完全最小化中は描画スキップ
 	TextRenderer* tr = TextRenderer::GetInstance();
 
-	// 最小化・展開トランジション座標計算（項目3）
+	// 最小化・展開トランジション座標計算
 	float s = win.animScale;
 	float smoothS = s * s * (3.0f - 2.0f * s);
 	const float tabTargetX = 120.0f + 148.0f + 70.0f;
@@ -1173,7 +1173,7 @@ void TitleScene::DrawOSWindowTelemetry(const OSWindow& win) {
 	if (win.animScale <= 0.01f) { return; } // 完全最小化中は描画スキップ
 	TextRenderer* tr = TextRenderer::GetInstance();
 
-	// 最小化・展開トランジション座標計算（項目3）
+	// 最小化・展開トランジション座標計算
 	float s = win.animScale;
 	float smoothS = s * s * (3.0f - 2.0f * s);
 	const float tabTargetX = 120.0f + 148.0f * 2.0f + 70.0f;
@@ -1962,7 +1962,7 @@ void TitleScene::DrawMissionSelectModal() {
 	// 1. ドロップシャドウ
 	DrawOSRect({ modalX + 8.0f, modalY + 10.0f }, { modalW, modalH }, { 0.0f, 0.0f, 0.0f, 0.70f });
 
-	// 2. ウィンドウ本体パネル（【重要】TitleSceneのメインウィンドウと完全に同一の純黒ブラック { 0.0f, 0.0f, 0.0f, 1.0f }）
+	// 2. ウィンドウ本体パネル
 	DrawOSPanel({ modalX, modalY }, { modalW, modalH }, { 0.0f, 0.0f, 0.0f, 1.0f }, borderCol, 2.0f);
 
 	// 3. タイトルバー

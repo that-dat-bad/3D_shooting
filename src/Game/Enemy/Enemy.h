@@ -53,27 +53,23 @@ enum class TypeBState {
 	Evading
 };
 
-/// <summary>
-/// 空中ターゲット（敵AI）
-/// </summary>
+// 空中ターゲット（敵AI）
 class Enemy : public ICollisionBody3D {
 public:
 	Enemy();
 	~Enemy();
 
-	/// <summary>
-	/// 初期化
-	/// </summary>
-	/// <param name="position">配置座標</param>
-	/// <param name="modelPath">モデルファイルパス</param>
-	/// <param name="maxHealth">最大HP</param>
-	/// <param name="airframeData">機体パラメータ</param>
-	/// <param name="engineData">エンジンパラメータ</param>
-	/// <param name="gunpodData">ガンポッドパラメータ</param>
-	/// <param name="playerFlightModel">自機のフライトモデルへのポインタ</param>
-	/// <param name="bulletManager">弾丸マネージャーへのポインタ</param>
-	/// <param name="aiType">AI挙動タイプ</param>
-	/// <param name="behaviorTreeJson">ビヘイビアツリー定義JSON（任意）</param>
+	// 初期化
+	// position: 配置座標
+	// modelPath: モデルファイルパス
+	// maxHealth: 最大HP
+	// airframeData: 機体パラメータ
+	// engineData: エンジンパラメータ
+	// gunpodData: ガンポッドパラメータ
+	// playerFlightModel: 自機のフライトモデル
+	// bulletManager: 弾丸マネージャー
+	// aiType: AI挙動タイプ
+	// behaviorTreeJson: ビヘイビアツリーJSON
 	void Initialize(
 		const MyMath::Vector3& position, 
 		const std::string& modelPath, 
@@ -87,23 +83,17 @@ public:
 		const std::string& behaviorTreeJson = ""
 	);
 
-	/// <summary>
-	/// 更新処理
-	/// </summary>
+	// 更新
 	void Update(float deltaTime);
 
-	/// <summary>
-	/// 描画処理
-	/// </summary>
+	// 描画
 	void Draw();
 
-	/// <summary>
-	/// ダメージを受ける
-	/// </summary>
-	/// <param name="damage">ダメージ量</param>
+	// ダメージ処理
+	// damage: ダメージ量
 	void TakeDamage(float damage);
 
-	/// @brief 追従するウェイポイントパスを設定
+	// ウェイポイントパス設定
 	void SetWaypointPath(const WaypointPath& path);
 
 	// === アクセッサ ===
@@ -163,7 +153,7 @@ public:
 	bool IsCollisionActive() const override { return isAlive_; }
 
 private:
-	/// @brief AI思考・操縦入力の更新
+	// AI更新
 	void UpdateAI(float deltaTime);
 
 	// 物理モデルとAIコントローラー

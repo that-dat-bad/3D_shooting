@@ -10,17 +10,15 @@
 
 using namespace MyMath;
 
-/// @brief 全てのUI要素（文字・図形パネル・画像・ボタン）の共通基底クラス。
-///        アニメーション補間（Tween）、ループモーション（Pulse/Float/Shake）、
-///        ラムダ式によるCustom条件判定を共通で提供する。
+// UI要素の基底クラス
 class UIElement {
 public:
 	virtual ~UIElement() = default;
 
-	/// @brief 毎フレームの更新処理
+	// 更新
 	virtual void Update() = 0;
 
-	/// @brief 描画処理
+	// 描画
 	virtual void Draw() = 0;
 
 	// ========================================================
@@ -54,9 +52,9 @@ public:
 	// 状態（State）& 条件判定（Custom Lambda）
 	// ========================================================
 
-	/// @brief Custom条件式（ラムダ）を登録する
-	/// @param stateName 条件を満たした時に遷移する状態名（例: "LowHP", "Warning", "Complete"）
-	/// @param condition 判定ラムダ式（true を返すと該当状態に切り替わる）
+	// 条件式の登録
+	// stateName: 状態名
+	// condition: 判定用関数
 	void SetCondition(const std::string& stateName, std::function<bool()> condition) {
 		// 既存の同名条件があれば更新、なければ追加
 		for (auto& pair : customConditions_) {
@@ -72,12 +70,12 @@ public:
 		}
 	}
 
-	/// @brief 全てのCustom条件をクリアする
+	// 条件のクリア
 	void ClearConditions() {
 		customConditions_.clear();
 	}
 
-	/// @brief 強制的に現在の状態を設定する（"Normal", "Hovered", "Selected", "Pressed" など）
+	// 状態の設定
 	void SetState(const std::string& stateName) {
 		currentState_ = stateName;
 	}
@@ -128,7 +126,7 @@ public:
 		return { currentColor_.x, currentColor_.y, currentColor_.z, currentColor_.w * loopAlpha_ };
 	}
 
-	/// @brief プレビュー用の強制状態を設定（エディタ用）
+	// プレビュー用の状態設定
 	void SetPreviewStateOverride(const std::string& stateName) {
 		previewStateOverride_ = stateName;
 	}
@@ -137,7 +135,7 @@ public:
 	}
 
 protected:
-	/// @brief 毎フレーム呼び出すアニメーション更新処理（派生クラスの Update() 内で実行）
+	// アニメーション更新
 	void UpdateAnimation(float dt = 1.0f / 60.0f) {
 		animTimer_ += dt;
 

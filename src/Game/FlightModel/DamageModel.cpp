@@ -50,7 +50,7 @@ void DamageModel::Initialize()
 	//                     パーツ             HP      素材            ダメ倍率  切断可
 	SetDef(DamagePart::Engine1,     49.5f, ArmorMaterial::Armor,     1.6f,   false);
 	SetDef(DamagePart::Propeller1,  20.0f, ArmorMaterial::Dural,     1.0f,   true);
-	SetDef(DamagePart::Wing_L,      67.0f, ArmorMaterial::Dural,     0.3f,   false);  // 付け根は切断されにくい
+	SetDef(DamagePart::Wing_L,      67.0f, ArmorMaterial::Dural,     0.3f,   false); 
 	SetDef(DamagePart::Wing_R,      67.0f, ArmorMaterial::Dural,     0.3f,   false);
 	SetDef(DamagePart::Wing1_L,     28.4f, ArmorMaterial::Dural,     0.5f,   true);
 	SetDef(DamagePart::Wing1_R,     28.4f, ArmorMaterial::Dural,     0.5f,   true);
@@ -80,7 +80,7 @@ void DamageModel::Initialize()
 		{ DamagePart::Engine1,  { 0.0f,  0.0f,   5.0f },  { 0.8f,  0.6f,  1.5f } },
 		{ DamagePart::Propeller1, { 0.0f, 0.0f,  6.5f },  { 2.0f,  2.0f,  0.2f } },
 		{ DamagePart::Fuse,     { 0.0f,  0.0f,   0.0f },  { 0.95f, 0.95f, 7.5f } },
-		{ DamagePart::Pilot,    { 0.0f,  0.5f,   1.0f },  { 0.4f,  0.5f,  0.6f } },  // コクピット（Fuseと重なるが優先判定）
+		{ DamagePart::Pilot,    { 0.0f,  0.5f,   1.0f },  { 0.4f,  0.5f,  0.6f } },
 		{ DamagePart::Fuse1,    { 0.0f,  0.1f,  -1.0f },  { 0.5f,  0.5f,  1.5f } },
 		{ DamagePart::Tail,     { 0.0f,  0.1f,  -4.0f },  { 0.3f,  0.3f,  2.0f } },
 		{ DamagePart::Fin,      { 0.0f,  0.8f,  -5.0f },  { 0.1f,  0.6f,  0.6f } },

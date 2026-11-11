@@ -99,7 +99,7 @@ void StageScene::TriggerGameOver() {
 		ParticleManager::GetInstance()->Emit("ExplosionSpark", Add(flightModel_.GetPosition(), Multiply(1.5f, upDir)), ejectParams, 15);
 	}
 
-	// カメラシェイクによる被弾・撃墜の強烈な物理的衝撃（指摘1）
+	// カメラシェイクによる被弾・撃墜の強烈な物理的衝撃
 	if (CameraManager::GetInstance()->GetActiveCamera()) {
 		CameraManager::GetInstance()->GetActiveCamera()->Shake(1.2f, 4.0f);
 	}
@@ -195,7 +195,7 @@ void StageScene::TriggerGameClear() {
 		clearHorizontalDir_ = { 0.0f, 0.0f, 1.0f };
 	}
 
-	// 項目5: HUDの順次シャットダウン開始
+	// HUDの順次シャットダウン開始
 	hud_.StartShutdown();
 }
 
@@ -303,7 +303,7 @@ void StageScene::CheckPartDestructionEvents() {
 }
 
 // ============================================================
-// ゲームオーバー / クリア演出シーケンス更新（項目1〜7）
+// ゲームオーバー / クリア演出シーケンス更新
 // ============================================================
 void StageScene::UpdateEndSequence(float dt) {
 	if (endSequence_ == StageEndSequence::None) {
@@ -385,8 +385,7 @@ void StageScene::UpdateEndSequence(float dt) {
 			Vector3 slipstream = Multiply(-0.06f, planeFwd);
 
 			// ========================================================
-			// A. 激しく燃え盛る火炎 (ExplosionFire - flame_particle.png)
-			//    煙に負けず後方へ大きく広がる高輝度燃焼炎
+			// A. 激しく燃え盛る火炎
 			// ========================================================
 			ParticleParameters fireParams;
 			fireParams.minVelocity = Add(slipstream, { -0.04f, -0.01f, -0.04f });
@@ -409,7 +408,7 @@ void StageScene::UpdateEndSequence(float dt) {
 			pm->Emit("ExplosionFire", planePos, fireParams, 2);
 
 			// ========================================================
-			// B. 内部着火煙（炎から黒煙への過渡熱光レイヤー）
+			// B. 内部着火煙
 			// ========================================================
 			ParticleParameters glowingSmoke;
 			glowingSmoke.minVelocity = { -0.035f, 0.02f, -0.035f };
@@ -431,8 +430,7 @@ void StageScene::UpdateEndSequence(float dt) {
 			pm->Emit("ExplosionSmoke", firePos2, glowingSmoke, 2);
 
 			// ========================================================
-			// C. 濃密黒煙トレイル (ExplosionSmoke - smoke_particle.png)
-			//    空中に滞留し、3D立体陰影を保ちながら巨大に膨張する黒煙雲
+			// C. 濃密黒煙トレイル
 			// ========================================================
 			ParticleParameters smokeParams;
 			smokeParams.minVelocity = { -0.03f, 0.02f, -0.03f };
@@ -454,7 +452,7 @@ void StageScene::UpdateEndSequence(float dt) {
 			pm->Emit("ExplosionSmoke", firePos2, smokeParams, 2);
 
 			// ========================================================
-			// D. 飛散する火の粉・燃焼スパーク (ExplosionSpark)
+			// D. 飛散する火の粉・燃焼スパーク
 			// ========================================================
 			ParticleParameters sparkParams;
 			Vector3 sparkBaseVel = Multiply(2.0f, slipstream);
@@ -486,9 +484,6 @@ void StageScene::UpdateEndSequence(float dt) {
 
 		// 4. シグナル途絶段階（フェーズ制御）
 		if (endSequence_ == StageEndSequence::GameOver_Critical) {
-			// Phase 1 (0.0s - 1.4s): 激しい炎上・黒煙噴出 & 警告表示 & ノイズが徐々に混入
-			// 最初 (0.0s - 0.35s) はノイズ完全ゼロで機体炎上を鮮明に捉える
-			// 0.35s - 1.4s から徐々にノイズと走査線が入り始める (0.00 -> 0.20)
 			if (endSeqTimer_ >= 0.35f) {
 				float p = (endSeqTimer_ - 0.35f) / 1.05f; // 0.0 -> 1.0
 				float easeNoise = p * p; // 二次曲線で穏やかに立ち上がり
@@ -551,10 +546,10 @@ void StageScene::UpdateEndSequence(float dt) {
 				endSequence_ = StageEndSequence::GameOver_CrtShutdown;
 			}
 		} else if (endSequence_ == StageEndSequence::GameOver_CrtShutdown) {
-			// Phase 3 (2.2s - 2.55s): 最大砂嵐ノイズが激しく鳴り響く最中にブラウン管プツッ切断（ノイズしながら切る: 0.35秒）
+			// Phase 3
 			ActivePostEffect noise;
 			noise.type = PostEffectType::kRandom;
-			noise.intensity = 0.85f; // 最大砂嵐ノイズを完全維持！ノイズを途切れさせない
+			noise.intensity = 0.85f;
 			postEffect->AddActiveEffect(noise);
 
 			ActivePostEffect scan;
@@ -588,7 +583,7 @@ void StageScene::UpdateEndSequence(float dt) {
 	}
 	// --- 時間切れ離脱系（爆発なし・作戦離脱） ---
 	else if (endSequence_ == StageEndSequence::TimeOver_Abort) {
-		// 0.0s - 1.4s: 作戦時間切れ警報 ＆ 自機水平レベリング・離脱加速開始
+		// 0.0s - 1.4s
 		timeScale_ = 1.0f;
 
 		// 翼のロールを水平に戻す目標姿勢
@@ -598,11 +593,11 @@ void StageScene::UpdateEndSequence(float dt) {
 		Quaternion currentOri = Slerp(clearStartOrientation_, qLevel, smoothT);
 		flightModel_.SetOrientation(currentOri);
 
-		// 巡航速度へ加速
+		// 巡航速度へ
 		float speed = clearStartSpeed_ + smoothT * (180.0f - clearStartSpeed_);
 		flightModel_.SetVelocity(Multiply(speed, flightModel_.GetForwardDirection()));
 
-		// 走査線と警告ビネット（アンバー調）
+		// 走査線と警告ビネット
 		ActivePostEffect scan;
 		scan.type = PostEffectType::kScanLine;
 		scan.intensity = 0.20f;
@@ -619,7 +614,7 @@ void StageScene::UpdateEndSequence(float dt) {
 			endSequence_ = StageEndSequence::TimeOver_Withdraw;
 		}
 	} else if (endSequence_ == StageEndSequence::TimeOver_Withdraw) {
-		// 1.4s - 3.4s: 機首を緩やかに上げてアフターバーナー離脱 ＆ 暗転フェード
+		// 1.4s - 3.4s
 		timeScale_ = 1.0f;
 
 		Quaternion qLevel = LookRotation(clearHorizontalDir_, { 0.0f, 1.0f, 0.0f });
@@ -661,11 +656,10 @@ void StageScene::UpdateEndSequence(float dt) {
 	}
 	// --- ステージクリア系 ---
 	else if (endSequence_ == StageEndSequence::Clear_HudShutdown) {
-		// 0.0s - 1.2s: 目標達成ファンファーレ & HUD順次OFFLINE消去
-		// 自機は機動姿勢を整え（水平レベリング）、アフターバーナー点火（加速開始）
+		// 0.0s - 1.2s
 		timeScale_ = 1.0f;
 
-		// 翼のロールを水平に戻す目標姿勢（水平巡航姿勢）
+		// 翼のロールを水平に戻す目標姿勢
 		Quaternion qLevel = LookRotation(clearHorizontalDir_, { 0.0f, 1.0f, 0.0f });
 
 		// 最初の0.8秒でクリア突入時の姿勢から水平姿勢へ滑らかに復帰
@@ -674,7 +668,7 @@ void StageScene::UpdateEndSequence(float dt) {
 		Quaternion currentOri = Slerp(clearStartOrientation_, qLevel, smoothT);
 		flightModel_.SetOrientation(currentOri);
 
-		// 速度：クリア開始速度から巡航加速（約180m/sへ）
+		// クリア開始速度から巡航加速
 		float speed = clearStartSpeed_ + smoothT * (180.0f - clearStartSpeed_);
 		Vector3 curFwd = flightModel_.GetForwardDirection();
 		flightModel_.SetVelocity(Multiply(speed, curFwd));
@@ -690,13 +684,13 @@ void StageScene::UpdateEndSequence(float dt) {
 			endSequence_ = StageEndSequence::Clear_AutopilotReturn;
 		}
 	} else if (endSequence_ == StageEndSequence::Clear_AutopilotReturn) {
-		// 1.2s - 2.5s: オートパイロット帰還時の超音速ズームクライム急上昇・急加速離脱機動
+		// 1.2s - 2.5s
 		timeScale_ = 1.0f;
 
-		// 水平巡航姿勢と、目標上昇姿勢（ピッチ角 約38度ピッチアップ）
+		// 水平巡航姿勢と、目標上昇姿勢
 		Quaternion qLevel = LookRotation(clearHorizontalDir_, { 0.0f, 1.0f, 0.0f });
 
-		// ピッチアップ上昇角: 約38度（約0.663ラジアン）
+		// ピッチアップ上昇
 		constexpr float kClimbAngle = 38.0f * (3.14159265f / 180.0f);
 		Vector3 climbForward = Normalize(Add(
 			Multiply(std::cos(kClimbAngle), clearHorizontalDir_),
@@ -704,25 +698,25 @@ void StageScene::UpdateEndSequence(float dt) {
 		));
 		Quaternion qClimb = LookRotation(climbForward, { 0.0f, 1.0f, 0.0f });
 
-		// 1.3秒間かけて滑らかに機首を持ち上げ（ピッチアップ）、進行方向と機体姿勢を完全に一致させる
+		// 1.3秒間かけて機首を持ち上げ
 		float climbT = std::clamp((endSeqTimer_ - 1.2f) / 1.3f, 0.0f, 1.0f);
 		float smoothClimb = climbT * climbT * (3.0f - 2.0f * climbT);
 		Quaternion currentOri = Slerp(qLevel, qClimb, smoothClimb);
 		flightModel_.SetOrientation(currentOri);
 
-		// 速度：機首を上げながらアフターバーナー全開で超音速（約660m/s = マッハ2）へ急加速！
+		// 急加速
 		float speed = 180.0f + smoothClimb * 480.0f;
 		Vector3 curFwd = flightModel_.GetForwardDirection();
 		flightModel_.SetVelocity(Multiply(speed, curFwd));
 
-		// 1. ラジアルブラー（スピード感・ワープ感の画面全体演出）
+		// ラジアルブラー
 		ActivePostEffect blur;
 		blur.type = PostEffectType::kRadialBlur;
 		blur.kernelSize = 8;
 		blur.intensity = smoothClimb * 0.08f;
 		postEffect->AddActiveEffect(blur);
 
-		// 2. 色収差（光速突入の色ズレ）
+		// 色収差（光速突入の色ズレ）
 		ActivePostEffect ca;
 		ca.type = PostEffectType::kChromaticAberration;
 		ca.intensity = smoothClimb * 0.04f;
@@ -732,10 +726,10 @@ void StageScene::UpdateEndSequence(float dt) {
 			endSequence_ = StageEndSequence::Clear_TacticalMapZoom;
 		}
 	} else if (endSequence_ == StageEndSequence::Clear_TacticalMapZoom) {
-		// 2.5s - 3.8s: 戦術マップ表示（走査線 + ビネット）＆ ターミナル転送接続
+		// 2.5s - 3.8s
 		timeScale_ = 1.0f;
 
-		// 機体は最高速のまま空へ離脱を継続
+		// 機体離脱
 		constexpr float kClimbAngle = 38.0f * (3.14159265f / 180.0f);
 		Vector3 climbForward = Normalize(Add(
 			Multiply(std::cos(kClimbAngle), clearHorizontalDir_),
@@ -774,7 +768,7 @@ void StageScene::UpdateEndSequence(float dt) {
 }
 
 // ============================================================
-// ゲームオーバー / クリア演出UI描画（項目1〜7）
+// ゲームオーバー / クリア演出UI描画
 // ============================================================
 void StageScene::DrawEndSequenceUI() {
 	if (endSequence_ == StageEndSequence::None) {
@@ -805,7 +799,7 @@ void StageScene::DrawEndSequenceUI() {
 	};
 
 	// ------------------------------------------------------------
-	// 項目4: 被弾・撃墜時のテーマカラー反転 & 警告バナー & 初期シグナル表示
+	// 被弾・撃墜時のテーマカラー反転 & 警告バナー & 初期シグナル表示
 	// ------------------------------------------------------------
 	if (endSequence_ == StageEndSequence::GameOver_Critical) {
 		float blinkPhase = std::fmod(endSeqTimer_, 0.12f);
@@ -854,7 +848,7 @@ void StageScene::DrawEndSequenceUI() {
 			);
 		}
 
-		// 画面下部：シグナル健全度（0.35秒までは100%、その後徐々に40%へ低下）
+		// シグナル健全度
 		int sigPct = 100;
 		if (endSeqTimer_ >= 0.35f) {
 			float p = (endSeqTimer_ - 0.35f) / 1.05f;
@@ -878,7 +872,7 @@ void StageScene::DrawEndSequenceUI() {
 	}
 
 	// ------------------------------------------------------------
-	// 項目1: 通信途絶（シグナル急減衰）& 砂嵐激化 & SIGNAL LOST & ノイズ中のブラウン管プツッ暗転
+	// 通信途絶（シグナル急減衰&砂嵐激化&SIGNAL LOST&ノイズ中のブラウン管暗転
 	// ------------------------------------------------------------
 	else if (endSequence_ == StageEndSequence::GameOver_SignalLost || endSequence_ == StageEndSequence::GameOver_CrtShutdown) {
 		float degradeT = (endSequence_ == StageEndSequence::GameOver_CrtShutdown)
@@ -889,13 +883,13 @@ void StageScene::DrawEndSequenceUI() {
 			: (std::max)(0, static_cast<int>(40.0f * (1.0f - degradeT / 0.45f)));
 		float cardAlpha = std::clamp(degradeT / 0.20f, 0.0f, 1.0f);
 
-		// 画面水平ジッター（致命的エラー・同期外れによる激しい横揺れ）
+		// 画面水平ジッター
 		float jitterX = std::sin(endSeqTimer_ * 110.0f) * (3.0f + 18.0f * degradeT);
 		if (std::fmod(endSeqTimer_, 0.09f) < (0.02f + 0.04f * degradeT)) {
 			jitterX += ((std::rand() % 24) - 12) * degradeT;
 		}
 
-		// 赤黒ノイズベール（シグナル低下に伴い濃縮）
+		// 赤黒ノイズベール
 		DrawSolidRect({ 0.0f, 0.0f }, { screenW, screenH }, { 0.12f, 0.01f, 0.01f, (0.05f + 0.40f * degradeT) * cardAlpha });
 
 		// 走査線インターレースグリッチ（数本が上下を高速に走る）
@@ -906,7 +900,7 @@ void StageScene::DrawEndSequenceUI() {
 		float glitchOffset3 = std::fmod(endSeqTimer_ * 600.0f + 480.0f, screenH);
 		DrawSolidRect({ 0.0f, glitchOffset3 }, { screenW, 10.0f }, { 0.2f, 0.8f, 1.0f, (0.08f + 0.25f * degradeT) }, BlendMode::kAdd);
 
-		// 中央警告カード（ジッター振動）
+		// 中央警告カード
 		float cardW = 780.0f;
 		float cardH = 165.0f;
 		float cardX = (screenW - cardW) * 0.5f + jitterX;
@@ -961,7 +955,7 @@ void StageScene::DrawEndSequenceUI() {
 				{ 0.5f, 0.0f }
 			);
 		} else {
-			// 完全途絶 (SIGNAL LOST) - 燃え落ちる機体からの通信が途絶した決定打の瞬間！
+			// 完全途絶 (SIGNAL LOST)
 			float signalPulse = (0.7f + 0.3f * std::sin(endSeqTimer_ * 30.0f)) * cardAlpha;
 			const char* signalLostTitle = (std::fmod(endSeqTimer_, 0.12f) < 0.03f) ? "S!GN#L L0ST // ERR" : "// SIGNAL LOST // (通信途絶)";
 
@@ -1016,8 +1010,7 @@ void StageScene::DrawEndSequenceUI() {
 		}
 
 		// ------------------------------------------------------------
-		// 項目2: ノイズが激しく鳴り響く最中にブラウン管プツッ暗転（0.35秒で収束）
-		//        ノイズを途切れさせず、ノイズとSIGNAL LOSTの真上から遮断マスクが閉じる！
+		// ノイズが激しく鳴り響く最中にブラウン管暗転
 		// ------------------------------------------------------------
 		if (endSequence_ == StageEndSequence::GameOver_CrtShutdown) {
 			float crtT = std::clamp((endSeqTimer_ - 2.2f) / 0.35f, 0.0f, 1.0f);
@@ -1025,7 +1018,7 @@ void StageScene::DrawEndSequenceUI() {
 			float centerX = screenW * 0.5f;
 
 			if (crtT < 0.55f) {
-				// Phase 1 (0.00〜0.55): ノイズとSIGNAL LOST画面の上下から黒幕が中央へ急速収束！
+				// Phase 1 (0.00〜0.55)
 				float p = crtT / 0.55f;
 				float collapse = 1.0f - std::pow(1.0f - p, 3.0f);
 				float halfH = (screenH * 0.5f) * (1.0f - collapse);
@@ -1034,11 +1027,11 @@ void StageScene::DrawEndSequenceUI() {
 				DrawSolidRect({ 0.0f, 0.0f }, { screenW, centerY - halfH }, { 0.0f, 0.0f, 0.0f, 1.0f });
 				DrawSolidRect({ 0.0f, centerY + halfH }, { screenW, screenH - (centerY + halfH) }, { 0.0f, 0.0f, 0.0f, 1.0f });
 
-				// 水平高輝度ビーム（砂嵐を圧縮した閃光線）
+				// 水平高輝度ビーム
 				float lineAlpha = 0.95f + 0.05f * std::sin(endSeqTimer_ * 90.0f);
 				DrawSolidRect({ 0.0f, centerY - 3.0f }, { screenW, 6.0f }, { 0.95f, 0.98f, 1.0f, lineAlpha }, BlendMode::kAdd);
 			} else if (crtT < 0.85f) {
-				// Phase 2 (0.55〜0.85): 水平線が左右から中心へ急激に収縮！
+				// Phase 2 (0.55〜0.85)
 				float p = (crtT - 0.55f) / 0.30f;
 				float shrink = 1.0f - p;
 				float halfW = (screenW * 0.5f) * shrink;
@@ -1046,7 +1039,7 @@ void StageScene::DrawEndSequenceUI() {
 				DrawSolidRect({ 0.0f, 0.0f }, { screenW, screenH }, { 0.0f, 0.0f, 0.0f, 1.0f });
 				DrawSolidRect({ centerX - halfW, centerY - 3.0f }, { halfW * 2.0f, 6.0f }, { 1.0f, 1.0f, 1.0f, 1.0f }, BlendMode::kAdd);
 			} else {
-				// Phase 3 (0.85〜1.00): 「プツッ」と極小の白光点が閃光して即暗転完了（次シーンへ）
+				// Phase 3 (0.85〜1.00)
 				float p = (crtT - 0.85f) / 0.15f;
 				DrawSolidRect({ 0.0f, 0.0f }, { screenW, screenH }, { 0.0f, 0.0f, 0.0f, 1.0f });
 
@@ -1058,7 +1051,7 @@ void StageScene::DrawEndSequenceUI() {
 		}
 	}
 	// ------------------------------------------------------------
-	// 時間切れ離脱演出: TIME OVER & ミッションから離脱します.....
+	// TIME OVER ミッションから離脱します.....
 	// ------------------------------------------------------------
 	else if (endSequence_ == StageEndSequence::TimeOver_Abort || endSequence_ == StageEndSequence::TimeOver_Withdraw) {
 		float fadeAlpha = std::clamp(endSeqTimer_ / 0.30f, 0.0f, 1.0f);
@@ -1079,7 +1072,7 @@ void StageScene::DrawEndSequenceUI() {
 		DrawSolidRect({ cardX, cardY }, { cardW, 4.0f }, { 1.0f, 0.85f, 0.30f, 1.0f * fadeAlpha });
 		DrawSolidRect({ cardX, cardY + cardH - 2.0f }, { cardW, 2.0f }, { 1.0f, 0.70f, 0.15f, 0.75f * fadeAlpha });
 
-		// 大見出し「Time Over」
+		// 大見出し
 		float blink = (std::fmod(endSeqTimer_, 0.5f) < 0.38f) ? 1.0f : 0.65f;
 		TextRenderer::GetInstance()->Print(
 			"HackGen",
@@ -1091,7 +1084,7 @@ void StageScene::DrawEndSequenceUI() {
 			{ 0.5f, 0.0f }
 		);
 
-		// サブメッセージ「ミッションから離脱します.....」
+		// サブメッセージ
 		std::string msgStr = "ミッションから離脱します" + dots;
 		TextRenderer::GetInstance()->Print(
 			"HackGen",
@@ -1115,7 +1108,7 @@ void StageScene::DrawEndSequenceUI() {
 		);
 	}
 	// ------------------------------------------------------------
-	// ステージクリア時の巨大ファンファーレUI（大きく「OPERATION CLEARED」演出）
+	// ステージクリア時のUI
 	// ------------------------------------------------------------
 	else if (endSequence_ == StageEndSequence::Clear_HudShutdown) {
 		float bannerW = 880.0f;
@@ -1152,7 +1145,7 @@ void StageScene::DrawEndSequenceUI() {
 	}
 
 	// ------------------------------------------------------------
-	// 項目6: 帰還シーケンス（オートパイロット）
+	// 帰還シーケンス
 	// ------------------------------------------------------------
 	else if (endSequence_ == StageEndSequence::Clear_AutopilotReturn) {
 		float bannerW = 760.0f;
@@ -1185,7 +1178,7 @@ void StageScene::DrawEndSequenceUI() {
 	}
 
 	// ------------------------------------------------------------
-	// 項目10, 11: タクティカルマップ移行（デジタル急ズームワイプ＆稼働する動的戦術マップ）
+	// タクティカルマップ移行
 	// ------------------------------------------------------------
 	else if (endSequence_ == StageEndSequence::Clear_TacticalMapZoom) {
 		float mapTimer = endSeqTimer_ - 2.8f; // 0.0s 〜 1.7s
@@ -1241,7 +1234,7 @@ void StageScene::DrawEndSequenceUI() {
 			{ 0.46f, 0.80f, 0.49f, 0.75f }
 		);
 
-		// 自機アイコン（画面中央）と円形走査レーダー波
+		// 自機アイコンと円形走査レーダー波
 		float pX = screenW * 0.5f;
 		float pY = screenH * 0.5f;
 
@@ -1266,7 +1259,7 @@ void StageScene::DrawEndSequenceUI() {
 			{ 0.50f, 0.86f, 0.53f, 0.90f }
 		);
 
-		// 項目10: 移行直後（0.0s〜0.26s）の鋭利な垂直急ズーム＋走査デジタルワイプ
+		// 移行直後（0.0s〜0.26s）の鋭利な垂直急ズーム＋走査デジタルワイプ
 		if (mapTimer < 0.26f) {
 			float wipeProg = mapTimer / 0.26f;
 			float bandH = screenH * 0.25f;
@@ -1310,7 +1303,7 @@ void StageScene::DrawEndSequenceUI() {
 			);
 		}
 
-		// 項目4: 戦術マップとリザルト画面（デスクトップ）の視覚的繋がり（転送ブリッジ）
+		// 戦術マップとリザルト画面（デスクトップ）の視覚的繋がり（転送ブリッジ）
 		if (mapTimer >= 0.60f) {
 			float transBannerW = 740.0f;
 			float transBannerH = 52.0f;

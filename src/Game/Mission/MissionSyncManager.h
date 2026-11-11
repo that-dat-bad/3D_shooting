@@ -22,39 +22,38 @@ namespace MissionSyncDefaults {
 	inline constexpr const char* kKeyMissionData = "missionData";
 }
 
-/// @brief Blender Mission Editor アドオンと HTTP/JSON ライブ同期を行う管理クラス
+// ミッション同期管理クラス
 class MissionSyncManager {
 public:
 	static MissionSyncManager* GetInstance();
 
-	/// @brief 接続先ホスト・ポートの初期化
+	// 接続設定
 	void Initialize(
 		const std::string& host = MissionSyncDefaults::kDefaultHost,
 		int port = MissionSyncDefaults::kDefaultPort);
 
-	/// @brief 現在ゲーム側で開いているミッションJSON相対パスを設定
+	// 対象ミッションファイルパスの設定
 	void SetActiveMissionFilePath(const std::string& filePath);
 
-	/// @brief 定期ポーリング開始
+	// 同期開始
 	void StartSync();
 
-	/// @brief 定期ポーリング停止
+	// 同期停止
 	void StopSync();
 
-	/// @brief 終了処理
+	// 終了処理
 	void Finalize();
 
-	/// @brief メインスレッド側で未適用のミッション更新を取り出す
-	/// @param outMissionData 最新のミッションデータ出力先
-	/// @param outFilePath 対象ミッションファイルパス出力先
-	/// @param outRestartRequested Blender側からフルリスタート要求があった場合 true
-	/// @return 新しいリビジョンを受信していた場合 true
+	// 保留中の更新を取り出す
+	// outMissionData: ミッションデータ出力先
+	// outFilePath: ファイルパス出力先
+	// outRestartRequested: リスタート要求フラグ出力先
 	bool ConsumePendingUpdate(
 		MissionData& outMissionData,
 		std::string& outFilePath,
 		bool& outRestartRequested);
 
-	/// @brief 単発で即時取得を試行する
+	// 即時同期要求
 	bool RequestSyncNow();
 
 	bool IsConnected() const { return mcpClient_.IsConnected(); }

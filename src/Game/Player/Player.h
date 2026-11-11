@@ -1,27 +1,17 @@
 #pragma once
-/// <summary>
-/// プレイヤーキャラクターを制御するクラス
-/// </summary>
+// プレイヤー
 class Player {
 public:
-	/// <summary>
-	/// 初期化
-	/// </summary>
+	// 初期化
 	void Initialize();
 
-	/// <summary>
-	/// 更新
-	/// </summary>
+	// 更新
 	void Update();
 
-	/// <summary>
-	/// 描画
-	/// </summary>
+	// 描画
 	void Draw();
 
-	/// <summary>
-	/// 終了処理
-	/// </summary>
+	// 終了処理
 	void Finalize();
 
 	//--アクセッサ--
@@ -31,13 +21,12 @@ public:
 	//-setter-
 
 private:
-	/// <summary>ユーザー入力によるスロットル値</summary>
+	// ユーザー入力によるスロットル値
 	float currentThrottle_; 
-	/// <summary>現在の推力</summary>
+	// 現在の推力
 	float currentThrust_;
-	/// <summary>現在の質量</summary>
+	// 現在の質量
 	float currentMass_;
-	/// <summary>残燃料</summary>
+	// 残燃料
 	float currentFuel_; 
 };
-

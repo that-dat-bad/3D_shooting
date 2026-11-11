@@ -22,7 +22,7 @@
 
 class EffectHandle;
 
-/// @brief チュートリアルミッション『Operation Halcyon Days』の全定数定義（マジックナンバー完全排除）
+// チュートリアル定数
 namespace HalcyonDefaults {
 	// --- 基本数値定数 ---
 	inline constexpr int kZeroInt = 0;
@@ -333,16 +333,16 @@ namespace HalcyonDefaults {
 	inline constexpr float kSysLogFadeInSeconds = 0.16f;
 	inline constexpr float kSysLogFadeOutSeconds = 0.80f;
 	inline constexpr float kSysLogPanelX = 22.0f;
-	inline constexpr float kSysLogPanelY = 160.0f;         ///< 左上計器(InfoUI: Y=32~145)と重ならないよう下部に配置
+	inline constexpr float kSysLogPanelY = 160.0f;         // 左上計器(InfoUI: Y=32~145)と重ならないよう下部に配置
 	inline constexpr float kSysLogRowHeight = 20.0f;
 	inline constexpr float kSysLogFontSize = 12.0f;
 	inline constexpr float kSysLogAccentWidth = 3.0f;
 	inline constexpr float kSysLogBgPadX = 8.0f;
-	inline constexpr float kSysLogBgWidth = 360.0f;        ///< 中央無線字幕との干渉を排除するコンパクト幅
+	inline constexpr float kSysLogBgWidth = 360.0f;        // 中央無線字幕との干渉を排除するコンパクト幅
 
 	inline constexpr float kGuidePanelWidth = 620.0f;
 	inline constexpr float kGuidePanelHeight = 72.0f;
-	inline constexpr float kGuidePanelBottomMargin = 16.0f; ///< 自機後部を遮らないよう画面最下部付近に配置
+	inline constexpr float kGuidePanelBottomMargin = 16.0f; // 自機後部を遮らないよう画面最下部付近に配置
 	inline constexpr float kGuideBorderThickness = 1.5f;
 	inline constexpr float kGuideCornerLen = 10.0f;
 	inline constexpr float kGuideTitleFontSize = 15.5f;
@@ -486,29 +486,29 @@ namespace HalcyonDefaults {
 	inline constexpr const char* kBrokenStatusLabel = "BROKEN";
 }
 
-/// @brief チュートリアル進行フェーズ
+// 進行フェーズ
 enum class HalcyonPhase {
 	Inactive,
-	Phase1_BasicControls,   ///< Phase 1: 起動と基本操作（視線誘導・水平復帰）
-	Phase2_ThrottleCruise,  ///< Phase 2: 加減速とスロットル操作
-	Phase3_CanyonWaypoints, ///< Phase 3: 峡谷通過（低空地形追従）
-	Phase4_OutpostIncident, ///< Phase 4: 異変（通信途絶と監視所炎上）
-	Phase5_DroneLeadSight,  ///< Phase 5: 模擬標的／偏差射撃
-	Phase6_WesternAmbush,   ///< Phase 6: 実戦・西側機の急襲（部位破壊体験）
-	Phase7_ExitBoundary,    ///< 帰投境界ライン通過待機
-	Phase8_DebriefFadeOut   ///< 画面フェードアウト → ClearScene遷移
+	Phase1_BasicControls,
+	Phase2_ThrottleCruise,
+	Phase3_CanyonWaypoints,
+	Phase4_OutpostIncident,
+	Phase5_DroneLeadSight,
+	Phase6_WesternAmbush,
+	Phase7_ExitBoundary,
+	Phase8_DebriefFadeOut
 };
 
-/// @brief システムログ種別（DAWN_OS テレメトリ端末出力）
+// システムログ種別
 enum class SysLogCategory {
-	Sys,   ///< [SYS]
-	Wrn,   ///< [WRN]
-	Alr,   ///< [ALR]
-	Rwr,   ///< [RWR]
-	Intel  ///< [INTEL]
+	Sys,
+	Wrn,
+	Alr,
+	Rwr,
+	Intel
 };
 
-/// @brief StageSceneから毎フレーム渡される更新コンテキスト
+// 更新用パラメータ
 struct TutorialUpdateContext {
 	float deltaTime = HalcyonDefaults::kZero;
 	float missionElapsedTime = HalcyonDefaults::kZero;
@@ -522,50 +522,42 @@ struct TutorialUpdateContext {
 	TerrainChunkManager* terrain = nullptr;
 };
 
-/// @brief チュートリアルミッション『Operation Halcyon Days』の進行・3D演出・HUDを一元統括するディレクタークラス
+// チュートリアル管理クラス
 class TutorialMissionDirector {
 public:
 	TutorialMissionDirector() = default;
 	~TutorialMissionDirector() = default;
 
-	/// @brief 初回アセット・スプライトプールの初期化
+	// 初期化
 	void Initialize(SpriteCommon* spriteCommon);
 
-	/// @brief ミッション開始／リトライ時の状態リセットと有効化判定
+	// ミッション開始時のリセット
 	void ResetForMission(
 		const MissionData& mission,
 		const std::string& missionFilePath,
 		const MyMath::Vector3& playerStartPos);
 
-	/// @brief Blender Live Sync からの3D空間配置変更を実行中にホット反映
+	// 配置変更の反映
 	void ApplyLiveLayout(const MissionData& mission, const TerrainChunkManager* terrain);
 
-	/// @brief 毎フレーム進行更新
+	// 更新
 	void Update(const TutorialUpdateContext& ctx);
 
-	/// @brief 3Dオブジェクト・ゲート・監視塔・隊長機・標的機の描画
+	// 3D描画
 	void Draw3D(Camera* camera);
 
-	/// @brief 2D HUD（システムログ・操作ガイド・リードマーカー・部位耐久・フェード）描画
+	// UI描画
 	void DrawUI(Camera* camera, float screenWidth, float screenHeight);
 
 	bool IsTutorialActive() const { return isActive_ && phase_ != HalcyonPhase::Inactive; }
 	bool IsReadyForDebriefScene() const { return readyForClearScene_; }
 	HalcyonPhase GetCurrentPhase() const { return phase_; }
 
-	/// @brief 画面下に操作ガイドパネルが表示中かどうか（操作許可の基準フラグ）
 	bool IsGuideDialogVisible() const;
-
-	/// @brief 自機の操縦桿（ピッチ/ロール/ヨー・マウスエイム）の操作が許可されているか
 	bool IsPlayerSteeringAllowed() const;
-
-	/// @brief 自機のスロットル加減速（[W]/[S]）の操作が許可されているか
 	bool IsPlayerThrottleAllowed() const;
-
-	/// @brief 自機の兵装発射（ガンポッド射撃）が許可されているか
 	bool IsPlayerWeaponAllowed() const;
 
-	/// @brief 峡谷ルート中心X座標の評価
 	static float EvaluateCanyonCenterX(float worldZ);
 
 private:

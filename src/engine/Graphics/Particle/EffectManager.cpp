@@ -59,9 +59,6 @@ namespace {
 	}
 }
 
-// ============================================
-// EffectPreset (.effect 外部ファイル I/O)
-// ============================================
 bool EffectPreset::LoadFromEffectFile(const std::string& path) {
 	ConfigFile cfg;
 	if (!cfg.LoadFromFile(path)) {
@@ -212,9 +209,6 @@ bool EffectPreset::SaveToEffectFile(const std::string& path) const {
 	return true;
 }
 
-// ============================================
-// EffectHandle 実装
-// ============================================
 EffectHandle::EffectHandle(const std::string& effectName)
 	: effectName_(effectName) {
 }
@@ -263,7 +257,7 @@ void EffectHandle::emit() {
 	}
 	calledThisFrame_ = true;
 
-	// 自動停止条件（時間指定 / 回数指定）に到達済みで、前フレームから条件が継続している間は再発生しない
+	// 停止条件に達している場合は再発生しない
 	if (isCompleted_ && wasCalledLastFrame_) {
 		return;
 	}
@@ -354,9 +348,6 @@ void EffectHandle::Update(float dt) {
 	calledThisFrame_ = false;
 }
 
-// ============================================
-// プリミティブ・複合エフェクト実装
-// ============================================
 RingEffect::RingEffect(const Vector3& pos, const Vector4& color, float lifeTime, float maxRadius) {
 	position_ = pos;
 	color_ = color;
@@ -673,7 +664,7 @@ MuzzleFlashEffect::MuzzleFlashEffect(const Vector3& pos, const Vector3& directio
 
 	ParticleManager* pm = ParticleManager::GetInstance();
 
-	// 1. 火花
+	// 火花
 	{
 		ParticleParameters sparkParams;
 		float sparkBase = 0.12f;
@@ -704,7 +695,7 @@ MuzzleFlashEffect::MuzzleFlashEffect(const Vector3& pos, const Vector3& directio
 		pm->Emit("ExplosionSpark", position_, sparkParams, 60);
 	}
 
-	// 2. フラッシュコア
+	// フラッシュ
 	{
 		ParticleParameters flashParams;
 		flashParams.minVelocity = { 0.0f, 0.0f, 0.0f };
@@ -722,7 +713,7 @@ MuzzleFlashEffect::MuzzleFlashEffect(const Vector3& pos, const Vector3& directio
 		pm->Emit("ExplosionFire", position_, flashParams, 10);
 	}
 
-	// 3. スモーク（上昇上限1.5m）
+	// スモーク
 	{
 		ParticleParameters smokeParams;
 		smokeParams.minVelocity = {
@@ -760,9 +751,6 @@ void MuzzleFlashEffect::Draw(Camera* camera) {
 	(void)camera;
 }
 
-// ============================================
-// EffectManager 実装
-// ============================================
 std::unique_ptr<EffectManager> EffectManager::instance_ = nullptr;
 
 EffectManager* EffectManager::GetInstance() {
@@ -823,7 +811,7 @@ void EffectManager::LoadAllEffectsFromDirectory(const std::string& directory) {
 		}
 	}
 
-	// 万が一ディレクトリが空だった場合は default_fire.effect を自動生成してロード
+	// ファイルがない場合はデフォルトを生成
 	if (presets_.empty()) {
 		EffectPreset fallback{};
 		fallback.name = "default_fire";
@@ -1045,7 +1033,7 @@ void EffectManager::DrawDebugGui(EffectHandle* previewHandle) {
 
 	ImGui::Begin("Effect Manager (.effect Editor) [DEBUG]");
 
-	// 1. 外部ファイル (.effect) 管理セクション
+	// ファイル管理
 	if (ImGui::CollapsingHeader("1. Effect File (.effect) Management", ImGuiTreeNodeFlags_DefaultOpen)) {
 		if (presets_.empty()) {
 			LoadAllEffectsFromDirectory("Resources/effects");
@@ -1126,7 +1114,7 @@ void EffectManager::DrawDebugGui(EffectHandle* previewHandle) {
 
 	EffectPreset& preset = presets_[selectedPresetIndex_];
 
-	// 2. 停止条件・発生サイクル設定 (emitやめる条件: Manual / 時間 / 回数)
+	// 停止条件
 	if (ImGui::CollapsingHeader("2. Stop Condition & Cycle (停止条件・発生間隔)", ImGuiTreeNodeFlags_DefaultOpen)) {
 		const char* condItems[] = {
 			"Manual (sample->stop() まで継続)",
@@ -1152,7 +1140,7 @@ void EffectManager::DrawDebugGui(EffectHandle* previewHandle) {
 		ImGui::TextDisabled("Code Usage: if (cond) { sample->emit(); }  /  sample->stop();  /  sample->Delete();");
 	}
 
-	// 3. レイヤー選択 & パーティクル詳細パラメータ (量・上昇速度・上限高さ・加速度・寿命・スケール・色)
+	// パーティクル設定
 	if (ImGui::CollapsingHeader("3. Particle Parameters (量・上昇速度・上限高さ・加速度・寿命)", ImGuiTreeNodeFlags_DefaultOpen)) {
 		if (ImGui::Button("+ Add Layer")) {
 			EffectParticleLayer newLayer{};
@@ -1271,7 +1259,7 @@ void EffectManager::DrawDebugGui(EffectHandle* previewHandle) {
 		}
 	}
 
-	// 4. プレビュー操作 & 統計
+	// プレビュー操作
 	if (ImGui::CollapsingHeader("4. Live Test Controls (emit / stop / clear)", ImGuiTreeNodeFlags_DefaultOpen)) {
 		if (previewHandle) {
 			previewHandle->SetEffectName(preset.name);

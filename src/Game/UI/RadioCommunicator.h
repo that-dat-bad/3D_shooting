@@ -7,12 +7,12 @@
 #include "../../engine/Graphics/Sprite/SpriteCommon.h"
 #include "../../engine/Graphics/UI/TypewriterEffect.h"
 
-/// @brief 無線通信の発信元属性（話者名および << >> 括弧の色分けに使用）
+// 無線通信の発信元属性
 enum class RadioFaction {
-	Ally,   ///< 味方機・僚機（AC7風 ペールミントグリーン）
-	Awacs,  ///< 管制・AWACS・司令部（AC7風 ペールスカイシアン）
-	Enemy,  ///< 敵機・敵指揮官（AC7風 ソフトコーラルレッド）
-	System  ///< システム警告・戦術通知（AC7風 ペールアンバー）
+	Ally,   // 味方機・僚機
+	Awacs,  // 管制・AWACS・司令部
+	Enemy,  // 敵機
+	System  // システム警告
 };
 
 inline const char* RadioFactionToString(RadioFaction faction) {
@@ -32,7 +32,7 @@ inline RadioFaction StringToRadioFaction(const std::string& text) {
 	return RadioFaction::Ally;
 }
 
-/// @brief エースコンバット7風 フローティング無線字幕UIの全定数定義（マジックナンバー完全排除）
+// 無線字幕の定数
 namespace RadioDefaults {
 	// --- 基本インデックス・文字数定数 ---
 	inline constexpr size_t kInitialIndex = 0;
@@ -57,11 +57,11 @@ namespace RadioDefaults {
 
 	// --- フローティング字幕レイアウト定数（ウィンドウ枠なし・画面上部中央） ---
 	inline constexpr float kCenterAnchorRatioX = 0.5f;
-	inline constexpr float kTopAnchorRatioY = 0.145f;     ///< 上部タイマー直下・空背景上のフローティング位置（左上計器・システムログとの干渉を回避）
-	inline constexpr float kSpeakerFontSize = 18.0f;      ///< 1行目: 話者名フォントサイズ
-	inline constexpr float kDialogueFontSize = 20.5f;     ///< 2行目: << 会話内容 >> フォントサイズ
-	inline constexpr float kSpeakerToDialogueGap = 6.0f;  ///< 話者名とセリフ行の垂直間隔
-	inline constexpr float kDialogueLineGap = 5.0f;       ///< 複数行セリフ時の行間
+	inline constexpr float kTopAnchorRatioY = 0.145f;
+	inline constexpr float kSpeakerFontSize = 18.0f;      // 話者名フォントサイズ
+	inline constexpr float kDialogueFontSize = 20.5f;     // セリフフォントサイズ
+	inline constexpr float kSpeakerToDialogueGap = 6.0f;  // 間隔
+	inline constexpr float kDialogueLineGap = 5.0f;       // 行間
 
 	// --- 雲・青空背景でもくっきり読める2層ソフトドロップシャドウ定数 ---
 	inline constexpr float kInnerShadowOffsetX = 1.2f;
@@ -78,7 +78,7 @@ namespace RadioDefaults {
 	inline constexpr float kCloseDurationSeconds = 0.24f;
 	inline constexpr float kInterruptCloseSeconds = 0.08f;
 	inline constexpr float kDefaultCharIntervalSeconds = 0.030f;
-	inline constexpr bool kDefaultEnableTypewriter = false; ///< AC7準拠: デフォルトはウィンドウ無し一括フェード表示
+	inline constexpr bool kDefaultEnableTypewriter = false; // AC7準拠: デフォルトはウィンドウ無し一括フェード表示
 
 	// --- 文字列フォーマット・フォント定数 ---
 	inline constexpr char kSingleOpenAngleChar = '<';
@@ -112,17 +112,17 @@ namespace RadioDefaults {
 	inline constexpr MyMath::Vector4 kSystemSpeakerColor = { 1.00f, 0.90f, 0.58f, 1.00f };
 }
 
-/// @brief 1件分の無線会話データ
+// 無線会話データ
 struct RadioMessage {
-	std::string speakerName;   ///< 1行目の話者名（例: "Joker 2 Coster"）
-	std::string dialogueText;  ///< 2行目の会話内容（自動で << 会話内容 >> に整形、\n 改行対応）
+	std::string speakerName;
+	std::string dialogueText;
 	RadioFaction faction = RadioFaction::Ally;
 	float holdDuration = RadioDefaults::kDefaultHoldSeconds;
 	float charInterval = RadioDefaults::kDefaultCharIntervalSeconds;
-	bool interrupt = false;    ///< true の場合、現在表示中の通信を高速フェードアウトして最優先表示
+	bool interrupt = false;
 };
 
-/// @brief 無線会話UIのレイアウト設定構造体
+// 無線会話UIのレイアウト設定
 struct RadioLayoutConfig {
 	float topAnchorRatioY = RadioDefaults::kTopAnchorRatioY;
 	float speakerFontSize = RadioDefaults::kSpeakerFontSize;
@@ -131,7 +131,7 @@ struct RadioLayoutConfig {
 	float dialogueLineGap = RadioDefaults::kDialogueLineGap;
 };
 
-/// @brief 無線会話UIのタイミング設定構造体
+// 無線会話UIのタイミング設定
 struct RadioTimingConfig {
 	float defaultHoldSeconds = RadioDefaults::kDefaultHoldSeconds;
 	float openDurationSeconds = RadioDefaults::kOpenDurationSeconds;
@@ -141,48 +141,47 @@ struct RadioTimingConfig {
 	bool enableTypewriter = RadioDefaults::kDefaultEnableTypewriter;
 };
 
-/// @brief エースコンバット7風のフローティング無線字幕 (Speaker / << Dialogue >>) を管理・描画するクラス
+// 無線字幕管理クラス
 class RadioCommunicator {
 public:
 	RadioCommunicator() = default;
 	~RadioCommunicator() = default;
 
-	/// @brief 初期化処理
+	// 初期化
 	void Initialize(SpriteCommon* spriteCommon = nullptr);
 
-	/// @brief 毎フレーム更新処理
+	// 更新
 	void Update(float deltaTime);
 
-	/// @brief 2D UIパスでの描画処理（ウィンドウ枠を描画せず、字幕テキストのみを直接描画）
+	// 描画
 	void Draw(float screenWidth, float screenHeight);
 
-	/// @brief 通常無線メッセージをキュー末尾に追加
+	// メッセージ追加
 	void Enqueue(
 		const std::string& speakerName,
 		const std::string& dialogueText,
 		RadioFaction faction = RadioFaction::Ally,
 		float holdDuration = RadioDefaults::kDefaultHoldSeconds);
 
-	/// @brief 構造体指定で無線メッセージを追加（interrupt フラグ対応）
+	// 構造体指定でメッセージを追加
 	void Enqueue(const RadioMessage& message);
 
-	/// @brief 優先割り込み無線を即時要求（表示中の通信を高速フェードアウトして最優先表示）
+	// 割り込みメッセージの追加
 	void Interrupt(
 		const std::string& speakerName,
 		const std::string& dialogueText,
 		RadioFaction faction = RadioFaction::Awacs,
 		float holdDuration = RadioDefaults::kDefaultHoldSeconds);
 
-	/// @brief 現在の通信を次メッセージへスキップ
+	// スキップ
 	void SkipCurrent();
 
-	/// @brief 全待機キューおよび現在の表示状態を完全リセット
+	// キューのクリア
 	void Clear();
 
-	/// @brief 現在通信を表示中または待機キューが存在するか
+	// 通信中判定
 	bool IsActive() const;
 
-	/// @brief 待機キュー内のメッセージ数を取得
 	size_t GetQueuedCount() const { return messageQueue_.size(); }
 
 	void SetLayoutConfig(const RadioLayoutConfig& config) { layoutConfig_ = config; }
@@ -191,10 +190,10 @@ public:
 	void SetTimingConfig(const RadioTimingConfig& config) { timingConfig_ = config; }
 	const RadioTimingConfig& GetTimingConfig() const { return timingConfig_; }
 
-	/// @brief 話者名から不要な外枠括弧 (<...>) を除去して純粋な話者名を取得
+	// 話者名の整形
 	static std::string SanitizeSpeakerName(const std::string& rawSpeaker);
 
-	/// @brief セリフ本文から外側の引用符 ("...") や二重山括弧 (<<...>>) を除去した純粋本文を取得
+	// セリフ本文の整形
 	static std::string SanitizeDialogueBody(const std::string& rawDialogue);
 
 private:

@@ -11,36 +11,36 @@ using namespace MyMath;
 class ModelCommon;
 class Camera;
 
-/// <summary>
-/// 3Dモデルデータを保持し描画を行うクラス
-/// (アセットファイルからのデータ読み込み、アニメーション対応)
-/// </summary>
+// <summary>
+// 3Dモデルデータを保持し描画を行うクラス
+// (アセットファイルからのデータ読み込み、アニメーション対応)
+// </summary>
 class Model {
 public:
-	/// <summary>
-	/// モデルの初期化
-	/// </summary>
-	/// <param name="modelCommon">ModelCommonポインタ</param>
-	/// <param name="directorypath">ディレクトリパス</param>
-	/// <param name="filename">ファイル名</param>
+	// <summary>
+	// モデルの初期化
+	// </summary>
+	// <param name="modelCommon">ModelCommonポインタ</param>
+	// <param name="directorypath">ディレクトリパス</param>
+	// <param name="filename">ファイル名</param>
 	void Initialize(ModelCommon* modelCommon, const std::string& directorypath, const std::string& filename);
 	
-	/// <summary>
-	/// モデルの描画コマンド発行
-	/// </summary>
+	// <summary>
+	// モデルの描画コマンド発行
+	// </summary>
 	void Draw();
 
-	/// <summary>
-	/// 特定のノード（とその子孫）のみを描画するコマンド発行
-	/// </summary>
+	// <summary>
+	// 特定のノード（とその子孫）のみを描画するコマンド発行
+	// </summary>
 	void DrawNode(const std::string& nodeName);
 
-	/// <summary>
-	/// デバッグ用: スケルトンの描画
-	/// </summary>
-	/// <param name="objectWorldMatrix">オブジェクトのワールド行列</param>
-	/// <param name="camera">カメラ</param>
-	/// <param name="color">描画色</param>
+	// <summary>
+	// デバッグ用: スケルトンの描画
+	// </summary>
+	// <param name="objectWorldMatrix">オブジェクトのワールド行列</param>
+	// <param name="camera">カメラ</param>
+	// <param name="color">描画色</param>
 	void DebugDrawSkeleton(const Matrix4x4& objectWorldMatrix, Camera* camera, const Vector4& color = { 1.0f, 1.0f, 1.0f, 1.0f });
 
 	void SetShininess(float shininess) { for (auto* mat : materialDatas_) { if (mat) mat->shininess = shininess; } }
@@ -134,18 +134,18 @@ public:
 	};
 
 	static ModelData LoadModelFile(const std::string& directoryPath, const std::string& filename);
-	/// <summary>
-	/// Assimp を経由しない軽量OBJローダー（静的メッシュ専用：ボーン・アニメーション非対応）
-	/// 地形チャンクなど大量の単純OBJを高速に読み込むためのもの
-	/// </summary>
+	// <summary>
+	// Assimp を経由しない軽量OBJローダー（静的メッシュ専用：ボーン・アニメーション非対応）
+	// 地形チャンクなど大量の単純OBJを高速に読み込むためのもの
+	// </summary>
 	static ModelData LoadObjFileFast(const std::string& filePath);
 	static Animation LoadAnimationFile(const std::string& directoryPath, const std::string& filename, const std::string& animationName);
 	static std::vector<std::string> LoadAnimationNames(const std::string& directoryPath, const std::string& filename, const std::string& animationName = "");
 	ModelData GetModelData() const { return modelData_; }
 
-	/// <summary>
-	/// 事前パース済みモデルデータからの初期化（マルチスレッド並列ロード対応）
-	/// </summary>
+	// <summary>
+	// 事前パース済みモデルデータからの初期化（マルチスレッド並列ロード対応）
+	// </summary>
 	void InitializeFromModelData(ModelCommon* modelCommon, ModelData modelData);
 
 	// アニメーションを再生スタートする関数
@@ -154,29 +154,29 @@ public:
 	// 毎フレーム呼んでアニメーションを進める関数
 	void Update(float deltaTime);
 
-	/// <summary>
-	/// モデル全体のメッシュに対するレイキャスト判定
-	/// </summary>
+	// <summary>
+	// モデル全体のメッシュに対するレイキャスト判定
+	// </summary>
 	bool IntersectRay(const Ray& ray, const Matrix4x4& worldMatrix, RaycastHit* outHit = nullptr) const;
 
-	/// <summary>
-	/// 特定ノードのメッシュに対するレイキャスト判定
-	/// </summary>
+	// <summary>
+	// 特定ノードのメッシュに対するレイキャスト判定
+	// </summary>
 	bool IntersectRayNode(const std::string& nodeName, const Ray& ray, const Matrix4x4& nodeWorldMatrix, RaycastHit* outHit = nullptr) const;
 
-	/// @brief マテリアルのカラーを設定
+	// マテリアルのカラーを設定
 	void SetMaterialColor(uint32_t materialIndex, const Vector4& color);
-	/// @brief マテリアルのライティング有効/無効を設定
+	// マテリアルのライティング有効/無効を設定
 	void SetMaterialEnableLighting(uint32_t materialIndex, bool enableLighting);
-	/// @brief マテリアルの反射強度を設定
+	// マテリアルの反射強度を設定
 	void SetMaterialSpecularIntensity(uint32_t materialIndex, float intensity);
-	/// @brief マテリアルの自発光（エミッシブ）を設定
+	// マテリアルの自発光（エミッシブ）を設定
 	void SetMaterialEmissive(uint32_t materialIndex, const Vector3& color, float intensity);
-	/// @brief マテリアルの光沢度（シャープさ）を設定
+	// マテリアルの光沢度（シャープさ）を設定
 	void SetMaterialShininess(uint32_t materialIndex, float shininess);
-	/// @brief マテリアルの環境反射係数を設定
+	// マテリアルの環境反射係数を設定
 	void SetMaterialEnvironmentCoefficient(uint32_t materialIndex, float coefficient);
-	/// @brief マテリアル数を取得
+	// マテリアル数を取得
 	size_t GetMaterialCount() const { return materialDatas_.size(); }
 
 private:

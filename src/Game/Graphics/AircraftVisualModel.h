@@ -14,74 +14,74 @@
 class Object3dCommon;
 class Camera;
 
-/// @brief 機体のビジュアルモデル（マルチパーツ描画・部位非表示・プロペラ回転制御）
+// 機体のビジュアルモデル
 class AircraftVisualModel {
 public:
 	AircraftVisualModel() = default;
 	~AircraftVisualModel() = default;
 
-	/// @brief 初期化
+	// 初期化
 	void Initialize(Object3dCommon* object3dCommon, Camera* camera);
 
-	/// @brief カメラの再設定
+	// カメラの再設定
 	void SetCamera(Camera* camera);
 
-	/// @brief パーツモデルの設定
+	// パーツモデルの設定
 	void SetModelForPart(DamagePart part, const std::string& modelFilePath, const std::string& targetNodeName = "");
 	void SetModelForPart(DamagePart part, Model* model, const std::string& targetNodeName = "");
 	void SetModelForPart(DamagePart part, Model* model, const std::vector<std::string>& targetNodeNames);
 
-	/// @brief 単一のモデルファイルから標準的なノード名で一括セットアップ
+	// 単一のモデルファイルから標準的なノード名で一括セットアップ
 	void SetupFromSingleModel(const std::string& modelFilePath);
 	void SetupFromSingleModel(Model* model);
 
-	/// @brief パーツのローカルオフセット設定
+	// パーツのローカルオフセット設定
 	void SetPartLocalTransform(DamagePart part, const Vector3& scale, const Vector3& rotate, const Vector3& translate);
 
-	/// @brief パーツの表示状態制御
+	// パーツの表示状態制御
 	void SetPartVisible(DamagePart part, bool visible);
 	bool IsPartVisible(DamagePart part) const;
-	/// @brief 全パーツを可視状態にリセット（リトライ・再出撃用）
+	// 全パーツを可視状態にリセット
 	void ResetAllPartsVisible();
 
-	/// @brief プロペラ回転速度の設定 (rad/sec)
+	// プロペラ回転速度の設定 (rad/sec)
 	void SetPropellerRpm(float rpm) { propellerRpm_ = rpm; }
 
-	/// @brief モデル全体の向き補正（ベース回転）の設定 (rad)
+	// モデル全体の向き補正（ベース回転）の設定 (rad)
 	void SetBaseRotation(const Vector3& rotate) { baseRotation_ = rotate; }
 	Vector3 GetBaseRotation() const { return baseRotation_; }
 
-	/// @brief 更新（親ワールド行列からの階層合成）
+	// 更新
 	void Update(const Matrix4x4& parentWorldMatrix, float deltaTime);
 
-	/// @brief 描画
+	// 描画
 	void Draw();
 
-	/// @brief 指定パーツの最新ワールド行列を取得（破片スポーン用）
+	// 指定パーツの最新ワールド行列を取得
 	Matrix4x4 GetPartWorldMatrix(DamagePart part) const;
 
-	/// @brief 指定パーツの最新ワールド座標を取得
+	// 指定パーツの最新ワールド座標を取得
 	Vector3 GetPartWorldPosition(DamagePart part) const;
 
-	/// @brief 全パーツのマテリアルパラメータ（光沢度、スペキュラ強度、環境反射係数）を設定
+	// 全パーツのマテリアルパラメータを設定
 	void SetMaterialProperties(float shininess, float specularIntensity, float envCoefficient);
 
-	/// @brief 全パーツのベースカラー乗算色を設定（焦げ跡・ダメージ変色用）
+	// 全パーツのベースカラー乗算色を設定
 	void SetMaterialColor(const Vector4& color);
 
-	/// @brief 全パーツのエミッシブ自発光を設定（ワイヤーフレームホログラム演出用）
+	// 全パーツのエミッシブ自発光を設定
 	void SetMaterialEmissive(const Vector3& color, float intensity);
 
-	/// @brief 全パーツのライティング有効・無効を設定
+	// 全パーツのライティング有効・無効を設定
 	void SetMaterialEnableLighting(bool enable);
 
-	/// @brief 全パーツにカスタムパイプラインステートを設定（特殊シェーダー用）
+	// 全パーツにカスタムパイプラインステートを設定
 	void SetCustomPipelineState(ID3D12PipelineState* pso);
 
-	/// @brief 全パーツにカスタム定数バッファ（LightingSettingsスロットb3差し替え用）を設定
+	// 全パーツにカスタム定数バッファを設定
 	void SetCustomLightingSettingsResource(ID3D12Resource* res);
 
-	/// @brief コクピットキャノピー（ガラス部）に半透明・高環境反射・シャープなスペキュラを設定（項目4）
+	// コクピットキャノピー（ガラス部）のマテリアル設定
 	void SetupCanopyMaterial();
 
 private:

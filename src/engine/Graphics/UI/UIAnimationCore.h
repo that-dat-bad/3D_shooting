@@ -9,15 +9,15 @@
 
 using namespace MyMath;
 
-/// @brief ループアニメーション種別
+// ループアニメーション種別
 enum class UILoopMotion {
-	None = 0,	///< なし
-	Pulse,		///< 脈動（サイン波による拡大縮小・呼吸）
-	Floating,	///< 浮遊（上下にフワフワと漂う）
-	Shake,		///< 震え（被弾・ピンチ・警告時のランダム振動）
+	None = 0,	// なし
+	Pulse,		// 脈動
+	Floating,	// 浮遊
+	Shake,		// 震え
 };
 
-/// @brief 文字列から UILoopMotion への変換ヘルパー
+// 文字列からUILoopMotionへの変換
 inline UILoopMotion StringToLoopMotion(const std::string& str) {
 	if (str == "Pulse" || str == "pulse") return UILoopMotion::Pulse;
 	if (str == "Floating" || str == "floating" || str == "Float" || str == "float") return UILoopMotion::Floating;
@@ -25,7 +25,7 @@ inline UILoopMotion StringToLoopMotion(const std::string& str) {
 	return UILoopMotion::None;
 }
 
-/// @brief UILoopMotion から文字列への変換ヘルパー
+// UILoopMotionから文字列への変換
 inline std::string LoopMotionToString(UILoopMotion motion) {
 	switch (motion) {
 	case UILoopMotion::Pulse:    return "Pulse";
@@ -35,12 +35,12 @@ inline std::string LoopMotionToString(UILoopMotion motion) {
 	}
 }
 
-/// @brief 特定の状態（通常・ホバー・選択・Custom等）におけるスタイル・モーション定義
+// UIスタイル設定
 struct UIStateStyle {
-	Vector4 color = { 1.0f, 1.0f, 1.0f, 1.0f };	///< 目標カラー＆アルファ
-	float scale = 1.0f;								///< 目標スケール倍率 (1.0 = 100%)
-	Vector2 offset = { 0.0f, 0.0f };				///< 位置オフセット (X, Y)
-	UILoopMotion loopMotion = UILoopMotion::None;	///< ループモーション
-	float motionSpeed = 3.0f;						///< モーション速度 (Hz相当)
-	float motionIntensity = 1.0f;					///< モーションの強さ (振幅・ピクセル量)
+	Vector4 color = { 1.0f, 1.0f, 1.0f, 1.0f };
+	float scale = 1.0f;
+	Vector2 offset = { 0.0f, 0.0f };
+	UILoopMotion loopMotion = UILoopMotion::None;
+	float motionSpeed = 3.0f;
+	float motionIntensity = 1.0f;
 };

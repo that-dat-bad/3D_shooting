@@ -10,30 +10,30 @@
 // ミッショントリガー (Mission Trigger) の型定義
 // ============================================================
 
-/// @brief トリガーの発火条件
+// トリガーの発火条件
 enum class TriggerCondition {
-	OnMissionStart,      ///< ミッション開始時
-	OnTimer,             ///< 経過時間で発火
-	OnAreaEnter,         ///< プレイヤーがエリアに進入
-	OnAreaLeave,         ///< プレイヤーがエリアから離脱
-	OnEnemyDestroyed,    ///< 特定の敵が撃破された
-	OnKillCount,         ///< 撃破数が閾値に達した
-	OnPlayerDamaged,     ///< プレイヤーのHPが閾値以下
-	OnObjectiveComplete, ///< 特定の目標が達成された
+	OnMissionStart,      // ミッション開始時
+	OnTimer,             // 経過時間で発火
+	OnAreaEnter,         // プレイヤーがエリアに進入
+	OnAreaLeave,         // プレイヤーがエリアから離脱
+	OnEnemyDestroyed,    // 特定の敵が撃破された
+	OnKillCount,         // 撃破数が閾値に達した
+	OnPlayerDamaged,     // プレイヤーのHPが閾値以下
+	OnObjectiveComplete, // 特定の目標が達成された
 };
 
-/// @brief トリガー発火時に実行するアクションの種類
+// トリガー発火時に実行するアクションの種類
 enum class TriggerActionType {
-	SpawnEnemies,       ///< 追加の敵を出現させる
-	ShowMessage,        ///< 画面にメッセージ表示
-	SetObjective,       ///< 目標のステータスを変更する
-	MissionComplete,    ///< ミッション成功
-	MissionFail,        ///< ミッション失敗
-	ActivateTrigger,    ///< 別のトリガーを有効化
-	PlayRadioDialogue,  ///< エースコンバット風の無線会話を再生
+	SpawnEnemies,       // 追加の敵を出現させる
+	ShowMessage,        // 画面にメッセージ表示
+	SetObjective,       // 目標のステータスを変更する
+	MissionComplete,    // ミッション成功
+	MissionFail,        // ミッション失敗
+	ActivateTrigger,    // 別のトリガーを有効化
+	PlayRadioDialogue,  // エースコンバット風の無線会話を再生
 };
 
-/// @brief トリガーアクションのデータ
+// トリガーアクションのデータ
 struct TriggerAction {
 	TriggerActionType type = TriggerActionType::ShowMessage;
 
@@ -42,38 +42,38 @@ struct TriggerAction {
 	float messageDuration = 3.0f;
 
 	// --- SetObjective 用 ---
-	int objectiveIndex = -1;         ///< 対象の目標インデックス
-	std::string newStatus = "Active"; ///< 変更先のステータス ("Active" / "Completed" / "Failed")
+	int objectiveIndex = -1;         // 対象の目標インデックス
+	std::string newStatus = "Active"; // 変更先のステータス ("Active" / "Completed" / "Failed")
 
 	// --- SpawnEnemies 用 ---
 	std::vector<EnemySpawnData> spawnEnemies;
 	std::vector<GroundEnemySpawnData> spawnGroundEnemies;
 
 	// --- ActivateTrigger 用 ---
-	int activateTriggerIndex = -1;   ///< 有効化する別トリガーのインデックス
+	int activateTriggerIndex = -1;   // 有効化する別トリガーのインデックス
 
 	// --- PlayRadioDialogue 用 ---
-	std::string speakerName = "";                     ///< 無線の話者名（自動で <○○> 整形）
-	RadioFaction speakerFaction = RadioFaction::Awacs; ///< 話者の所属・色分け属性
-	bool radioInterrupt = false;                      ///< true の場合は再生中の無線を割り込み更新
+	std::string speakerName = "";                     // 無線の話者名（自動で <○○> 整形）
+	RadioFaction speakerFaction = RadioFaction::Awacs; // 話者の所属・色分け属性
+	bool radioInterrupt = false;                      // true の場合は再生中の無線を割り込み更新
 };
 
-/// @brief ミッショントリガーのデータ
+// ミッショントリガーのデータ
 struct MissionTrigger {
 	std::string name = "Trigger";
 	TriggerCondition condition = TriggerCondition::OnMissionStart;
-	bool isEnabled = true;          ///< 有効/無効（無効なら評価をスキップ）
-	bool isFired = false;           ///< 発火済みフラグ（ランタイム用、JSONには保存しない）
-	bool isRepeatable = false;      ///< true: 条件を満たすたびに何度でも発火
+	bool isEnabled = true;          // 有効/無効（無効なら評価をスキップ）
+	bool isFired = false;           // 発火済みフラグ（ランタイム用、JSONには保存しない）
+	bool isRepeatable = false;      // true: 条件を満たすたびに何度でも発火
 
 	// --- 条件パラメータ ---
-	float timerSeconds = 0.0f;             ///< OnTimer用: 発火までの秒数
-	MyMath::Vector3 areaCenter{};          ///< OnAreaEnter/Leave用
-	float areaRadius = 100.0f;             ///< OnAreaEnter/Leave用
-	int enemyIndex = -1;                   ///< OnEnemyDestroyed用
-	int killCount = 0;                     ///< OnKillCount用
-	float hpThreshold = 50.0f;             ///< OnPlayerDamaged用
-	int objectiveIndex = -1;               ///< OnObjectiveComplete用
+	float timerSeconds = 0.0f;             // OnTimer用: 発火までの秒数
+	MyMath::Vector3 areaCenter{};          // OnAreaEnter/Leave用
+	float areaRadius = 100.0f;             // OnAreaEnter/Leave用
+	int enemyIndex = -1;                   // OnEnemyDestroyed用
+	int killCount = 0;                     // OnKillCount用
+	float hpThreshold = 50.0f;             // OnPlayerDamaged用
+	int objectiveIndex = -1;               // OnObjectiveComplete用
 
 	// --- 発火時のアクション（複数設定可能） ---
 	std::vector<TriggerAction> actions;

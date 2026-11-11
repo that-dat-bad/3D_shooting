@@ -10,26 +10,19 @@
 #include "Payload/IPayload.h"
 
 
-/// <summary>
-/// 飛行機の物理挙動（フライトモデル）を計算・管理するクラス
-/// </summary>
+// 飛行機の物理挙動（フライトモデル）を計算・管理するクラス
 class FlightModel {
 public:
-	/// <summary>コンストラクタ</summary>
 	FlightModel();
 	~FlightModel() = default;
 
-	/// <summary>
-	/// 初期化
-	/// </summary>
-	/// <param name="airframeData">機体パラメータ</param>
-	/// <param name="engineData">エンジンパラメータ</param>
+	// 初期化
+	// airframeData: 機体パラメータ
+	// engineData: エンジンパラメータ
 	void Initialize(const AirframeData& airframeData, const EngineData& engineData);
 
-	/// <summary>
-	/// 毎フレームの更新処理(物理計算など)
-	/// </summary>
-	/// <param name="deltaTime">デルタタイム(秒)</param>
+	// 更新
+	// deltaTime: デルタタイム
 	void Update(float deltaTime);
 
 
@@ -84,7 +77,7 @@ public:
 	void SetAutopilot(bool autopilot) { isAutopilot_ = autopilot; }
 	bool IsAutopilot() const { return isAutopilot_; }
 
-	/// @brief 弾丸のワールド位置からサブコライダー被弾処理を実行
+	// 弾丸の被弾処理
 	HitResult ProcessBulletHit(const MyMath::Vector3& bulletWorldPos, float rawDamage) {
 		return airframe_.GetDamageModel().ProcessBulletHit(bulletWorldPos, position_, orientation_, rawDamage);
 	}

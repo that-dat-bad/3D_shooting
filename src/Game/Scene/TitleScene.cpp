@@ -30,7 +30,7 @@ void TitleScene::Initialize() {
 #ifdef _DEBUG
 	auto tStart = std::chrono::high_resolution_clock::now();
 #endif
-	SetCursorVisible(false); // ドローン視点・コンソール画面ではOSカーソルを完全非表示（項目7）
+	SetCursorVisible(false); // ドローン視点・コンソール画面ではOSカーソルを完全非表示
 	sceneID = SCENE::TITLE;
 	pseudoOS_.ResetSpritePool();
 	selectionManager_.Clear();
@@ -172,7 +172,7 @@ void TitleScene::Initialize() {
 		// ============================================================
 		// 初回生成（パーツ・セグメント・モデルの削減は一切行わず100%保持）
 		// ============================================================
-		// コンソールブート時の完全漆黒背景スプライト（項目1: 格納庫の透けを100%遮蔽）
+		// コンソールブート時の完全漆黒背景スプライト
 		consoleBgSprite_ = std::make_unique<Sprite>();
 		consoleBgSprite_->Initialize(spriteCommon, "assets/textures/white1x1.png");
 		consoleBgSprite_->SetAnchorPoint({ 0.0f, 0.0f });
@@ -448,7 +448,7 @@ void TitleScene::Draw() {
 		}
 	}
 
-	// 接地影（項目7: ソフトシャドウの濃さ・エッジ調整 - 黒潰れを解消し自然な接地感を表現）
+	// 接地影
 	if (loc.id == TitleLocation::Hangar && titleCamera) {
 		PrimitiveModel* pm = PrimitiveModel::GetInstance();
 		MyMath::Vector3 origin = loc.origin;
@@ -462,7 +462,7 @@ void TitleScene::Draw() {
 		pm->DrawPlane({ 5.5f, 1.0f, 9.5f }, { 0.0f, 0.5f, 0.0f }, { origin.x, origin.y + 0.015f, origin.z }, { 0.0f, 0.0f, 0.0f, 0.20f }, shadowTex, titleCamera);
 	}
 
-	// 墜落現場の焦げ跡・激突滑走溝デカール（項目6: 胴体着陸の長大な滑走溝と左翼激突痕）
+	// 墜落現場の焦げ跡・激突滑走溝デカール
 	if (loc.id == TitleLocation::CrashedForest && titleCamera) {
 		PrimitiveModel* pm = PrimitiveModel::GetInstance();
 		MyMath::Vector3 origin = loc.origin;
@@ -481,7 +481,7 @@ void TitleScene::Draw() {
 		loc.debrisModel->Draw();
 	}
 
-	// トンネル飛行中の演出（項目9: スピード感向上 - 高密度な流動ライト＆推進炎）
+	// トンネル飛行中の演出
 	if (loc.id == TitleLocation::Tunnel && titleCamera) {
 		PrimitiveModel* pm = PrimitiveModel::GetInstance();
 
@@ -491,7 +491,7 @@ void TitleScene::Draw() {
 		float scrollZ = -std::fmod(animTimer_ * kFlightSpeed, kMarkerSpacing);
 		for (float z = -40.0f; z <= 40.0f; z += kMarkerSpacing) {
 			float markerZ = z + scrollZ;
-			// 左右の壁面（X = ±6.25m, Y = 1.8m）: 適正なシアンガイドライン（項目1）
+			// 左右の壁面（X = ±6.25m, Y = 1.8m）: 適正なシアンガイドライン
 			pm->DrawPlane({ 0.14f, 1.0f, 2.8f }, { 0.0f, 0.0f, 1.5707963f }, { -6.25f, 1.8f, markerZ }, { 0.15f, 0.65f, 1.4f, 0.85f }, whiteTexIndex_, titleCamera, BlendMode::kAdd);
 			pm->DrawPlane({ 0.14f, 1.0f, 2.8f }, { 0.0f, 0.0f, 1.5707963f }, {  6.25f, 1.8f, markerZ }, { 0.15f, 0.65f, 1.4f, 0.85f }, whiteTexIndex_, titleCamera, BlendMode::kAdd);
 
@@ -525,7 +525,7 @@ void TitleScene::DrawUI() {
 
 	if (state_ == TitleState::DroneView) {
 		DrawOSD();
-		// 操作案内テキストの半透明ダーク帯を描画（項目9: 主翼や車輪との被りを100%防止）
+		// 操作案内テキストの半透明ダーク帯を描画
 		if (pressSpaceBannerBg_) {
 			pressSpaceBannerBg_->Draw();
 		}
@@ -557,16 +557,15 @@ void TitleScene::DrawUI() {
 }
 
 void TitleScene::Finalize() {
-	SetCursorVisible(false); // ゲーム画面へ遷移するためOSカーソルを確実に非表示（項目9）
+	SetCursorVisible(false); // ゲーム画面へ遷移するためOSカーソルを確実に非表示
 	UITextRegistry::GetInstance()->Clear();
 	isStartMenuOpen_ = false;
 	isMissionSelectModalOpen_ = false;
 	missionSelectModalAnim_ = 0.0f;
 
 	// ------------------------------------------------------------
-	// 静的リソースキャッシュへの退避（リファクタリング最適化）
-	// 次回タイトル訪問時のD3D12リソース生成（2,000バッファ以上）と
-	// 3D背景109個のObject3d再初期化をスキップして0ms高速遷移を実現
+	// 静的リソースキャッシュへの退避
+	// 次回タイトル訪問時のリソース生成と3D背景の再初期化をスキップ
 	// ------------------------------------------------------------
 	s_cache_.skybox = std::move(skybox_);
 	s_cache_.locations = std::move(locations_);

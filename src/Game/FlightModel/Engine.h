@@ -12,25 +12,19 @@ struct EngineData {
 };
 
 // --- エンジンクラス本体 ---
-/// <summary>
-/// 飛行機のエンジン（推力発生装置）を管理するクラス
-/// </summary>
+// エンジン
 class Engine {
 public:
 	Engine() : currentThrottle_(0.0f), altitudeThrottleFactor_(0.0f) {}
 	~Engine() = default;
 
-	/// <summary>
-	/// 初期化（外部データを受け取ってセットアップ）
-	/// </summary>
-	/// <param name="data">エンジンパラメータ</param>
+	// 初期化
+	// data: エンジンパラメータ
 	void Initialize(const EngineData& data);
 
-	/// <summary>
-	/// 毎フレームの更新処理（目標スロットルに向かって物理的に出力を変化させる）
-	/// </summary>
-	/// <param name="dt">デルタタイム</param>
-	/// <param name="targetThrottle">目標スロットル値</param>
+	// 更新
+	// dt: デルタタイム
+	// targetThrottle: 目標スロットル値
 	void Update(float dt, float targetThrottle);
 
 	// --- アクセッサ（外部から情報を取得） ---

@@ -8,7 +8,7 @@
 
 #include "../../engine/Physics/Collider.h"
 
-/// エンジン機能テスト用のデバッグシーン
+// デバッグシーン
 class DebugScene : public IScene {
 public:
 	void Initialize() override;

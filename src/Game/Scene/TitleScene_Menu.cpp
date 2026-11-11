@@ -4,7 +4,7 @@ using namespace TitleSceneInternal;
 
 void TitleScene::InitializeUI(SpriteCommon* spriteCommon, bool fromCache) {
 	// ============================
-	// 背景オーバーレイ（暗い半透明パネル）
+	// 背景オーバーレイ
 	// ============================
 	backgroundPanel_.Initialize(spriteCommon);
 	backgroundPanel_.SetPosition({ 0.0f, 0.0f });
@@ -12,26 +12,26 @@ void TitleScene::InitializeUI(SpriteCommon* spriteCommon, bool fromCache) {
 	backgroundPanel_.SetBackgroundColor({ 0.0f, 0.0f, 0.0f, 0.3f }); // 少し透明度を上げて後ろの3Dが見えるように
 
 	// ============================
-	// タイトルテキスト（コンソールプロジェクト識別バナー: 鮮烈なターミナルグリーン）
+	// タイトルテキスト
 	// ============================
 	titleText_.Initialize("HackGen", "DAWN", 48.0f);
 	titleText_.SetAnchorPoint({ 0.5f, 0.0f });
 	titleText_.SetPosition({ kScreenWidth * 0.5f, 106.0f });
-	titleText_.SetColor({ 0.0f, 1.0f, 0.12f, 1.0f }); // (0, 255, 30) ネオングリーン
+	titleText_.SetColor({ 0.0f, 1.0f, 0.12f, 1.0f });
 	titleText_.SetDropShadow(true, { 2.0f, 3.0f }, { 0.0f, 0.0f, 0.0f, 0.95f });
 	titleText_.SetOutline(true, 1.5f, { 0.0f, 0.10f, 0.015f, 0.95f });
 
 	// ============================
-	// サブタイトルテキスト（(0, 255, 30)統一＆重なり解消）
+	// サブタイトルテキスト
 	// ============================
 	subtitleText_.Initialize("HackGen", "- OPERATION : DAWN -", 14.0f);
 	subtitleText_.SetAnchorPoint({ 0.5f, 0.0f });
 	subtitleText_.SetPosition({ kScreenWidth * 0.5f, 196.0f });
-	subtitleText_.SetColor({ 0.0f, 1.0f, 0.12f, 0.95f }); // (0, 255, 30) ネオングリーン
+	subtitleText_.SetColor({ 0.0f, 1.0f, 0.12f, 0.95f });
 	subtitleText_.SetDropShadow(true, { 1.5f, 2.0f }, { 0.0f, 0.0f, 0.0f, 0.90f });
 
 	// ============================
-	// メニューボタン（コンソール端末コマンド行）
+	// メニューボタン
 	// ============================
 	float buttonWidth = 390.0f;
 	float buttonHeight = 44.0f;
@@ -39,11 +39,11 @@ void TitleScene::InitializeUI(SpriteCommon* spriteCommon, bool fromCache) {
 	float buttonStartY = 248.0f;
 	float buttonSpacing = 56.0f;
 
-	const Vector4 btnNormalBg   = { 0.0f, 0.0f, 0.0f, 0.0f };       // 漆黒ウィンドウを活かしたクリーンな背景
-	const Vector4 btnHoverBg    = { 0.0f, 0.15f, 0.02f, 0.50f };  // 深緑半透明ハイライト
-	const Vector4 btnSelectedBg = { 0.0f, 0.15f, 0.02f, 0.50f };  // 深緑半透明ハイライト
-	const Vector4 btnNormalText = { 0.0f, 0.88f, 0.10f, 0.95f };  // (0, 255, 30) ターミナルグリーン文字
-	const Vector4 btnSelText    = { 0.0f, 1.0f, 0.12f, 1.00f };  // 鮮やかな(0, 255, 30)ネオングリーン文字
+	const Vector4 btnNormalBg   = { 0.0f, 0.0f, 0.0f, 0.0f }; // 漆黒ウィンドウを活かしたクリーンな背景
+	const Vector4 btnHoverBg    = { 0.0f, 0.15f, 0.02f, 0.50f }; // 深緑半透明ハイライト
+	const Vector4 btnSelectedBg = { 0.0f, 0.15f, 0.02f, 0.50f }; // 深緑半透明ハイライト
+	const Vector4 btnNormalText = { 0.0f, 0.88f, 0.10f, 0.95f };
+	const Vector4 btnSelText    = { 0.0f, 1.0f, 0.12f, 1.00f }; // 鮮やかなネオングリーン文字
 
 	const Vector4 btnLockedBg   = { 0.04f, 0.08f, 0.045f, 0.70f };
 	const Vector4 btnLockedText = { 0.40f, 0.52f, 0.41f, 0.65f };
@@ -70,7 +70,7 @@ void TitleScene::InitializeUI(SpriteCommon* spriteCommon, bool fromCache) {
 		}
 	});
 
-	// FREE FLIGHT ボタン (未実装ロック表示・開けないように無効化)
+	// FREE FLIGHT ボタン
 	editorButton_.Initialize(spriteCommon, "[02] FREE FLIGHT [LOCKED]", 21.0f);
 	editorButton_.SetLeftAligned(true, 100.0f);
 	editorButton_.SetTextOffset({ 0.0f, 3.0f });
@@ -86,7 +86,7 @@ void TitleScene::InitializeUI(SpriteCommon* spriteCommon, bool fromCache) {
 		lockedAlertTimer_ = 1.8f;
 	});
 
-	// SETTINGS ボタン (未実装ロック表示・開けないように無効化)
+	// SETTINGS ボタン
 	settingsButton_.Initialize(spriteCommon, "[03] SYSTEM CONFIG [LOCKED]", 21.0f);
 	settingsButton_.SetLeftAligned(true, 100.0f);
 	settingsButton_.SetTextOffset({ 0.0f, 3.0f });
@@ -124,17 +124,17 @@ void TitleScene::InitializeUI(SpriteCommon* spriteCommon, bool fromCache) {
 	selectionManager_.AddButton(&exitButton_);
 
 	// ============================================================
-	// 初回のみ実行するスプライト・エフェクト初期化（キャッシュ復元時は0msスキップ）
+	// 初回のみ実行するスプライト・エフェクト初期化
 	// ============================================================
 	if (!fromCache) {
 		// コンソールメニューカードの初期化
 		InitializeMenuCard(spriteCommon);
 
-		// 操作案内テキスト＆ミリタリー黒帯（枠線中央にジャストフィット配置：UIずれ解消）
+		// 操作案内テキスト＆ミリタリー黒帯
 		const float bannerW = 600.0f;
 		const float bannerH = 34.0f; // 高さを34pxに設定し、テキストが上下枠線に重ならない余裕を確保
 		const float bannerX = (kScreenWidth - bannerW) * 0.5f;
-		const float bannerY = 672.0f; // 画面最下部（672～706px）の安全領域
+		const float bannerY = 672.0f; // 画面最下部の安全領域
 
 		pressSpaceBannerBg_ = std::make_unique<Sprite>();
 		pressSpaceBannerBg_->Initialize(spriteCommon, "assets/textures/white1x1.png");
@@ -156,10 +156,10 @@ void TitleScene::InitializeUI(SpriteCommon* spriteCommon, bool fromCache) {
 			pressSpaceBorders_.push_back(std::move(sp));
 		};
 		const MyMath::Vector4 bannerLineCol = { 0.38f, 0.74f, 0.41f, 0.70f };
-		// 上下の境界線 (1px)
+		// 上下の境界線
 		addBannerLine({ bannerX, bannerY }, { bannerW, 1.0f }, bannerLineCol);
 		addBannerLine({ bannerX, bannerY + bannerH - 1.0f }, { bannerW, 1.0f }, bannerLineCol);
-		// 左右のコーナーブラケット (2px)
+		// 左右のコーナーブラケット
 		addBannerLine({ bannerX, bannerY }, { 8.0f, 2.0f }, bannerLineCol);
 		addBannerLine({ bannerX, bannerY }, { 2.0f, 8.0f }, bannerLineCol);
 		addBannerLine({ bannerX + bannerW - 8.0f, bannerY }, { 8.0f, 2.0f }, bannerLineCol);
@@ -169,7 +169,7 @@ void TitleScene::InitializeUI(SpriteCommon* spriteCommon, bool fromCache) {
 		addBannerLine({ bannerX + bannerW - 8.0f, bannerY + bannerH - 2.0f }, { 8.0f, 2.0f }, bannerLineCol);
 		addBannerLine({ bannerX + bannerW - 2.0f, bannerY + bannerH - 8.0f }, { 2.0f, 8.0f }, bannerLineCol);
 
-		// DAWN タイトルロゴスプライト初期化（白文字 + MiG-21通過）
+		// DAWN タイトルロゴスプライト初期化
 		titleLogoSprite_ = std::make_unique<Sprite>();
 		titleLogoSprite_->Initialize(spriteCommon, "assets/textures/title_logo_dawn_cropped.png");
 		titleLogoSprite_->SetAnchorPoint({ 0.5f, 0.5f });
@@ -182,10 +182,10 @@ void TitleScene::InitializeUI(SpriteCommon* spriteCommon, bool fromCache) {
 		// ドローンカメラOSD初期化
 		InitializeOSD(spriteCommon);
 
-		// カメラ映像ウィンドウ閉じる演出の初期化（項目1）
+		// カメラ映像ウィンドウ閉じる演出の初期化
 		InitializeWindowCloseVisuals(spriteCommon);
 
-		// 高品位アフターバーナーの初期化（Mig-21 単発エンジン・ショックダイヤモンド）
+		// 高品位アフターバーナーの初期化
 		afterburner_ = std::make_unique<Afterburner>();
 		afterburner_->Initialize();
 		afterburner_->SetTwinEngine(false);
@@ -220,7 +220,7 @@ void TitleScene::InitializeUI(SpriteCommon* spriteCommon, bool fromCache) {
 	pulseStyle.motionSpeed = 2.2f;
 	pressSpaceText_.SetStyle("Normal", pulseStyle);
 
-	// UITextRegistryに登録（エディタから編集可能にする）
+	// UITextRegistryに登録
 	UITextRegistry::GetInstance()->Register("Title_Main", &titleText_);
 	UITextRegistry::GetInstance()->Register("Title_Sub", &subtitleText_);
 	UITextRegistry::GetInstance()->Register("Title_BtnStart", startButton_.GetLabelText());
@@ -257,22 +257,22 @@ void TitleScene::InitializeMenuCard(SpriteCommon* spriteCommon) {
 		menuBorderSprites_.push_back(std::move(sp));
 	};
 
-	// 0. ウィンドウ立体ドロップシャドウ（背後のぼかし背景からウィンドウを美しく浮かび上がらせる）
+	// ウィンドウ立体ドロップシャドウ
 	addBorderLine({ cardX + 8.0f, cardY + 10.0f }, { cardWidth, cardHeight }, { 0.0f, 0.0f, 0.0f, 0.75f });
 
-	// 1. ターミナルウィンドウ本体背景パネル（完全な漆黒・純黒ブラック、不透明度100%）
+	// ターミナルウィンドウ本体背景パネル
 	menuCardPanel_.Initialize(spriteCommon);
 	menuCardPanel_.SetPosition({ cardX, cardY });
 	menuCardPanel_.SetSize({ cardWidth, cardHeight });
 	menuCardPanel_.SetBackgroundColor({ 0.0f, 0.0f, 0.0f, 1.0f }); // 100%不透明の完全黒背景
 
-	// 2. ターミナルウィンドウ・タイトルバー背景パネル
+	// ターミナルウィンドウ・タイトルバー背景パネル
 	menuHeaderPanel_.Initialize(spriteCommon);
 	menuHeaderPanel_.SetPosition({ cardX, cardY });
 	menuHeaderPanel_.SetSize({ cardWidth, 34.0f });
 	menuHeaderPanel_.SetBackgroundColor({ 0.03f, 0.10f, 0.035f, 1.0f }); // 重厚なダークグリーンのタイトルバー
 
-	// 3. タイトルバーのステータスLEDインジケーターランプ
+	// タイトルバーのステータスLEDインジケーターランプ
 	headerLampSprite_ = std::make_unique<Sprite>();
 	headerLampSprite_->Initialize(spriteCommon, "assets/textures/white1x1.png");
 	headerLampSprite_->SetAnchorPoint({ 0.0f, 0.0f });
@@ -281,7 +281,7 @@ void TitleScene::InitializeMenuCard(SpriteCommon* spriteCommon) {
 	headerLampSprite_->SetColor({ 0.0f, 1.0f, 0.12f, 0.95f });
 	headerLampSprite_->Update();
 
-	// 5. ウィンドウ外周境界線 (太さ 2px) - ウィンドウの淵は白
+	// ウィンドウ外周境界線 - ウィンドウの淵は白
 	const MyMath::Vector4 borderColor = { 1.0f, 1.0f, 1.0f, 0.85f };
 	const MyMath::Vector4 cornerColor = { 1.0f, 1.0f, 1.0f, 1.00f };
 	const float cLen = 20.0f;
@@ -292,7 +292,7 @@ void TitleScene::InitializeMenuCard(SpriteCommon* spriteCommon) {
 	addBorderLine({ cardX, cardY }, { 2.0f, cardHeight }, borderColor);
 	addBorderLine({ cardX + cardWidth - 2.0f, cardY }, { 2.0f, cardHeight }, borderColor);
 
-	// 四隅のコーナーブラケット (太さ 3px) - 白
+	// 四隅のコーナーブラケット - 白
 	addBorderLine({ cardX, cardY }, { cLen, cThick }, cornerColor);
 	addBorderLine({ cardX, cardY }, { cThick, cLen }, cornerColor);
 	addBorderLine({ cardX + cardWidth - cLen, cardY }, { cLen, cThick }, cornerColor);
@@ -302,13 +302,13 @@ void TitleScene::InitializeMenuCard(SpriteCommon* spriteCommon) {
 	addBorderLine({ cardX + cardWidth - cLen, cardY + cardHeight - cThick }, { cLen, cThick }, cornerColor);
 	addBorderLine({ cardX + cardWidth - cThick, cardY + cardHeight - cLen }, { cThick, cLen }, cornerColor);
 
-	// タイトルバー下部区切り線 (太さ 2px, Y = cardY + 32.0f)
+	// タイトルバー下部区切り線
 	addBorderLine({ cardX, cardY + 32.0f }, { cardWidth, 2.0f }, { 1.0f, 1.0f, 1.0f, 0.65f });
 
-	// タイトル下の水平区切り線 (Y = cardY + 172.0f)
+	// タイトル下の水平区切り線
 	addBorderLine({ cardX + 24.0f, cardY + 172.0f }, { cardWidth - 48.0f, 1.0f }, { 1.0f, 1.0f, 1.0f, 0.40f });
 
-	// 操作案内枠（Y=482、高さ38px、幅 cardWidth - 50px）
+	// 操作案内枠
 	const float gfX = cardX + 25.0f;
 	const float gfY = cardY + 430.0f;
 	const float gfW = cardWidth - 50.0f;
@@ -323,13 +323,13 @@ void TitleScene::InitializeMenuCard(SpriteCommon* spriteCommon) {
 	addBorderLine({ gfX + gfW - 10.0f, gfY + gfH - 1.0f }, { 10.0f, 1.0f }, gfCorner);
 	addBorderLine({ gfX + gfW - 1.0f, gfY + gfH - 10.0f }, { 1.0f, 10.0f }, gfCorner);
 
-	// ウィンドウ最下部ステータスバー背景＆境界線 (高さ 26px)
+	// ウィンドウ最下部ステータスバー背景＆境界線
 	const float sbY = cardY + cardHeight - 26.0f;
 	addBorderLine({ cardX, sbY }, { cardWidth, 26.0f }, { 0.0f, 0.0f, 0.0f, 1.0f });
 	addBorderLine({ cardX, sbY }, { cardWidth, 1.0f }, { 1.0f, 1.0f, 1.0f, 0.50f });
 
 	// ------------------------------------------------------------
-	// 各ボタンのアウトライン枠線＆サイバーブラケット（buttonBorders_）
+	// 各ボタンのアウトライン枠線＆サイバーブラケット
 	// ------------------------------------------------------------
 	const float btnW = 390.0f;
 	const float btnH = 44.0f;
@@ -365,13 +365,13 @@ void TitleScene::InitializeMenuCard(SpriteCommon* spriteCommon) {
 			group.brackets.push_back(createLineSprite(pos, size, color));
 		};
 
-		// 外周枠線 (1px) 4本 - 白
+		// 外周枠線 4本 - 白
 		addOutline({ btnX, by }, { btnW, 1.0f }, { 1.0f, 1.0f, 1.0f, 0.35f });
 		addOutline({ btnX, by + btnH - 1.0f }, { btnW, 1.0f }, { 1.0f, 1.0f, 1.0f, 0.35f });
 		addOutline({ btnX, by }, { 1.0f, btnH }, { 1.0f, 1.0f, 1.0f, 0.35f });
 		addOutline({ btnX + btnW - 1.0f, by }, { 1.0f, btnH }, { 1.0f, 1.0f, 1.0f, 0.35f });
 
-		// 四隅ブラケット (2px) 8本 - 白
+		// 四隅ブラケット 8本 - 白
 		addBracket({ btnX, by }, { bcLen, bcThick }, { 1.0f, 1.0f, 1.0f, 0.50f });
 		addBracket({ btnX, by }, { bcThick, bcLen }, { 1.0f, 1.0f, 1.0f, 0.50f });
 		addBracket({ btnX + btnW - bcLen, by }, { bcLen, bcThick }, { 1.0f, 1.0f, 1.0f, 0.50f });
@@ -381,7 +381,7 @@ void TitleScene::InitializeMenuCard(SpriteCommon* spriteCommon) {
 		addBracket({ btnX + btnW - bcLen, by + btnH - bcThick }, { bcLen, bcThick }, { 1.0f, 1.0f, 1.0f, 0.50f });
 		addBracket({ btnX + btnW - bcThick, by + btnH - bcLen }, { bcThick, bcLen }, { 1.0f, 1.0f, 1.0f, 0.50f });
 
-		// ボタン左端内側のソリッド・アクティブバー（ボタン枠線と完璧にアライン・統合）
+		// ボタン左端内側のソリッド・アクティブバー
 		buttonBorderIndicatorOffsets_.push_back({ (btnX + 1.0f) - cardX, (by + 2.0f) - cardY });
 		group.indicator = createLineSprite({ btnX + 1.0f, by + 2.0f }, { 3.0f, btnH - 4.0f }, { 0.0f, 1.0f, 0.12f, 0.25f });
 
@@ -469,11 +469,11 @@ void TitleScene::UpdateMenuConsoleVisuals() {
 		headerLampSprite_->Update();
 	}
 
-	// タイトル＆サブタイトルを完全な鮮烈グリーンに固定（外部INIファイルによる白文字上書きを完全防止）
+	// タイトル＆サブタイトルを完全な鮮烈グリーンに固定
 	titleText_.SetColor({ 0.45f, 0.84f, 0.48f, 1.0f });
 	subtitleText_.SetColor({ 0.46f, 0.82f, 0.49f, 0.95f });
 
-	// ボタンテキスト色を動的設定（ロック中ボタンは減衰・アンバー調）
+	// ボタンテキスト色を動的設定
 	const Vector4 normalGreen = { 0.46f, 0.82f, 0.49f, 0.95f };
 	const Vector4 selectedGreen = { 0.78f, 0.95f, 0.80f, 1.00f };
 	const Vector4 lockedNormal = { 0.35f, 0.42f, 0.36f, 0.60f };
@@ -533,7 +533,7 @@ void TitleScene::DrawMenuCard() {
 	const float cardX = menuWindowPos_.x;
 	const float cardY = menuWindowPos_.y;
 
-	// 0. ウィンドウ立体ドロップシャドウ（外側に4〜8pxのアルファ50%の黒い影を落とし、左側ウィンドウとの境界を浮き立たせる）
+	// ウィンドウ立体ドロップシャドウ
 	DrawOSRect({ cardX - 16.0f, cardY - 6.0f }, { cardWidth + 32.0f, cardHeight + 16.0f }, { 0.0f, 0.0f, 0.0f, 0.25f });
 	DrawOSRect({ cardX - 10.0f, cardY - 4.0f }, { cardWidth + 20.0f, cardHeight + 12.0f }, { 0.0f, 0.0f, 0.0f, 0.42f });
 	DrawOSRect({ cardX - 5.0f,  cardY - 2.0f }, { cardWidth + 10.0f, cardHeight + 8.0f  }, { 0.0f, 0.0f, 0.0f, 0.58f });
@@ -556,13 +556,13 @@ void TitleScene::DrawMenuCard() {
 
 	TextRenderer* tr = TextRenderer::GetInstance();
 
-	// 端末ヘッダーテキスト (HackGen 13.0f) - タイトルバー左側（アクティブ時は鮮烈発光＆FOCUSバッジ）
+	// 端末ヘッダーテキスト - タイトルバー左側
 	bool isActive = (activeWindowId_ == 0) || isMissionSelectModalOpen_;
 	if (isActive) {
 		DrawOSRect({ cardX, cardY }, { cardWidth, 2.0f }, { 1.0f, 1.0f, 1.0f, 0.95f }); // 上端白アクセントライン
 	}
 
-	// 1. 左端のアプリアイコン (14x14px ターミナルアイコン)
+	// 左端のアプリアイコン
 	Vector4 iconCol = isActive ? Vector4{ 0.0f, 1.0f, 0.12f, 1.0f } : Vector4{ 0.0f, 0.50f, 0.06f, 0.55f };
 	DrawOSBorder({ cardX + 8.0f, cardY + 10.0f }, { 14.0f, 14.0f }, iconCol, 1.0f);
 	DrawOSRect({ cardX + 11.0f, cardY + 14.0f }, { 2.0f, 2.0f }, iconCol);
@@ -570,7 +570,7 @@ void TitleScene::DrawMenuCard() {
 	DrawOSRect({ cardX + 11.0f, cardY + 18.0f }, { 2.0f, 2.0f }, iconCol);
 	DrawOSRect({ cardX + 15.0f, cardY + 20.0f }, { 4.0f, 1.5f }, iconCol);
 
-	// 2. LEDインジケーター ＆ タイトル名 (SOVI_OS)
+	// LEDインジケーター ＆ タイトル名
 	if (isActive) {
 		DrawOSRect({ cardX + 26.0f, cardY + 13.0f }, { 8.0f, 8.0f }, { 0.0f, 1.0f, 0.12f, 1.0f }); // 高輝度LED
 		if (isMissionSelectModalOpen_) {
@@ -587,10 +587,10 @@ void TitleScene::DrawMenuCard() {
 		}
 	}
 
-	// 3. プロセス情報 (PID: 0421)
+	// プロセス情報
 	tr->Print("HackGen", "PID: 0421", cardX + cardWidth - 236.0f, cardY + 10.0f, 10.5f, isActive ? Vector4{ 0.0f, 0.75f, 0.09f, 0.80f } : Vector4{ 0.0f, 0.40f, 0.05f, 0.50f });
 
-	// 4. タイトルバー右側のステータスバッジ
+	// タイトルバー右側のステータスバッジ
 	const float badgeX = cardX + cardWidth - 158.0f;
 	const float badgeY = cardY + 8.0f;
 	bool secBlink = (std::fmod(animTimer_, 1.2f) < 0.6f);
@@ -598,7 +598,7 @@ void TitleScene::DrawMenuCard() {
 	DrawOSRect({ badgeX + 7.0f, badgeY + 5.0f }, { 6.0f, 6.0f }, ledColor);
 	tr->Print("HackGen", "SEC:LV5 [OK]", badgeX + 18.0f, badgeY + 2.0f, 10.5f, isActive ? Vector4{ 0.0f, 1.0f, 0.12f, 0.95f } : Vector4{ 0.0f, 0.45f, 0.06f, 0.50f });
 
-	// 5. 操作ボタン（[_][口][X]）の3連ボタン化
+	// 操作ボタンの3連ボタン化
 	const float btnW = 18.0f;
 	const float btnH = 18.0f;
 	const float btnTopY = cardY + 7.0f;
@@ -632,7 +632,7 @@ void TitleScene::DrawMenuCard() {
 	}
 	tr->Print("HackGen", "X", closeBtnX + btnW * 0.5f, btnTopY + 2.0f, 11.5f, hovClose ? Vector4{ 1.0f, 1.0f, 1.0f, 1.0f } : btnTxt, { 0.5f, 0.0f });
 
-	// 工業的なインデックス刻み（チックマーク & 3連ドット）
+	// 工業的なインデックス刻み
 	float tickMidY = cardY + cardHeight * 0.5f - 10.0f;
 	Vector4 tickCol = isActive ? Vector4{ 1.0f, 1.0f, 1.0f, 0.60f } : Vector4{ 0.40f, 0.50f, 0.42f, 0.35f };
 	for (int i = 0; i < 4; ++i) {
@@ -643,10 +643,10 @@ void TitleScene::DrawMenuCard() {
 		DrawOSRect({ cardX + cardWidth - 76.0f + static_cast<float>(i) * 5.0f, cardY + 30.0f }, { 2.5f, 2.5f }, tickCol);
 	}
 
-	// 作戦指令ヘッダーラベル - タイトルバー直下の独立行（ロゴの上に綺麗に独立配置）
-	tr->Print("HackGenRegular", "/// CLASSIFIED OPERATION DIRECTIVE ///", cardX + cardWidth * 0.5f, cardY + 44.0f, 11.5f, { 0.0f, 1.0f, 0.12f, 0.90f }, { 0.5f, 0.0f });
+	// 作戦指令ヘッダーラベル - タイトルバー直下の独立行
+	tr->Print("HackGenRegular", " /// CLASSIFIED OPERATION DIRECTIVE ///", cardX + cardWidth * 0.5f, cardY + 44.0f, 11.5f, { 0.0f, 1.0f, 0.12f, 0.90f }, { 0.5f, 0.0f });
 
-	// メインタイトル：DAWN ロゴスプライト（Y: 60.1〜151.9px、指令テキストと一切被らず堂々配置）
+	// メインタイトル：DAWN ロゴスプライト
 	if (titleLogoSprite_) {
 		titleLogoSprite_->Draw();
 	}
@@ -658,7 +658,7 @@ void TitleScene::DrawMenuCard() {
 		subtitleText_.Draw();
 	}
 
-	// システム認証ステータス行（ディバイダーラインにインラインマウント）
+	// システム認証ステータス行
 	// テキスト背面に完全不透明の黒ベタ矩形を敷くことで、背後の水平線を完璧にマスクして可読性を100%確保
 	const float authY = cardY + 172.0f;
 	const float authCenterX = cardX + cardWidth * 0.5f;
@@ -671,43 +671,43 @@ void TitleScene::DrawMenuCard() {
 
 	if (state_ == TitleState::SortieSequence) {
 		// ============================================================
-		// 出撃シーケンス専用コンソール（メインターミナル内部に完全統合描画）
-		// 他のUI（ボタンやガイド）と一切被らず、美しい映画的演出を実現
+		// 出撃シーケンス専用コンソール
+		// 他のUIと一切被らず、美しい映画的演出を実現
 		// ============================================================
 		float consoleY = cardY + 196.0f;
 		const float consoleW = cardWidth - 36.0f;
 		const float consoleX = cardX + 18.0f;
 		const float consoleH = 390.0f;
 
-		// 1. 出撃コンソール専用パネル（背景ダーク ＋ ネオングリーン/ゴールド二重枠）
+		// 出撃コンソール専用パネル
 		bool blinkFast = (static_cast<int>(sortieTimer_ * 16.0f) % 2) == 0;
 		Vector4 panelBorder = blinkFast ? Vector4{ 1.0f, 0.85f, 0.25f, 0.95f } : Vector4{ 0.48f, 0.84f, 0.50f, 0.90f };
 		DrawOSPanel({ consoleX, consoleY }, { consoleW, consoleH }, { 0.01f, 0.04f, 0.015f, 0.95f }, panelBorder, 1.5f);
 
-		// 2. 出撃バナーヘッダー
+		// 出撃バナーヘッダー
 		DrawOSRect({ consoleX + 2.0f, consoleY + 2.0f }, { consoleW - 4.0f, 28.0f }, { 0.05f, 0.16f, 0.06f, 0.95f });
 		tr->Print("HackGen", "[ ! ] COMBAT SORTIE INITIATED [ ! ]", consoleX + consoleW * 0.5f, consoleY + 7.0f, 13.0f, panelBorder, { 0.5f, 0.0f });
 
-		// 3. カタパルトチャージプログレスバー（項目3: 負荷タメ・認証停滞の緩急カーブ）
+		// カタパルトチャージプログレスバー
 		float catProgress = 0.0f;
 		if (sortieTimer_ < 0.40f) {
-			// 急速初期チャージ (0% -> 38%)
+			// 急速初期チャージ
 			float t = sortieTimer_ / 0.40f;
 			catProgress = (1.0f - std::pow(1.0f - t, 2.0f)) * 0.38f;
 		} else if (sortieTimer_ < 0.75f) {
-			// 負荷タメ・蒸気圧充填停滞 (38% -> 42% で一瞬停滞！)
+			// 負荷タメ・蒸気圧充填停滞
 			float t = (sortieTimer_ - 0.40f) / 0.35f;
 			catProgress = 0.38f + t * 0.04f;
 		} else if (sortieTimer_ < 1.30f) {
-			// 一気にチャージ上昇 (42% -> 89%)
+			// 一気にチャージ上昇
 			float t = (sortieTimer_ - 0.75f) / 0.55f;
 			catProgress = 0.42f + (t * t * (3.0f - 2.0f * t)) * 0.47f;
 		} else if (sortieTimer_ < 1.60f) {
-			// インターロック解除待ちのタメ (89% -> 91% で一瞬停滞！)
+			// インターロック解除待ちのタメ
 			float t = (sortieTimer_ - 1.30f) / 0.30f;
 			catProgress = 0.89f + t * 0.02f;
 		} else if (sortieTimer_ < 1.75f) {
-			// 100%突破！ (91% -> 100% 一気に完了！)
+			// 100%突破！
 			float t = (sortieTimer_ - 1.60f) / 0.15f;
 			catProgress = 0.91f + (1.0f - std::pow(1.0f - t, 3.0f)) * 0.09f;
 		} else {
@@ -727,7 +727,7 @@ void TitleScene::DrawMenuCard() {
 		DrawOSRect({ consoleX + 16.0f, barY }, { gW * catProgress, 8.0f }, { 0.42f, 0.78f, 0.45f, 0.95f });
 		DrawOSBorder({ consoleX + 16.0f, barY }, { gW, 8.0f }, { 0.33f, 0.62f, 0.36f, 0.75f }, 1.0f);
 
-		// 4. リアルタイム・シーケンス認証ログ
+		// リアルタイム・シーケンス認証ログ
 		float logY = barY + 20.0f;
 		const float lineGap = 26.0f;
 		const Vector4 greenLog = { 0.50f, 0.86f, 0.53f, 0.95f };
@@ -756,18 +756,18 @@ void TitleScene::DrawMenuCard() {
 			tr->Print("HackGen", ">>> AFTERBURNER IGNITION // LAUNCH >>>", consoleX + consoleW * 0.5f, logY + 4.0f, 12.5f, goldLog, { 0.5f, 0.0f });
 		}
 
-		// 5. 最下部ステータスバッジ
+		// 最下部ステータスバッジ
 		float badgeY = consoleY + consoleH - 34.0f;
 		DrawOSPanel({ consoleX + 14.0f, badgeY }, { consoleW - 28.0f, 24.0f }, { 0.06f, 0.16f, 0.07f, 0.85f }, { 0.46f, 0.82f, 0.49f, 0.85f }, 1.0f);
 		tr->Print("HackGen", "STATUS // SCRAMBLE AUTHORIZED - INTERCEPT READY", consoleX + consoleW * 0.5f, badgeY + 5.0f, 10.5f, { 1.0f, 0.95f, 0.30f, 0.98f }, { 0.5f, 0.0f });
 	} else {
-		// メニューボタン（コマンド行）
+		// メニューボタン
 		startButton_.Draw();
 		editorButton_.Draw();
 		settingsButton_.Draw();
 		exitButton_.Draw();
 
-		// 操作ガイド (HackGen 14.0f) - ロック中の警告メッセージ表示対応
+		// 操作ガイド - ロック中の警告メッセージ表示対応
 		if (lockedAlertTimer_ > 0.0f) {
 			bool blinkAlert = (static_cast<int>(lockedAlertTimer_ * 14.0f) % 2) == 0;
 			Vector4 alertCol = blinkAlert ? Vector4{ 1.0f, 0.40f, 0.25f, 1.0f } : Vector4{ 0.70f, 0.25f, 0.15f, 0.85f };
@@ -793,10 +793,10 @@ void TitleScene::DrawMenuCard() {
 		}
 	}
 
-	// 5. ウィンドウ最下部ステータスバー（独立フッター領域: 画像仕様に準拠）
+	// ウィンドウ最下部ステータスバー
 	const float footH = 24.0f;
 	const float footY = cardY + cardHeight - footH;
-	// 上部水平仕切り線（白）
+	// 上部水平仕切り線
 	DrawOSRect({ cardX, footY }, { cardWidth, 1.0f }, isActive ? Vector4{ 1.0f, 1.0f, 1.0f, 0.45f } : Vector4{ 0.35f, 0.45f, 0.38f, 0.25f });
 	// 独立フッター背景
 	DrawOSRect({ cardX, footY + 1.0f }, { cardWidth, footH - 1.0f }, { 0.0f, 0.025f, 0.006f, 0.98f });
@@ -867,7 +867,7 @@ void TitleScene::DrawTransitionGlitch() {
 		if (pick < 0.40f) {
 			col = { 0.02f, 0.02f, 0.02f, alpha * 1.2f }; // 黒帯
 		} else if (pick < 0.75f) {
-			col = { 0.1f, 0.95f, 1.0f, alpha * 0.85f };   // エレクトリックシアン
+			col = { 0.1f, 0.95f, 1.0f, alpha * 0.85f }; // エレクトリックシアン
 		} else {
 			col = { 0.95f, 0.95f, 0.98f, alpha * 0.75f }; // 白ノイズ
 		}
@@ -879,13 +879,13 @@ void TitleScene::DrawTransitionGlitch() {
 		glitchSprites_[i]->Draw();
 	}
 
-	// 画面中央の警告テキスト（ミリタリー通信同期アラート）
+	// 画面中央の警告テキスト
 	TextRenderer* tr = TextRenderer::GetInstance();
 	if (std::fmod(transitionTimer_, 0.09f) < 0.06f) {
 		const float cx = kScreenWidth * 0.5f;
 		const float cy = kScreenHeight * 0.5f;
 		tr->Print("HackGen", ">> OPTICAL FEED DISRUPTED - CHANNEL SYNCHRONIZING <<", cx, cy - 40.0f, 17.0f, { 1.0f, 0.82f, 0.15f, 0.95f }, { 0.5f, 0.5f });
-		tr->Print("HackGen", "/// SENSOR RE-ACQUISITION IN PROGRESS - STAND BY ///", cx, cy - 16.0f, 13.0f, { 0.2f, 0.92f, 1.0f, 0.85f }, { 0.5f, 0.5f });
+		tr->Print("HackGen", " /// SENSOR RE-ACQUISITION IN PROGRESS - STAND BY ///", cx, cy - 16.0f, 13.0f, { 0.2f, 0.92f, 1.0f, 0.85f }, { 0.5f, 0.5f });
 	}
 }
 
@@ -913,7 +913,7 @@ void TitleScene::InitializeOSD(SpriteCommon* spriteCommon) {
 	const MyMath::Vector4 cornerColor = { 0.90f, 0.96f, 1.0f, 0.85f };
 	const MyMath::Vector4 shadowColor = { 0.0f, 0.0f, 0.0f, 0.70f };
 
-	// 四隅のL字ブラケット（黒縁ドロップシャドウ付きで明所でもクッキリ視認可能）
+	// 四隅のL字ブラケット
 	auto addShadowedBar = [&](const Vector2& pos, const Vector2& size, const MyMath::Vector4& color) {
 		addBar({ pos.x + 1.0f, pos.y + 1.0f }, size, shadowColor);
 		addBar(pos, size, color);
@@ -932,13 +932,13 @@ void TitleScene::InitializeOSD(SpriteCommon* spriteCommon) {
 	addShadowedBar({ right - len, bottom - thick }, { len, thick }, cornerColor);
 	addShadowedBar({ right - thick, bottom - len }, { thick, len }, cornerColor);
 
-	// 左右の水平マーカー（ピッチラダー風）
+	// 左右の水平マーカー
 	const float cy = kScreenHeight * 0.5f;
 	const MyMath::Vector4 markerColor = { 0.90f, 0.96f, 1.0f, 0.60f };
 	addShadowedBar({ left, cy - 1.0f }, { 14.0f, 2.0f }, markerColor);
 	addShadowedBar({ right - 14.0f, cy - 1.0f }, { 14.0f, 2.0f }, markerColor);
 
-	// 中央十字レティクル（HUD全体と統一した上品なミリタリーターミナルグリーン）
+	// 中央十字レティクル
 	const float cx = kScreenWidth * 0.5f;
 	const MyMath::Vector4 reticleColor = { 0.42f, 0.80f, 0.45f, 0.65f }; // タクティカルグリーン
 	const float rLen = 14.0f;
@@ -951,7 +951,7 @@ void TitleScene::InitializeOSD(SpriteCommon* spriteCommon) {
 	addShadowedBar({ cx - rGap - rLen, cy - 1.0f }, { rLen, rThick }, reticleColor);
 	addShadowedBar({ cx + rGap, cy - 1.0f }, { rLen, rThick }, reticleColor);
 
-	// センターターゲットサークル/ブラケット（直径 24px の外枠ブラケット）
+	// センターターゲットサークル/ブラケット
 	const float bSize = 12.0f;
 	const float bCorner = 4.0f;
 	// 左上
@@ -970,7 +970,7 @@ void TitleScene::InitializeOSD(SpriteCommon* spriteCommon) {
 	// センタードット
 	addShadowedBar({ cx - 1.5f, cy - 1.5f }, { 3.0f, 3.0f }, { 0.75f, 0.90f, 0.98f, 0.65f });
 
-	// REC点滅インジケータ（赤ランプ）
+	// REC点滅インジケータ
 	recDotSprite_ = std::make_unique<Sprite>();
 	recDotSprite_->Initialize(spriteCommon, "assets/textures/white1x1.png");
 	recDotSprite_->SetAnchorPoint({ 0.0f, 0.0f });
@@ -979,7 +979,7 @@ void TitleScene::InitializeOSD(SpriteCommon* spriteCommon) {
 	recDotSprite_->SetColor({ 1.0f, 0.15f, 0.15f, 0.95f });
 	recDotSprite_->Update();
 
-	// グリッチ用スプライト（8個）の事前初期化
+	// グリッチ用スプライトの事前初期化
 	for (int i = 0; i < 8; ++i) {
 		auto sp = std::make_unique<Sprite>();
 		sp->Initialize(spriteCommon, "assets/textures/white1x1.png");
@@ -1012,14 +1012,14 @@ void TitleScene::DrawOSD() {
 		recDotSprite_->Update();
 	}
 
-	// 枠線・レティクルの動的カラー設定（墜落現場 CrashedForest では全て警告赤に！）
+	// 枠線・レティクルの動的カラー設定
 	float blinkAlpha = isDisconnected ? (0.70f + 0.30f * std::sin(animTimer_ * 10.0f)) : 1.0f;
 	const MyMath::Vector4 redBorderCol = { 1.0f, 0.20f, 0.20f, 0.88f * blinkAlpha };
 	const MyMath::Vector4 redReticleCol = { 0.98f, 0.25f, 0.25f, 0.78f * blinkAlpha };
 
 	for (size_t i = 0; i < osdSprites_.size(); ++i) {
 		auto& sp = osdSprites_[i];
-		if (i % 2 == 1) { // 奇数インデックスが表面のバー（偶数は黒ドロップシャドウ）
+		if (i % 2 == 1) { // 奇数インデックスが表面のバー
 			if (isDisconnected) {
 				sp->SetColor(redBorderCol);
 			} else {
@@ -1051,7 +1051,7 @@ void TitleScene::DrawOSD() {
 		// 墜落現場専用：DISCONNECTED / 信号途絶HUD表示
 		// ============================================================
 
-		// 水平グリッチノイズバーの描画（控えめに時々走る程度に調整）
+		// 水平グリッチノイズバーの描画
 		for (size_t i = 0; i < glitchSprites_.size(); ++i) {
 			if (rand() % 100 < 10) { // 10%の控えめな確率で出現
 				float gy = static_cast<float>(rand() % static_cast<int>(kScreenHeight));
@@ -1083,7 +1083,7 @@ void TitleScene::DrawOSD() {
 		bool centerBlink = (std::fmod(animTimer_, 0.8f) < 0.55f);
 		if (centerBlink) {
 			tr->Print("HackGen", ">> [ DISCONNECTED : SIGNAL LOST ] <<", cx, cy - 42.0f, 17.0f, { 1.0f, 0.15f, 0.15f, 0.95f }, { 0.5f, 0.5f });
-			tr->Print("HackGen", "/// CRASH PROTOCOL ENGAGED - RECONNECT PENDING ///", cx, cy - 18.0f, 12.0f, { 1.0f, 0.45f, 0.45f, 0.80f }, { 0.5f, 0.5f });
+			tr->Print("HackGen", " /// CRASH PROTOCOL ENGAGED - RECONNECT PENDING ///", cx, cy - 18.0f, 12.0f, { 1.0f, 0.45f, 0.45f, 0.80f }, { 0.5f, 0.5f });
 		}
 
 		// --- 左下: 途絶ロケーション ---
@@ -1096,7 +1096,7 @@ void TitleScene::DrawOSD() {
 
 	} else {
 		// ============================================================
-		// 通常ロケーション（Tunnel, Hangar）HUD表示
+		// 通常ロケーションHUD表示
 		// ============================================================
 
 		// --- 左上: REC & タイムコード (HackGen) ---
@@ -1160,7 +1160,7 @@ void TitleScene::DrawOSD() {
 
 void TitleScene::InitializeWindowCloseVisuals(SpriteCommon* spriteCommon) {
 	windowCloseMaskSprites_.clear();
-	// 4枚のマスクスプライト（上下左右の黒枠）
+	// 4枚のマスクスプライト
 	for (int i = 0; i < 4; ++i) {
 		auto sp = std::make_unique<Sprite>();
 		sp->Initialize(spriteCommon, "assets/textures/white1x1.png");
@@ -1171,7 +1171,7 @@ void TitleScene::InitializeWindowCloseVisuals(SpriteCommon* spriteCommon) {
 	}
 
 	windowCloseBorderSprites_.clear();
-	// ウィンドウタイトルバーと外枠線、クライアント内部背景、BOOTINGステータス枠（計11本）
+	// ウィンドウタイトルバーと外枠線、クライアント内部背景、BOOTINGステータス枠
 	for (int i = 0; i < 11; ++i) {
 		auto sp = std::make_unique<Sprite>();
 		sp->Initialize(spriteCommon, "assets/textures/white1x1.png");
@@ -1185,7 +1185,7 @@ void TitleScene::InitializeWindowCloseVisuals(SpriteCommon* spriteCommon) {
 void TitleScene::DrawWindowClose() {
 	float t = windowCloseTimer_ / kWindowCloseDuration;
 	t = (std::min)((std::max)(t, 0.0f), 1.0f);
-	// スムーズなイージング (Smoothstep: 最初滑らかに動き始め、中央へ吸い込まれるように最小化：項目7)
+	// スムーズなイージング
 	float shrink = t * t * (3.0f - 2.0f * t);
 	float curW = (kScreenWidth - 32.0f) * (1.0f - shrink);
 	float curH = (kScreenHeight - 32.0f) * (1.0f - shrink);
@@ -1193,26 +1193,26 @@ void TitleScene::DrawWindowClose() {
 	float curY = (kScreenHeight - curH) * 0.5f;
 
 	if (windowCloseMaskSprites_.size() >= 4) {
-		// 上マスク: (0, 0) ～ (kScreenWidth, curY)
+		// 上マスク: ～
 		windowCloseMaskSprites_[0]->SetPosition({ 0.0f, 0.0f });
 		windowCloseMaskSprites_[0]->SetSize({ kScreenWidth, (std::max)(0.0f, curY) });
 		windowCloseMaskSprites_[0]->Update();
 		windowCloseMaskSprites_[0]->Draw();
 
-		// 下マスク: (0, curY + curH) ～ (kScreenWidth, kScreenHeight - (curY + curH))
+		// 下マスク: ～
 		float bottomY = curY + curH;
 		windowCloseMaskSprites_[1]->SetPosition({ 0.0f, bottomY });
 		windowCloseMaskSprites_[1]->SetSize({ kScreenWidth, (std::max)(0.0f, kScreenHeight - bottomY) });
 		windowCloseMaskSprites_[1]->Update();
 		windowCloseMaskSprites_[1]->Draw();
 
-		// 左マスク: (0, curY) ～ (curX, curH)
+		// 左マスク: ～
 		windowCloseMaskSprites_[2]->SetPosition({ 0.0f, curY });
 		windowCloseMaskSprites_[2]->SetSize({ (std::max)(0.0f, curX), (std::max)(0.0f, curH) });
 		windowCloseMaskSprites_[2]->Update();
 		windowCloseMaskSprites_[2]->Draw();
 
-		// 右マスク: (curX + curW, curY) ～ (kScreenWidth - (curX + curW), curH)
+		// 右マスク: ～
 		float rightX = curX + curW;
 		windowCloseMaskSprites_[3]->SetPosition({ rightX, curY });
 		windowCloseMaskSprites_[3]->SetSize({ (std::max)(0.0f, kScreenWidth - rightX), (std::max)(0.0f, curH) });
@@ -1221,7 +1221,7 @@ void TitleScene::DrawWindowClose() {
 	}
 
 	if (curW > 16.0f && curH > 16.0f && windowCloseBorderSprites_.size() >= 11) {
-		// 1. ウィンドウ内部クライアント領域の暗転背景（映像リンク切断に伴い画面がダークターミナルへ移行）
+		// ウィンドウ内部クライアント領域の暗転背景
 		float innerDarken = (std::min)(0.92f, 0.40f + 0.52f * t);
 		windowCloseBorderSprites_[5]->SetPosition({ curX, curY });
 		windowCloseBorderSprites_[5]->SetSize({ curW, curH });
@@ -1229,15 +1229,15 @@ void TitleScene::DrawWindowClose() {
 		windowCloseBorderSprites_[5]->Update();
 		windowCloseBorderSprites_[5]->Draw();
 
-		// 2. ウィンドウ中央のステータス情報枠（BOOTINGメッセージを綺麗に囲むサイバーフレーム）
+		// ウィンドウ中央のステータス情報枠
 		// アニメーション中のアルファ曲線: 開始時に素早くフェードインし、終盤ウィンドウ消滅に合わせてフェードアウト
 		float fadeIn = (std::min)(1.0f, t / 0.12f);
 		float fadeOut = (std::clamp)((0.88f - t) / 0.18f, 0.0f, 1.0f);
 		float textAlpha = fadeIn * fadeOut;
 
 		TextRenderer* tr = TextRenderer::GetInstance();
-		const std::string line1 = "/// VIDEO LINK DISENGAGED ///";
-		const std::string line2 = "/// BOOTING SOVI TERMINAL ///";
+		const std::string line1 = " /// VIDEO LINK DISENGAGED ///";
+		const std::string line2 = " /// BOOTING SOVI TERMINAL ///";
 		const float baseFontSize = 13.5f;
 
 		Vector2 size1 = tr->CalculateTextSize("HackGenRegular", line1, baseFontSize);
@@ -1246,7 +1246,7 @@ void TitleScene::DrawWindowClose() {
 		float lineGap = 6.0f;
 		float totalTextH = baseFontSize * 2.0f + lineGap;
 
-		// ウィンドウ枠（グリーンボーダー）の内側に完全に収めるためのマージン
+		// ウィンドウ枠の内側に完全に収めるためのマージン
 		const float marginX = 20.0f;
 		const float marginY = 14.0f;
 		float maxBoxW = (std::max)(0.0f, curW - marginX * 2.0f);
@@ -1281,7 +1281,7 @@ void TitleScene::DrawWindowClose() {
 			windowCloseBorderSprites_[6]->Update();
 			windowCloseBorderSprites_[6]->Draw();
 
-			// ステータス枠のサイバーボーダー（上・下・左・右）
+			// ステータス枠のサイバーボーダー
 			MyMath::Vector4 innerBorderCol = { 0.42f, 0.78f, 0.45f, 0.70f * textAlpha };
 			float borderThick = (std::max)(1.0f, 1.5f * boxScale);
 
@@ -1333,7 +1333,7 @@ void TitleScene::DrawWindowClose() {
 			);
 		}
 
-		// 3. OSウィンドウタイトルバー
+		// OSウィンドウタイトルバー
 		float titleBarH = 24.0f;
 		windowCloseBorderSprites_[0]->SetPosition({ curX, curY - titleBarH });
 		windowCloseBorderSprites_[0]->SetSize({ curW, titleBarH });
@@ -1341,7 +1341,7 @@ void TitleScene::DrawWindowClose() {
 		windowCloseBorderSprites_[0]->Update();
 		windowCloseBorderSprites_[0]->Draw();
 
-		// 4. 外枠線4辺 (鮮烈なエレクトリックネオングリーン)
+		// 外枠線4辺
 		MyMath::Vector4 borderCol = { 0.45f, 0.84f, 0.48f, 0.95f };
 		windowCloseBorderSprites_[1]->SetPosition({ curX, curY });
 		windowCloseBorderSprites_[1]->SetSize({ curW, 2.0f }); // 上
@@ -1367,7 +1367,7 @@ void TitleScene::DrawWindowClose() {
 		windowCloseBorderSprites_[4]->Update();
 		windowCloseBorderSprites_[4]->Draw();
 
-		// 5. タイトルバーテキスト（最小化アニメーション中：幅に応じて動的短縮して枠内維持）
+		// タイトルバーテキスト
 		if (curW > 80.0f) {
 			float titleAlpha = (std::min)(1.0f, (curW - 80.0f) / 100.0f);
 			if (curW >= 460.0f) {
@@ -1388,7 +1388,7 @@ void TitleScene::DrawWindowClose() {
 void TitleScene::DrawConsoleBoot() {
 	pseudoOS_.ResetSpritePool();
 
-	// 背景の完全漆黒コンソールスプライト（格納庫の透けを100%遮蔽）
+	// 背景の完全漆黒コンソールスプライト
 	if (consoleBgSprite_) {
 		consoleBgSprite_->Draw();
 	}
@@ -1406,7 +1406,7 @@ void TitleScene::DrawConsoleBoot() {
 	const float centerX = kScreenWidth * 0.5f;
 	const float centerY = kScreenHeight * 0.5f;
 
-	// 中央ターミナルパネル枠（ロード完了時にサイバーブートログ領域がスッとスムーズに展開）
+	// 中央ターミナルパネル枠
 	const float basePanelW = 680.0f;
 	const float basePanelH = 210.0f;
 	float panelW = basePanelW;
@@ -1446,7 +1446,7 @@ void TitleScene::DrawConsoleBoot() {
 	pseudoOS_.DrawRect({ panelX + 16.0f, panelY + 36.0f }, { panelW - 32.0f, 1.0f },
 		{ 0.20f, 0.50f, 0.65f, 0.40f * textAlpha });
 
-	// 1. コマンド行演出（コマンドのやつ）
+	// コマンド行演出
 	std::string fullCmd = isRebootLog_
 		? "root@sovi-core:~$ ./emergency_recovery --restore-desktop"
 		: "root@sovi-core:~$ ./authenticate_sortie --launch-system";
@@ -1464,9 +1464,9 @@ void TitleScene::DrawConsoleBoot() {
 	tr->Print("HackGen", dispCmd.c_str(), panelX + 28.0f, panelY + 50.0f, 16.0f,
 		{ 0.48f, 0.84f, 0.50f, 0.98f * textAlpha });
 
-	// 2. ローディング演出（コマンドのやつ -> loading...）
+	// ローディング演出
 	if (consoleBootTimer_ >= kCommandTypingDuration) {
-		// ローディングバーの文字列構築（ユーザー指定: loading...[||||||||||]）
+		// ローディングバーの文字列構築
 		constexpr int kTotalBars = 24;
 		int filledBars = static_cast<int>(loadingProgress_ * kTotalBars);
 		if (filledBars > kTotalBars) filledBars = kTotalBars;
@@ -1482,7 +1482,7 @@ void TitleScene::DrawConsoleBoot() {
 
 		// 色
 		Vector4 barColor = isLoadingComplete_
-			? Vector4{ 0.48f, 0.84f, 0.50f, 1.0f * textAlpha }   // complete時はエレクトリックグリーン
+			? Vector4{ 0.48f, 0.84f, 0.50f, 1.0f * textAlpha } // complete時はエレクトリックグリーン
 			: Vector4{ 0.25f, 0.90f, 1.0f, 0.98f * textAlpha }; // 進行中は鮮やかなシアン
 
 		tr->Print("HackGen", barStr.c_str(), panelX + 28.0f, panelY + 95.0f, 20.0f, barColor);
@@ -1497,12 +1497,12 @@ void TitleScene::DrawConsoleBoot() {
 			tr->Print("HackGen", ">> ACCESS GRANTED // INITIALIZING SYSTEM DAEMONS <<",
 				centerX, panelY + 144.0f, 14.0f, compCol, { 0.5f, 0.0f });
 
-			// 区切り線（ブートログ領域とのセパレーター）
+			// 区切り線
 			if (bootExpand > 0.05f) {
 				pseudoOS_.DrawRect({ panelX + 16.0f, panelY + 164.0f }, { (panelW - 32.0f) * bootExpand, 1.0f },
 					{ 0.20f, 0.60f, 0.75f, 0.45f * textAlpha * bootExpand });
 
-				// 3. 高速ブートログストリーム（コンピュータ演出）
+				// 高速ブートログストリーム
 				struct BootLogEntry {
 					float time;
 					const char* tag;
@@ -1566,7 +1566,7 @@ void TitleScene::DrawConsoleBoot() {
 			tr->Print("HackGen", pctBuf, panelX + panelW - 28.0f, panelY + 95.0f, 18.0f,
 				{ 0.50f, 0.85f, 0.95f, 0.90f * textAlpha }, { 1.0f, 0.0f });
 
-			// ロードフェーズテキスト（タイトルの全カメラ等の事前読み込み状況をリアルタイム表示）
+			// ロードフェーズテキスト
 			const char* phaseText = loadingPhaseText_;
 			if (!phaseText || phaseText[0] == '\0') {
 				phaseText = "LOADING ALL TITLE CAMERAS & SENSORS...";
@@ -1584,14 +1584,14 @@ void TitleScene::DrawConsoleBoot() {
 	// コンソールからデスクトップへのGUIモード切替演出
 	// ============================================================
 	if (consoleExitTimer_ > 0.0f) {
-		// 1. 横断CRTラスタースキャンビーム（画面上端から下端へ一気に走査してデスクトップを展開）
+		// 横断CRTラスタースキャンビーム
 		float beamY = exitT * kScreenHeight;
 		pseudoOS_.DrawRect({ 0.0f, beamY - 1.0f }, { kScreenWidth, 3.0f },
 			{ 0.72f, 0.94f, 0.75f, (1.0f - exitT * 0.5f) * 0.90f });
 		pseudoOS_.DrawRect({ 0.0f, beamY - 8.0f }, { kScreenWidth, 16.0f },
 			{ 0.35f, 0.68f, 0.38f, (1.0f - exitT) * 0.30f });
 
-		// 2. ランダムサイバーグリッチスライス
+		// ランダムサイバーグリッチスライス
 		uint32_t seed = static_cast<uint32_t>(consoleExitTimer_ * 1000.0f) + 123;
 		for (size_t gi = 0; gi < glitchSprites_.size(); ++gi) {
 			seed = seed * 1664525u + 1013904223u;
@@ -1616,10 +1616,10 @@ void TitleScene::DrawSortieSequence() {
 	// 背景オーバーレイ
 	backgroundPanel_.Draw();
 
-	// フルOSデスクトップ環境（マルチウィンドウ・タスクバー・ターミナル内統合出撃コンソール）
+	// フルOSデスクトップ環境
 	DrawOSDesktop();
 
-	// 終盤のブラックアウト発光（黒フェードアウト）
+	// 終盤のブラックアウト発光
 	if (sortieFlashSprite_) {
 		float blackAlpha = 0.0f;
 		if (sortieTimer_ > 1.25f) {
@@ -1637,7 +1637,7 @@ void TitleScene::DrawSortieSequence() {
 }
 
 // ------------------------------------------------------------
-// 項目10: セッション終了・再認証セキュリティ演出描画
+// セッション終了・再認証セキュリティ演出描画
 // ------------------------------------------------------------
 void TitleScene::DrawReAuthentication() {
 	if (consoleBgSprite_) {
@@ -1684,7 +1684,7 @@ void TitleScene::DrawReAuthentication() {
 		);
 	}
 
-	// 自動パスワード入力 (0.7s〜1.4s で ***** が1文字ずつ打たれる)
+	// 自動パスワード入力
 	if (reauthTimer_ >= 0.70f) {
 		float pwTime = reauthTimer_ - 0.70f;
 		int starCount = std::clamp(static_cast<int>(pwTime / 0.12f), 0, 5);
@@ -1708,7 +1708,7 @@ void TitleScene::DrawReAuthentication() {
 		);
 	}
 
-	// 認証成功表示 (1.5s以降)
+	// 認証成功表示
 	if (reauthTimer_ >= 1.50f) {
 		tr->Print(
 			"HackGen",

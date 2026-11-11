@@ -62,7 +62,7 @@ namespace StageRadioDefaults {
 
 class TerrainChunkManager;
 
-/// @brief ゲーム本編のステージシーン
+// ステージシーン
 class StageScene : public IScene {
 public:
 	void Initialize() override;
@@ -74,9 +74,9 @@ public:
 	void Restart();
 
 private:
-	bool isAssetsInitialized_ = false; ///< アセット（3Dモデル・スカイボックス・バッファ）初回生成完了フラグ
-	void InitializeAssets();           ///< 初回アセット生成
-	void ResetGameplayState();         ///< ゲームプレイ状態リセット（リトライ・再出撃用高速処理）
+	bool isAssetsInitialized_ = false; // アセット生成完了フラグ
+	void InitializeAssets();           // 初回アセット生成
+	void ResetGameplayState();         // ゲームプレイ状態リセット
 
 	// フライトモデル（物理）
 	FlightModel flightModel_;
@@ -126,12 +126,12 @@ private:
 	GunPod gunpod_;
 	EnemyManager enemyManager_;
 	BulletManager bulletManager_;
-	bool enableEnemies_ = true; ///< 敵出現フラグ（falseで敵スポーン無効）
+	bool enableEnemies_ = true; // 敵出現フラグ
 
 	// --- 統合当たり判定 ---
 	CollisionSystem collisionSystem_;
 
-	/// @brief プレイヤーの当たり判定ボディ（内部クラス）
+	// プレイヤーの当たり判定ボディ
 	class PlayerCollisionBody : public ICollisionBody3D {
 	public:
 		StageScene* scene_ = nullptr;
@@ -157,21 +157,21 @@ private:
 	float muzzleFlashRandomAlpha_ = 1.0f;
 
 	// ============================
-	// ゲームオーバー / クリア演出シーケンス（項目1〜7）
+	// ゲームオーバー / クリア演出シーケンス
 	// ============================
 	enum class StageEndSequence {
 		None,
 		// ゲームオーバー演出（被弾撃墜）
-		GameOver_Critical,      ///< 項目4: HUD赤反転、CRITICAL DAMAGE 点滅
-		GameOver_SignalLost,    ///< 項目1: 3Dフリーズ、強烈ノイズ/砂嵐、SIGNAL LOST 表示
-		GameOver_CrtShutdown,   ///< 項目2: ブラウン管電源切断演出（中央水平線収束・プツッ消滅）
-		// 時間切れ離脱演出（爆発せず自機が戦域から離脱）
-		TimeOver_Abort,         ///< 離脱指示・水平復帰・「Time Over / ミッションから離脱します.....」
-		TimeOver_Withdraw,      ///< 急上昇加速離脱・戦域脱出フェード
+		GameOver_Critical,      // HUD赤反転、警告点滅
+		GameOver_SignalLost,    // シグナルロスト演出
+		GameOver_CrtShutdown,   // CRT電源切断演出
+		// 時間切れ離脱演出
+		TimeOver_Abort,         // 離脱指示
+		TimeOver_Withdraw,      // 急上昇加速離脱
 		// ステージクリア演出
-		Clear_HudShutdown,      ///< 項目5: HUD順次OFFLINE消去、MISSION ACCOMPLISHED タイピング
-		Clear_AutopilotReturn,  ///< 項目6: オートパイロット移行、自機急上昇・急加速離脱
-		Clear_TacticalMapZoom   ///< 項目7: 垂直急ズームアウト、戦術マップ、SECTOR CLEARED スタンプ
+		Clear_HudShutdown,      // HUD順次消去
+		Clear_AutopilotReturn,  // オートパイロット離脱
+		Clear_TacticalMapZoom   // 戦術マップ演出
 	};
 	StageEndSequence endSequence_ = StageEndSequence::None;
 	float endSeqTimer_ = 0.0f;
@@ -204,7 +204,7 @@ private:
 
 	// ミッション制限時間（MissionData.timeLimitから設定）
 	float remainingTime_ = 300.0f;
-	float missionElapsedTime_ = 0.0f;  ///< ミッション経過時間（トリガー評価用）
+	float missionElapsedTime_ = 0.0f;  // ミッション経過時間（トリガー評価用）
 	UIText timeText_;
 
 	// 演出用スプライト

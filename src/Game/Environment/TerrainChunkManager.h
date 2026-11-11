@@ -10,17 +10,17 @@
 class Object3dCommon;
 class Camera;
 
-/// @brief 地形の描画モード（1枚巨大メッシュ vs チャンク分割カリング）
+// 地形の描画モード
 enum class TerrainMode {
-	SingleMesh, // 1枚メッシュ版 (Resources/terrains/demo.obj)
-	Chunked     // 4000mチャンク分割版 (Resources/terrains/demo/chunks_info.json)
+	SingleMesh, // 1枚メッシュ版
+	Chunked     // チャンク分割版
 };
 
-/// @brief チャンク内の個別LODメッシュ（将来のLOD段階拡張用）
+// LODメッシュ
 struct TerrainLodMesh {
-	uint32_t lodLevel = 0;       // 0 = 最高精細(LOD0), 1, 2...
-	float switchDistance = 0.0f; // 切り替え推奨距離（将来用、0なら自動）
-	std::string fullPath;        // ModelManagerキー
+	uint32_t lodLevel = 0;       // LODレベル
+	float switchDistance = 0.0f; // 切り替え距離
+	std::string fullPath;        // パス
 	std::unique_ptr<Object3d> object3d;
 };
 
@@ -42,7 +42,7 @@ namespace TerrainHeightDefaults {
 	inline constexpr int kEmptyNeighborCount = 0;
 }
 
-/// @brief 個別チャンクのメタデータと3Dオブジェクト（LOD拡張性対応）
+// 地形チャンクデータ
 struct TerrainChunk {
 	int gridX = 0;
 	int gridY = 0;
@@ -56,14 +56,13 @@ struct TerrainChunk {
 	std::string fileName;
 	std::string fullPath;
 
-	// 高速対地高度(AGL)・地面衝突判定用 2Dハイトマップサンプル (51x51)
+	// ハイトマップサンプル (51x51)
 	std::vector<float> heightSamples;
 
-	// LODメッシュ配列（将来の多段階LOD用）
+	// LODメッシュ配列
 	std::vector<TerrainLodMesh> lodMeshes;
 	int currentLodIndex = 0;
 
-	// 後方互換用（LOD0のオブジェクトを直接参照）
 	std::unique_ptr<Object3d> object3d;
 
 	bool isLoaded = false;
@@ -71,57 +70,58 @@ struct TerrainChunk {
 	float distanceToViewer = 0.0f;
 };
 
-/// @brief 広域地形(40km x 40km)のロード・管理・描画マネージャー（1枚メッシュ / チャンク分割 両対応）
+// 地形管理クラス
 class TerrainChunkManager {
 public:
 	static TerrainChunkManager* GetInstance();
 
-	/// @brief 地形の初期化
-	/// @param object3dCommon 3Dオブジェクト描画共通基盤
-	/// @param camera 描画用カメラ
-	/// @param terrainPath demo.obj または chunks_info.json へのパス
+	// 初期化
+	// object3dCommon: 描画共通基盤
+	// camera: 描画カメラ
+	// terrainPath: 設定ファイルパス
 	void Initialize(Object3dCommon* object3dCommon, Camera* camera, const std::string& terrainPath = "Resources/terrains/demo/chunks_info.json");
 
-	/// @brief モード切り替え（SingleMesh または Chunked）
+	// モード切り替え
 	void SetTerrainMode(TerrainMode mode);
 	TerrainMode GetTerrainMode() const { return mode_; }
 
-	/// @brief 毎フレームの更新（距離カリング、カメラ追従）
-	/// @param viewerPos 視点座標（自機またはカメラ位置）
+	// 更新
+	// viewerPos: 視点座標
 	void Update(const Vector3& viewerPos);
 
-	/// @brief 地形を描画
+	// 描画
 	void Draw();
 
-	/// @brief 終了処理
+	// 終了処理
 	void Finalize();
 
-	/// @brief 地形がロード完了しているか
 	bool IsLoaded() const { return isLoaded_; }
 
-	/// @brief チャンク/メッシュの再読み込み（ホットリロード）
+	// 再読み込み
 	void Reload();
 
-	/// @brief 表示・非表示切り替え
+	// 表示設定
 	void SetVisible(bool visible) { isVisible_ = visible; }
 	bool IsVisible() const { return isVisible_; }
 
-	/// @brief チャンク統計
+	// 統計情報
 	int GetTotalChunkCount() const { return (mode_ == TerrainMode::SingleMesh) ? 1 : static_cast<int>(chunks_.size()); }
 	int GetLoadedChunkCount() const;
 	int GetRenderedChunkCount() const { return renderedChunkCount_; }
 
-	/// @brief カリング描画距離の設定（メートル単位）
+	// 描画距離設定
 	void SetDrawDistance(float distance) { drawDistance_ = distance; }
 	float GetDrawDistance() const { return drawDistance_; }
 
-	/// @brief ワールドXZ座標における地形標高Yを高速バイリニア補間で取得
+	// 地形標高取得
+	// worldX: X座標
+	// worldZ: Z座標
 	float GetTerrainHeightAt(
 		float worldX,
 		float worldZ,
 		float fallbackY = TerrainHeightDefaults::kDefaultFallbackHeight) const;
 
-	/// @brief ImGuiによる地形監視・モード切り替えUI
+	// デバッグ用UI
 	void DrawImGui();
 
 private:

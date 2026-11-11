@@ -4,31 +4,23 @@
 #include "../../engine/Physics/ICollisionBody.h"
 #include "../../engine/Physics/CollisionConfig.h"
 
-/// <summary>
-/// 弾丸エンティティ（オブジェクトプールで管理される）
-/// </summary>
+// 弾丸
 class Bullet : public ICollisionBody3D {
 public:
 	Bullet() = default;
 	~Bullet() = default;
 
-	/// <summary>
-	/// 弾丸を発射状態にする
-	/// </summary>
-	/// <param name="position">初期位置</param>
-	/// <param name="velocity">弾丸の初速度ベクトル (m/s)</param>
-	/// <param name="damage">1発のダメージ</param>
-	/// <param name="isEnemyBullet">敵の弾丸かどうか（デフォルト false）</param>
+	// 弾丸を発射
+	// position : 初期位置
+	// velocity : 初速度ベクトル
+	// damage : ダメージ
+	// isEnemyBullet : 敵の弾丸フラグ
 	void Spawn(const MyMath::Vector3& position, const MyMath::Vector3& velocity, float damage, bool isEnemyBullet = false);
 
-	/// <summary>
-	/// 弾丸の位置更新
-	/// </summary>
+	// 更新
 	void Update(float dt);
 
-	/// <summary>
-	/// 弾丸を強制消滅
-	/// </summary>
+	// 弾丸を消滅
 	void Kill() { isAlive_ = false; }
 
 	// === アクセッサ ===
@@ -42,9 +34,7 @@ public:
 	const MyMath::Vector3* GetHistory() const { return history_; }
 	int GetHistoryCount() const { return historyCount_; }
 
-	/// <summary>
-	/// 衝突判定用のコライダーを取得
-	/// </summary>
+	// コライダー取得
 	SphereCollider GetCollider() const;
 
 	// === ICollisionBody3D 実装 ===

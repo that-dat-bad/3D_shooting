@@ -1076,10 +1076,10 @@ void StageScene::DrawPauseMenuUI() {
 	// 2. ウィンドウ本体背景（純黒ブラック 100%）
 	DrawPauseSolidRect(curPos, curSize, { 0.0f, 0.0f, 0.0f, 1.0f });
 
-	// 3. タイトルバー背景（枠線より先に描画することで、左枠・右枠の白線が黒で上書き欠損するバグを根絶）
+	// 3. タイトルバー背景
 	DrawPauseSolidRect(curPos, { curSize.x, 34.0f }, titleBarBg);
 
-	// 4. ウィンドウ外周境界線 (太さ 2px) - 白（背景描画後に重ねて描くため絶対に欠けない）
+	// 4. ウィンドウ外周境界線 (太さ 2px)
 	DrawPauseBorder(curPos, curSize, borderCol, 2.0f);
 
 	// タイトルバー境界線（上端アクセントライン & 下部水平区切り線）

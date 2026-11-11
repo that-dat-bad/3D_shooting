@@ -261,7 +261,7 @@ void AircraftVisualModel::SetupCanopyMaterial() {
 				// キャノピー（風防）専用マテリアル（m21_wg のマテリアル4: baseColor [0.8, 0.8, 0.8, 1]）のみを対象
 				bool isCanopy = (m == 4 && matData.baseColor.x > 0.75f && matData.baseColor.y > 0.75f && matData.baseColor.z > 0.75f);
 				if (isCanopy) {
-					// 航空機用キャノピーガラス：自然なディープスモーク、滑らかなハイライト、適正な環境反射（項目4）
+					// 航空機用キャノピーガラス：自然なディープスモーク、滑らかなハイライト、適正な環境反射
 					model->SetMaterialColor(static_cast<uint32_t>(m), { 0.08f, 0.12f, 0.16f, 0.60f });
 					model->SetMaterialShininess(static_cast<uint32_t>(m), 24.0f);
 					model->SetMaterialSpecularIntensity(static_cast<uint32_t>(m), 0.35f);

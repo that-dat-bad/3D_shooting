@@ -44,7 +44,7 @@ struct LightingSettings {
 	int32_t lightType;
 	float padding;
 	Vector3 cameraPosition;
-	float emissiveIntensityScale = 1.0f; ///< メッシュ自発光の全体強度スケール
+	float emissiveIntensityScale = 1.0f; // メッシュ自発光の全体強度スケール
 };
 
 /// <summary>

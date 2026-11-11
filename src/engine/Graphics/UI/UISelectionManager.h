@@ -3,39 +3,35 @@
 #include <vector>
 
 enum class UIInputMode {
-	KeyboardGamepad, // 矢印/WASD等でのカーソル移動専用
-	MousePointer,    // マウスカーソルでのホバー・クリック専用
-	Both             // 両方有効
+	KeyboardGamepad,
+	MousePointer,
+	Both
 };
 
+// UI選択管理
 class UISelectionManager {
 public:
 	UISelectionManager() = default;
 	~UISelectionManager() = default;
 
-	/// @brief ボタンの登録
+	// ボタンの登録
+	// button: 登録するボタン
 	void AddButton(UIButton* button);
 
-	/// @brief 管理対象ボタンのクリア
+	// ボタンのクリア
 	void Clear();
 
-	/// @brief 入力モードの設定
 	void SetInputMode(UIInputMode mode) { inputMode_ = mode; }
-
-	/// @brief 現在の入力モードの取得
 	UIInputMode GetInputMode() const { return inputMode_; }
 
-	/// @brief 現在選択されているボタンのインデックスを取得
 	int GetSelectedIndex() const { return selectedIndex_; }
-
-	/// @brief 選択インデックスを設定
 	void SetSelectedIndex(int index) {
 		if (!buttons_.empty() && index >= 0 && index < static_cast<int>(buttons_.size())) {
 			selectedIndex_ = index;
 		}
 	}
 
-	/// @brief 毎フレームの更新処理（入力とフォーカスの反映）
+	// 更新
 	void Update();
 
 private:

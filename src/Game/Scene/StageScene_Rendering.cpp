@@ -11,7 +11,7 @@ void StageScene::DrawGround() {
 
 	Vector3 aircraftPos = flightModel_.GetPosition();
 
-	// --- 地面タイル（項目7: 4.5km四方の広大な大地） ---
+	// --- 地面タイル ---
 	const float tileSize = 160.0f;
 	const int tileRange = 14;
 

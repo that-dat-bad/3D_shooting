@@ -3,21 +3,19 @@
 #include <unordered_map>
 #include <vector>
 
-/// @brief 汎用CFG / INI設定ファイルパーサー
-/// [Section] 構造、Key = Value ペア、# / ; / // コメントに対応
+// 汎用CFG / INI設定ファイルパーサー
+// [Section] 構造、Key = Value ペア、# / ; / // コメントに対応
 class ConfigFile {
 public:
 	ConfigFile() = default;
 	~ConfigFile() = default;
 
-	/// @brief ファイルからCFGデータを読み込む
-	/// @param filepath ファイルパス
-	/// @return 読み込み成功時 true
+	// ファイルからCFGデータを読み込む
+	// filepath: ファイルパス
 	bool LoadFromFile(const std::string& filepath);
 
-	/// @brief CFGデータをファイルに保存する
-	/// @param filepath ファイルパス
-	/// @return 保存成功時 true
+	// CFGデータをファイルに保存する
+	// filepath: ファイルパス
 	bool SaveToFile(const std::string& filepath) const;
 
 	// === ゲッター ===
@@ -32,16 +30,16 @@ public:
 	void SetInt(const std::string& section, const std::string& key, int value);
 	void SetBool(const std::string& section, const std::string& key, bool value);
 
-	/// @brief セクションが存在するか
+	// セクションが存在するか
 	bool HasSection(const std::string& section) const;
 
-	/// @brief キーが存在するか
+	// キーが存在するか
 	bool HasKey(const std::string& section, const std::string& key) const;
 
-	/// @brief 全セクション名を取得
+	// 全セクション名を取得
 	std::vector<std::string> GetSections() const;
 
-	/// @brief クリア
+	// クリア
 	void Clear();
 
 private:

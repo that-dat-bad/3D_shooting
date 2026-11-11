@@ -8,7 +8,7 @@
 // ImGui forward declaration
 struct ImDrawList;
 
-/// @brief ミッションエディタのビジュアルマップ表示（War Thunder風）
+// ミッションエディタのビジュアルマップ表示（War Thunder風）
 class MissionMapView {
 public:
 	MissionMapView() = default;
@@ -16,9 +16,9 @@ public:
 
 	void Initialize();
 
-	/// @brief 2Dマップを描画し、インタラクション（ドラッグ等）を処理する
-	/// @param missionData 現在編集中のミッションデータ
-	/// @param playerPos 現在のプレイヤー座標
+	// 2Dマップを描画し、インタラクション（ドラッグ等）を処理する
+	// missionData: 現在編集中のミッションデータ
+	// playerPos: 現在のプレイヤー座標
 	void Draw(MissionData& missionData, const MyMath::Vector3& playerPos);
 
 	// 選択状態の取得・設定用

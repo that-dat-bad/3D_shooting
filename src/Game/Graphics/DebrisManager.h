@@ -7,7 +7,7 @@
 class Object3dCommon;
 class Camera;
 
-/// @brief 切断・破壊されたパーツの破片物理オブジェクト
+// 切断・破壊されたパーツの破片物理オブジェクト
 struct DebrisObject {
 	std::unique_ptr<Object3d> object;
 	Matrix4x4 initialWorldMatrix = Identity4x4();
@@ -28,7 +28,7 @@ struct DebrisObject {
 	bool IsDead() const { return lifetime <= 0.0f; }
 };
 
-/// @brief 破片オブジェクトの一括管理・物理シミュレーションクラス
+// 破片オブジェクトの一括管理・物理シミュレーションクラス
 class DebrisManager {
 public:
 	static DebrisManager* GetInstance();
@@ -41,12 +41,12 @@ public:
 	void Draw();
 	void Clear();
 
-	/// @brief 破片を生成してワールドへ放出
-	/// @param model 破片用モデル
-	/// @param initialWorldMatrix 切り離された瞬間のワールド行列
-	/// @param baseVelocity 機体の現在速度
-	/// @param ejectionForce 散乱方向の追加力
-	/// @param targetNodeName 描画対象ノード名（空の場合はモデル全体）
+	// 破片を生成してワールドへ放出
+	// model: 破片用モデル
+	// initialWorldMatrix: 切り離された瞬間のワールド行列
+	// baseVelocity: 機体の現在速度
+	// ejectionForce: 散乱方向の追加力
+	// targetNodeName: 描画対象ノード名（空の場合はモデル全体）
 	void SpawnDebris(Model* model, const Matrix4x4& initialWorldMatrix, const Vector3& baseVelocity, const Vector3& ejectionForce, const std::string& targetNodeName = "");
 
 private:

@@ -143,7 +143,7 @@ void TitleScene::InitializeLocations3D(Camera* titleCamera, uint32_t duskSky, ui
 	}
 
 	// ------------------------------------------------------------
-	// 3. 墜落現場: 広大な荒野地形モデル + 夕暮れ・黄昏天球 + 激突焦げ跡（項目2, 8）
+	// 3. 墜落現場: 広大な荒野地形モデル + 夕暮れ・黄昏天球 + 激突焦げ跡
 	// ------------------------------------------------------------
 	{
 		LocationData& loc = locations_[static_cast<int>(TitleLocation::CrashedForest)];
@@ -153,7 +153,7 @@ void TitleScene::InitializeLocations3D(Camera* titleCamera, uint32_t duskSky, ui
 		loc.envModelPath = "assets/models/terrain.obj"; // 起伏のある荒野・地面テクスチャモデル（背景の虚無を解消：項目2）
 		loc.envScale = { 15.0f, 2.5f, 15.0f };
 		loc.envRotation = { 0.0f, 0.0f, 0.0f };
-		loc.aircraftModelPath = "Resources/models/m21_crashed.gltf"; // 激突・焦げ跡テクスチャ適用モデル（項目8）
+		loc.aircraftModelPath = "Resources/models/m21_crashed.gltf"; // 激突・焦げ跡テクスチャ適用モデル
 		loc.aircraftOffset = { 0.0f, 0.32f, 0.0f };         // 機体が地面に激突し食い込む
 		loc.aircraftRotation = { 0.22f, -0.85f, 0.38f };    // 機首突っ込み + 左に激しく傾斜
 		loc.hiddenParts = {
@@ -163,7 +163,7 @@ void TitleScene::InitializeLocations3D(Camera* titleCamera, uint32_t duskSky, ui
 		};
 		loc.debrisOffset = { -6.5f, 0.38f, 4.2f };          // 千切れた左翼が激突痕に突き刺さる
 		loc.debrisRotation = { 0.95f, 0.70f, -0.45f };
-		loc.skyboxTexIndex = duskSky;                       // 暗黒の虚無を解消し、夕暮れ・黄昏の空を配置（項目2）
+		loc.skyboxTexIndex = duskSky;                       // 暗黒の虚無を解消し、夕暮れ・黄昏の空を配置
 		loc.skyboxColor = { 0.38f, 0.32f, 0.36f, 1.0f };   // 哀愁のある夕暮れトーン
 		loc.extraEnvParts.clear();
 
@@ -253,10 +253,10 @@ void TitleScene::SetupLocation(LocationData& loc, Camera* camera) {
 		}
 	}
 
-	// キャノピー（ガラス部分）の半透明・高環境反射・鋭角スペキュラ設定（項目4）
+	// キャノピー（ガラス部分）の半透明・高環境反射・鋭角スペキュラ設定
 	loc.visualModel->SetupCanopyMaterial();
 
-	// ロケーション別マテリアルの質感設定（項目8: 墜落現場ダメージ、項目9: 重厚なジュラルミン金属感とパネルライン強調）
+	// ロケーション別マテリアルの質感設定
 	if (loc.id == TitleLocation::Hangar) {
 		// 格納庫: 軍用機らしいジュラルミン・メタリック質感（モデル本来のカラーを保護）
 		loc.visualModel->SetMaterialProperties(48.0f, 1.35f, 0.45f);
@@ -264,7 +264,7 @@ void TitleScene::SetupLocation(LocationData& loc, Camera* camera) {
 		// トンネル: スラスター光を反射する金属肌（モデル本来のカラーを保護）
 		loc.visualModel->SetMaterialProperties(40.0f, 1.20f, 0.40f);
 	} else if (loc.id == TitleLocation::CrashedForest) {
-		// 墜落現場: 激突・炎上による黒焦げ・煤煙テクスチャを鮮明に映し出すダークトーン（項目8）
+		// 墜落現場: 激突・炎上による黒焦げ・煤煙テクスチャを鮮明に映し出すダークトーン
 		loc.visualModel->SetMaterialProperties(16.0f, 0.25f, 0.05f);
 		loc.visualModel->SetMaterialColor({ 0.70f, 0.68f, 0.68f, 1.0f });
 		// 残存した右主翼や昇降舵を激突の衝撃力で歪ませる（激突の説得力向上：項目8）
@@ -453,7 +453,7 @@ void TitleScene::UpdateLocations3D(float dt) {
 			tunnelScrollZ = std::fmod(animTimer_ * kFlightSpeed, kTunnelLength);
 		}
 
-		// 墜落現場専用：折れた左翼付け根・破損エンジンから立ち上るリアルな濃煙と微小火の粉（項目4）
+		// 墜落現場専用：折れた左翼付け根・破損エンジンから立ち上るリアルな濃煙と微小火の粉
 		if (loc.id == TitleLocation::CrashedForest) {
 			crashSmokeTimer_ += dt;
 			if (crashSmokeTimer_ >= 0.035f) {
@@ -466,7 +466,7 @@ void TitleScene::UpdateLocations3D(float dt) {
 				ParticleParameters smokeParams;
 				smokeParams.minVelocity = { -0.012f, 0.028f, -0.012f };
 				smokeParams.maxVelocity = {  0.012f, 0.065f,  0.012f };
-				// R=G=Bを厳格に完全同値化し、ピンクや緑の偏色を100%根絶（項目6: 漆黒・チャコールグレー重煙）
+				// R=G=Bを厳格に完全同値化し、ピンクや緑の偏色を100%根絶
 				float g = 0.08f + static_cast<float>(rand() % 100) / 100.0f * 0.10f; // 0.08～0.18
 				smokeParams.minColor = { g, g, g, 0.88f };
 				smokeParams.maxColor = { g, g, g, 0.94f };
@@ -738,7 +738,7 @@ void TitleScene::ChangeLocation(int index) {
 	if (locations_.empty()) { return; }
 	currentLocationIndex_ = index % static_cast<int>(locations_.size());
 	cutTimer_ = 0.0f;
-	transitionTimer_ = kTransitionDuration; // カメラ切替砂嵐トランジションを発動（項目10）
+	transitionTimer_ = kTransitionDuration; // カメラ切替砂嵐トランジションを発動
 	cameraTheta_ = static_cast<float>(rand() % 628) * 0.01f; // ランダムな角度から映す
 	LocationData& loc = CurrentLocation();
 	ApplyLocationLighting(loc);

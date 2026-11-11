@@ -77,36 +77,6 @@ struct PixelInput
     float32_t3 worldPosition : WORLDPOSITION0;
 };
 
-// --- プロシージャル地形ノイズ生成ヘルパー ---
-float TerrainHash21(float2 p)
-{
-    p = frac(p * float2(234.34f, 435.345f));
-    p += dot(p, p + 34.23f);
-    return frac(p.x * p.y);
-}
-
-float TerrainNoise2D(float2 p)
-{
-    float2 i = floor(p);
-    float2 f = frac(p);
-    f = f * f * (3.0f - 2.0f * f);
-    float a = TerrainHash21(i);
-    float b = TerrainHash21(i + float2(1.0f, 0.0f));
-    float c = TerrainHash21(i + float2(0.0f, 1.0f));
-    float d = TerrainHash21(i + float2(1.0f, 1.0f));
-    return lerp(lerp(a, b, f.x), lerp(c, d, f.x), f.y);
-}
-
-float TerrainFbm(float2 p)
-{
-    float v = 0.0f;
-    v += TerrainNoise2D(p) * 0.5000f;
-    v += TerrainNoise2D(p * 2.03f) * 0.2500f;
-    v += TerrainNoise2D(p * 4.09f) * 0.1250f;
-    v += TerrainNoise2D(p * 8.17f) * 0.0625f;
-    return v;
-}
-
 PixelShaderOutput main(PixelInput input)
 {
     PixelShaderOutput output;
@@ -121,12 +91,6 @@ PixelShaderOutput main(PixelInput input)
     // 1. 地形起伏の陰影コントラスト強調（緩やかな傾斜でも山肌・稜線の陰影をクッキリ描出）
     float3 steepN = normalize(float3(rawN.x * 2.8f, rawN.y, rawN.z * 2.8f));
     float slope = saturate(1.0f - rawN.y); // 0 = 水平な平地, 1 = 垂直な絶壁
-
-    // プロシージャルマイクロバンプ（地面との高度感・立体感を強調する微細凹凸）
-    float2 bumpCoord = worldPos.xz * 0.18f;
-    float bumpNoise = TerrainNoise2D(bumpCoord);
-    steepN.xz += (float2(TerrainNoise2D(bumpCoord + float2(0.1f, 0.0f)), TerrainNoise2D(bumpCoord + float2(0.0f, 0.1f))) - bumpNoise) * 0.35f;
-    steepN = normalize(steepN);
 
     // 2. 太陽光・山肌シャドウ計算
     float dirLen = length(gDirectionalLight.direction);
@@ -215,50 +179,28 @@ PixelShaderOutput main(PixelInput input)
     float ambientShadow = (1.0f - aircraftShadow * 0.40f);
     float3 lighting = (skyAmbient * valleyAO * ambientShadow) + (sunLightColor * sunLit * shadowFactor);
 
-    // 3. プロシージャル地形テクスチャリング（極寒冷地峡谷・岩石・地層・砂利・泥土・霜の多層マテリアル）
-    // (A) マルチスケールノイズサンプリング
-    float macroNoise = TerrainFbm(worldPos.xz * 0.0032f);   // 300mスケール（地質帯・断層の斑）
-    float midNoise   = TerrainFbm(worldPos.xz * 0.024f);    // 40mスケール（岩肌・砂利の分布）
-    float microNoise = TerrainNoise2D(worldPos.xz * 0.18f); // 5mスケール（砂利・岩のザラつき）
-    float cliffNoise = TerrainFbm(float2(worldPos.x + worldPos.z, worldPos.y) * 0.048f); // 垂直崖面のゴツゴツ感
+    // 3. プロシージャル地形テクスチャリング（グランドキャニオン & 山岳バイオーム）
+    // (A) 平野・台地の緑地
+    float3 grassColor = float3(0.24f, 0.36f, 0.18f);
+    // (B) 峡谷・崖面の赤褐色砂岩・地層（グランドキャニオン調）
+    float3 rockBase = float3(0.48f, 0.36f, 0.26f);
+    // 水平方向の堆積地層（ストラータ縞模様）
+    float strata = sin(worldPos.y * 0.14f) * 0.5f + 0.5f;
+    float3 cliffRock = lerp(rockBase * 0.85f, rockBase * 1.18f, strata);
 
-    // (B) 谷底・低空平坦部のリアルな地面（冷たい暗灰褐色の泥土・頁岩・砂利グラベル）
-    float3 soilDark  = float3(0.18f, 0.16f, 0.14f); // 湿った泥土・頁岩（シェール）
-    float3 gravel    = float3(0.27f, 0.25f, 0.23f); // 砕石・粗い砂利
-    float3 soilClay  = float3(0.22f, 0.19f, 0.16f); // 粘土質・風化岩粉
-    float3 lichen    = float3(0.19f, 0.22f, 0.16f); // 寒冷地帯特有の暗色地衣類・微小枯草
-    
-    float3 groundBase = lerp(soilDark, gravel, midNoise);
-    groundBase = lerp(groundBase, soilClay, smoothstep(0.45f, 0.75f, microNoise));
-    groundBase = lerp(groundBase, lichen, smoothstep(0.60f, 0.90f, macroNoise) * 0.25f);
-    groundBase *= (0.78f + 0.44f * microNoise); // 砂利・地面の細かな起伏明暗
-
-    // (C) 峡谷・崖面の玄武岩・花崗岩（リアルな地層ストラータ＋ゴツゴツした岩肌）
-    float3 rockDark  = float3(0.15f, 0.14f, 0.16f); // 暗色玄武岩
-    float3 rockLight = float3(0.30f, 0.28f, 0.29f); // 露出した白っぽい花崗岩層
-    float strata = sin(worldPos.y * 0.18f + cliffNoise * 3.6f) * 0.5f + 0.5f;
-    float3 cliffRock = lerp(rockDark, rockLight, strata);
-    cliffRock *= (0.72f + 0.55f * microNoise); // 岩肌の細かな明暗・ざらつき
-
-    // (D) 高所・尾根の岩肌と雪・霜
-    float3 peakRock = float3(0.24f, 0.24f, 0.26f);
-    float heightRock = saturate((worldPos.y - 40.0f) / 220.0f);
+    // (C) 高所・尾根の岩肌
+    float3 peakRock = float3(0.38f, 0.35f, 0.32f);
+    float heightRock = saturate((worldPos.y - 50.0f) / 250.0f);
     cliffRock = lerp(cliffRock, peakRock, heightRock);
 
-    // 極夜・寒冷地の山頂薄雪・霜（高所かつ上向き面に付着）
-    float snowMask = saturate((worldPos.y - 120.0f) / 180.0f) * saturate(rawN.y * 1.5f - 0.2f);
-    snowMask = smoothstep(0.35f, 0.65f, snowMask + midNoise * 0.25f);
-    float3 snowColor = float3(0.82f, 0.88f, 0.94f);
-
-    // 斜面傾斜に応じた岩肌・断崖の露出（崖は岩肌、緩斜面は土・砂利）
-    float rockBlend = smoothstep(0.04f, 0.22f, slope + midNoise * 0.08f);
-    float3 albedo = lerp(groundBase, cliffRock, rockBlend);
-    albedo = lerp(albedo, snowColor, snowMask * 0.65f);
+    // 斜面傾斜に応じた岩肌・断崖の露出
+    float rockBlend = smoothstep(0.06f, 0.26f, slope);
+    float3 albedo = lerp(grassColor, cliffRock, rockBlend);
 
     // マテリアル基本色の反映
     float3 matTint = gMaterial.color.rgb;
     if (matTint.r > 0.01f || matTint.g > 0.01f || matTint.b > 0.01f) {
-        albedo = lerp(albedo, albedo * (matTint / float3(0.24f, 0.35f, 0.20f)), 0.20f);
+        albedo = lerp(albedo, albedo * (matTint / float3(0.24f, 0.35f, 0.20f)), 0.25f);
     }
 
     // 4. 飛行 HUD / 空間把握用の等高線・距離グリッド（微細なディテール）

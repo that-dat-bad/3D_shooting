@@ -23,47 +23,47 @@ namespace MyMath {
 // ミッション目標 (Mission Objective) の型定義
 // ============================================================
 
-/// @brief ミッション目標の種類
+// ミッション目標の種類
 enum class ObjectiveType {
-	DestroyAll,      ///< 全敵を殲滅
-	DestroyCount,    ///< N体以上の敵を撃破
-	DestroyTarget,   ///< 特定のユニットを撃破（enemyIndex指定）
-	ReachArea,       ///< 指定エリアに到達
-	Survive,         ///< 制限時間まで生存
-	EscortProtect,   ///< 護衛対象の生存
+	DestroyAll,      // 全敵を殲滅
+	DestroyCount,    // N体以上の敵を撃破
+	DestroyTarget,   // 特定のユニットを撃破（enemyIndex指定）
+	ReachArea,       // 指定エリアに到達
+	Survive,         // 制限時間まで生存
+	EscortProtect,   // 護衛対象の生存
 };
 
-/// @brief ミッション目標の状態
+// ミッション目標の状態
 enum class ObjectiveStatus {
-	Inactive,   ///< 未開始（トリガーで有効化されるまで非表示）
-	Active,     ///< 進行中
-	Completed,  ///< 達成
-	Failed,     ///< 失敗
+	Inactive,   // 未開始（トリガーで有効化されるまで非表示）
+	Active,     // 進行中
+	Completed,  // 達成
+	Failed,     // 失敗
 };
 
-/// @brief ミッション目標のデータ
+// ミッション目標のデータ
 struct MissionObjective {
 	std::string name = "Objective";
 	std::string description = "";
 	ObjectiveType type = ObjectiveType::DestroyAll;
 	ObjectiveStatus status = ObjectiveStatus::Active;
-	bool isPrimary = true;       ///< true: 主目標, false: 副目標
-	bool isHidden = false;       ///< true: HUDに表示しない（隠し目標）
+	bool isPrimary = true;       // true: 主目標, false: 副目標
+	bool isHidden = false;       // true: HUDに表示しない（隠し目標）
 
 	// --- 各目標タイプのパラメータ ---
-	int requiredKills = 0;              ///< DestroyCount用: 必要撃破数
-	int targetIndex = -1;               ///< DestroyTarget / EscortProtect用: 敵インデックス
-	MyMath::Vector3 areaCenter{};       ///< ReachArea用: エリア中心
-	float areaRadius = 100.0f;          ///< ReachArea用: エリア半径
-	float duration = 300.0f;            ///< Survive用: 生存時間 (秒)
-	float minHP = 0.0f;                 ///< EscortProtect用: 最低HP
+	int requiredKills = 0;              // DestroyCount用: 必要撃破数
+	int targetIndex = -1;               // DestroyTarget / EscortProtect用: 敵インデックス
+	MyMath::Vector3 areaCenter{};       // ReachArea用: エリア中心
+	float areaRadius = 100.0f;          // ReachArea用: エリア半径
+	float duration = 300.0f;            // Survive用: 生存時間 (秒)
+	float minHP = 0.0f;                 // EscortProtect用: 最低HP
 };
 
 // ============================================================
 // JSON シリアライズ / デシリアライズ
 // ============================================================
 
-/// @brief ObjectiveType → 文字列変換
+// ObjectiveType → 文字列変換
 inline const char* ObjectiveTypeToString(ObjectiveType type) {
 	switch (type) {
 	case ObjectiveType::DestroyAll:    return "DestroyAll";
@@ -76,7 +76,7 @@ inline const char* ObjectiveTypeToString(ObjectiveType type) {
 	}
 }
 
-/// @brief 文字列 → ObjectiveType 変換
+// 文字列 → ObjectiveType 変換
 inline ObjectiveType StringToObjectiveType(const std::string& str) {
 	if (str == "DestroyCount")  return ObjectiveType::DestroyCount;
 	if (str == "DestroyTarget") return ObjectiveType::DestroyTarget;
@@ -86,7 +86,7 @@ inline ObjectiveType StringToObjectiveType(const std::string& str) {
 	return ObjectiveType::DestroyAll;
 }
 
-/// @brief ObjectiveStatus → 文字列変換
+// ObjectiveStatus → 文字列変換
 inline const char* ObjectiveStatusToString(ObjectiveStatus status) {
 	switch (status) {
 	case ObjectiveStatus::Inactive:  return "Inactive";
@@ -97,7 +97,7 @@ inline const char* ObjectiveStatusToString(ObjectiveStatus status) {
 	}
 }
 
-/// @brief 文字列 → ObjectiveStatus 変換
+// 文字列 → ObjectiveStatus 変換
 inline ObjectiveStatus StringToObjectiveStatus(const std::string& str) {
 	if (str == "Inactive")  return ObjectiveStatus::Inactive;
 	if (str == "Completed") return ObjectiveStatus::Completed;

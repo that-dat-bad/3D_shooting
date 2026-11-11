@@ -32,14 +32,14 @@ namespace MissionSchemaDefaults {
 	inline constexpr MyMath::Vector3 kDefaultExitBoundaryPos = { -640.0f, -325.0f, 7400.0f };
 }
 
-/// @brief ミッション一覧（マニフェスト）エントリデータ（各ミッションの件名・別名・ファイルパス等のメタデータ一元管理）
+// ミッション一覧（マニフェスト）エントリデータ（各ミッションの件名・別名・ファイルパス等のメタデータ一元管理）
 struct MissionEntry {
-	std::string id = "[01]";                           ///< ミッションID（例: "[00]", "[01]"）
-	std::string filePath = "";                        ///< ミッションJSONファイルパス
-	std::string title = "";                           ///< 作戦件名・主要タイトル（例: "Obuchenie"）
-	std::string aliasName = "";                       ///< 作戦別名・コードネーム（例: "ZADANIE 00"）
-	std::string subTitle = "";                        ///< 日本語件名・サブタイトル
-	bool isLocked = false;                            ///< 解放フラグ
+	std::string id = "[01]";                           // ミッションID（例: "[00]", "[01]"）
+	std::string filePath = "";                        // ミッションJSONファイルパス
+	std::string title = "";                           // 作戦件名・主要タイトル（例: "Obuchenie"）
+	std::string aliasName = "";                       // 作戦別名・コードネーム（例: "ZADANIE 00"）
+	std::string subTitle = "";                        // 日本語件名・サブタイトル
+	bool isLocked = false;                            // 解放フラグ
 };
 
 inline void to_json(nlohmann::json& j, const MissionEntry& e) {
@@ -77,7 +77,7 @@ namespace MyMath {
 }
 #endif
 
-/// @brief ZADANIE 00（チュートリアル導入任務）の非会話・3D空間オブジェクト配置データ（Blender Mission Editor 対応）
+// ZADANIE 00（チュートリアル導入任務）の非会話・3D空間オブジェクト配置データ（Blender Mission Editor 対応）
 struct TutorialSpatialLayout {
 	bool useCustomLayout = false;
 	MyMath::Vector3 coraxStartPos = MissionSchemaDefaults::kDefaultCoraxStartPos;
@@ -135,24 +135,24 @@ inline void from_json(const nlohmann::json& j, TutorialSpatialLayout& t) {
 	if (j.contains("exitBoundaryPosition")) j.at("exitBoundaryPosition").get_to(t.exitBoundaryPosition);
 }
 
-/// @brief ミッションの構成データ
+// ミッションの構成データ
 struct MissionData {
 	std::string name = "Default Mission";
-	std::string aliasName = "";                  ///< 作戦別名・コードネーム（例: "ZADANIE 00"）
-	std::string subTitle = "";                   ///< サブタイトル（例: "オブチェーニエ：訓練・教程 — 極夜の異変 —"）
-	std::string difficulty = "NORMAL";           ///< 難易度表示（例: "NORMAL", "HARD", "EXPERT"）
-	std::string areaName = "SECTOR 07";          ///< 作戦空域名称
+	std::string aliasName = "";                  // 作戦別名・コードネーム（例: "ZADANIE 00"）
+	std::string subTitle = "";                   // サブタイトル（例: "オブチェーニエ：訓練・教程 — 極夜の異変 —"）
+	std::string difficulty = "NORMAL";           // 難易度表示（例: "NORMAL", "HARD", "EXPERT"）
+	std::string areaName = "SECTOR 07";          // 作戦空域名称
 	std::string description = "Destroy all enemy aircraft and ground targets.";
 	float playerHP = MissionSchemaDefaults::kDefaultPlayerHp;
 	MyMath::Vector3 playerPosition = MissionSchemaDefaults::kDefaultPlayerStartPos;
-	float playerYawDeg = MissionSchemaDefaults::kDefaultPlayerYawDeg; ///< 初期方位角（度, 0=+Z北向き, 時計回り）
+	float playerYawDeg = MissionSchemaDefaults::kDefaultPlayerYawDeg; // 初期方位角（度, 0=+Z北向き, 時計回り）
 	std::vector<EnemySpawnData> enemies;
 	std::vector<GroundEnemySpawnData> groundEnemies;
 
 	// --- Phase 1: ミッション目標 & トリガーシステム ---
-	float timeLimit = MissionSchemaDefaults::kDefaultTimeLimitSeconds; ///< ミッション制限時間 (秒, 0 = 無制限)
-	std::vector<MissionObjective> objectives;                          ///< ミッション目標リスト
-	std::vector<MissionTrigger> triggers;                              ///< トリガーリスト
+	float timeLimit = MissionSchemaDefaults::kDefaultTimeLimitSeconds; // ミッション制限時間 (秒, 0 = 無制限)
+	std::vector<MissionObjective> objectives;                          // ミッション目標リスト
+	std::vector<MissionTrigger> triggers;                              // トリガーリスト
 
 	// --- Phase 2: ウェイポイント ---
 	std::vector<WaypointPath> waypointPaths;
@@ -322,56 +322,56 @@ inline void from_json(const nlohmann::json& j, MissionData& m) {
 	if (j.contains("tutorialLayout")) j.at("tutorialLayout").get_to(m.tutorialLayout);
 }
 
-/// @brief ランタイム中に表示するメッセージ情報
+// ランタイム中に表示するメッセージ情報
 struct RuntimeMessage {
 	std::string text;
 	float remainingTime = MissionSchemaDefaults::kDefaultMessageDuration;
 };
 
-/// @brief ミッションの管理とJSONシリアライズ・デシリアライズを担当するクラス
+// ミッションの管理とJSONシリアライズ・デシリアライズを担当するクラス
 class MissionManager {
 public:
-	/// @brief シングルトンインスタンスの取得
+	// シングルトンインスタンスの取得
 	static MissionManager& GetInstance();
 
-	/// @brief 指定したJSONファイルからミッションをロード
+	// 指定したJSONファイルからミッションをロード
 	bool Load(const std::string& filepath);
 
-	/// @brief 現在のミッションを指定したJSONファイルに保存
+	// 現在のミッションを指定したJSONファイルに保存
 	bool Save(const std::string& filepath);
 
-	/// @brief Blender Live Sync 等から受信したミッションデータを即時適用
+	// Blender Live Sync 等から受信したミッションデータを即時適用
 	void ApplyLiveMissionData(const MissionData& liveData, const std::string& liveFilePath = "");
 
-	/// @brief フォルダ内のミッションファイル一覧を取得
+	// フォルダ内のミッションファイル一覧を取得
 	std::vector<std::string> GetMissionList();
 
-	/// @brief デフォルトのミッションデータを構築して保存
+	// デフォルトのミッションデータを構築して保存
 	void CreateDefaultMission(const std::string& filepath);
 
 	// === ミッション一覧（マニフェスト・別名一元管理） ===
 
-	/// @brief missions.json（ミッション一覧インデックス）をロード
+	// missions.json（ミッション一覧インデックス）をロード
 	bool LoadMissionManifest(const std::string& manifestPath = "Resources/missions/missions.json");
 
-	/// @brief missions.json にミッション一覧を保存
+	// missions.json にミッション一覧を保存
 	bool SaveMissionManifest(const std::string& manifestPath = "Resources/missions/missions.json");
 
-	/// @brief ミッションエントリ一覧を取得（未ロード時は自動ロード）
+	// ミッションエントリ一覧を取得（未ロード時は自動ロード）
 	const std::vector<MissionEntry>& GetMissionEntries();
 
-	/// @brief デフォルトの missions.json を生成
+	// デフォルトの missions.json を生成
 	void CreateDefaultMissionManifest(const std::string& manifestPath);
 
 	// === Phase 1: 目標 & トリガー評価 ===
 
-	/// @brief 個別ターゲット撃破判定用に現在の EnemyManager をバインドする
+	// 個別ターゲット撃破判定用に現在の EnemyManager をバインドする
 	void BindEnemyManager(const EnemyManager* enemyManager) { boundEnemyManager_ = enemyManager; }
 
-	/// @brief ミッション開始時にランタイム状態をリセット
+	// ミッション開始時にランタイム状態をリセット
 	void ResetRuntimeState();
 
-	/// @brief 全目標のステータスを評価・更新する
+	// 全目標のステータスを評価・更新する
 	void EvaluateObjectives(
 		const MyMath::Vector3& playerPos,
 		float playerHP,
@@ -381,7 +381,7 @@ public:
 		const EnemyManager* enemyManager = nullptr
 	);
 
-	/// @brief 全トリガーの条件をチェックし、該当するアクションを実行する
+	// 全トリガーの条件をチェックし、該当するアクションを実行する
 	void EvaluateTriggers(
 		const MyMath::Vector3& playerPos,
 		float playerHP,
@@ -390,27 +390,27 @@ public:
 		const EnemyManager* enemyManager = nullptr
 	);
 
-	/// @brief 全主目標が達成されたかを返す
+	// 全主目標が達成されたかを返す
 	bool AreAllPrimaryObjectivesCompleted() const;
 
-	/// @brief いずれかの主目標が失敗したかを返す
+	// いずれかの主目標が失敗したかを返す
 	bool IsAnyPrimaryObjectiveFailed() const;
 
-	/// @brief トリガーによるミッション成功フラグ
+	// トリガーによるミッション成功フラグ
 	bool IsTriggerMissionComplete() const { return triggerMissionComplete_; }
 
-	/// @brief トリガーによるミッション失敗フラグ
+	// トリガーによるミッション失敗フラグ
 	bool IsTriggerMissionFail() const { return triggerMissionFail_; }
 
-	/// @brief トリガーで出現した追加敵のリストを取得・クリア
+	// トリガーで出現した追加敵のリストを取得・クリア
 	std::vector<EnemySpawnData> PopPendingEnemySpawns();
 	std::vector<GroundEnemySpawnData> PopPendingGroundEnemySpawns();
 	std::vector<RadioMessage> PopPendingRadioMessages();
 
-	/// @brief 表示中のメッセージを取得
+	// 表示中のメッセージを取得
 	const std::vector<RuntimeMessage>& GetActiveMessages() const { return activeMessages_; }
 
-	/// @brief メッセージのタイマーを更新
+	// メッセージのタイマーを更新
 	void UpdateMessages(float deltaTime);
 
 	// === ゲッター・セッター ===

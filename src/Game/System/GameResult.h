@@ -2,29 +2,29 @@
 #include <cstdint>
 
 enum class TitleEntryReason {
-	InitialBoot,          ///< 通常の初回起動（ドローン視点）
-	RebootFromGameOver,   ///< ゲームオーバーからの復旧（SYSTEM REBOOTING... → ConsoleBoot）
-	ReturnFromClear       ///< クリアからの復帰（WindowClose → 再認証セキュリティ演出）
+	InitialBoot,          // 通常の初回起動（ドローン視点）
+	RebootFromGameOver,   // ゲームオーバーからの復旧（SYSTEM REBOOTING... → ConsoleBoot）
+	ReturnFromClear       // クリアからの復帰（WindowClose → 再認証セキュリティ演出）
 };
 
 enum class GameOverReason {
-	Destroyed,   ///< 撃墜・爆発
-	TimeOver     ///< 時間切れ・作戦離脱
+	Destroyed,   // 撃墜・爆発
+	TimeOver     // 時間切れ・作戦離脱
 };
 
-/// @brief ゲームのクリア結果データ。シーン間でstatic共有する。
+// ゲームのクリア結果データ。シーン間でstatic共有する。
 struct GameResult {
-	int enemiesDestroyed = 0;		///< 撃破した敵の数
-	float clearTimeSeconds = 0.0f;	///< クリアまでの経過時間（秒）
-	float playerHPRemaining = 0.0f;	///< 残りHP
-	float playerMaxHP = 100.0f;		///< 最大HP
-	bool missionCleared = false;	///< ミッションクリアしたか
-	bool isRetry = false;           ///< リトライ出撃か（trueなら起動シーケンスを高速短縮）
-	bool isHalcyonDaysTutorial = false; ///< Operation Halcyon Days チュートリアルクリアか
-	GameOverReason gameOverReason = GameOverReason::Destroyed; ///< 失敗要因
-	TitleEntryReason titleEntryReason = TitleEntryReason::InitialBoot; ///< タイトル画面への突入理由
+	int enemiesDestroyed = 0;		// 撃破した敵の数
+	float clearTimeSeconds = 0.0f;	// クリアまでの経過時間（秒）
+	float playerHPRemaining = 0.0f;	// 残りHP
+	float playerMaxHP = 100.0f;		// 最大HP
+	bool missionCleared = false;	// ミッションクリアしたか
+	bool isRetry = false;           // リトライ出撃か（trueなら起動シーケンスを高速短縮）
+	bool isHalcyonDaysTutorial = false; // Operation Halcyon Days チュートリアルクリアか
+	GameOverReason gameOverReason = GameOverReason::Destroyed; // 失敗要因
+	TitleEntryReason titleEntryReason = TitleEntryReason::InitialBoot; // タイトル画面への突入理由
 
-	/// @brief 結果をリセットする
+	// 結果をリセットする
 	void Reset() {
 		enemiesDestroyed = 0;
 		clearTimeSeconds = 0.0f;
@@ -37,7 +37,7 @@ struct GameResult {
 		titleEntryReason = TitleEntryReason::InitialBoot;
 	}
 
-	/// @brief シーン間の受け渡し用グローバルインスタンス
+	// シーン間の受け渡し用グローバルインスタンス
 	static GameResult& GetInstance() {
 		static GameResult instance;
 		return instance;

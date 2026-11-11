@@ -8,7 +8,7 @@
 #include <string>
 #include <vector>
 
-/// @brief 疑似OS環境（PseudoOS）上で動作する非戦闘シーン（Clear, GameOver等）の共通基底クラス
+// 疑似OS環境（PseudoOS）上で動作する非戦闘シーン（Clear, GameOver等）の共通基底クラス
 class OSSceneBase : public IScene {
 public:
 	static constexpr float kScreenWidth = static_cast<float>(WinApp::kClientWidth);
@@ -17,22 +17,22 @@ public:
 	OSSceneBase() = default;
 	virtual ~OSSceneBase() override = default;
 
-	/// @brief OS環境の基本初期化（背景パネル、テーマ、OS情報文字列、背景色設定）
+	// OS環境の基本初期化（背景パネル、テーマ、OS情報文字列、背景色設定）
 	void InitializeOS(SpriteCommon* spriteCommon, PseudoOS::Theme theme,
 		const std::string& osName, const std::string& clearance,
 		const std::string& startMenuTitle,
 		const Vector4& bgPanelColor = { 0.01f, 0.02f, 0.05f, 0.95f });
 
-	/// @brief OS環境の毎フレーム基本更新（animTimer, fadeInAlpha, btnClickFlash, pseudoOS, selectionManager更新）
+	// OS環境の毎フレーム基本更新（animTimer, fadeInAlpha, btnClickFlash, pseudoOS, selectionManager更新）
 	void UpdateOS(float dt, float fadeInSpeed = 1.5f);
 
-	/// @brief 背景オーバーレイパネルの描画
+	// 背景オーバーレイパネルの描画
 	void DrawOSBackground();
 
-	/// @brief OSデスクトップ環境（ウィンドウ群、タスクバー、カーソル）の描画
+	// OSデスクトップ環境（ウィンドウ群、タスクバー、カーソル）の描画
 	void DrawOSDesktop();
 
-	/// @brief OS標準カーソルの表示/非表示（ウィンドウフォーカス連動）
+	// OS標準カーソルの表示/非表示（ウィンドウフォーカス連動）
 	void SetOSCursorVisible(bool visible);
 
 protected:

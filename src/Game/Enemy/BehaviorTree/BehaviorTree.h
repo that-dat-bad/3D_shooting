@@ -8,32 +8,31 @@ class Enemy;
 
 namespace AI {
 
-/// @brief ビヘイビアツリーのノード実行結果ステータス
+// ノードの実行結果ステータス
 enum class NodeStatus {
-	Success, ///< 成功（条件成立、タスク完了など）
-	Failure, ///< 失敗（条件不成立、タスク失敗など）
-	Running  ///< 実行中（フレームを跨いで継続実行中）
+	Success, // 成功
+	Failure, // 失敗
+	Running  // 実行中
 };
 
-/// @brief ビヘイビアツリーのノード基底クラス
+// ノード基底クラス
 class BTNode {
 public:
 	virtual ~BTNode() = default;
 
-	/// @brief 毎フレームの評価・更新処理
-	/// @param deltaTime 前フレームからの経過秒数
-	/// @param enemy 対象の敵インスタンス
-	/// @return 実行ステータス
+	// 評価・更新処理
+	// deltaTime: 経過時間
+	// enemy: 対象の敵
 	virtual NodeStatus Tick(float deltaTime, Enemy& enemy) = 0;
 
-	/// @brief 状態リセット
+	// 状態リセット
 	virtual void Reset() {}
 
-	/// @brief ノードの識別名
+	// ノード名取得
 	virtual const char* GetName() const = 0;
 };
 
-/// @brief 複数の子ノードを持つコンポジットノード基底
+// コンポジットノード基底
 class CompositeNode : public BTNode {
 public:
 	virtual ~CompositeNode() = default;
@@ -60,9 +59,7 @@ protected:
 	std::vector<std::unique_ptr<BTNode>> children_;
 };
 
-/// @brief セレクターノード（Fallback / OR条件）：
-/// 子ノードを左から評価し、SuccessまたはRunningを返したノードで即座に終了する。
-/// すべての子ノードがFailureとなった場合のみFailureを返す。
+// セレクターノード
 class SelectorNode : public CompositeNode {
 public:
 	explicit SelectorNode(const char* name = "Selector")
@@ -85,9 +82,7 @@ private:
 	const char* name_ = "Selector";
 };
 
-/// @brief シーケンスノード（AND条件）：
-/// 子ノードを左から順に評価し、FailureまたはRunningを返したノードで即座に終了する。
-/// すべての子ノードがSuccessとなった場合のみSuccessを返す。
+// シーケンスノード
 class SequenceNode : public CompositeNode {
 public:
 	explicit SequenceNode(const char* name = "Sequence")
@@ -110,7 +105,7 @@ private:
 	const char* name_ = "Sequence";
 };
 
-/// @brief デコレーターノード基底（1つの子ノードを装飾）
+// デコレーターノード基底
 class DecoratorNode : public BTNode {
 public:
 	virtual ~DecoratorNode() = default;
@@ -129,7 +124,7 @@ protected:
 	std::unique_ptr<BTNode> child_;
 };
 
-/// @brief 成功・失敗を反転するインバーターノード
+// インバーターノード
 class InverterNode : public DecoratorNode {
 public:
 	explicit InverterNode(const char* name = "Inverter")
@@ -149,7 +144,7 @@ private:
 	const char* name_ = "Inverter";
 };
 
-/// @brief ラムダ式や述語関数で成否を即座に判定するコンディションノード
+// コンディションノード
 class ConditionNode : public BTNode {
 public:
 	using Predicate = std::function<bool(Enemy& enemy)>;
@@ -172,7 +167,7 @@ private:
 	Predicate predicate_;
 };
 
-/// @brief ビヘイビアツリー管理クラス
+// ビヘイビアツリー管理クラス
 class BehaviorTree {
 public:
 	BehaviorTree() = default;

@@ -10,18 +10,17 @@
 class SpriteCommon;
 using Vector4 = MyMath::Vector4;
 
-/// @brief 疑似OSデスクトップ環境（マルチウィンドウ、タスクバー、カスタムカーソル、サイバーOS描画基盤）
-///        TitleScene, GameOverScene, ClearScene などの非戦闘シーンで統一された高密度ミリタリーOS-UIを提供する。
+// 疑似OSデスクトップ環境
 class PseudoOS {
 public:
-	/// @brief OSのカラーテーマ
+	// カラーテーマ
 	enum class Theme {
-		TerminalGreen,   ///< 通常ターミナル（タイトル等: 鮮烈ネオングリーン）
-		KernelPanicRed,  ///< カーネルパニック（ゲームオーバー: 深紅アラート＆アンバー）
-		TacticalCyan,    ///< 作戦成功・デブリーフィング（クリア: エレクトリックシアン＆エメラルド）
+		TerminalGreen,   // 通常ターミナル
+		KernelPanicRed,  // カーネルパニック
+		TacticalCyan,    // 作戦成功・デブリーフィング
 	};
 
-	/// @brief ウィンドウ定義
+	// ウィンドウ定義
 	struct Window {
 		int id = 0;
 		std::string title;
@@ -34,13 +33,13 @@ public:
 		bool isMinimized = false;
 		bool isDragging = false;
 		Vector2 dragOffset = { 0.0f, 0.0f };
-		float animScale = 1.0f; ///< 最小化・復元アニメーション (0.0〜1.0)
+		float animScale = 1.0f; // 最小化・復元アニメーション
 
-		/// @brief ウィンドウ内部の描画コールバック
+		// 描画コールバック
 		std::function<void(const Window&, PseudoOS*)> onDrawContent;
 	};
 
-	/// @brief スタートメニューの項目
+	// スタートメニュー項目
 	struct StartMenuItem {
 		std::string label;
 		std::function<void()> onClick;
@@ -50,26 +49,23 @@ public:
 	PseudoOS();
 	~PseudoOS();
 
-	/// @brief 初期化
-	/// @param spriteCommon SpriteCommonポインタ
-	/// @param theme カラーテーマ
+	// 初期化
+	// spriteCommon: SpriteCommonポインタ
+	// theme: カラーテーマ
 	void Initialize(SpriteCommon* spriteCommon, Theme theme = Theme::TerminalGreen);
 
-	/// @brief 毎フレーム更新（内部で Input からスケーリング済みマウス座標とボタン入力を自動取得）
-	/// @param dt デルタタイム
+	// 更新
+	// dt: デルタタイム
 	void Update(float dt);
 
-	/// @brief 毎フレーム更新（マウス入力手動指定版）
-	/// @param dt デルタタイム
-	/// @param mousePos マウス画面座標
-	/// @param isLDown 左クリック押下中
-	/// @param isLTrig 左クリックトリガー
+	// 更新（マウス入力指定版）
+	// dt: デルタタイム
 	void Update(float dt, const Vector2& mousePos, bool isLDown, bool isLTrig);
 
-	/// @brief デスクトップ環境の描画（背景・ウィンドウ・タスクバー・カーソル）
+	// 描画
 	void Draw();
 
-	/// @brief カラーテーマの動的切り替え
+	// テーマ設定
 	void SetTheme(Theme theme);
 	Theme GetTheme() const { return currentTheme_; }
 
@@ -92,22 +88,22 @@ public:
 	// ========================================================
 	enum class WindowAnimState {
 		None,
-		Opening,  ///< ズームイン展開中 (0.0 -> 1.0)
-		Closing,  ///< 縮小消滅中 (1.0 -> 0.0)
+		Opening,  // 展開中
+		Closing,  // 縮小中
 	};
 
-	/// @brief 全ウィンドウの展開アニメーション開始
-	/// @param duration 所要時間（秒、デフォルト0.35s）
+	// ウィンドウ展開アニメーション開始
+	// duration: 所要時間
 	void PlayWindowOpenAnimation(float duration = 0.35f);
 
-	/// @brief 全ウィンドウの縮小消滅アニメーション開始
-	/// @param duration 所要時間（秒、デフォルト0.28s）
+	// ウィンドウ縮小アニメーション開始
+	// duration: 所要時間
 	void PlayWindowCloseAnimation(float duration = 0.28f);
 
-	/// @brief 全ウィンドウの位置・スケールを初期状態にリセット
+	// ウィンドウ位置リセット
 	void ResetWindowPositions();
 
-	/// @brief ウィンドウアニメーションが完了しているか
+	// アニメーション完了判定
 	bool IsWindowAnimComplete() const { return windowAnimState_ == WindowAnimState::None; }
 	WindowAnimState GetWindowAnimState() const { return windowAnimState_; }
 
@@ -142,18 +138,14 @@ public:
 	// ========================================================
 	// 共通画面演出（CRT電源オフ収束・ボタン発光フィードバック）
 	// ========================================================
-	/// @brief CRTモニター電源オフ収束演出を描画（上下からスリット化し、横一線の光になって消滅）
-	/// @param progress 演出進行度 (0.0〜1.0)
-	/// @param screenWidth 画面幅 (デフォルト1280.0f)
-	/// @param screenHeight 画面高さ (デフォルト720.0f)
+	// CRT電源オフ演出の描画
+	// progress: 進行度
 	void DrawCRTShutdown(float progress, float screenWidth = 1280.0f, float screenHeight = 720.0f);
 
-	/// @brief ボタンクリック時の拡散発光ボーダーを描画
-	/// @param pos ボタン位置
-	/// @param size ボタンサイズ
-	/// @param timer 残りタイマー
-	/// @param duration 全体の所要時間 (デフォルト0.25f)
-	/// @param color 発光色
+	// ボタン発光演出の描画
+	// pos: 描画位置
+	// size: サイズ
+	// timer: タイマー
 	void DrawButtonFlash(const Vector2& pos, const Vector2& size, float timer, float duration = 0.25f, const Vector4& color = { 1.0f, 0.95f, 0.85f, 1.0f });
 
 	// ========================================================

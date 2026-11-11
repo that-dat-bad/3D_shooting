@@ -5,7 +5,7 @@
 #include "Engine.h"
 #include "Payload/Gunpod.h"
 
-/// @brief 機体の全体・ビジュアル設定
+// 機体の全体設定
 struct AircraftGeneralConfig {
 	std::string name = "MiG-21 Fishbed";
 	std::string modelPath = "Resources/models/m21.gltf";
@@ -14,29 +14,26 @@ struct AircraftGeneralConfig {
 	float shininess = 48.0f;
 };
 
-/// @brief 機体設定ファイル（.cfg）の読み込み・保存・管理クラス
+// 機体設定ファイルの管理クラス
 class AircraftConfig {
 public:
 	AircraftConfig() = default;
 	~AircraftConfig() = default;
 
-	/// @brief .cfg ファイルから機体設定をロード
-	/// @param filepath .cfg ファイルのパス
-	/// @return 成功時 true
+	// 設定ファイルの読み込み
+	// filepath: ファイルパス
 	bool LoadFromCfg(const std::string& filepath);
 
-	/// @brief .cfg ファイルへ機体設定を保存
-	/// @param filepath 保存先の .cfg ファイルパス
-	/// @return 成功時 true
+	// 設定ファイルの保存
+	// filepath: 保存先パス
 	bool SaveToCfg(const std::string& filepath) const;
 
-	/// @brief デフォルトの機体設定を生成して保存
-	/// @param filepath 保存先パス
+	// デフォルト設定の生成
+	// filepath: 保存先パス
 	void CreateDefault(const std::string& filepath);
 
-	/// @brief 利用可能な機体CFGファイル一覧を取得
-	/// @param directory 走査するディレクトリ (デフォルト: "Resources/aircraft")
-	/// @return ファイルパス一覧
+	// 利用可能な機体設定の一覧取得
+	// directory: 走査するディレクトリ
 	static std::vector<std::string> GetAvailableAircraftList(const std::string& directory = "Resources/aircraft");
 
 	// === アクセッサ ===

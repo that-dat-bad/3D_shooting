@@ -11,30 +11,30 @@ using namespace MyMath;
 
 class UIText;
 
-/// @brief Win32ネイティブ別ウィンドウで動作するUIエディタ。
-///        リアルタイムな文字装飾・レイアウト調整、状態（Normal/Hover/Selected/Custom）
-///        およびモーション（Tween, Pulse, Float, Shake）の編集・保存を提供する。
+// Win32ネイティブ別ウィンドウで動作するUIエディタ。
+// リアルタイムな文字装飾・レイアウト調整、状態（Normal/Hover/Selected/Custom）
+// およびモーション（Tween, Pulse, Float, Shake）の編集・保存を提供する。
 class UIEditorWindow {
 public:
 	static UIEditorWindow* GetInstance();
 
-	/// @brief エディタウィンドウの初期化・生成（非表示で生成）
+	// エディタウィンドウの初期化・生成（非表示で生成）
 	bool Initialize(HWND parentHwnd = nullptr);
 	bool Initialize(HINSTANCE hInstance, HWND parentHwnd);
 
-	/// @brief 毎フレーム更新（登録テキスト一覧の変更検知など）
+	// 毎フレーム更新（登録テキスト一覧の変更検知など）
 	void Update();
 
-	/// @brief 終了処理
+	// 終了処理
 	void Finalize();
 
-	/// @brief ウィンドウの表示/非表示切り替え
+	// ウィンドウの表示/非表示切り替え
 	void Show(bool show = true);
 	void Toggle() { ToggleVisible(); }
 	void ToggleVisible();
 	bool IsVisible() const;
 
-	/// @brief 現在選択されているUIText要素を取得
+	// 現在選択されているUIText要素を取得
 	UIText* GetSelectedText() const;
 
 private:

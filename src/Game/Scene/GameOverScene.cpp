@@ -308,7 +308,7 @@ void GameOverScene::Update() {
 		}
 	}
 
-	// 項目3: ヘッダータイピングアニメーション（共通TypewriterEffectを使用）
+	// ヘッダータイピングアニメーション（共通TypewriterEffectを使用）
 	headerTypewriter_.Update(dt);
 	gameOverText_.SetText(headerTypewriter_.GetCurrentText());
 
@@ -323,7 +323,7 @@ void GameOverScene::Update() {
 	PostEffect* postEffect = PostEffect::GetInstance();
 	postEffect->ClearActiveEffects();
 
-	// リトライ時のホワイトノイズ＆クリーンアップグリッチ（指摘3, 4）
+	// リトライ時のホワイトノイズ＆クリーンアップグリッチ
 	if (isRetrying_) {
 		retryGlitchTimer_ += dt;
 
@@ -353,7 +353,7 @@ void GameOverScene::Update() {
 			return;
 		}
 	}
-	// リブート演出進行（指摘1: CRT画面収束）
+	// リブート演出進行
 	else if (isRebooting_) {
 		rebootTimer_ += dt;
 
@@ -376,7 +376,7 @@ void GameOverScene::Update() {
 			return;
 		}
 	} else {
-		// 通常待機時: 冒頭0.4sは激しい緊急警告ストロボ点滅（指摘5）、以降はCRTモニター質感（指摘4）
+		// 通常待機時: 冒頭0.4sは激しい緊急警告ストロボ点滅、以降はCRTモニター質感
 		if (animTimer_ < 0.40f) {
 			bool blinkOn = (std::fmod(animTimer_, 0.08f) < 0.04f);
 			ActivePostEffect tint;
@@ -464,7 +464,7 @@ void GameOverScene::DrawUI() {
 	pseudoOS_.Draw();
 
 	// ------------------------------------------------------------
-	// リトライ時のシステム再構築・クリーンアッププログレスバー（指摘4, 5）
+	// リトライ時のシステム再構築・クリーンアッププログレスバー
 	// ------------------------------------------------------------
 	if (isRetrying_) {
 		TextRenderer* tr = TextRenderer::GetInstance();
@@ -489,7 +489,7 @@ void GameOverScene::DrawUI() {
 		snprintf(progBuf, sizeof(progBuf), "CLEANUP PROGRESS : %3.0f %%", progress * 100.0f);
 		tr->Print("HackGen", progBuf, kScreenWidth * 0.5f, cardY + 54.0f, 15.0f, { 0.85f, 1.0f, 0.95f, 0.95f }, { 0.5f, 0.0f });
 
-		// プログレスバー描画（指摘5）
+		// プログレスバー描画
 		float barW = cardW - 60.0f;
 		float barH = 16.0f;
 		pseudoOS_.DrawGauge({ cardX + 30.0f, cardY + 86.0f }, { barW, barH }, progress,
@@ -504,7 +504,7 @@ void GameOverScene::DrawUI() {
 	}
 
 	// ------------------------------------------------------------
-	// 項目3-1: リブート演出進行（SYSTEM REBOOTING... → ブラウン管画面収束でタイトルへ復帰）
+	// リブート演出進行（SYSTEM REBOOTING... → ブラウン管画面収束でタイトルへ復帰）
 	// ------------------------------------------------------------
 	if (isRebooting_) {
 		float rebootProgress = rebootTimer_ / 0.65f;

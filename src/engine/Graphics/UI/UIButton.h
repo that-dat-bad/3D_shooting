@@ -9,48 +9,48 @@
 
 class SpriteCommon;
 
-/// @brief ボタンUI要素。マウスホバー・クリック判定付き。
+// ボタンUI要素
 class UIButton : public UIElement {
 public:
-	/// @brief ボタンの状態
+	// ボタンの状態
 	enum class State {
-		Normal,		///< 通常
-		Hovered,	///< マウスホバー中
-		Pressed,	///< 押下中
-		Selected,	///< キーボード選択中
+		Normal,		// 通常
+		Hovered,	// マウスホバー中
+		Pressed,	// 押下中
+		Selected,	// 選択中
 	};
 
-	/// @brief 初期化
-	/// @param spriteCommon SpriteCommonのポインタ
-	/// @param label ボタンに表示するテキスト
-	/// @param fontSize フォントサイズ
+	// 初期化
+	// spriteCommon: SpriteCommonのポインタ
+	// label: ボタンに表示するテキスト
+	// fontSize: フォントサイズ
 	void Initialize(SpriteCommon* spriteCommon, const std::string& label, float fontSize = 28.0f);
 
 	void Update() override;
 	void Draw() override;
 
-	/// @brief クリック時のコールバック設定
+	// クリック時のコールバック設定
 	void SetOnClick(std::function<void()> callback) { onClick_ = callback; }
 	
-	/// @brief 強制的にクリックイベントを発火する
+	// クリック実行
 	void Click() { if (onClick_) onClick_(); }
 
-	/// @brief ボタンラベルのUIText要素を取得（エディタ連携用）
+	// ラベルテキスト取得
 	UIText* GetLabelText() { return &labelText_; }
 	const UIText* GetLabelText() const { return &labelText_; }
 
-	/// @brief ボタンラベルの設定
+	// ラベル設定
 	void SetLabel(const std::string& label);
 	const std::string& GetLabel() const;
 
-	/// @brief キーボード選択状態の設定（タイトルメニュー等で使用）
+	// 選択状態の設定
 	void SetSelected(bool selected) { isSelected_ = selected; }
 	bool IsSelected() const { return isSelected_; }
 
-	/// @brief ボタンが押されたかチェック（トリガー判定）
+	// クリック判定
 	bool IsClicked() const { return isClicked_; }
 
-	/// @brief 現在の状態を取得
+	// 状態取得
 	State GetState() const { return state_; }
 
 	// 色設定
@@ -60,27 +60,27 @@ public:
 	void SetTextColor(const Vector4& color);
 	void SetSelectedTextColor(const Vector4& color);
 
-	/// @brief ラベルテキストのオフセット位置を設定（上下左右のアラインメント微調整用）
+	// テキストオフセット設定
 	void SetTextOffset(const Vector2& offset) { textOffset_ = offset; }
 	const Vector2& GetTextOffset() const { return textOffset_; }
 
-	/// @brief 選択時のプロンプト装飾（左側余白の >> と末尾の点滅カーソル _）の有効化
+	// プロンプト装飾の有効化
 	void SetPromptDecoratorsEnabled(bool enabled) { enablePromptDecorators_ = enabled; }
 	bool IsPromptDecoratorsEnabled() const { return enablePromptDecorators_; }
 
-	/// @brief テキスト配置方式
+	// テキスト配置方式
 	enum class TextAlignment {
-		Center,		///< 中央揃え
-		Left,		///< 左揃え（leftPadding_ による固定インデント配置）
+		Center,		// 中央揃え
+		Left,		// 左揃え
 	};
 
-	/// @brief テキストのアライメントを設定
+	// テキストアライメント設定
 	void SetTextAlignment(TextAlignment alignment, float leftPadding = 100.0f) {
 		textAlignment_ = alignment;
 		leftPadding_ = leftPadding;
 	}
 
-	/// @brief 左揃え（固定インデント）を有効化
+	// 左揃え設定
 	void SetLeftAligned(bool leftAligned, float leftPadding = 100.0f) {
 		textAlignment_ = leftAligned ? TextAlignment::Left : TextAlignment::Center;
 		leftPadding_ = leftPadding;
@@ -89,7 +89,7 @@ public:
 	TextAlignment GetTextAlignment() const { return textAlignment_; }
 	float GetLeftPadding() const { return leftPadding_; }
 
-	/// @brief マウスが矩形の範囲内にいるかチェック
+	// マウス判定
 	bool IsMouseInside() const;
 
 private:

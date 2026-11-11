@@ -9,7 +9,7 @@
 #include "../../../external/imgui/imgui.h"
 #endif
 
-/// @brief フレームタイム監視・ヒッチ検知・ログ記録マネージャー
+// フレームタイム監視・ヒッチ検知・ログ記録マネージャー
 class HitchDetector {
 public:
 	static HitchDetector* GetInstance() {
@@ -17,7 +17,7 @@ public:
 		return &instance;
 	}
 
-	/// @brief 毎フレームの開始時に呼び出し、DeltaTimeとヒッチを監視
+	// 毎フレームの開始時に呼び出し、DeltaTimeとヒッチを監視
 	void OnBeginFrame() {
 		auto now = std::chrono::steady_clock::now();
 		if (hasLastFrame_) {
@@ -59,7 +59,7 @@ public:
 		frameCount_++;
 	}
 
-	/// @brief 統計データのリセット
+	// 統計データのリセット
 	void ResetStats() {
 		maxFrameTimeMs_ = 0.0;
 		hitchCount_ = 0;
@@ -76,7 +76,7 @@ public:
 	int GetHitchCount() const { return hitchCount_; }
 	int GetSevereHitchCount() const { return severeHitchCount_; }
 
-	/// @brief ImGuiによるヒッチ＆フレームタイム監視パネルの描画
+	// ImGuiによるヒッチ＆フレームタイム監視パネルの描画
 	void DrawImGui() {
 #ifdef USE_IMGUI
 		if (ImGui::Begin("Hitch & Performance Monitor", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {

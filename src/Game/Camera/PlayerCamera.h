@@ -5,21 +5,16 @@
 #include "../FlightModel/FlightModel.h"
 #include "../FlightModel/MouseAimController.h"
 
-/// <summary>
-/// 自機を追従するカメラの制御クラス（War Thunder準拠 固定ブーム球面追従仕様）
-/// カメラ光軸(Zc)とブーム軸を単一の正規直交基底(Xc, Yc, Zc)に統合し、
-/// 一定距離D・一定高さH・一定FOVで自機を常にビュー空間(0, -H, +D)へ完全固定することで、
-/// 激しい上下左右のマウス操作でも前後揺れ(カメラ酔い)や境界壁への張り付きを一切起こさない。
-/// </summary>
+// プレイヤー追従カメラ
 class PlayerCamera {
 public:
-    /// <summary>初期化処理</summary>
+    // 初期化
     void Initialize(const MyMath::Vector3& initialPos, const MyMath::Vector3& initialForward);
 
-    /// <summary>カメラの位置・姿勢の更新処理</summary>
+    // 更新
     void Update(float dt, FlightModel* flightModel, MouseAimController* mouseAimController, bool mouseAimEnabled);
 
-    /// <summary>カメラの現在位置と注視点を直接指定して同期（イントロからのシームレス接続用）</summary>
+    // 位置と注視点の同期
     void SnapTo(const MyMath::Vector3& pos, const MyMath::Vector3& lookTarget);
 
     bool& GetFreeViewActive() { return freeViewActive_; }

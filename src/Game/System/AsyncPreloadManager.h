@@ -6,28 +6,28 @@
 #include "../FlightModel/AircraftConfig.h"
 #include "MissionManager.h"
 
-/// @brief バックグラウンドスレッドで重いステージデータ（ミッションJSON、機体CFG等）を非同期プリロードするマネージャー
+// バックグラウンドスレッドで重いステージデータ（ミッションJSON、機体CFG等）を非同期プリロードするマネージャー
 class AsyncPreloadManager {
 public:
     static AsyncPreloadManager* GetInstance();
 
-    /// @brief バックグラウンドスレッドでステージリソースの事前非同期ロードを開始（ゲームオーバー演出中やリトライ待機中に発火）
+    // バックグラウンドスレッドでステージリソースの事前非同期ロードを開始（ゲームオーバー演出中やリトライ待機中に発火）
     void StartStagePreloadAsync(const std::string& missionPath = "Resources/missions/mission00.json",
                                 const std::string& aircraftCfgPath = "Resources/aircraft/mig21.cfg");
 
-    /// @brief プリロードが完了しているか
+    // プリロードが完了しているか
     bool IsStagePreloadReady() const;
 
-    /// @brief プリロード完了を同期待機
+    // プリロード完了を同期待機
     void WaitForStagePreload();
 
-    /// @brief キャッシュされたミッションデータを適用
+    // キャッシュされたミッションデータを適用
     bool ApplyPreloadedMission(MissionManager& missionManager);
 
-    /// @brief キャッシュされた機体CFGを適用
+    // キャッシュされた機体CFGを適用
     bool ApplyPreloadedAircraftConfig(AircraftConfig& aircraftConfig);
 
-    /// @brief キャッシュのクリア
+    // キャッシュのクリア
     void ClearCache();
 
 private:

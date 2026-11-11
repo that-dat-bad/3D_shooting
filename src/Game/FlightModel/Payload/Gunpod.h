@@ -9,9 +9,7 @@ struct GunPodData {
 	float fireRate;     // 1秒間に何発撃てるか (例: 10.0f なら秒間10発)
 };
 
-/// <summary>
-/// 航空機に搭載するガンポッド（武装）を管理するクラス
-/// </summary>
+// ガンポッド
 class GunPod : public IPayload {
 public:
 	GunPod() : baseMass_(0.0f), drag_(0.0f), ammoWeight_(0.0f),
@@ -19,15 +17,15 @@ public:
 	           fireInterval_(0.0f), cooldownTimer_(0.0f), isAttached_(true) {}
 	~GunPod() override = default;
 
-	/// <summary>初期化処理</summary>
+	// 初期化
 	void Initialize(const GunPodData& data);
 
-	/// <summary>更新処理</summary>
+	// 更新
 	void Update(float dt) override;
 	float GetWeight() const override;
 	float GetDragCoeff() const override;
 
-	/// <summary>トリガーを引いている間に呼ばれる関数</summary>
+	// 発射
 	void Fire() override;
 
 	// --- アクセッサ ---
