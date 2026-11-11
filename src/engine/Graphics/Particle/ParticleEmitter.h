@@ -6,16 +6,28 @@ using namespace MyMath;
 
 #include "ParticleManager.h"
 
-// パーティクル発生器
+/// <summary>
+/// パーティクル発生器
+/// </summary>
 class ParticleEmitter {
 public:
-	// コンストラクタで設定を受け取る
+	/// <summary>
+	/// コンストラクタ
+	/// </summary>
+	/// <param name="name">パーティクルグループ名</param>
+	/// <param name="transform">発生位置などの情報</param>
+	/// <param name="count">一度に発生させる数</param>
+	/// <param name="frequency">発生頻度(秒間隔)</param>
 	ParticleEmitter(const std::string& name, const Transform& transform, uint32_t count, float frequency);
 
-	// 更新処理
+	/// <summary>
+	/// 毎フレームの更新処理(時間経過による自動発生)
+	/// </summary>
 	void Update();
 
-	// 発生させる
+	/// <summary>
+	/// 手動でパーティクルを発生させる
+	/// </summary>
 	void Emit();
 
 	/// <summary>

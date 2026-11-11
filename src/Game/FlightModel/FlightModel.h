@@ -5,19 +5,24 @@
 #include "math/MyMath.h"
 
 #include "AirFrame.h"
+#include "DamageModel.h"
 #include "Engine.h"
 #include "Payload/IPayload.h"
 
 
+// 飛行機の物理挙動（フライトモデル）を計算・管理するクラス
 class FlightModel {
 public:
 	FlightModel();
 	~FlightModel() = default;
 
 	// 初期化
+	// airframeData: 機体パラメータ
+	// engineData: エンジンパラメータ
 	void Initialize(const AirframeData& airframeData, const EngineData& engineData);
 
-	// 毎フレームの更新処理
+	// 更新
+	// deltaTime: デルタタイム
 	void Update(float deltaTime);
 
 
@@ -56,16 +61,42 @@ public:
 	// ダメージ連動
 	Airframe& GetAirframe() { return airframe_; }
 	const Airframe& GetAirframe() const { return airframe_; }
+	DamageModel& GetDamageModel() { return airframe_.GetDamageModel(); }
+	const DamageModel& GetDamageModel() const { return airframe_.GetDamageModel(); }
+
+	// 無敵モード制御（被弾・地面衝突・構造Gダメージを0にする）
+	void SetInvulnerable(bool inv) { isInvulnerable_ = inv; airframe_.GetDamageModel().SetInvulnerable(inv); }
+	bool IsInvulnerable() const { return isInvulnerable_; }
+
+	// G効果（ブラックアウト・レッドアウト）の制御
+	void SetGEffectsEnabled(bool enabled) { gEffectsEnabled_ = enabled; if (!enabled) { ResetGEffects(); } }
+	bool IsGEffectsEnabled() const { return gEffectsEnabled_; }
+	void ResetGEffects() { blackoutFactor_ = 0.0f; redoutFactor_ = 0.0f; blackoutToleranceTimer_ = 0.0f; redoutToleranceTimer_ = 0.0f; }
+
+	// オートパイロット（クリア演出・自動操縦）モード
+	void SetAutopilot(bool autopilot) { isAutopilot_ = autopilot; }
+	bool IsAutopilot() const { return isAutopilot_; }
+
+	// 弾丸の被弾処理
+	HitResult ProcessBulletHit(const MyMath::Vector3& bulletWorldPos, float rawDamage) {
+		return airframe_.GetDamageModel().ProcessBulletHit(bulletWorldPos, position_, orientation_, rawDamage);
+	}
 
 	// 外部から位置・姿勢・速度をセットする（スポーン時など）
 	void SetPosition(const MyMath::Vector3& pos) { position_ = pos; }
 	void SetOrientation(const MyMath::Quaternion& ori) { orientation_ = ori; }
+	static constexpr float kDefaultGroundElevation = 0.0f;
 	void SetVelocity(const MyMath::Vector3& vel) { velocity_ = vel; }
+	void SetGroundElevation(float groundY) { groundElevation_ = groundY; }
+	float GetGroundElevation() const { return groundElevation_; }
 
 	// 方向ベクトルの取得（クォータニオンから計算）
 	MyMath::Vector3 GetForwardDirection() const;
 	MyMath::Vector3 GetUpDirection() const;
 	MyMath::Vector3 GetRightDirection() const;
+
+	// 機体のワールド変換行列を取得
+	MyMath::Matrix4x4 GetWorldMatrix() const;
 
 
 private:
@@ -94,6 +125,10 @@ private:
 	float redoutFactor_;      // レッドアウト度合い (-G)
 	float blackoutToleranceTimer_ = 0.0f; // ブラックアウトまでの猶予タイマー
 	float redoutToleranceTimer_ = 0.0f;   // レッドアウトまでの猶予タイマー
+	bool  isInvulnerable_ = false;       // 無敵フラグ
+	bool  gEffectsEnabled_ = true;       // G効果有効フラグ
+	bool  isAutopilot_ = false;          // オートパイロット演出フラグ
+	float groundElevation_ = kDefaultGroundElevation; // 現在XZ座標直下の地形標高Y
 
 	// プレイヤーからの入力状態
 	float targetThrottle_;  // 目標スロットル

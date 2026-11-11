@@ -15,7 +15,14 @@
 
 using namespace MyMath;
 
-// パーティクル1粒の情報（CPU側での計算用）
+namespace ParticleHeightCapDefaults {
+	inline constexpr float kNoHeightLimit = 0.0f;
+	inline constexpr float kSoftBrakeStartRatio = 0.45f;
+	inline constexpr float kSoftBrakeSpanRatio = 0.55f;
+	inline constexpr float kUnitRatio = 1.0f;
+	inline constexpr uint32_t kZeroCount = 0u;
+}
+
 // パーティクル1粒の情報（CPU側での計算用）
 struct Particle {
 	Transform transform;
@@ -31,6 +38,10 @@ struct Particle {
 	float endScale = 0.0f;     // 終了時スケール
 	float startAlpha = 1.0f;   // 初期アルファ（フェードアウト用）
 	float scaleEasing = 1.0f;  // スケールイージング指数
+
+	// 上昇上限高さ制御（0.0f以下で無制限）
+	float spawnY = ParticleHeightCapDefaults::kNoHeightLimit;
+	float maxRiseHeight = ParticleHeightCapDefaults::kNoHeightLimit;
 
 	// ストレッチビルボード
 	bool isStretched = false;
@@ -48,6 +59,9 @@ struct ParticleParameters {
 	float maxLifeTime = 3.0f;
 	Vector3 acceleration = { 0.0f, 0.0f, 0.0f }; // 重力など
 	float randomPositionRange = 1.0f;            // 発生位置のランダムばらつき範囲（0.0で完全に点から発生）
+
+	// 上昇上限高さ（発生Y座標からの最大上昇距離[m]：0.0f以下で無制限）
+	float maxRiseHeight = ParticleHeightCapDefaults::kNoHeightLimit;
 
 	// 回転
 	float minRotation = 0.0f;
@@ -103,10 +117,22 @@ struct ParticleGroup {
 
 #include <memory> 
 
+/// <summary>
+/// CPU駆動型パーティクルシステム管理クラス
+/// </summary>
 class ParticleManager
 {
 public: // シングルトンパターン
+	/// <summary>
+	/// シングルトンインスタンスの取得
+	/// </summary>
+	/// <returns>インスタンスポインタ</returns>
 	static ParticleManager* GetInstance();
+
+	/// <summary>
+	/// デフォルトコンストラクタ (std::make_unique対応のためpublic)
+	/// </summary>
+	ParticleManager() = default;
 
 	void Initialize(DirectXCommon* dxCommon, SrvManager* srvManager);
 	void Update();
@@ -126,8 +152,12 @@ public: // シングルトンパターン
 	// 加速度場の追加
 	void AddAccelerationField(const std::string& name, const Vector3& acceleration, const AABB& area);
 
+	// 稼働中パーティクルの全消去・統計取得
+	void ClearAllParticles();
+	uint32_t GetTotalActiveParticleCount() const;
+	uint32_t GetGroupActiveParticleCount(const std::string& name) const;
+
 private:
-	ParticleManager() = default;
 	ParticleManager(const ParticleManager&) = delete;
 	ParticleManager& operator=(const ParticleManager&) = delete;
 

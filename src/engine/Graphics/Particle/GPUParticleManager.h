@@ -9,6 +9,9 @@
 #include "../System/SrvManager.h"
 #include "../System/BlendMode.h"
 
+/// <summary>
+/// GPU駆動型パーティクルシステム管理クラス (Compute Shader利用)
+/// </summary>
 class GPUParticleManager {
 public:
 	struct ParticleCS {
@@ -21,7 +24,16 @@ public:
 		Vector4 color;
 	};
 
+	/// <summary>
+	/// シングルトンインスタンスの取得
+	/// </summary>
+	/// <returns>インスタンスポインタ</returns>
 	static GPUParticleManager* GetInstance();
+
+	/// <summary>
+	/// デフォルトコンストラクタ (std::make_unique対応のためpublic)
+	/// </summary>
+	GPUParticleManager() = default;
 
 	void Initialize(DirectXCommon* dxCommon, SrvManager* srvManager);
 	void Finalize();
@@ -42,7 +54,6 @@ public:
 	~GPUParticleManager() = default;
 
 private:
-	GPUParticleManager() = default;
 	GPUParticleManager(const GPUParticleManager&) = delete;
 	GPUParticleManager& operator=(const GPUParticleManager&) = delete;
 

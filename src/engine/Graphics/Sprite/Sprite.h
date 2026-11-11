@@ -10,19 +10,33 @@ using namespace MyMath;
 class SpriteCommon;
 class DirectXCommon;
 
+/// <summary>
+/// 2Dスプライト(画像)の描画を行うクラス
+/// </summary>
 class Sprite
 {
 public:
-	// 初期化
+	/// <summary>
+	/// スプライトの初期化
+	/// </summary>
+	/// <param name="spriteCommon">SpriteCommonポインタ</param>
+	/// <param name="textureFilePath">テクスチャのファイルパス</param>
 	void Initialize(SpriteCommon* spriteCommon, std::string textureFilePath = "");
 
-	// 更新
+	/// <summary>
+	/// 毎フレームの更新処理
+	/// </summary>
 	void Update();
 
-	// 描画 (引数なしに変更)
+	/// <summary>
+	/// 描画コマンドの発行
+	/// </summary>
 	void Draw();
 
-	// テクスチャ変更
+	/// <summary>
+	/// テクスチャの変更
+	/// </summary>
+	/// <param name="textureFilePath">新しいテクスチャパス</param>
 	void ChangeTexture(std::string textureFilePath);
 
 	//--アクセッサ--//

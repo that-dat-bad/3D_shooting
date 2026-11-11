@@ -4,53 +4,95 @@
 #include <string>
 #include "../../engine/base/Math/MyMath.h"
 #include "Enemy.h"
+#include "GroundEnemy.h"
 
-/// @brief 敵の配置データ（コード内で直接定義する用）
+namespace EnemyManagerDefaults {
+	inline constexpr int kZeroCount = 0;
+}
+
+class Camera;
+
+// 敵の配置データ（空中目標）
 struct EnemySpawnData {
 	MyMath::Vector3 position;
 	std::string modelPath;
 	float health;
+	AIType aiType = AIType::ChaseAttack;
+	std::string waypointPathName = "";
+	std::string behaviorTreeJson = "";
 };
 
-/// @brief 敵の生成・管理クラス
+// 地上敵の配置データ
+struct GroundEnemySpawnData {
+	MyMath::Vector3 position{ 0.0f, 0.0f, 0.0f };
+	GroundAIType aiType = GroundAIType::Turret;
+	float health = 60.0f;
+	GroundEnemyParam param{};
+	std::string waypointPathName = "";
+};
+
+// 敵の生成・管理クラス
 class EnemyManager {
 public:
 	EnemyManager() = default;
 	~EnemyManager() = default;
 
-	/// @brief 配置データから敵を一括生成
+	// 初期化
 	void Initialize(
 		const std::vector<EnemySpawnData>& spawnList,
 		const AirframeData& airframeData,
 		const EngineData& engineData,
 		const GunPodData& gunpodData,
 		FlightModel* playerFlightModel,
-		BulletManager* bulletManager
+		BulletManager* bulletManager,
+		const std::vector<GroundEnemySpawnData>& groundSpawnList = {}
 	);
 
-	/// @brief 全敵の更新
+	// 更新
 	void Update(float deltaTime);
 
-	/// @brief 全敵の描画
-	void Draw();
+	// 描画
+	void Draw(Camera* camera = nullptr);
+
+	// ウェイポイントパス登録
+	void SetWaypointPaths(const std::vector<WaypointPath>& paths);
+
+	// 空中敵の追加スポーン
+	void SpawnAirEnemies(const std::vector<EnemySpawnData>& spawnList);
+
+	// 地上敵の追加スポーン
+	void SpawnGroundEnemies(const std::vector<GroundEnemySpawnData>& groundSpawnList);
+
+	// 撃破判定
+	bool IsUnitDestroyedByIndex(int unitIndex) const;
 
 	// === ステータス照会 ===
 
-	/// @brief 生存している敵の数
 	int GetAliveCount() const;
-
-	/// @brief 総敵数
 	int GetTotalCount() const;
-
-	/// @brief 撃破した敵の数
 	int GetDestroyedCount() const;
-
-	/// @brief 全敵が撃破されたか
+	int GetAliveAirCount() const;
+	int GetAliveGroundCount() const;
 	bool IsAllDestroyed() const;
 
-	/// @brief 生存中の敵へのポインタリストを取得（衝突判定用）
+	// 生存敵の取得
 	std::vector<Enemy*> GetAliveEnemies();
+	std::vector<GroundEnemy*> GetAliveGroundEnemies();
+
+	const std::vector<std::unique_ptr<GroundEnemy>>& GetGroundEnemies() const { return groundEnemies_; }
+	std::vector<std::unique_ptr<GroundEnemy>>& GetGroundEnemies() { return groundEnemies_; }
 
 private:
 	std::vector<std::unique_ptr<Enemy>> enemies_;
+	std::vector<std::unique_ptr<GroundEnemy>> groundEnemies_;
+	std::vector<WaypointPath> waypointPaths_;
+	AirframeData cachedAirframe_{};
+	EngineData cachedEngine_{};
+	GunPodData cachedGunpod_{};
+	FlightModel* playerFlightModel_ = nullptr;
+	BulletManager* bulletManager_ = nullptr;
+	bool hasCachedInitContext_ = false;
+
+	const WaypointPath* FindWaypointPathByName(const std::string& pathName) const;
 };
+

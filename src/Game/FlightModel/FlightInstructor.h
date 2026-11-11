@@ -3,30 +3,30 @@
 
 class FlightModel;
 
-/// フライトインストラクター
-/// 操作がないときに機体を自動で水平に戻す補助システム。
+// フライトインストラクター
+// 操作がないときに機体を自動で水平に戻す補助システム。
 class FlightInstructor {
 public:
 	FlightInstructor() = default;
 	~FlightInstructor() = default;
 
-	/// インストラクターを有効/無効に切り替える
+	// インストラクターを有効/無効に切り替える
 	void SetEnabled(bool enabled) { enabled_ = enabled; }
 	bool IsEnabled() const { return enabled_; }
 	void ToggleEnabled() { enabled_ = !enabled_; }
 
-	/// 補正の強さを設定（0.0 ～ 1.0, デフォルト 0.5）
+	// 補正の強さを設定（0.0 ～ 1.0, デフォルト 0.5）
 	void SetCorrectionStrength(float strength) { correctionStrength_ = strength; }
 	float GetCorrectionStrength() const { return correctionStrength_; }
 
-	/// プレイヤーの入力と機体の現在姿勢を受け取り、補正済みの操舵入力を返す。
-	/// @param rawPitch   プレイヤーのピッチ入力 (-1 ～ 1)
-	/// @param rawRoll    プレイヤーのロール入力 (-1 ～ 1)
-	/// @param rawYaw     プレイヤーのヨー入力 (-1 ～ 1)
-	/// @param orientation 機体の現在の姿勢クォータニオン
-	/// @param outPitch   補正後のピッチ出力
-	/// @param outRoll    補正後のロール出力
-	/// @param outYaw     補正後のヨー出力
+	// プレイヤーの入力と機体の現在姿勢を受け取り、補正済みの操舵入力を返す。
+	// rawPitch: プレイヤーのピッチ入力 (-1 ～ 1)
+	// rawRoll: プレイヤーのロール入力 (-1 ～ 1)
+	// rawYaw: プレイヤーのヨー入力 (-1 ～ 1)
+	// orientation: 機体の現在の姿勢クォータニオン
+	// outPitch: 補正後のピッチ出力
+	// outRoll: 補正後のロール出力
+	// outYaw: 補正後のヨー出力
 	void ApplyCorrection(
 		float rawPitch, float rawRoll, float rawYaw,
 		const MyMath::Quaternion& orientation,

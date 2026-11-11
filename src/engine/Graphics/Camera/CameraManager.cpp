@@ -5,7 +5,7 @@ std::unique_ptr<CameraManager> CameraManager::instance_ = nullptr;
 
 CameraManager* CameraManager::GetInstance() {
 	if (instance_ == nullptr) {
-		instance_.reset(new CameraManager());
+		instance_ = std::make_unique<CameraManager>();
 	}
 	return instance_.get();
 }
@@ -36,6 +36,18 @@ void CameraManager::SetActiveCamera(const std::string& name) {
 	if (cameras_.contains(name)) {
 		activeCamera_ = cameras_[name].get(); // 生ポインタを取得
 	}
+}
+
+Camera* CameraManager::GetCamera(const std::string& name) const {
+	auto it = cameras_.find(name);
+	if (it != cameras_.end()) {
+		return it->second.get();
+	}
+	return nullptr;
+}
+
+bool CameraManager::HasCamera(const std::string& name) const {
+	return cameras_.contains(name);
 }
 
 void CameraManager::Update() {

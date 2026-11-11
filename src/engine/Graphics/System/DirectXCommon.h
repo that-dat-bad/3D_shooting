@@ -18,30 +18,47 @@ class SrvManager;
 #include "../base/Math/MyMath.h"
 using namespace MyMath;
 
+/// <summary>
+/// DirectX12基盤管理クラス
+/// </summary>
 class DirectXCommon
 {
 public:
+	/// <summary>
+	/// シングルトンインスタンスの取得
+	/// </summary>
+	/// <returns>インスタンスポインタ</returns>
 	static DirectXCommon* GetInstance();
+
+	/// <summary>
+	/// デフォルトコンストラクタ (std::make_unique対応のためpublic)
+	/// </summary>
+	DirectXCommon() = default;
 
 	static const uint32_t kRtvHeapDescriptorNum_ = 5; // ダブルバッファ(2) + レンダーテクスチャ用(3)
 	static const uint32_t kDsvHeapDescriptorNum_ = 2; // 深度バッファ用(R/W と ReadOnly)
 	static const uint32_t kSwapChainBufferCount_ = 2;
 
 
-	// 初期化
+	/// <summary>
+	/// 初期化
+	/// </summary>
+	/// <param name="winApp">Windowsアプリケーションへのポインタ</param>
 	void Initialize(WinApp* winApp);
+	
+	/// <summary>終了処理</summary>
 	void Finalize();
 
-	// 全てのGPU処理の完了を待つ
+	/// <summary>全てのGPU処理の完了を待つ</summary>
 	void WaitForGPU();
 
-	//描画前処理
+	/// <summary>描画前処理</summary>
 	void PreDraw();
 
-	//描画後処理（ポストエフェクト適用、バックバッファをRTのまま残す）
+	/// <summary>描画後処理（ポストエフェクト適用、バックバッファをRTのまま残す）</summary>
 	void PostDraw();
 
-	//フレーム終了処理（バックバッファをPRESENTに戻してsubmit）
+	/// <summary>フレーム終了処理（バックバッファをPRESENTに戻してsubmit）</summary>
 	void EndFrame();
 
 	Microsoft::WRL::ComPtr<IDxcBlob> CompileShader(const std::wstring& filePath, const wchar_t* profile);
@@ -108,7 +125,6 @@ public:
 	~DirectXCommon() = default;
 
 private:
-	DirectXCommon() = default;
 	DirectXCommon(const DirectXCommon&) = delete;
 	DirectXCommon& operator=(const DirectXCommon&) = delete;
 	static std::unique_ptr<DirectXCommon> instance_;

@@ -3,12 +3,47 @@
 #include "../System/SrvManager.h"
 #include "../System/TextureManager.h"
 #include <cassert>
+#include <fstream>
+#include <filesystem>
+#include "../../io/json.hpp"
+
+using json = nlohmann::json;
+
+void to_json(json& j, const ActivePostEffect& effect) {
+	j = json{
+		{"type", static_cast<int>(effect.type)},
+		{"kernelSize", effect.kernelSize},
+		{"intensity", effect.intensity},
+		{"dirX", effect.dirX},
+		{"dirY", effect.dirY},
+		{"dissolveThreshold", effect.dissolveThreshold},
+		{"dissolveEdgeWidth", effect.dissolveEdgeWidth},
+		{"dissolveMaskIndex", effect.dissolveMaskIndex},
+		{"colorR", effect.colorR},
+		{"colorG", effect.colorG},
+		{"colorB", effect.colorB}
+	};
+}
+
+void from_json(const json& j, ActivePostEffect& effect) {
+	effect.type = static_cast<PostEffectType>(j.value("type", 0));
+	effect.kernelSize = j.value("kernelSize", 3);
+	effect.intensity = j.value("intensity", 1.0f);
+	effect.dirX = j.value("dirX", 0.0f);
+	effect.dirY = j.value("dirY", 0.0f);
+	effect.dissolveThreshold = j.value("dissolveThreshold", 0.5f);
+	effect.dissolveEdgeWidth = j.value("dissolveEdgeWidth", 0.05f);
+	effect.dissolveMaskIndex = j.value("dissolveMaskIndex", 0);
+	effect.colorR = j.value("colorR", 1.0f);
+	effect.colorG = j.value("colorG", 1.0f);
+	effect.colorB = j.value("colorB", 1.0f);
+}
 
 std::unique_ptr<PostEffect> PostEffect::instance_ = nullptr;
 
 PostEffect* PostEffect::GetInstance() {
 	if (instance_ == nullptr) {
-		instance_.reset(new PostEffect());
+		instance_ = std::make_unique<PostEffect>();
 	}
 	return instance_.get();
 }
@@ -23,7 +58,7 @@ void PostEffect::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager) {
 	CreateGraphicsPipelines();
 
 	size_t cbAlignedSize = (sizeof(PostEffectParams) + 0xff) & ~0xff;
-	postEffectParamsBuffer_ = dxCommon_->CreateBufferResource(cbAlignedSize * 10);
+	postEffectParamsBuffer_ = dxCommon_->CreateBufferResource(cbAlignedSize * 64);
 	HRESULT hr = postEffectParamsBuffer_->Map(0, nullptr, reinterpret_cast<void**>(&mappedPostEffectParams_));
 	assert(SUCCEEDED(hr));
 }
@@ -150,7 +185,7 @@ void PostEffect::CreateGraphicsPipelines() {
 
 	// ピクセルシェーダーのコンパイル（各種エフェクト）
 	Microsoft::WRL::ComPtr<IDxcBlob> psNone = dxCommon_->CompileShader(L"./assets/shaders/CopyImage.PS.hlsl", L"ps_6_0");
-	Microsoft::WRL::ComPtr<IDxcBlob> psGray = dxCommon_->CompileShader(L"./assets/shaders/GrayScale.PS.hlsl", L"ps_6_0");
+	Microsoft::WRL::ComPtr<IDxcBlob> psColorTint = dxCommon_->CompileShader(L"./assets/shaders/ColorTint.PS.hlsl", L"ps_6_0");
 	Microsoft::WRL::ComPtr<IDxcBlob> psVignette = dxCommon_->CompileShader(L"./assets/shaders/Vignette.PS.hlsl", L"ps_6_0");
 	Microsoft::WRL::ComPtr<IDxcBlob> psBoxFilter = dxCommon_->CompileShader(L"./assets/shaders/BoxFilter.PS.hlsl", L"ps_6_0");
 	Microsoft::WRL::ComPtr<IDxcBlob> psGaussBlur = dxCommon_->CompileShader(L"./assets/shaders/GaussBlur.PS.hlsl", L"ps_6_0");
@@ -158,10 +193,18 @@ void PostEffect::CreateGraphicsPipelines() {
 	Microsoft::WRL::ComPtr<IDxcBlob> psRadialBlur = dxCommon_->CompileShader(L"./assets/shaders/RadialBlur.PS.hlsl", L"ps_6_0");
 	Microsoft::WRL::ComPtr<IDxcBlob> psDissolve = dxCommon_->CompileShader(L"./assets/shaders/Dissolve.PS.hlsl", L"ps_6_0");
 	Microsoft::WRL::ComPtr<IDxcBlob> psRandom = dxCommon_->CompileShader(L"./assets/shaders/Random.PS.hlsl", L"ps_6_0");
+	Microsoft::WRL::ComPtr<IDxcBlob> psScanLine = dxCommon_->CompileShader(L"./assets/shaders/ScanLine.PS.hlsl", L"ps_6_0");
+	Microsoft::WRL::ComPtr<IDxcBlob> psLightAmp = dxCommon_->CompileShader(L"./assets/shaders/LightAmp.PS.hlsl", L"ps_6_0");
+	Microsoft::WRL::ComPtr<IDxcBlob> psLensDistortion = dxCommon_->CompileShader(L"./assets/shaders/LensDistortion.PS.hlsl", L"ps_6_0");
+	Microsoft::WRL::ComPtr<IDxcBlob> psChromaticAberration = dxCommon_->CompileShader(L"./assets/shaders/ChromaticAberration.PS.hlsl", L"ps_6_0");
+	Microsoft::WRL::ComPtr<IDxcBlob> psBloom = dxCommon_->CompileShader(L"./assets/shaders/Bloom.PS.hlsl", L"ps_6_0");
+	Microsoft::WRL::ComPtr<IDxcBlob> psColorIsolation = dxCommon_->CompileShader(L"./assets/shaders/ColorIsolation.PS.hlsl", L"ps_6_0");
+	Microsoft::WRL::ComPtr<IDxcBlob> psLuminanceOutline = dxCommon_->CompileShader(L"./assets/shaders/LuminanceBasedOutline.PS.hlsl", L"ps_6_0");
+	Microsoft::WRL::ComPtr<IDxcBlob> psDepthOutline = dxCommon_->CompileShader(L"./assets/shaders/DepthBasedOutline.PS.hlsl", L"ps_6_0");
 
 	Microsoft::WRL::ComPtr<IDxcBlob> pixelShaders[static_cast<size_t>(PostEffectType::kCountOfPostEffects)];
 	pixelShaders[static_cast<size_t>(PostEffectType::kNone)] = psNone;
-	pixelShaders[static_cast<size_t>(PostEffectType::kGrayScale)] = psGray;
+	pixelShaders[static_cast<size_t>(PostEffectType::kColorTint)] = psColorTint;
 	pixelShaders[static_cast<size_t>(PostEffectType::kVignette)] = psVignette;
 	pixelShaders[static_cast<size_t>(PostEffectType::kBoxFilter)] = psBoxFilter;
 	pixelShaders[static_cast<size_t>(PostEffectType::kGaussBlur)] = psGaussBlur;
@@ -169,6 +212,14 @@ void PostEffect::CreateGraphicsPipelines() {
 	pixelShaders[static_cast<size_t>(PostEffectType::kRadialBlur)] = psRadialBlur;
 	pixelShaders[static_cast<size_t>(PostEffectType::kDissolve)] = psDissolve;
 	pixelShaders[static_cast<size_t>(PostEffectType::kRandom)] = psRandom;
+	pixelShaders[static_cast<size_t>(PostEffectType::kScanLine)] = psScanLine;
+	pixelShaders[static_cast<size_t>(PostEffectType::kLightAmp)] = psLightAmp;
+	pixelShaders[static_cast<size_t>(PostEffectType::kLensDistortion)] = psLensDistortion;
+	pixelShaders[static_cast<size_t>(PostEffectType::kChromaticAberration)] = psChromaticAberration;
+	pixelShaders[static_cast<size_t>(PostEffectType::kBloom)] = psBloom;
+	pixelShaders[static_cast<size_t>(PostEffectType::kColorIsolation)] = psColorIsolation;
+	pixelShaders[static_cast<size_t>(PostEffectType::kLuminanceOutline)] = psLuminanceOutline;
+	pixelShaders[static_cast<size_t>(PostEffectType::kDepthOutline)] = psDepthOutline;
 
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc{};
 	psoDesc.pRootSignature = rootSignature_.Get();
@@ -216,19 +267,8 @@ void PostEffect::CreateGraphicsPipelines() {
 
 void PostEffect::Draw(ID3D12Resource* renderTextureResource, uint32_t renderTextureSrvIndex) {
 	ID3D12GraphicsCommandList* commandList = dxCommon_->GetCommandList();
-
 	time_ += 0.016f;
 
-	size_t effectIndex = static_cast<size_t>(currentEffect_);
-	if (currentEffect_ != PostEffectType::kDissolve) {
-		commandList->SetGraphicsRootSignature(rootSignature_.Get());
-		commandList->SetPipelineState(pipelineStates_[effectIndex].Get());
-	}
-
-	ID3D12DescriptorHeap* heaps[] = { srvManager_->descriptorHeap_.Get() };
-	commandList->SetDescriptorHeaps(1, heaps);
-
-	// ビューポートとシザー矩形を設定
 	D3D12_VIEWPORT viewport = dxCommon_->GetViewport();
 	commandList->RSSetViewports(1, &viewport);
 
@@ -237,148 +277,310 @@ void PostEffect::Draw(ID3D12Resource* renderTextureResource, uint32_t renderText
 
 	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-	size_t cbAlignedSize = (sizeof(PostEffectParams) + 0xff) & ~0xff;
+	ID3D12DescriptorHeap* heaps[] = { srvManager_->descriptorHeap_.Get() };
+	commandList->SetDescriptorHeaps(1, heaps);
 
-	if (currentEffect_ == PostEffectType::kGaussBlur) {
-		// --- パス1: 横方向ブラー (renderTextures_[0] -> renderTextures_[1]) ---
+	if (activeEffects_.empty()) {
+		// 後方互換モード
+		ActivePostEffect legacyEffect;
+		legacyEffect.type = currentEffect_;
+		legacyEffect.kernelSize = kernelSize_;
+		legacyEffect.intensity = intensity_;
+		legacyEffect.dirX = dirX_;
+		legacyEffect.dirY = dirY_;
+		legacyEffect.colorR = colorR_;
+		legacyEffect.colorG = colorG_;
+		legacyEffect.colorB = colorB_;
+		
+		if (legacyEffect.type == PostEffectType::kGaussBlur) {
+			DrawSinglePass(commandList, legacyEffect, 0, 1, false, 0, 1.0f, 0.0f);
+			DrawSinglePass(commandList, legacyEffect, 1, 0, true, 1, 0.0f, 1.0f);
+		} else if (legacyEffect.type == PostEffectType::kKawaseBlur) {
+			int passes = legacyEffect.kernelSize;
+			if (passes < 1) passes = 1;
+			if (passes > 10) passes = 10;
+			uint32_t tempSrc = 0;
+			uint32_t tempDst = 1;
+			for (int j = 0; j < passes; ++j) {
+				bool isFinalOfKawase = (j == passes - 1);
+				float kawaseOffset = (float)j + 0.5f;
+				DrawSinglePass(commandList, legacyEffect, tempSrc, tempDst, isFinalOfKawase, j, 0.0f, 0.0f, kawaseOffset);
+				if (!isFinalOfKawase) {
+					std::swap(tempSrc, tempDst);
+				}
+			}
+		} else {
+			DrawSinglePass(commandList, legacyEffect, 0, 0, true, 0);
+		}
+		return;
+	}
+
+	uint32_t currentSrcIndex = 0;
+	uint32_t passIndex = 0;
+
+	for (size_t i = 0; i < activeEffects_.size(); ++i) {
+		const ActivePostEffect& effect = activeEffects_[i];
+		bool isLastEffect = (i == activeEffects_.size() - 1);
+		uint32_t dstIndex = 1 - currentSrcIndex;
+
+		if (effect.type == PostEffectType::kGaussBlur) {
+			DrawSinglePass(commandList, effect, currentSrcIndex, dstIndex, false, passIndex++, 1.0f, 0.0f);
+			DrawSinglePass(commandList, effect, dstIndex, currentSrcIndex, isLastEffect, passIndex++, 0.0f, 1.0f);
+			if (!isLastEffect) currentSrcIndex = currentSrcIndex;
+		} else if (effect.type == PostEffectType::kKawaseBlur) {
+			int passes = effect.kernelSize;
+			if (passes < 1) passes = 1;
+			if (passes > 10) passes = 10;
+			uint32_t tempSrc = currentSrcIndex;
+			uint32_t tempDst = dstIndex;
+			for (int j = 0; j < passes; ++j) {
+				bool isFinalOfKawase = (j == passes - 1);
+				float kawaseOffset = (float)j + 0.5f;
+				DrawSinglePass(commandList, effect, tempSrc, tempDst, isLastEffect && isFinalOfKawase, passIndex++, 0.0f, 0.0f, kawaseOffset);
+				if (!isLastEffect || !isFinalOfKawase) {
+					std::swap(tempSrc, tempDst);
+				}
+			}
+			if (!isLastEffect) currentSrcIndex = tempSrc;
+		} else {
+			DrawSinglePass(commandList, effect, currentSrcIndex, dstIndex, isLastEffect, passIndex++);
+			if (!isLastEffect) currentSrcIndex = dstIndex;
+		}
+	}
+}
+
+void PostEffect::DrawSinglePass(ID3D12GraphicsCommandList* commandList, const ActivePostEffect& effect, uint32_t srcIndex, uint32_t dstIndex, bool isOutputToBackBuffer, uint32_t passIndex, float customDirX, float customDirY, float customIntensity) {
+	size_t cbAlignedSize = (sizeof(PostEffectParams) + 0xff) & ~0xff;
+	size_t effectIndex = static_cast<size_t>(effect.type);
+
+	if (effect.type == PostEffectType::kDissolve) {
+		commandList->SetGraphicsRootSignature(dissolveRootSignature_.Get());
+		commandList->SetPipelineState(dissolvePSO_.Get());
+	} else {
+		commandList->SetGraphicsRootSignature(rootSignature_.Get());
+		commandList->SetPipelineState(pipelineStates_[effectIndex].Get());
+	}
+
+	// Set Render Target
+	if (!isOutputToBackBuffer) {
 		D3D12_RESOURCE_BARRIER barrierRT = {};
 		barrierRT.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-		barrierRT.Transition.pResource = dxCommon_->GetRenderTexture(1);
+		barrierRT.Transition.pResource = dxCommon_->GetRenderTexture(dstIndex);
 		barrierRT.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
 		barrierRT.Transition.StateBefore = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
 		barrierRT.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
 		commandList->ResourceBarrier(1, &barrierRT);
 
-		D3D12_CPU_DESCRIPTOR_HANDLE rtv1 = dxCommon_->GetRenderTextureRTVHandle(1);
-		commandList->OMSetRenderTargets(1, &rtv1, false, nullptr);
+		D3D12_CPU_DESCRIPTOR_HANDLE rtv = dxCommon_->GetRenderTextureRTVHandle(dstIndex);
+		commandList->OMSetRenderTargets(1, &rtv, false, nullptr);
+	} else {
+		D3D12_CPU_DESCRIPTOR_HANDLE destRtv = dxCommon_->GetCurrentRTVHandle();
+		commandList->OMSetRenderTargets(1, &destRtv, false, nullptr);
+	}
 
-		commandList->SetGraphicsRootDescriptorTable(0, srvManager_->GetGPUDescriptorHandle(renderTextureSrvIndex));
+	// Set SRV Input
+	uint32_t srvIndex = dxCommon_->GetRenderTextureSrvIndex(srcIndex);
+	commandList->SetGraphicsRootDescriptorTable(0, srvManager_->GetGPUDescriptorHandle(srvIndex));
 
-		PostEffectParams* param0 = reinterpret_cast<PostEffectParams*>(reinterpret_cast<uint8_t*>(mappedPostEffectParams_) + 0);
-		param0->kernelSize = kernelSize_;
-		param0->intensity = intensity_;
-		param0->dirX = 1.0f;
-		param0->dirY = 0.0f;
-		commandList->SetGraphicsRootConstantBufferView(1, postEffectParamsBuffer_->GetGPUVirtualAddress());
+	// Set Parameters
+	if (passIndex >= 64) passIndex = 63; // Limit to buffer boundary
+	size_t offset = cbAlignedSize * passIndex;
+	PostEffectParams* param = reinterpret_cast<PostEffectParams*>(reinterpret_cast<uint8_t*>(mappedPostEffectParams_) + offset);
+	
+	param->time = time_;
+	param->colorR = effect.colorR;
+	param->colorG = effect.colorG;
+	param->colorB = effect.colorB;
 
-		commandList->DrawInstanced(3, 1, 0, 0);
+	if (effect.type == PostEffectType::kDissolve) {
+		param->kernelSize = 0;
+		param->intensity = effect.dissolveThreshold;
+		param->dirX = effect.dissolveEdgeWidth;
+		param->dirY = 0.0f;
+		commandList->SetGraphicsRootConstantBufferView(1, postEffectParamsBuffer_->GetGPUVirtualAddress() + offset);
 
-		// --- パス2: 縦方向ブラー (renderTextures_[1] -> backBuffer) ---
+		int maskIdx = effect.dissolveMaskIndex;
+		if (maskIdx < 0 || maskIdx >= static_cast<int>(dissolveMaskSrvIndices_.size())) maskIdx = 0;
+		if (dissolveMaskSrvIndices_.size() > 0) {
+			commandList->SetGraphicsRootDescriptorTable(2, srvManager_->GetGPUDescriptorHandle(dissolveMaskSrvIndices_[maskIdx]));
+		}
+	} else {
+		param->kernelSize = effect.kernelSize;
+		param->intensity = (customIntensity >= 0.0f) ? customIntensity : effect.intensity;
+		param->dirX = (customDirX != -999999.0f) ? customDirX : effect.dirX;
+		param->dirY = (customDirY != -999999.0f) ? customDirY : effect.dirY;
+		commandList->SetGraphicsRootConstantBufferView(1, postEffectParamsBuffer_->GetGPUVirtualAddress() + offset);
+	}
+
+	commandList->DrawInstanced(3, 1, 0, 0);
+
+	// Revert Render Target back to SRV if not last pass
+	if (!isOutputToBackBuffer) {
 		D3D12_RESOURCE_BARRIER barrierSRV = {};
 		barrierSRV.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-		barrierSRV.Transition.pResource = dxCommon_->GetRenderTexture(1);
+		barrierSRV.Transition.pResource = dxCommon_->GetRenderTexture(dstIndex);
 		barrierSRV.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
 		barrierSRV.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
 		barrierSRV.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
 		commandList->ResourceBarrier(1, &barrierSRV);
-
-		D3D12_CPU_DESCRIPTOR_HANDLE destRtv = dxCommon_->GetCurrentRTVHandle();
-		commandList->OMSetRenderTargets(1, &destRtv, false, nullptr);
-
-		commandList->SetGraphicsRootDescriptorTable(0, srvManager_->GetGPUDescriptorHandle(dxCommon_->GetRenderTextureSrvIndex(1)));
-
-		PostEffectParams* param1 = reinterpret_cast<PostEffectParams*>(reinterpret_cast<uint8_t*>(mappedPostEffectParams_) + cbAlignedSize);
-		param1->kernelSize = kernelSize_;
-		param1->intensity = intensity_;
-		param1->dirX = 0.0f;
-		param1->dirY = 1.0f;
-		commandList->SetGraphicsRootConstantBufferView(1, postEffectParamsBuffer_->GetGPUVirtualAddress() + cbAlignedSize);
-
-		commandList->DrawInstanced(3, 1, 0, 0);
 	}
-	else if (currentEffect_ == PostEffectType::kKawaseBlur) {
-		int passes = kernelSize_;
-		if (passes < 1) { passes = 1; }
-		if (passes > 10) { passes = 10; }
+}
 
-		for (int i = 0; i < passes; ++i) {
-			bool isLastPass = (i == passes - 1);
-			int srcIndex = (i % 2 == 0) ? 0 : 1;
-			int dstIndex = (i % 2 == 0) ? 1 : 0;
+void PostEffect::ApplyBuiltInPreset(const std::string& presetName) {
+	activeEffects_.clear();
+	if (presetName == "NVD (Night Vision)") {
+		ActivePostEffect amp;
+		amp.type = PostEffectType::kLightAmp;
+		amp.intensity = 4.0f;
+		amp.colorR = 0.15f;
+		amp.colorG = 1.0f;
+		amp.colorB = 0.3f;
+		activeEffects_.push_back(amp);
 
-			if (!isLastPass) {
-				D3D12_RESOURCE_BARRIER barrierRT = {};
-				barrierRT.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-				barrierRT.Transition.pResource = dxCommon_->GetRenderTexture(dstIndex);
-				barrierRT.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-				barrierRT.Transition.StateBefore = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-				barrierRT.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
-				commandList->ResourceBarrier(1, &barrierRT);
+		ActivePostEffect bloom;
+		bloom.type = PostEffectType::kBloom;
+		bloom.intensity = 4.5f;
+		bloom.dirX = 2.0f;
+		bloom.dirY = 0.5f; // 輝度閾値を低めにして空などの広範囲を鮮烈に発光させる
+		activeEffects_.push_back(bloom);
 
-				D3D12_CPU_DESCRIPTOR_HANDLE rtv = dxCommon_->GetRenderTextureRTVHandle(dstIndex);
-				commandList->OMSetRenderTargets(1, &rtv, false, nullptr);
-			} else {
-				D3D12_CPU_DESCRIPTOR_HANDLE destRtv = dxCommon_->GetCurrentRTVHandle();
-				commandList->OMSetRenderTargets(1, &destRtv, false, nullptr);
-			}
+		ActivePostEffect noise;
+		noise.type = PostEffectType::kRandom;
+		noise.intensity = 0.10f;
+		activeEffects_.push_back(noise);
 
-			uint32_t srvIndex = dxCommon_->GetRenderTextureSrvIndex(srcIndex);
-			commandList->SetGraphicsRootDescriptorTable(0, srvManager_->GetGPUDescriptorHandle(srvIndex));
+		ActivePostEffect scan;
+		scan.type = PostEffectType::kScanLine;
+		scan.kernelSize = 0;
+		scan.intensity = 0.15f;
+		scan.dirX = 600.0f;
+		scan.dirY = 5.0f;
+		activeEffects_.push_back(scan);
 
-			size_t offset = cbAlignedSize * i;
-			PostEffectParams* param = reinterpret_cast<PostEffectParams*>(reinterpret_cast<uint8_t*>(mappedPostEffectParams_) + offset);
-			param->kernelSize = kernelSize_;
-			param->intensity = (float)i + 0.5f;
-			param->dirX = 0.0f;
-			param->dirY = 0.0f;
-			commandList->SetGraphicsRootConstantBufferView(1, postEffectParamsBuffer_->GetGPUVirtualAddress() + offset);
+		ActivePostEffect ab;
+		ab.type = PostEffectType::kChromaticAberration;
+		ab.intensity = 0.015f;
+		activeEffects_.push_back(ab);
 
-			commandList->DrawInstanced(3, 1, 0, 0);
+		ActivePostEffect dist;
+		dist.type = PostEffectType::kLensDistortion;
+		dist.intensity = 0.18f;
+		activeEffects_.push_back(dist);
 
-			if (!isLastPass) {
-				D3D12_RESOURCE_BARRIER barrierSRV = {};
-				barrierSRV.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-				barrierSRV.Transition.pResource = dxCommon_->GetRenderTexture(dstIndex);
-				barrierSRV.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-				barrierSRV.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
-				barrierSRV.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-				commandList->ResourceBarrier(1, &barrierSRV);
-			}
-		}
+		ActivePostEffect vig;
+		vig.type = PostEffectType::kVignette;
+		vig.intensity = 3.5f;
+		activeEffects_.push_back(vig);
 	}
-	else if (currentEffect_ == PostEffectType::kDissolve) {
-		commandList->SetGraphicsRootSignature(dissolveRootSignature_.Get());
-		commandList->SetPipelineState(dissolvePSO_.Get());
+	else if (presetName == "VHS Retro") {
+		ActivePostEffect tint;
+		tint.type = PostEffectType::kColorTint;
+		tint.colorR = 1.0f;
+		tint.colorG = 0.92f;
+		tint.colorB = 0.82f;
+		activeEffects_.push_back(tint);
 
-		commandList->SetGraphicsRootDescriptorTable(0, srvManager_->GetGPUDescriptorHandle(renderTextureSrvIndex));
+		ActivePostEffect noise;
+		noise.type = PostEffectType::kRandom;
+		noise.intensity = 0.1f;
+		activeEffects_.push_back(noise);
 
-		PostEffectParams* param0 = reinterpret_cast<PostEffectParams*>(reinterpret_cast<uint8_t*>(mappedPostEffectParams_) + 0);
-		param0->kernelSize = 0;
-		param0->intensity = dissolveThreshold_;
-		param0->dirX = dissolveEdgeWidth_;
-		param0->dirY = 0.0f;
-		commandList->SetGraphicsRootConstantBufferView(1, postEffectParamsBuffer_->GetGPUVirtualAddress());
+		ActivePostEffect scan;
+		scan.type = PostEffectType::kScanLine;
+		scan.kernelSize = 0;
+		scan.intensity = 0.12f;
+		scan.dirX = 400.0f;
+		scan.dirY = 2.0f;
+		activeEffects_.push_back(scan);
 
-		int maskIdx = dissolveMaskIndex_;
-		if (maskIdx < 0 || maskIdx >= static_cast<int>(dissolveMaskSrvIndices_.size())) { maskIdx = 0; }
-		commandList->SetGraphicsRootDescriptorTable(2, srvManager_->GetGPUDescriptorHandle(dissolveMaskSrvIndices_[maskIdx]));
+		ActivePostEffect ab;
+		ab.type = PostEffectType::kChromaticAberration;
+		ab.intensity = 0.02f;
+		activeEffects_.push_back(ab);
 
-		commandList->DrawInstanced(3, 1, 0, 0);
+		ActivePostEffect vig;
+		vig.type = PostEffectType::kVignette;
+		vig.intensity = 1.2f;
+		activeEffects_.push_back(vig);
 	}
-	else if (currentEffect_ == PostEffectType::kRadialBlur) {
-		commandList->SetGraphicsRootDescriptorTable(0, srvManager_->GetGPUDescriptorHandle(renderTextureSrvIndex));
+	else if (presetName == "Cinematic Bloom") {
+		ActivePostEffect bloom;
+		bloom.type = PostEffectType::kBloom;
+		bloom.intensity = 4.0f;
+		bloom.dirX = 2.0f;
+		bloom.dirY = 0.7f;
+		activeEffects_.push_back(bloom);
 
-		PostEffectParams* param0 = reinterpret_cast<PostEffectParams*>(reinterpret_cast<uint8_t*>(mappedPostEffectParams_) + 0);
-		param0->kernelSize = kernelSize_;
-		param0->intensity = intensity_;
-		param0->dirX = dirX_;
-		param0->dirY = dirY_;
-		commandList->SetGraphicsRootConstantBufferView(1, postEffectParamsBuffer_->GetGPUVirtualAddress());
-
-		commandList->DrawInstanced(3, 1, 0, 0);
+		ActivePostEffect vig;
+		vig.type = PostEffectType::kVignette;
+		vig.intensity = 1.0f;
+		activeEffects_.push_back(vig);
 	}
-	else {
-		// 通常の1パス描画
-		commandList->SetGraphicsRootDescriptorTable(0, srvManager_->GetGPUDescriptorHandle(renderTextureSrvIndex));
+	else if (presetName == "Digital Glitch") {
+		ActivePostEffect noise;
+		noise.type = PostEffectType::kRandom;
+		noise.intensity = 0.25f;
+		activeEffects_.push_back(noise);
 
-		PostEffectParams* param0 = reinterpret_cast<PostEffectParams*>(reinterpret_cast<uint8_t*>(mappedPostEffectParams_) + 0);
-		param0->kernelSize = kernelSize_;
-		param0->intensity = intensity_;
-		param0->dirX = dirX_;
-		param0->dirY = dirY_;
-		param0->time = time_;
-		commandList->SetGraphicsRootConstantBufferView(1, postEffectParamsBuffer_->GetGPUVirtualAddress());
+		ActivePostEffect ab;
+		ab.type = PostEffectType::kChromaticAberration;
+		ab.intensity = 0.04f;
+		activeEffects_.push_back(ab);
 
-		commandList->DrawInstanced(3, 1, 0, 0);
+		ActivePostEffect scan;
+		scan.type = PostEffectType::kScanLine;
+		scan.kernelSize = 0;
+		scan.intensity = 0.25f;
+		scan.dirX = 800.0f;
+		scan.dirY = -10.0f;
+		activeEffects_.push_back(scan);
+
+		ActivePostEffect dist;
+		dist.type = PostEffectType::kLensDistortion;
+		dist.intensity = 0.1f;
+		activeEffects_.push_back(dist);
+	}
+	else if (presetName == "Color Isolation (Red Focus)") {
+		ActivePostEffect iso;
+		iso.type = PostEffectType::kColorIsolation;
+		iso.colorR = 0.9f;
+		iso.colorG = 0.1f;
+		iso.colorB = 0.1f;
+		iso.intensity = 0.45f; // Tolerance
+		iso.dirX = 0.15f;      // Smoothness
+		iso.dirY = 1.0f;       // Desaturation (Full monochrome for non-red)
+		activeEffects_.push_back(iso);
+	}
+}
+
+bool PostEffect::SavePreset(const std::string& presetName) {
+	try {
+		std::filesystem::create_directories("assets/presets");
+		std::string filepath = "assets/presets/" + presetName + ".json";
+		std::ofstream file(filepath);
+		if (!file.is_open()) return false;
+
+		json j = activeEffects_;
+		file << j.dump(4);
+		return true;
+	}
+	catch (...) {
+		return false;
+	}
+}
+
+bool PostEffect::LoadPreset(const std::string& presetName) {
+	try {
+		std::string filepath = "assets/presets/" + presetName + ".json";
+		std::ifstream file(filepath);
+		if (!file.is_open()) return false;
+
+		json j;
+		file >> j;
+		activeEffects_ = j.get<std::vector<ActivePostEffect>>();
+		return true;
+	}
+	catch (...) {
+		return false;
 	}
 }

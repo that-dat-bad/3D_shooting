@@ -3,7 +3,7 @@
 
 class FlightModel;
 
-/// 汎用PIDコントローラー（1軸分）
+// <summary>汎用PIDコントローラー（1軸分）</summary>
 struct PIDController {
 	float kP = 0.0f;    // 比例ゲイン
 	float kI = 0.0f;    // 積分ゲイン
@@ -13,12 +13,12 @@ struct PIDController {
 	float prevError = 0.0f;     // 前フレームの誤差
 	float maxIntegral = 1.0f;   // 積分アンチワインドアップ上限
 
-	/// PIDのパラメータを設定
+	// <summary>PIDのパラメータを設定</summary>
 	void SetGains(float p, float i, float d, float maxI = 1.0f) {
 		kP = p; kI = i; kD = d; maxIntegral = maxI;
 	}
 
-	/// 誤差と経過時間からPID出力を計算
+	// <summary>誤差と経過時間からPID出力を計算</summary>
 	float Update(float error, float dt) {
 		// 比例項
 		float pTerm = kP * error;
@@ -41,7 +41,7 @@ struct PIDController {
 		return pTerm + iTerm + dTerm;
 	}
 
-	/// 状態をリセット
+	// <summary>状態をリセット</summary>
 	void Reset() {
 		integral = 0.0f;
 		prevError = 0.0f;
@@ -49,47 +49,49 @@ struct PIDController {
 };
 
 
-/// War Thunder風 マウスエイム・コントローラー
-/// マウス入力 → ワールド空間の目標方向を回転 → PID制御で操舵入力を生成。
+// <summary>
+// War Thunder準拠 マウスエイム・コントローラー
+// ワールド水平基準の球面座標(方位角・仰角±89°)で目標方向を更新し、PID制御で操舵入力を生成。
+// </summary>
 class MouseAimController {
 public:
 	MouseAimController() = default;
 	~MouseAimController() = default;
 
-	/// 初期化
+	// <summary>初期化</summary>
 	void Initialize();
 
-	/// マウスの相対移動量でワールド空間の目標方向を回転（カメラのローカル軸を使用）
+	// マウスの相対移動量でワールド空間の目標方向を回転
 	void UpdateTargetDirection(long deltaX, long deltaY, const MyMath::Vector3& camRight, const MyMath::Vector3& camUp);
 
-	/// 目標方向を指定の前方ベクトルにリセット
+	// 目標方向を指定の前方ベクトルにリセット
 	void ResetToDirection(const MyMath::Vector3& forward);
 
-	/// PID制御で操舵入力を生成
-	/// @param orientation 機体の現在姿勢（クォータニオン）
-	/// @param deltaTime フレーム間の経過時間（秒）
-	/// @param outPitch 生成されたピッチ入力 (-1 ～ 1)
-	/// @param outRoll  生成されたロール入力 (-1 ～ 1)
-	/// @param outYaw   生成されたヨー入力 (-1 ～ 1)
+	// PID制御で操舵入力を生成
+	// orientation: 機体の現在姿勢（クォータニオン）
+	// deltaTime: フレーム間の経過時間（秒）
+	// outPitch: 生成されたピッチ入力 (-1 ～ 1)
+	// outRoll: 生成されたロール入力 (-1 ～ 1)
+	// outYaw: 生成されたヨー入力 (-1 ～ 1)
 	void CalculateSteeringInput(
 		const MyMath::Quaternion& orientation,
 		float deltaTime,
 		float& outPitch, float& outRoll, float& outYaw
 	);
 
-	/// 有効/無効の切り替え
+	// 有効/無効の切り替え
 	void SetEnabled(bool enabled) { enabled_ = enabled; }
 	bool IsEnabled() const { return enabled_; }
 	void ToggleEnabled() { enabled_ = !enabled_; }
 
-	/// マウス感度の設定
+	// マウス感度の設定
 	void SetSensitivity(float sensitivity) { sensitivity_ = sensitivity; }
 	float GetSensitivity() const { return sensitivity_; }
 
-	/// ワールド空間の目標方向ベクトル（レティクル投影用）
+	// ワールド空間の目標方向ベクトル（レティクル投影用）
 	MyMath::Vector3 GetTargetDirection() const { return targetDirection_; }
 
-	/// PIDコントローラーへのアクセス（ImGuiチューニング用）
+	// PIDコントローラーへのアクセス（ImGuiチューニング用）
 	PIDController& GetPitchPID() { return pitchPID_; }
 	PIDController& GetRollPID() { return rollPID_; }
 	PIDController& GetYawPID() { return yawPID_; }
@@ -100,6 +102,10 @@ private:
 
 	// マウス感度
 	float sensitivity_ = 0.05f; // reduced mouse sensitivity
+
+	// ワールド水平基準の方位角・仰角（War Thunder準拠：360°方位角＋±89°仰角）
+	float targetYaw_ = 0.0f;
+	float targetPitch_ = 0.0f;
 
 	// ワールド空間の目標方向（単位ベクトル）
 	MyMath::Vector3 targetDirection_ = { 0.0f, 0.0f, 1.0f };

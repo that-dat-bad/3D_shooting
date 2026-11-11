@@ -7,10 +7,23 @@ class DirectXCommon;
 
 #include <memory> 
 
+/// <summary>
+/// スプライト描画の共通設定管理クラス
+/// </summary>
 class SpriteCommon
 {
 public:
+	/// <summary>
+	/// シングルトンインスタンスの取得
+	/// </summary>
+	/// <returns>インスタンスポインタ</returns>
 	static SpriteCommon* GetInstance();
+
+	/// <summary>
+	/// デフォルトコンストラクタ (std::make_unique対応のためpublic)
+	/// </summary>
+	SpriteCommon() = default;
+
     void Initialize(DirectXCommon* dxCommon);
     void Finalize();
 
@@ -24,6 +37,8 @@ public:
 
 private:
 	static std::unique_ptr<SpriteCommon> instance;
+	SpriteCommon(const SpriteCommon&) = delete;
+	SpriteCommon& operator=(const SpriteCommon&) = delete;
 	DirectXCommon* dxCommon_ = nullptr;
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSignature_;
 	std::array<Microsoft::WRL::ComPtr<ID3D12PipelineState>, static_cast<size_t>(BlendMode::kCountOf)> graphicsPipelineStates_;

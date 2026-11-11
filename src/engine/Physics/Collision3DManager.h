@@ -3,47 +3,66 @@
 #include "Collider.h"
 #include "ICollisionBody.h"
 
-/// @brief 3D衝突判定マネージャ
+/// <summary>
+/// 3D衝突判定マネージャ
 /// 登録されたコライダーを毎フレーム総当たり判定し、コールバックを呼ぶ
+/// </summary>
 class Collision3DManager {
 public:
-	/// @brief コライダーを登録する（毎フレーム呼ぶ）
-	/// @param body 判定に参加するオブジェクト
+	/// <summary>
+	/// コライダーを登録する（毎フレーム呼ぶ）
+	/// </summary>
+	/// <param name="body">判定に参加するオブジェクト</param>
 	void Register(ICollisionBody3D* body);
 
-	/// @brief 登録済みの全コライダーの総当たり判定を実行
+	/// <summary>
+	/// 登録済みの全コライダーの総当たり判定を実行
 	/// 衝突があれば双方の OnCollision() を呼ぶ
+	/// </summary>
 	void CheckAllCollisions();
 
-	/// @brief 登録リストをクリア（フレーム開始時に呼ぶ）
+	/// <summary>登録リストをクリア（フレーム開始時に呼ぶ）</summary>
 	void Clear();
 
-	/// @brief 現在の登録数を取得
+	/// <summary>現在の登録数を取得</summary>
 	size_t GetBodyCount() const { return bodies_.size(); }
 
 	// ============================================================
 	// ジオメトリユーティリティ (static)
 	// ============================================================
 
-	/// @brief 球と球の衝突判定
+	/// <summary>球と球の衝突判定</summary>
 	static bool CheckSphereSphere(const SphereCollider& a, const SphereCollider& b);
 
-	/// @brief AABBとAABBの衝突判定
+	/// <summary>AABBとAABBの衝突判定</summary>
 	static bool CheckAABBAABB(const AABBCollider& a, const AABBCollider& b);
 
-	/// @brief 球とAABBの衝突判定
+	/// <summary>球とAABBの衝突判定</summary>
 	static bool CheckSphereAABB(const SphereCollider& sphere, const AABBCollider& aabb);
 
-	/// @brief 座標が地面より下かどうか
-	/// @param position 判定座標
-	/// @param groundY 地面の高さ（デフォルト 0）
+	/// <summary>レイとAABBの衝突判定（高速アーリーアウト用）</summary>
+	static bool CheckRayAABB(const Ray& ray, const AABBCollider& aabb, float* outTMin = nullptr);
+
+	/// <summary>レイと三角形ポリゴンの Möller–Trumbore 交差判定</summary>
+	static bool RayTriangleIntersect(
+		const Ray& ray,
+		const MyMath::Vector3& v0,
+		const MyMath::Vector3& v1,
+		const MyMath::Vector3& v2,
+		RaycastHit* outHit = nullptr);
+
+	/// <summary>
+	/// 座標が地面より下かどうか
+	/// </summary>
+	/// <param name="position">判定座標</param>
+	/// <param name="groundY">地面の高さ（デフォルト 0）</param>
 	static bool CheckGroundCollision(const MyMath::Vector3& position, float groundY = 0.0f);
 
 private:
-	/// @brief 属性/マスクの組み合わせで判定すべきかチェック
+	/// <summary>属性/マスクの組み合わせで判定すべきかチェック</summary>
 	static bool ShouldCheckCollision(const ICollisionBody3D* a, const ICollisionBody3D* b);
 
-	/// @brief 2つのボディの形状に応じた衝突判定
+	/// <summary>2つのボディの形状に応じた衝突判定</summary>
 	static bool CheckBodyCollision(ICollisionBody3D* a, ICollisionBody3D* b);
 
 	std::list<ICollisionBody3D*> bodies_;

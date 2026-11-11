@@ -12,7 +12,7 @@ std::unique_ptr<GPUParticleManager> GPUParticleManager::instance_ = nullptr;
 
 GPUParticleManager* GPUParticleManager::GetInstance() {
 	if (!instance_) {
-		instance_.reset(new GPUParticleManager());
+		instance_ = std::make_unique<GPUParticleManager>();
 	}
 	return instance_.get();
 }

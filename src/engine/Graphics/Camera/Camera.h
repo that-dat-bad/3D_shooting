@@ -2,11 +2,24 @@
 #include "../base/Math/MyMath.h"
 using namespace MyMath;
 
+/// <summary>
+/// 仮想カメラクラス
+/// 空間のビュー行列・プロジェクション行列の計算と保持を行う
+/// </summary>
 class Camera
 {
 public:
+	/// <summary>コンストラクタ</summary>
 	Camera();
+
+	/// <summary>
+	/// カメラ情報の更新
+	/// 行列の再計算を行う
+	/// </summary>
 	void Update();
+
+	/// <summary>シェイクタイマーを進めずに現在のTransform・FOVから各種行列のみ即座に再計算する</summary>
+	void UpdateMatrices();
 
 	//アクセッサ
 	//--セッター--//
@@ -29,6 +42,13 @@ public:
 	float GetNearClip() const { return nearClip_; }
 	float GetFarClip() const { return farClip_; }
 
+	/// <summary>
+	/// カメラを揺らす（カメラシェイク）
+	/// </summary>
+	/// <param name="duration">揺れる時間（秒）</param>
+	/// <param name="magnitude">揺れの大きさ</param>
+	void Shake(float duration, float magnitude);
+
 private:
 	Transform transform_;
 	Matrix4x4 worldMatrix_;
@@ -43,5 +63,12 @@ private:
 	float nearClip_;
 	//ファークリップ
 	float farClip_;
+
+	// カメラシェイク用
+	float shakeTimer_ = 0.0f;
+	float shakeMagnitude_ = 0.0f;
+	Vector3 shakeOffset_ = { 0.0f, 0.0f, 0.0f };
+	bool shakeSteppedThisFrame_ = false;
+	void StepShakeOncePerFrame();
 };
 

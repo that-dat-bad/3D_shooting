@@ -42,7 +42,7 @@ void BulletManager::Draw(Camera* camera) {
 }
 
 void BulletManager::DrawTracerSegment(const Vector3& p1, const Vector3& p2, int segmentIndex, Camera* camera, uint32_t texIndex) {
-	Vector3 toP1 = Substract(p1, p2);
+	Vector3 toP1 = Subtract(p1, p2);
 	float length = Length(toP1);
 	if (length < 0.01f) { return; }
 

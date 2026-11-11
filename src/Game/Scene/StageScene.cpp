@@ -1,828 +1,525 @@
-#include "StageScene.h"
-#include "../../engine/Graphics/Camera/CameraManager.h"
-#include "../../engine/Graphics/Model/Object3dCommon.h"
-#include "../../engine/Graphics/Model/SkyboxCommon.h"
-#include "../../engine/Graphics/System/TextureManager.h"
-#include "../../engine/Graphics/Model/ModelManager.h"
-#include "../../engine/Graphics/Model/PrimitiveModel.h"
-#include "WinApp.h"
-#include "../../engine/Graphics/PostProcess/PostEffect.h"
-#include "../../engine/Graphics/Particle/EffectManager.h"
-#include "../../engine/Graphics/Particle/ParticleManager.h"
-#include "../../engine/Graphics/Particle/GPUParticleManager.h"
-#include "../../engine/Physics/Collision3DManager.h"
-#include <cmath>
-#include <algorithm>
-
-#ifdef USE_IMGUI
-#include "../../../external/imgui/imgui.h"
-#endif
+#include "StageSceneInternal.h"
 
 using namespace MyMath;
-
-// 固定フレームレートの deltaTime (60FPS想定)
-static constexpr float kDeltaTime = 1.0f / 60.0f;
-
+using namespace StageSceneInternal;
 
 void StageScene::Initialize() {
+#ifdef _DEBUG
+	auto tStart = std::chrono::high_resolution_clock::now();
+	double assetsMs = 0.0;
+	bool ranAssets = false;
+#endif
 	sceneID = SCENE::STAGE;
 
+	if (!isAssetsInitialized_) {
+#ifdef _DEBUG
+		auto aStart = std::chrono::high_resolution_clock::now();
+#endif
+		InitializeAssets();
+		isAssetsInitialized_ = true;
+#ifdef _DEBUG
+		auto aEnd = std::chrono::high_resolution_clock::now();
+		assetsMs = std::chrono::duration<double, std::milli>(aEnd - aStart).count();
+		ranAssets = true;
+#endif
+	}
+
+#ifdef _DEBUG
+	auto rStart = std::chrono::high_resolution_clock::now();
+#endif
+	ResetGameplayState();
+#ifdef _DEBUG
+	auto rEnd = std::chrono::high_resolution_clock::now();
+	double resetMs = std::chrono::duration<double, std::milli>(rEnd - rStart).count();
+
+	auto tEnd = std::chrono::high_resolution_clock::now();
+	double totalMs = std::chrono::duration<double, std::milli>(tEnd - tStart).count();
+
+	char buf[256];
+	snprintf(buf, sizeof(buf), 
+		"  [StageScene::Initialize] Total: %.2f ms (Assets: %.2f ms [%s], ResetGameplayState: %.2f ms)\n",
+		totalMs, assetsMs, ranAssets ? "FRESH LOAD" : "PREWARMED", resetMs);
+	OutputDebugStringA(buf);
+
+	FILE* fp = nullptr;
+	if (fopen_s(&fp, "scene_transition.log", "a") == 0 && fp) {
+		fputs(buf, fp);
+		fclose(fp);
+	}
+#endif
+}
+
+void StageScene::PrewarmAssets() {
+	if (!isAssetsInitialized_) {
+#ifdef _DEBUG
+		auto aStart = std::chrono::high_resolution_clock::now();
+#endif
+		InitializeAssets();
+		isAssetsInitialized_ = true;
+#ifdef _DEBUG
+		auto aEnd = std::chrono::high_resolution_clock::now();
+		double assetsMs = std::chrono::duration<double, std::milli>(aEnd - aStart).count();
+
+		char buf[256];
+		snprintf(buf, sizeof(buf), "  [StageScene::PrewarmAssets] GPU & Assets prewarmed in %.2f ms\n", assetsMs);
+		OutputDebugStringA(buf);
+
+		FILE* fp = nullptr;
+		if (fopen_s(&fp, "scene_transition.log", "a") == 0 && fp) {
+			fputs(buf, fp);
+			fclose(fp);
+		}
+#endif
+	}
+}
+
+void StageScene::InitializeAssets() {
 	// ============================
+	// 機体設定（CFG）のロード
 	// ============================
-	AirframeData airframeData{};
-	airframeData.emptyFrameMass = 3000.0f;   // 3トン
-	airframeData.maxInternalFuel = 800.0f;
-	airframeData.baseDrag = 0.02f;            // 基本空気抵抗
-	airframeData.liftCoefficient = 0.4f;      // 迎え角0時の揚力係数（キャンバー翼）
-	airframeData.wingArea = 40.0f;            // 翼面積 20m^2
-	airframeData.maxHealth = 100.0f;          // 耐久値
-	// 揚力・失速
-	airframeData.criticalAoA = 0.5f;         // 臨界迎え角
-	airframeData.maxLiftCoefficient = 1.5f;   // 最大CL
-	airframeData.stallLiftCoefficient = 0.3f; // 失速後CL
-	// 誘導抵抗
-	airframeData.aspectRatio = 6.0f;
-	airframeData.oswaldEfficiency = 0.8f;
-	airframeData.positiveGLimit = 9.0f;
-	airframeData.negativeGLimit = -3.0f;
-	// フラップ
-	airframeData.flapLiftBonus = 0.5f;
-	airframeData.flapDragBonus = 0.08f;
-	airframeData.flapMaxSpeed = 97.0f;        // ≈350 km/h
-	airframeData.flapDeploySpeed = 2.0f;
-	// エアブレーキ
-	airframeData.airBrakeDragBonus = 0.15f;
-	airframeData.airBrakeDeploySpeed = 3.0f;
-
-	EngineData engineData{};
-	engineData.mass = 500.0f;                 // エンジン 500kg
-	engineData.baseThrust = 80000.0f;         // 推力 80kN
-	engineData.normalThrottleLimit = 1.0f;
-	engineData.wepThrottleLimit = 1.1f;       // WEPで110%
-	engineData.physicalSpoolSpeed = 0.5f;     // スプール速度
-	engineData.baseFuelFlowRate = 2.0f;       // 燃料消費率 2kg/s @ 100%
-	engineData.altitudeThrottleFactor = 0.00004f; // 高度推力低下率
-
-	flightModel_.Initialize(airframeData, engineData);
-
-	// 初期位置: 上空100mから開始
-	flightModel_.SetPosition({ 0.0f, 100.0f, 0.0f });
-
-	// 開始時の速度を250km/hに設定
-	float initialSpeed = 250.0f / 3.6f;
-	flightModel_.SetVelocity(Multiply(initialSpeed, flightModel_.GetForwardDirection()));
-
-	// スロットルを60%に初期化（速度維持のため）
-	throttle_ = 0.6f;
-	flightModel_.SetThrottle(throttle_);
+	std::string aircraftCfgPath = aircraftConfig_.GetCurrentFilePath();
+	if (aircraftCfgPath.empty()) {
+		aircraftCfgPath = "Resources/aircraft/mig21.cfg";
+	}
+	if (!AsyncPreloadManager::GetInstance()->ApplyPreloadedAircraftConfig(aircraftConfig_)) {
+		auto t0 = std::chrono::high_resolution_clock::now();
+		aircraftConfig_.LoadFromCfg(aircraftCfgPath);
+		auto t1 = std::chrono::high_resolution_clock::now();
+		double ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
+		char buf[256];
+		sprintf_s(buf, "[Benchmark:StageScene] AircraftConfig SYNCHRONOUS LOAD -> Blocking time: %.2f ms", ms);
+		Benchmark::Log(buf);
+	}
+	const auto& generalConfig = aircraftConfig_.GetGeneral();
 
 	// ============================
-	// 描画オブジェクトの初期化
+	// 描画オブジェクト・モデル・テクスチャの初期化（初回のみ）
 	// ============================
-
-	// テクスチャのプリロード（モデルのマテリアルが参照するテクスチャを先に読み込む）
 	TextureManager::GetInstance()->LoadTexture("assets/textures/uvChecker.png");
 	TextureManager::GetInstance()->LoadTexture("assets/textures/circle2.png");
+	TextureManager::GetInstance()->LoadTexture("assets/textures/white1x1.png");
+	TextureManager::GetInstance()->LoadTexture("assets/textures/circle.png");
+	groundTextureIndex_ = TextureManager::GetInstance()->GetTextureIndexByFilePath("assets/textures/white1x1.png");
 
 	// 機体モデル
-	ModelManager::GetInstance()->LoadModel("Resources/planeplane.obj");
+	ModelManager::GetInstance()->LoadModel(generalConfig.modelPath);
 	aircraftObject_ = std::make_unique<Object3d>();
 	aircraftObject_->Initialize(Object3dCommon::GetInstance());
 	aircraftObject_->SetCamera(CameraManager::GetInstance()->GetActiveCamera());
-	aircraftObject_->SetModel("Resources/planeplane.obj");
-	aircraftObject_->GetModel()->SetEnvironmentCoefficient(0.6f); // 機体表面にスカイボックスの映り込み (強度引き上げ)
-	aircraftObject_->GetModel()->SetSpecularIntensity(2.5f);     // 鏡面反射強度を大幅に引き上げ
-	aircraftObject_->GetModel()->SetShininess(120.0f);            // シャープな光沢
+	aircraftObject_->SetModel(generalConfig.modelPath);
+	if (aircraftObject_->GetModel()) {
+		aircraftObject_->GetModel()->SetEnvironmentCoefficient(generalConfig.environmentCoefficient);
+		aircraftObject_->GetModel()->SetSpecularIntensity(generalConfig.specularIntensity);
+		aircraftObject_->GetModel()->SetShininess(generalConfig.shininess);
+	}
 
-	// 地面テクスチャ
-	TextureManager::GetInstance()->LoadTexture("assets/textures/white1x1.png");
-	groundTextureIndex_ = TextureManager::GetInstance()->GetTextureIndexByFilePath("assets/textures/white1x1.png");
+	// 部位破壊対応マルチパーツビジュアルモデル初期化
+	aircraftVisualModel_.Initialize(Object3dCommon::GetInstance(), CameraManager::GetInstance()->GetActiveCamera());
+	DebrisManager::GetInstance()->Initialize(Object3dCommon::GetInstance(), CameraManager::GetInstance()->GetActiveCamera());
 
+	// 1つのモデルファイルからノード名に基づいて自動セットアップ
+	aircraftVisualModel_.SetupFromSingleModel(generalConfig.modelPath);
+	aircraftVisualModel_.SetupCanopyMaterial();
+	aircraftVisualModel_.SetMaterialProperties(48.0f, 1.15f, 0.45f);
 
+	if (!aircraftVisualModel_.IsPartVisible(DamagePart::Fuse)) {
+		std::vector<DamagePart> parts = {
+			DamagePart::Fuse, DamagePart::Engine1, DamagePart::Wing_L, DamagePart::Wing_R,
+			DamagePart::Wing1_L, DamagePart::Wing1_R, DamagePart::Wing2_L, DamagePart::Wing2_R,
+			DamagePart::Tail, DamagePart::Rudder, DamagePart::Elevator0, DamagePart::Elevator1
+		};
+		for (auto p : parts) {
+			aircraftVisualModel_.SetModelForPart(p, "Resources/models/m21.gltf");
+		}
+	}
 
-	TextureManager::GetInstance()->LoadTexture("assets/textures/cedar_bridge_sunset_1_2k.dds");
+	// 自機アフターバーナーの初期化
+	afterburner_ = std::make_unique<Afterburner>();
+	afterburner_->Initialize();
+	afterburner_->SetTwinEngine(false);
+	afterburner_->SetSingleNozzleOffset({ 0.0f, 0.011f, 7.60f });
+	afterburner_->SetFlameRadius(0.38f);
+	afterburner_->SetFlameLength(6.2f);
+	afterburner_->SetShockDiamondCount(5);
+	afterburner_->SetFlameColor({ 0.28f, 0.65f, 1.0f });
+	afterburner_->SetCoreColor({ 0.88f, 0.95f, 1.0f });
+	afterburner_->SetIntensity(0.0f);
+	afterburner_->LoadConfig("assets/configs/afterburner_m21.json");
+
+	// スカイボックス
+	TextureManager::GetInstance()->LoadTexture("assets/textures/qwantani_dusk_2_puresky_2k.dds");
 	skybox_ = std::make_unique<Skybox>();
 	skybox_->Initialize(SkyboxCommon::GetInstance());
 	skybox_->SetCamera(CameraManager::GetInstance()->GetActiveCamera());
-	uint32_t skyboxTexIndex = TextureManager::GetInstance()->GetTextureIndexByFilePath("assets/textures/cedar_bridge_sunset_1_2k.dds");
+	uint32_t skyboxTexIndex = TextureManager::GetInstance()->GetTextureIndexByFilePath("assets/textures/qwantani_dusk_2_puresky_2k.dds");
 	skybox_->SetTextureIndex(skyboxTexIndex);
+	skybox_->SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
 	Object3dCommon::GetInstance()->SetDefaultEnvTextureIndex(skyboxTexIndex);
 
-	// ============================
-	// ライティング設定（太陽光）
-	// ============================
-	DirectionalLight* dirLight = Object3dCommon::GetInstance()->GetDirectionalLightData();
-	if (dirLight) {
-		dirLight->color = { 1.0f, 0.95f, 0.85f, 1.0f };       // やや暖色の太陽光
-		dirLight->direction = { 0.5f, -0.8f, 0.3f };           // 斜め上から
-		dirLight->intensity = 0.5f;
-	}
-	// ライティングモデル設定
-	Object3dCommon::GetInstance()->SetLightType(1);             // Directional Light 有効
+	// ライティング設定
+	environmentManager_.Initialize();
+	Object3dCommon::GetInstance()->SetLightType(1);
 	Object3dCommon::GetInstance()->SetShadingModel(1);
 	Object3dCommon::GetInstance()->SetSpecularModel(2);
 
-	// ============================
-		// ============================
-	// カメラ初期位置（機体の後方）
-	// ============================
-	Vector3 initPos = flightModel_.GetPosition();
-	Vector3 initForward = flightModel_.GetForwardDirection();
+	// 戦闘HUD・出撃イントロ・演出スプライト初期化
+	SpriteCommon* spriteCommon = SpriteCommon::GetInstance();
+	combatBootSequence_.Initialize(spriteCommon);
+	hud_.Initialize(spriteCommon);
+	radioCommunicator_.Initialize(spriteCommon);
+	tutorialDirector_.Initialize(spriteCommon);
+	infoUI_.Initialize(spriteCommon);
 
-	playerCamera_.Initialize(initPos, initForward);
-	CameraManager::GetInstance()->Update();
+	seqOverlaySprite_ = std::make_unique<Sprite>();
+	seqOverlaySprite_->Initialize(spriteCommon, "assets/textures/white1x1.png");
+	seqNoiseSprite_ = std::make_unique<Sprite>();
+	seqNoiseSprite_->Initialize(spriteCommon, "assets/textures/white1x1.png");
 
-	// ============================
-	// マウスエイムコントローラの初期化
-	// ============================
-	mouseAimController_.Initialize();
-	mouseAimEnabled_ = true;
+	// ポーズメニュー用スプライトプールの初期化（512枚：DAWN_OS デスクトップ完全同期）
+	pauseSpritePool_.clear();
+	for (int i = 0; i < 512; ++i) {
+		auto sp = std::make_unique<Sprite>();
+		sp->Initialize(spriteCommon, "assets/textures/white1x1.png");
+		pauseSpritePool_.push_back(std::move(sp));
+	}
+	pauseSpritePoolIndex_ = 0;
 
-	// マウスエイム開始時はOSカーソルを非表示＆ロック
-	Input::GetInstance()->LockCursor();
-
-	// ============================
-	// 戦闘システムの初期化
-	// ============================
-
-	GunPodData gunpodData{};
-	gunpodData.baseMass = 50.0f;
-	gunpodData.drag = 0.005f;
-	gunpodData.ammoWeight = 0.1f;
-	gunpodData.maxAmmo = 500;
-	gunpodData.fireRate = 25.0f;  // 秒間25発（レートアップ）
-	gunpod_.Initialize(gunpodData);
-
-	// 弾丸マネージャー初期化
-	bulletManager_.Initialize(512);
-
-	// 敵の配置（ミッション01仕様）
-	std::vector<EnemySpawnData> mission01Enemies = {
-		{ {  100.0f, 100.0f,  200.0f }, "Resources/planeplane.obj", 50.0f },
-		{ {  -80.0f, 100.0f,  300.0f }, "Resources/planeplane.obj", 50.0f },
-		{ {  200.0f, 100.0f,  450.0f }, "Resources/planeplane.obj", 50.0f },
-		{ { -150.0f, 100.0f,  500.0f }, "Resources/planeplane.obj", 50.0f },
-		{ {   50.0f, 100.0f,  700.0f }, "Resources/planeplane.obj", 50.0f },
-	};
-	enemyManager_.Initialize(
-		mission01Enemies,
-		airframeData,
-		engineData,
-		gunpodData,
-		&flightModel_,
-		&bulletManager_
-	);
-
-	// エフェクトマネージャー初期化
-	EffectManager::GetInstance()->Initialize();
+	// パーティクルグループの登録（初回のみ）
 	ParticleManager::GetInstance()->CreateParticleGroup("HitSpark", "assets/textures/white1x1.png");
 	ParticleManager::GetInstance()->CreateParticleGroup("Vortex", "assets/textures/circle2.png");
 	ParticleManager::GetInstance()->CreateParticleGroup("Casing", "assets/textures/white1x1.png");
-
-	// 爆発用パーティクルグループの登録
-	TextureManager::GetInstance()->LoadTexture("assets/textures/circle.png");
 	ParticleManager::GetInstance()->CreateParticleGroup("ExplosionSpark", "assets/textures/circle.png");
 	ParticleManager::GetInstance()->SetBlendMode("ExplosionSpark", BlendMode::kAdd);
-
-	ParticleManager::GetInstance()->CreateParticleGroup("ExplosionFire", "assets/textures/circle2.png");
+	ParticleManager::GetInstance()->CreateParticleGroup("ExplosionFire", "assets/textures/flame_particle.png");
 	ParticleManager::GetInstance()->SetBlendMode("ExplosionFire", BlendMode::kAdd);
-
-	ParticleManager::GetInstance()->CreateParticleGroup("ExplosionSmoke", "assets/textures/circle2.png");
+	ParticleManager::GetInstance()->CreateParticleGroup("ExplosionSmoke", "assets/textures/smoke_particle.png");
 	ParticleManager::GetInstance()->SetBlendMode("ExplosionSmoke", BlendMode::kNormal);
 
 	GPUParticleManager::GetInstance()->SetTexture(TextureManager::GetInstance()->GetTextureIndexByFilePath("assets/textures/circle.png"));
 
+	// 地形チャンクマネージャー初期化（4000mチャンク分割 40km x 40km）
+	terrainChunkManager_ = TerrainChunkManager::GetInstance();
+	terrainChunkManager_->Initialize(Object3dCommon::GetInstance(), CameraManager::GetInstance()->GetActiveCamera(), "Resources/terrains/demo/chunks_info.json");
+
+	// 初回のみテクスチャアップロードを確定
+	DirectXCommon::GetInstance()->FlushTextureUploads();
+}
+
+void StageScene::ResetGameplayState() {
+	// マウスポインターを非表示（自ウィンドウがアクティブな場合のみ）
+	HWND hwnd = Input::GetInstance() ? Input::GetInstance()->GetHwnd() : nullptr;
+	if (hwnd && ::GetForegroundWindow() == hwnd) {
+		while (::ShowCursor(FALSE) >= 0) {}
+		::SetCursor(nullptr);
+	}
+
+	// 機体設定（CFG）の最新反映
+	std::string aircraftCfgPath = aircraftConfig_.GetCurrentFilePath();
+	if (aircraftCfgPath.empty()) {
+		aircraftCfgPath = "Resources/aircraft/mig21.cfg";
+	}
+	if (!AsyncPreloadManager::GetInstance()->ApplyPreloadedAircraftConfig(aircraftConfig_)) {
+		aircraftConfig_.LoadFromCfg(aircraftCfgPath);
+	}
+
+	const auto& airframeData = aircraftConfig_.GetAirframe();
+	const auto& engineData = aircraftConfig_.GetEngine();
+	const auto& gunpodData = aircraftConfig_.GetGunpod();
+
+	flightModel_.Initialize(airframeData, engineData);
+	flightModel_.SetPosition({ 0.0f, 100.0f, 0.0f });
+
+	float initialSpeed = 250.0f / 3.6f;
+	flightModel_.SetVelocity(Multiply(initialSpeed, flightModel_.GetForwardDirection()));
+	throttle_ = 0.6f;
+	flightModel_.SetThrottle(throttle_);
+
+	// 自機パーツをすべて可視状態に復元
+	aircraftVisualModel_.ResetAllPartsVisible();
+
+	// Blender MCP リアルタイム同期の初期化＆自動開始
+	TerrainSyncManager::GetInstance()->Initialize("localhost", 8765);
+	TerrainSyncManager::GetInstance()->StartSync();
+	{
+		std::string syncMissionPath = MissionManager::GetInstance().GetCurrentFilePath();
+		if (syncMissionPath.empty()) {
+			syncMissionPath = MissionSyncDefaults::kDefaultMissionFilePath;
+		}
+		MissionSyncManager::GetInstance()->Initialize();
+		MissionSyncManager::GetInstance()->SetActiveMissionFilePath(syncMissionPath);
+		MissionSyncManager::GetInstance()->StartSync();
+	}
+
+	// カメラ初期位置
+	Vector3 initPos = flightModel_.GetPosition();
+	Vector3 initForward = flightModel_.GetForwardDirection();
+	playerCamera_.Initialize(initPos, initForward);
+	CameraManager::GetInstance()->Update();
+
+	// マウスエイムコントローラ
+	mouseAimController_.Initialize();
+	mouseAimEnabled_ = true;
+	Input::GetInstance()->UnlockCursor();
+
+	// 武装・弾丸
+	gunpod_.Initialize(gunpodData);
+	bulletManager_.Initialize(512);
+
+	// ミッションデータのロード
+	auto& missionManager = MissionManager::GetInstance();
+	std::string loadPath = missionManager.GetCurrentFilePath();
+	if (loadPath.empty()) {
+		loadPath = "Resources/missions/mission00.json";
+	}
+	if (!AsyncPreloadManager::GetInstance()->ApplyPreloadedMission(missionManager)) {
+		auto t0 = std::chrono::high_resolution_clock::now();
+		missionManager.Load(loadPath);
+		auto t1 = std::chrono::high_resolution_clock::now();
+		double ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
+		char buf[256];
+		sprintf_s(buf, "[Benchmark:StageScene] MissionData SYNCHRONOUS LOAD -> Blocking time: %.2f ms", ms);
+		Benchmark::Log(buf);
+	}
+
+	const auto& mission = missionManager.GetCurrentMission();
+	playerMaxHP_ = mission.playerHP;
+	playerHP_ = mission.playerHP;
+	flightModel_.SetPosition(mission.playerPosition);
+	{
+		const float yawRad = mission.playerYawDeg * StageRadioDefaults::kDegToRad;
+		const float halfYaw = yawRad * StageRadioDefaults::kHalfAngleFactor;
+		flightModel_.SetOrientation({
+			StageRadioDefaults::kZeroTimeLimit,
+			std::sin(halfYaw),
+			StageRadioDefaults::kZeroTimeLimit,
+			std::cos(halfYaw)
+		});
+		flightModel_.SetVelocity(Multiply(initialSpeed, flightModel_.GetForwardDirection()));
+		mouseAimController_.ResetToDirection(flightModel_.GetForwardDirection());
+	}
+	if (terrainChunkManager_ && terrainChunkManager_->IsLoaded()) {
+		flightModel_.SetGroundElevation(terrainChunkManager_->GetTerrainHeightAt(
+			mission.playerPosition.x,
+			mission.playerPosition.z,
+			-485.0f));
+	}
+	playerCamera_.Initialize(mission.playerPosition, flightModel_.GetForwardDirection());
+	tutorialDirector_.ResetForMission(mission, loadPath, mission.playerPosition);
+	const bool isTutorial = tutorialDirector_.IsTutorialActive() || (mission.difficulty == "TUTORIAL" || mission.aliasName == "ZADANIE 00" || loadPath.find("mission00") != std::string::npos);
+	GameResult::GetInstance().isHalcyonDaysTutorial = isTutorial;
+
+	static const std::vector<EnemySpawnData> kEmptyAirEnemies = {};
+	static const std::vector<GroundEnemySpawnData> kEmptyGroundEnemies = {};
+	enemyManager_.SetWaypointPaths(mission.waypointPaths);
+
+	enemyManager_.Initialize(
+		enableEnemies_ ? mission.enemies : kEmptyAirEnemies,
+		airframeData,
+		engineData,
+		gunpodData,
+		&flightModel_,
+		&bulletManager_,
+		enableEnemies_ ? mission.groundEnemies : kEmptyGroundEnemies
+	);
+
+	// エフェクトマネージャー初期化＆残存破片のクリア
+	EffectManager::GetInstance()->Initialize();
+	DebrisManager::GetInstance()->Clear();
+
 	// ゲーム状態リセット
 	isMissionCleared_ = false;
 	isMissionFailed_ = false;
+	isGameOver_ = false;
+	GameResult::GetInstance().gameOverReason = GameOverReason::Destroyed;
+	gameOverTimer_ = 0.0f;
+	timeScale_ = 1.0f;
+	isBailout_ = false;
+	gameOverBurnTimer_ = 0.0f;
+	gameOverVelocity_ = { 0.0f, 0.0f, 0.0f };
+	gameOverTumbleRate_ = { 0.0f, 0.0f, 0.0f };
 	muzzleFlashTimer_ = 0.0f;
 	totalTime_ = 0.0f;
+	missionElapsedTime_ = 0.0f;
+	isPaused_ = false;
+	isPauseAborting_ = false;
+	flightModel_.SetInvulnerable(false);
+	flightModel_.SetGEffectsEnabled(true);
+	flightModel_.ResetGEffects();
+	flightModel_.SetAutopilot(false);
+	pauseAbortTimer_ = 0.0f;
+	pauseMenuIndex_ = 0;
+	pauseAnimTimer_ = 0.0f;
+	pauseWinPos_ = { (static_cast<float>(WinApp::kClientWidth) - 500.0f) * 0.5f,
+	                 (static_cast<float>(WinApp::kClientHeight) - 430.0f) * 0.5f };
+	pauseIsDragging_ = false;
 
-	// プレイヤー当たり判定ボディの初期化
 	playerBody_.scene_ = this;
-}
 
-// ============================================================
-// PlayerCollisionBody のコールバック実装
-// ============================================================
-void StageScene::PlayerCollisionBody::OnCollision(ICollisionBody3D* other) {
-	if (!scene_ || scene_->isMissionFailed_) { return; }
+	// 制限時間の初期化
+	remainingTime_ = mission.timeLimit;
+	int initMin = static_cast<int>(remainingTime_) / 60;
+	int initSec = static_cast<int>(remainingTime_) % 60;
+	char initTimeStr[32];
+	snprintf(initTimeStr, sizeof(initTimeStr), "TIME %02d:%02d", initMin, initSec);
+	timeText_.Initialize("HackGen", initTimeStr, 32.0f);
+	timeText_.SetAnchorPoint({ 0.5f, 0.0f });
+	timeText_.SetPosition({ WinApp::kClientWidth * 0.5f, 20.0f });
+	timeText_.SetColor({ 1.0f, 1.0f, 1.0f, 1.0f });
+	timeText_.SetCondition("Warning", [this]() {
+		return MissionManager::GetInstance().GetCurrentMission().timeLimit > StageRadioDefaults::kZeroTimeLimit &&
+		       remainingTime_ <= StageRadioDefaults::kTimeWarningThresholdSeconds;
+	});
+	UITextRegistry::GetInstance()->Register("Stage_Time", &timeText_);
 
-	// EnemyBullet との衝突 → ダメージを受ける
-	if (other->GetCollisionAttribute() & CollisionAttribute::kEnemyBullet) {
-		// 弾丸からダメージ量を取得（Bullet の場合）
-		auto* bullet = dynamic_cast<Bullet*>(other);
-		float damage = bullet ? bullet->GetDamage() : 10.0f;
-
-		scene_->playerHP_ -= damage;
-		EffectManager::GetInstance()->EmitHitEffect(scene_->flightModel_.GetPosition());
-
-		// HPが0以下でゲームオーバー
-		if (scene_->playerHP_ <= 0.0f) {
-			scene_->playerHP_ = 0.0f;
-			scene_->isMissionFailed_ = true;
-			scene_->sceneID = SCENE::RESULT;
-			EffectManager::GetInstance()->EmitDestroyEffect(scene_->flightModel_.GetPosition());
-		}
+	// 出撃イントロ
+	if (GameResult::GetInstance().isRetry) {
+		combatBootSequence_.SetQuickMode(true);
+		GameResult::GetInstance().isRetry = false;
+	} else {
+		combatBootSequence_.SetQuickMode(false);
 	}
-}
+	combatBootSequence_.Start();
+	sortieIntroDuration_ = combatBootSequence_.GetCurrentDuration();
+	sortieIntroTimer_ = 0.0f;
+	if (combatBootSequence_.IsWaitingForSpace()) {
+		Input::GetInstance()->UnlockCursor();
+		const float screenW = static_cast<float>(WinApp::kClientWidth);
+		const float screenH = static_cast<float>(WinApp::kClientHeight);
+		customCursorPos_ = Input::GetInstance()->GetVirtualMousePosition(screenW, screenH);
+		combatBootSequence_.SetCursorPos(customCursorPos_);
+		cursorRippleTimer_ = 0.0f;
+	} else {
+		Input::GetInstance()->LockCursor();
+	}
 
+	// HUDリセット
+	hud_.SetWarningColorMode(false);
+	hud_.ResetShutdown();
+	hud_.ResetDeploy();
+	radioCommunicator_.Clear();
+	hasSentSortieRadio_ = false;
+	hasSentDamageWarningRadio_ = false;
+	lastRadioKillCount_ = StageRadioDefaults::kInitialKillCount;
+	isFiringThisFrame_ = false;
+
+	endSequence_ = StageEndSequence::None;
+	endSeqTimer_ = 0.0f;
+
+	missionManager.BindEnemyManager(&enemyManager_);
+	missionManager.ResetRuntimeState();
+}
 
 void StageScene::Update() {
-	// 経過時間を更新
-	totalTime_ += kDeltaTime;
-
-	// ============================
-	// プレイヤー入力 → FlightModel
-	// ============================
+	ApplyMissionLiveSyncUpdate();
+	// ----------------------------------------------------
+	// ポーズメニュー制御（ゲームプレイ中のみ作動）
+	// ----------------------------------------------------
 	Input* input = Input::GetInstance();
-
-	// --- スロットル ---
-	if (input->PushKey(DIK_W)) {
-		throttle_ += 0.8f * kDeltaTime;
+	if (isPaused_) {
+		UpdatePauseMenu();
+		return;
 	}
-	if (input->PushKey(DIK_S)) {
-		throttle_ -= 0.8f * kDeltaTime;
-	}
-	if (throttle_ < 0.0f) { throttle_ = 0.0f; }
-	if (throttle_ > 1.0f) { throttle_ = 1.0f; }
-	flightModel_.SetThrottleInput(throttle_);
 
-	// --- マウスエイム ON/OFF トグル (M キー) ---
-	if (input->TriggerKey(DIK_M)) {
-		mouseAimEnabled_ = !mouseAimEnabled_;
-		mouseAimController_.SetEnabled(mouseAimEnabled_);
-		if (mouseAimEnabled_) {
-			mouseAimController_.ResetToDirection(flightModel_.GetForwardDirection());
-			input->LockCursor();
-		} else {
+	// ブリーフィング中（SPACE/クリック入力待機中）のマウス座標・波紋・アンロック更新
+	if (combatBootSequence_.IsWaitingForSpace()) {
+		if (input) {
 			input->UnlockCursor();
-		}
-	}
-
-	// --- カーソルロック ON/OFF トグル (P キー) ---
-	if (input->TriggerKey(DIK_P)) {
-		if (input->IsCursorLocked()) {
-			input->UnlockCursor();
-		} else {
-			input->LockCursor();
-		}
-	}
-
-	// --- WASD 手動操縦入力 ---
-	float manualPitch = 0.0f;
-	float manualRoll = 0.0f;
-	float manualYaw = 0.0f;
-
-	if (input->PushKey(DIK_LSHIFT)) { manualPitch -= 1.0f; }
-	if (input->PushKey(DIK_LCONTROL)) { manualPitch += 1.0f; }
-	if (input->PushKey(DIK_A)) { manualRoll += 1.0f; }
-	if (input->PushKey(DIK_D)) { manualRoll -= 1.0f; }
-	if (input->PushKey(DIK_Q)) { manualYaw -= 1.0f; }
-	if (input->PushKey(DIK_E)) { manualYaw += 1.0f; }
-
-	bool hasManualInput = (std::fabs(manualPitch) > 0.01f ||
-	                       std::fabs(manualRoll) > 0.01f ||
-	                       std::fabs(manualYaw) > 0.01f);
-
-	// フリーカメラ時、マウスエイムの目標が画面外（カメラの向いている方向から外れている）場合は
-	// マウスエイムによる追従を一時停止し、機体がそちらに向かわないようにする
-	bool pauseMouseAim = false;
-	if (mouseAimEnabled_ && playerCamera_.GetFreeViewActive()) {
-		Camera* cam = CameraManager::GetInstance()->GetActiveCamera();
-		if (cam) {
-			const Matrix4x4& mat = cam->GetWorldMatrix();
-			Vector3 camForward = { mat.m[2][0], mat.m[2][1], mat.m[2][2] };
-			Vector3 targetDir = mouseAimController_.GetTargetDirection();
-			
-			// 視界（カメラ前方）から一定以上外れているか判定（約36度: cos 0.8）
-			if (MyMath::Dot(camForward, targetDir) < 0.8f) {
-				pauseMouseAim = true;
+			const float screenW = static_cast<float>(WinApp::kClientWidth);
+			const float screenH = static_cast<float>(WinApp::kClientHeight);
+			customCursorPos_ = input->GetVirtualMousePosition(screenW, screenH);
+			combatBootSequence_.SetCursorPos(customCursorPos_);
+			if (cursorRippleTimer_ > 0.0f) {
+				cursorRippleTimer_ -= kDeltaTime;
+			}
+			if (input->TriggerMouse(0)) {
+				cursorRippleTimer_ = 0.30f;
+				cursorRipplePos_ = customCursorPos_;
 			}
 		}
 	}
 
-	// --- 操舵入力の決定 ---
-	float finalPitch = 0.0f;
-	float finalRoll = 0.0f;
-	float finalYaw = 0.0f;
-
-	// --- マウス入力による目標方向の更新 ---
-	// カーソルロック中かつ自由視点カメラ(Cキー)でない場合のみ、マウスで目標方向を更新する
-	// ※WASD操作中でもマウスエイム目標の更新は止めない（置いてけぼりになるのを防ぐため）
-	if (mouseAimEnabled_ && input->IsCursorLocked() && !playerCamera_.GetFreeViewActive()) {
-		Input::MouseMove mouseMove = input->GetMouseMove();
-		Camera* cam = CameraManager::GetInstance()->GetActiveCamera();
-		if (cam) {
-			const Matrix4x4& mat = cam->GetWorldMatrix();
-			Vector3 camRight = { mat.m[0][0], mat.m[0][1], mat.m[0][2] };
-			Vector3 camUp = { mat.m[1][0], mat.m[1][1], mat.m[1][2] };
-			mouseAimController_.UpdateTargetDirection(mouseMove.lX, mouseMove.lY, camRight, camUp);
+	// ゲームプレイ中のみポーズ可能（出撃イントロ中・ゲームオーバー演出中・クリア演出中は作動させない）
+	if (IsGameplayActive()) {
+		if (input && (input->TriggerKey(DIK_ESCAPE) || input->TriggerKey(DIK_P))) {
+			SetPaused(true);
+			return;
+		}
+		// ベイルアウト（脱出）入力（Jキーで被撃墜と同じゲームオーバー演出）
+		if (input && input->TriggerKey(DIK_J)) {
+			isBailout_ = true;
+			TriggerGameOver();
+			return;
 		}
 	}
 
-	// 失速して機首が強制的に落ちている間は、エイム目標が空に取り残されないよう
-	// 機首の方向へ徐々に引き戻す（ドラッグする）※フリーカメラ時限定
-	if (mouseAimEnabled_ && playerCamera_.GetFreeViewActive() && flightModel_.IsStalling()) {
-		Vector3 currentTarget = mouseAimController_.GetTargetDirection();
-		Vector3 forward = flightModel_.GetForwardDirection();
-		Vector3 newTarget = MyMath::Normalize(MyMath::Lerp(currentTarget, forward, 5.0f * kDeltaTime));
-		mouseAimController_.ResetToDirection(newTarget);
-	}
-
-	if (mouseAimEnabled_ && !hasManualInput && !pauseMouseAim) {
-		// === マウスエイムモード ===
-		// マウスエイムコントローラーがPID制御で操舵入力を生成
-		mouseAimController_.CalculateSteeringInput(
-			flightModel_.GetOrientation(),
-			kDeltaTime,
-			finalPitch, finalRoll, finalYaw
-		);
-	} else {
-		// === 手動操縦モード（WASDオーバーライド or マウスエイムOFF or 目標が画面外）===
-
-		// フリーカメラ(Cキー)中に手動でWASD操作をした場合は、
-		// 目標に到達しているかどうかに関わらずエイム目標を現在の機首方向に上書きする
-		if (mouseAimEnabled_ && playerCamera_.GetFreeViewActive() && hasManualInput) {
-			mouseAimController_.ResetToDirection(flightModel_.GetForwardDirection());
+	// ミッション制限時間の更新 (出撃演出・ブリーフィング完了後の実プレイ中のみ減算)
+	if (IsGameplayActive()) {
+		missionElapsedTime_ += kDeltaTime;
+		const bool hasMissionTimeLimit =
+			(MissionManager::GetInstance().GetCurrentMission().timeLimit > StageRadioDefaults::kZeroTimeLimit);
+		if (hasMissionTimeLimit) {
+			remainingTime_ -= kDeltaTime;
+		}
+		if (hasMissionTimeLimit && remainingTime_ <= StageRadioDefaults::kZeroTimeLimit) {
+			remainingTime_ = 0.0f;
+			// 制限時間切れ時は爆発させず作戦離脱シーケンスを開始
+			TriggerTimeOver();
 		}
 
-		// インストラクター ON/OFF (I キー)
-		if (input->TriggerKey(DIK_I)) {
-			flightInstructor_.ToggleEnabled();
+		const float displayClockSeconds = hasMissionTimeLimit ? remainingTime_ : missionElapsedTime_;
+		constexpr int kSecondsPerMinute = 60;
+		int minutes = static_cast<int>(displayClockSeconds) / kSecondsPerMinute;
+		int seconds = static_cast<int>(displayClockSeconds) % kSecondsPerMinute;
+		char timeStr[32];
+		snprintf(timeStr, sizeof(timeStr), "TIME %02d:%02d", minutes, seconds);
+		timeText_.SetText(timeStr);
+	}
+	timeText_.Update();
+
+	// デバッグ用キー（VキーでGameOver演出、BキーでGameClear演出を即時テスト可能）
+	Input* inputDebug = Input::GetInstance();
+	if (inputDebug) {
+		if (inputDebug->TriggerKey(DIK_V)) {
+			TriggerGameOver();
 		}
-
-		// インストラクターによる補正（無入力時に自動水平復帰）
-		flightInstructor_.ApplyCorrection(
-			manualPitch, manualRoll, manualYaw,
-			flightModel_.GetOrientation(),
-			finalPitch, finalRoll, finalYaw
-		);
-	}
-
-	flightModel_.SetControlInput(finalPitch, finalRoll, finalYaw);
-
-	// --- フラップ / エアブレーキ ---
-	flightModel_.SetFlapInput(input->PushKey(DIK_F));
-	flightModel_.SetAirBrakeInput(input->PushKey(DIK_B));
-
-	if (input->TriggerKey(DIK_V)) {
-		sceneID = SCENE::RESULT;
-	}
-
-	// --- 射撃入力（マウス左クリック） ---
-	if (input->PushMouse(0) && !isMissionCleared_ && !isMissionFailed_) {
-		int ammoBefore = gunpod_.GetCurrentAmmo();
-		gunpod_.Fire();
-		if (gunpod_.GetCurrentAmmo() < ammoBefore) {
-			Vector3 aircraftPos = flightModel_.GetPosition();
-			Vector3 aircraftForward = flightModel_.GetForwardDirection();
-			Vector3 aircraftVelocity = flightModel_.GetVelocity();
-
-			// 機首先端から発射
-			Vector3 firePos = Add(aircraftPos, Multiply(8.0f, aircraftForward));
-
-			// まっすぐ発射 (ガンコンバージェンスを廃止し、機首方向固定)
-			Vector3 fireDir = aircraftForward;
-
-			// 弾丸の初速ベクトル ＝ 機体速度 ＋ (射出方向 × 射出速度)
-			// (自機が弾を追い抜く問題を防止し、物理法則に従う)
-			float muzzleSpeed = 500.0f;
-			Vector3 muzzleVelocity = Multiply(muzzleSpeed, fireDir);
-			Vector3 bulletVelocity = Add(aircraftVelocity, muzzleVelocity);
-
-			bulletManager_.SpawnBullet(firePos, bulletVelocity, 10.0f);
-
-			// --- 薬莢の放出エフェクト ---
-			{
-				Vector3 aircraftPos = flightModel_.GetPosition();
-				Vector3 velocity = flightModel_.GetVelocity(); // 機体の現在の速度
-				Vector3 right = flightModel_.GetRightDirection();
-				Vector3 up = flightModel_.GetUpDirection();
-				Vector3 forward = flightModel_.GetForwardDirection();
-
-				// 薬莢の排出口位置（コックピットより少し後ろの左下あたりにオフセット）
-				Vector3 casingPos = Add(aircraftPos, Multiply(-2.0f, forward));
-				casingPos = Add(casingPos, Multiply(-0.4f, right)); // 排出口に近い本来の左下オフセットに戻す
-				casingPos = Add(casingPos, Multiply(-0.5f, up));
-
-				ParticleParameters casingParams;
-				// 機体速度をベースに、後方（-forward）へ勢いよくはじき出す速度を加算（後ろ側に吹き飛ぶように設定）
-				Vector3 localMinVel = Add(Add(Multiply(-2.0f, right), Multiply(-3.0f, up)), Multiply(-18.0f, forward));
-				Vector3 localMaxVel = Add(Add(Multiply(-0.5f, right), Multiply(-1.0f, up)), Multiply(-10.0f, forward));
-				
-				casingParams.minVelocity = Add(velocity, localMinVel);
-				casingParams.maxVelocity = Add(velocity, localMaxVel);
-				
-				// 加速度：重力（-Y方向に 9.8m/s^2）
-				casingParams.acceleration = { 0.0f, -9.8f, 0.0f };
-
-				// 寿命：1.5秒程度で消える
-				casingParams.minLifeTime = 1.2f;
-				casingParams.maxLifeTime = 1.8f;
-
-				// サイズ：カメラからでも黄銅色の破片がはっきり見えるようにサイズを大きくする
-				casingParams.minScale = 0.12f;
-				casingParams.maxScale = 0.18f;
-				casingParams.endScale = 0.08f;
-				casingParams.fadeOut = true;
-
-				// 色：より明るく目立つゴールド/真鍮色
-				casingParams.minColor = { 0.95f, 0.75f, 0.15f, 1.0f };
-				casingParams.maxColor = { 1.0f, 0.85f, 0.30f, 1.0f };
-
-				// 向き（回転）を完全にランダムに
-				casingParams.minRotation = 0.0f;
-				casingParams.maxRotation = 6.283185f;
-				casingParams.minRotationSpeed = -15.0f;
-				casingParams.maxRotationSpeed = 15.0f;
-
-				// 発生位置のランダムばらつきはゼロ (排出口から直接)
-				casingParams.randomPositionRange = 0.0f;
-
-				// エミット（1発につき1個）
-				ParticleManager::GetInstance()->Emit("Casing", casingPos, casingParams, 1);
-			}
-
-			// マズルフラッシュの間引き（2発に1回エフェクトを発生）
-			muzzleFlashCount_++;
-			if (muzzleFlashCount_ % 2 == 0) {
-				EffectManager::GetInstance()->EmitMuzzleFlash(firePos, fireDir);
-				muzzleFlashTimer_ = 0.08f; // 表示時間
-
-				// ランダム化パラメータの設定
-				muzzleFlashRandomScale_ = 0.8f + (rand() % 40) / 100.0f; // 0.8 ~ 1.2
-				muzzleFlashRandomRoll_ = (rand() % 628) / 100.0f;        // 0 ~ 2PI
-				muzzleFlashRandomAlpha_ = 0.8f + (rand() % 20) / 100.0f; // 0.8 ~ 1.0
-
-				// 動的ライト (PointLight) の点灯
-				PointLight* pLight = Object3dCommon::GetInstance()->GetPointLightData();
-				if (pLight) {
-					pLight->position = firePos;
-					pLight->color = { 1.0f, 0.4f, 0.05f, 1.0f }; // 濃いオレンジ
-					pLight->intensity = 30.0f; // 強く光らせる
-					pLight->radius = 30.0f;    // 届く範囲
-					pLight->decay = 2.0f;      // 減衰
-				}
-			}
+		if (inputDebug->TriggerKey(DIK_B)) {
+			TriggerGameClear();
 		}
 	}
 
-	if (muzzleFlashTimer_ > 0.0f) {
-		muzzleFlashTimer_ -= kDeltaTime;
+	// ゲームオーバー / クリア演出シーケンスの更新
+	UpdateEndSequence(kDeltaTime);
+
+	float gameDeltaTime = kDeltaTime * timeScale_;
+	totalTime_ += gameDeltaTime;
+
+	// 各責務コンポーネント更新
+	UpdateFlightControls(gameDeltaTime);
+	UpdateCombatFiring(gameDeltaTime);
+	UpdateFlightAndEffects(gameDeltaTime);
+	UpdateCombatAndMission(gameDeltaTime);
+	UpdateCamera(gameDeltaTime);
+	UpdateDebugAndStatusUI(gameDeltaTime);
+	UpdatePostEffects(gameDeltaTime);
+
+	// 地形チャンクの更新（距離カリング）
+	if (terrainChunkManager_) {
+		terrainChunkManager_->Update(flightModel_.GetPosition());
 	}
 
-	// 動的ライトの減衰（毎フレーム少しずつ暗くする）
-	PointLight* pLight = Object3dCommon::GetInstance()->GetPointLightData();
-	if (pLight && pLight->intensity > 0.0f) {
-		pLight->intensity -= 200.0f * kDeltaTime; // 0.15秒程度で消えるペース
-		if (pLight->intensity < 0.0f) { pLight->intensity = 0.0f; }
-	}
-
-	// ============================
-	// ============================
-	flightModel_.Update(kDeltaTime);
-
-	// --- 翼端ボルテックスエフェクトの発生 ---
-	float currentG = flightModel_.GetCurrentG();
-	Vector3 aircraftPos = flightModel_.GetPosition();
-	Vector3 right = flightModel_.GetRightDirection();
-	Vector3 forward = flightModel_.GetForwardDirection();
-
-	// 左右の翼端位置の計算 (翼幅を約12mと仮定し、左右に6.0mオフセット)
-	// 翼端は重心より少し後方（-2.0m）にあると仮定
-	Vector3 leftWingTip = Add(Add(aircraftPos, Multiply(-6.0f, right)), Multiply(-2.0f, forward));
-	Vector3 rightWingTip = Add(Add(aircraftPos, Multiply(6.0f, right)), Multiply(-2.0f, forward));
-
-	if (currentG > 3.0f && flightModel_.GetSpeed() > 50.0f) {
-		float gFactor = (currentG - 3.0f) / 3.0f; // 0.0 ~ 1.0
-		if (gFactor < 0.0f) { gFactor = 0.0f; }
-		if (gFactor > 1.0f) { gFactor = 1.0f; }
-
-		Vector4 baseColor = { 0.95f, 0.98f, 1.0f, 0.35f * gFactor }; // アルファ値を適度に見える濃さに調整
-
-		ParticleParameters params;
-		params.minVelocity = { 0.0f, 0.0f, 0.0f }; // 完全にブレをゼロにして直線を保つ
-		params.maxVelocity = { 0.0f, 0.0f, 0.0f };
-		params.randomPositionRange = 0.0f;         // 発生位置の強制的なランダム散らしを無効化する
-		params.minColor = baseColor;
-		params.maxColor = baseColor;
-		params.minLifeTime = 0.4f; // 寿命は少し長めで安定させる
-		params.maxLifeTime = 0.4f;
-		params.minScale = 0.08f;   // 初期サイズを非常に細くする (直径約16cm)
-		params.maxScale = 0.08f;
-		params.endScale = 0.12f;   // 消え際もあまり膨らませない (直径約24cm)
-		params.fadeOut = true;
-		params.minRotation = 0.0f; // 回転を完全にゼロにして繋がりを均一にする
-		params.maxRotation = 0.0f;
-		params.minRotationSpeed = 0.0f;
-		params.maxRotationSpeed = 0.0f;
-
-		// ストレッチビルボード（トレイル化）設定
-		params.isStretched = true;
-		params.stretchFactor = 12.5f; // scale 0.08f の逆数（1/0.08 = 12.5）で移動長さにフィットさせる
-
-		if (hasLastWingTips_) {
-			// 前フレームからの移動距離に応じて、隙間を埋めるように補間
-			Vector3 deltaL = Substract(leftWingTip, lastLeftWingTip_);
-			float distL = Length(deltaL);
-			Vector3 deltaR = Substract(rightWingTip, lastRightWingTip_);
-
-			// 0.25m（25cm）間隔で配置するための補間数（ストレッチビルボード化によりステップ数を激減）
-			int steps = static_cast<int>(std::ceil(distL / 0.25f));
-			if (steps < 1) { steps = 1; }
-			if (steps > 40) { steps = 40; }
-
-			// 各ステップの移動ベクトルを計算
-			Vector3 stepDeltaL = Multiply(1.0f / static_cast<float>(steps), deltaL);
-			Vector3 stepDeltaR = Multiply(1.0f / static_cast<float>(steps), deltaR);
-
-			for (int i = 0; i < steps; ++i) {
-				float t = static_cast<float>(i) / static_cast<float>(steps);
-				Vector3 interpL = Lerp(lastLeftWingTip_, leftWingTip, t);
-				Vector3 interpR = Lerp(lastRightWingTip_, rightWingTip, t);
-
-				// 左翼ボルテックスのストレッチ方向を設定してエミット
-				params.stretchDir = stepDeltaL;
-				ParticleManager::GetInstance()->Emit("Vortex", interpL, params, 1);
-
-				// 右翼ボルテックスのストレッチ方向を設定してエミット
-				params.stretchDir = stepDeltaR;
-				ParticleManager::GetInstance()->Emit("Vortex", interpR, params, 1);
-			}
-		} else {
-			// 最初の1フレームは補間なしで単一生成（ストレッチは無効化）
-			params.isStretched = false;
-			ParticleManager::GetInstance()->Emit("Vortex", leftWingTip, params, 1);
-			ParticleManager::GetInstance()->Emit("Vortex", rightWingTip, params, 1);
-		}
-
-		lastLeftWingTip_ = leftWingTip;
-		lastRightWingTip_ = rightWingTip;
-		hasLastWingTips_ = true;
-	} else {
-		// ボルテックスが発生していないときは前フレーム履歴をリセット
-		hasLastWingTips_ = false;
-	}
-
-	// ============================
-	// 戦闘システム更新
-	// ============================
-	gunpod_.Update(kDeltaTime);
-	bulletManager_.Update(kDeltaTime);
-	enemyManager_.Update(kDeltaTime);
-	EffectManager::GetInstance()->Update();
-
-
-
-	// ============================
-	// 衝突判定（新システム）
-	// ============================
-	{
-		// 毎フレーム登録をクリアして再登録
-		collisionSystem_.ClearAll();
-
-		// プレイヤーを登録
-		collisionSystem_.Register(&playerBody_);
-
-		// 全弾丸を登録
-		for (auto& bullet : bulletManager_.GetBullets()) {
-			collisionSystem_.Register(&bullet);
-		}
-
-		// 全敵を登録
-		for (auto* enemy : enemyManager_.GetAliveEnemies()) {
-			collisionSystem_.Register(enemy);
-		}
-
-		// 全判定実行（コールバックが自動で呼ばれる）
-		collisionSystem_.UpdateAll();
-	}
-
-	// --- クリア判定 ---
-	if (!isMissionCleared_ && enemyManager_.IsAllDestroyed()) {
-		isMissionCleared_ = true;
+	if (tutorialDirector_.IsReadyForDebriefScene()) {
+		PostEffect::GetInstance()->ClearActiveEffects();
+		auto& res = GameResult::GetInstance();
+		res.missionCleared = true;
+		res.isHalcyonDaysTutorial = true;
+		res.enemiesDestroyed = StageRadioDefaults::kTutorialConfirmedHostileCount;
+		res.clearTimeSeconds = missionElapsedTime_;
+		res.playerHPRemaining = playerHP_;
+		res.playerMaxHP = playerMaxHP_;
 		sceneID = SCENE::CLEAR;
+		return;
 	}
-
-	// --- 地面衝突判定 ---
-	if (!isMissionFailed_ && Collision3DManager::CheckGroundCollision(flightModel_.GetPosition())) {
-		isMissionFailed_ = true;
-		sceneID = SCENE::RESULT;
-	}
-
-	// ============================
-	// 描画オブジェクトに位置・姿勢を反映
-	// ============================
-	Vector3 pos = flightModel_.GetPosition();
-	Vector3 euler = PlayerCamera::QuaternionToEuler(flightModel_.GetOrientation());
-
-	aircraftObject_->SetTranslate(pos);
-	aircraftObject_->SetRotate(euler);
-	aircraftObject_->Update();
-
-	if (skybox_) {
-		skybox_->Update();
-	}
-
-	// ============================
-	// 追従カメラ
-	// ============================
-	playerCamera_.Update(kDeltaTime, &flightModel_, &mouseAimController_, mouseAimEnabled_);
-
-	// ============================
-	// ============================
-#ifdef USE_IMGUI
-	ImGui::Begin("Flight Model Debug");
-
-	ImGui::Text("=== Status ===");
-	ImGui::Text("Position: (%.1f, %.1f, %.1f)", pos.x, pos.y, pos.z);
-
-	Vector3 vel = flightModel_.GetVelocity();
-	ImGui::Text("Velocity: (%.1f, %.1f, %.1f)", vel.x, vel.y, vel.z);
-	ImGui::Text("Speed: %.1f m/s (%.1f km/h)", flightModel_.GetSpeed(), flightModel_.GetSpeed() * 3.6f);
-	ImGui::Text("Altitude: %.1f m", pos.y);
-
-	ImGui::Separator();
-	ImGui::Text("=== Flight Data ===");
-	ImGui::Text("AoA: %.1f deg", flightModel_.GetCurrentAoA() * 57.2958f);
-	ImGui::Text("G-Force: %.1f G", flightModel_.GetCurrentG());
-	if (flightModel_.IsStalling()) {
-		ImGui::TextColored(ImVec4(1, 0, 0, 1), "*** STALL ***");
-	}
-	if (flightModel_.GetBlackoutFactor() > 0.01f) {
-		ImGui::TextColored(ImVec4(0.3f, 0.3f, 0.3f, 1), "Blackout: %.0f%%", flightModel_.GetBlackoutFactor() * 100.0f);
-	}
-	if (flightModel_.GetRedoutFactor() > 0.01f) {
-		ImGui::TextColored(ImVec4(1, 0.2f, 0.2f, 1), "Redout: %.0f%%", flightModel_.GetRedoutFactor() * 100.0f);
-	}
-
-	ImGui::Separator();
-	ImGui::Text("=== Engine ===");
-	ImGui::Text("Throttle: %.0f%%", throttle_ * 100.0f);
-	ImGui::Text("Engine Output: %.0f%%", flightModel_.GetCurrentThrottle() * 100.0f);
-	ImGui::Text("Fuel: %.1f kg", flightModel_.GetCurrentFuel());
-
-	ImGui::Separator();
-	ImGui::Text("=== Aero Devices ===");
-	ImGui::Text("Flap: %.0f%%", flightModel_.GetFlapPosition() * 100.0f);
-	ImGui::Text("AirBrake: %.0f%%", flightModel_.GetAirBrakePosition() * 100.0f);
-
-	ImGui::Separator();
-	ImGui::Text("=== Damage ===");
-	const auto& af = flightModel_.GetAirframe();
-	ImGui::Text("Engine:    %.0f%%", af.GetDamageState(DamageZone::Engine) * 100.0f);
-	ImGui::Text("L.Wing:    %.0f%%", af.GetDamageState(DamageZone::LeftWing) * 100.0f);
-	ImGui::Text("R.Wing:    %.0f%%", af.GetDamageState(DamageZone::RightWing) * 100.0f);
-	ImGui::Text("Tail:      %.0f%%", af.GetDamageState(DamageZone::Tail) * 100.0f);
-	ImGui::Text("FuelTank:  %.0f%%", af.GetDamageState(DamageZone::FuelTank) * 100.0f);
-
-	ImGui::Separator();
-	ImGui::Text("=== Mass ===");
-	ImGui::Text("Total Mass: %.1f kg", flightModel_.GetTotalMass());
-
-	ImGui::Separator();
-	ImGui::Text("=== Camera ===");
-	ImGui::DragFloat("Distance", &*playerCamera_.GetCameraDistancePtr(), 0.5f, 5.0f, 100.0f);
-	ImGui::DragFloat("Height", &*playerCamera_.GetCameraHeightPtr(), 0.5f, 0.0f, 30.0f);
-	ImGui::DragFloat("Pos Lag", &*playerCamera_.GetCameraPosLagPtr(), 0.1f, 0.5f, 20.0f);
-	ImGui::DragFloat("Look Lag", &*playerCamera_.GetCameraLookLagPtr(), 0.1f, 0.5f, 30.0f);
-
-	ImGui::Separator();
-	ImGui::Text("=== Mouse Aim ===");
-	ImGui::Text("Mode: %s", mouseAimEnabled_ ? "MOUSE AIM (PID)" : "MANUAL");
-	if (mouseAimEnabled_) {
-		// マウス感度調整スライダー
-		float sens = mouseAimController_.GetSensitivity();
-		if (ImGui::SliderFloat("Sensitivity", &sens, 0.01f, 1.0f, "%.3f")) {
-			mouseAimController_.SetSensitivity(sens);
-		}
-		Vector3 tDir = mouseAimController_.GetTargetDirection();
-		ImGui::Text("Target Dir: (%.2f, %.2f, %.2f)", tDir.x, tDir.y, tDir.z);
-
-		if (ImGui::TreeNode("PID Tuning")) {
-			auto pidSliders = [](const char* label, PIDController& pid) {
-				if (ImGui::TreeNode(label)) {
-					ImGui::SliderFloat("P", &pid.kP, 0.0f, 5.0f);
-					ImGui::SliderFloat("I", &pid.kI, 0.0f, 2.0f);
-					ImGui::SliderFloat("D", &pid.kD, 0.0f, 3.0f);
-					ImGui::Text("Integral: %.3f", pid.integral);
-					ImGui::TreePop();
-				}
-			};
-			pidSliders("Pitch PID", mouseAimController_.GetPitchPID());
-			pidSliders("Roll PID", mouseAimController_.GetRollPID());
-			pidSliders("Yaw PID", mouseAimController_.GetYawPID());
-			pidSliders("Bank Level PID", mouseAimController_.GetBankPID());
-			ImGui::TreePop();
-		}
-	}
-	ImGui::Text("Steering: P=%.2f R=%.2f Y=%.2f", finalPitch, finalRoll, finalYaw);
-
-	ImGui::Separator();
-	ImGui::Text("=== Controls ===");
-	ImGui::Text("Mouse: Aim direction (PID)");
-	ImGui::Text("LShift/LCtrl: Pitch | A/D: Roll | Q/E: Yaw (override)");
-	ImGui::Text("W/S: Throttle");
-	ImGui::Text("F: Flaps | B: AirBrake");
-	ImGui::Text("M: Mouse Aim [%s]", mouseAimEnabled_ ? "ON" : "OFF");
-	ImGui::Text("I: Instructor [%s]", flightInstructor_.IsEnabled() ? "ON" : "OFF");
-	ImGui::Text("P: Cursor Lock [%s]", input->IsCursorLocked() ? "LOCKED" : "FREE");
-
-	ImGui::End();
-
-	// === レティクルの描画（ワールド空間→スクリーン投影）===
-	if (mouseAimEnabled_) {
-		Camera* cam = CameraManager::GetInstance()->GetActiveCamera();
-		if (cam) {
-			ImDrawList* drawList = ImGui::GetForegroundDrawList();
-			const Matrix4x4& vpMat = cam->GetViewProjectionMatrix();
-			float screenW = static_cast<float>(WinApp::kClientWidth);
-			float screenH = static_cast<float>(WinApp::kClientHeight);
-			Vector3 aircraftPos = flightModel_.GetPosition();
-
-			// --- ワールド方向をスクリーン座標に投影するラムダ ---
-			auto projectToScreen = [&](const Vector3& worldPos, float& outX, float& outY) -> bool {
-				float cX = worldPos.x * vpMat.m[0][0] + worldPos.y * vpMat.m[1][0] + worldPos.z * vpMat.m[2][0] + vpMat.m[3][0];
-				float cY = worldPos.x * vpMat.m[0][1] + worldPos.y * vpMat.m[1][1] + worldPos.z * vpMat.m[2][1] + vpMat.m[3][1];
-				float cW = worldPos.x * vpMat.m[0][3] + worldPos.y * vpMat.m[1][3] + worldPos.z * vpMat.m[2][3] + vpMat.m[3][3];
-				if (cW <= 0.001f) { return false; }
-				outX = (cX / cW * 0.5f + 0.5f) * screenW;
-				outY = (-cY / cW * 0.5f + 0.5f) * screenH;
-				return true;
-			};
-
-			// --- マウスエイム目標レティクル（緑の十字線）---
-			Vector3 targetDir = mouseAimController_.GetTargetDirection();
-			Vector3 aimWorldPos = Add(aircraftPos, Multiply(500.0f, targetDir));
-			float cx, cy;
-			if (projectToScreen(aimWorldPos, cx, cy)) {
-				float crossSize = 15.0f;
-				float dotRadius = 3.0f;
-				ImU32 reticleColor = IM_COL32(0, 255, 100, 220);
-				ImU32 reticleColorDark = IM_COL32(0, 180, 70, 150);
-
-				// 十字線
-				drawList->AddLine(ImVec2(cx - crossSize, cy), ImVec2(cx - 5.0f, cy), reticleColor, 2.0f);
-				drawList->AddLine(ImVec2(cx + 5.0f, cy), ImVec2(cx + crossSize, cy), reticleColor, 2.0f);
-				drawList->AddLine(ImVec2(cx, cy - crossSize), ImVec2(cx, cy - 5.0f), reticleColor, 2.0f);
-				drawList->AddLine(ImVec2(cx, cy + 5.0f), ImVec2(cx, cy + crossSize), reticleColor, 2.0f);
-				drawList->AddCircle(ImVec2(cx, cy), dotRadius, reticleColor, 12, 2.0f);
-				drawList->AddCircle(ImVec2(cx, cy), crossSize + 5.0f, reticleColorDark, 24, 1.0f);
-
-				// --- 機首方向マーカー（白い×印）---
-				Vector3 forward = flightModel_.GetForwardDirection();
-				Vector3 noseWorldPos = Add(aircraftPos, Multiply(500.0f, forward));
-				float nx, ny;
-				if (projectToScreen(noseWorldPos, nx, ny)) {
-					float noseSize = 8.0f;
-					ImU32 noseColor = IM_COL32(255, 255, 255, 200);
-					drawList->AddLine(ImVec2(nx - noseSize, ny - noseSize), ImVec2(nx + noseSize, ny + noseSize), noseColor, 2.0f);
-					drawList->AddLine(ImVec2(nx + noseSize, ny - noseSize), ImVec2(nx - noseSize, ny + noseSize), noseColor, 2.0f);
-
-					// 目標と機首をつなぐ薄いライン
-					ImU32 lineColor = IM_COL32(255, 255, 255, 60);
-					drawList->AddLine(ImVec2(cx, cy), ImVec2(nx, ny), lineColor, 1.0f);
-				}
-			}
-		}
-	}
-#endif
-
-	// === ゲーム情報UI（ImGui仮実装） ===
-#ifdef USE_IMGUI
-	ImGui::Begin("Mission Status");
-	
-	// プレイヤーHPを色を変えて表示
-	ImVec4 hpColor = (playerHP_ > 30.0f) ? ImVec4(0, 1, 0, 1) : ImVec4(1, 0, 0, 1);
-	ImGui::TextColored(hpColor, "PLAYER HP: %.1f / %.1f", playerHP_, playerMaxHP_);
-	ImGui::Separator();
-
-	ImGui::Text("Enemies: %d / %d", enemyManager_.GetDestroyedCount(), enemyManager_.GetTotalCount());
-	ImGui::Text("Ammo: %d / %d", gunpod_.GetCurrentAmmo(), gunpod_.GetMaxAmmo());
-	ImGui::Text("Bullets Active: %u", bulletManager_.GetActiveBulletCount());
-	if (isMissionCleared_) {
-		ImGui::TextColored(ImVec4(0, 1, 0, 1), "*** MISSION CLEAR ***");
-	}
-	if (isMissionFailed_) {
-		ImGui::TextColored(ImVec4(1, 0, 0, 1), "*** MISSION FAILED ***");
-	}
-	ImGui::End();
-#endif
-
-	// ============================
-	// ブラックアウト & レッドアウト ポストエフェクト（既存ビネットを拡張）
-	// ============================
-	// 常にビネットを有効にし、Gフォースに応じて強度を滑らかに変化させる
-	float blackout = flightModel_.GetBlackoutFactor();
-	float redout = flightModel_.GetRedoutFactor();
-	
-	PostEffect* postEffect = PostEffect::GetInstance();
-	postEffect->SetEffectType(PostEffectType::kVignette);
-	postEffect->SetIntensity(blackout * 5.0f);
-	postEffect->SetDirX(redout * 1.5f); // 1.5倍で強めにかける
 }
-
 
 void StageScene::Draw() {
 	if (skybox_) {
@@ -830,301 +527,750 @@ void StageScene::Draw() {
 		skybox_->Draw();
 	}
 
+	// 太陽の見た目を無限遠に描画
+	environmentManager_.Draw(CameraManager::GetInstance()->GetActiveCamera());
+
 	// 3Dオブジェクト描画（Object3dパイプライン）
 	Object3dCommon::GetInstance()->SetupCommonState();
-	if (aircraftObject_) {
-		aircraftObject_->Draw();
+	Object3dCommon::GetInstance()->SetLightType(1); // 自機・通常3Dモデル描画時は平行光源(Directional Light)を保証
+
+	// 部位破壊対応ビジュアルモデルの描画
+	// 【戦闘モード起動演出（自機専用スキャン波形マテリアライズ・パイプライン）】
+	if (!combatBootSequence_.IsFinished() && !combatBootSequence_.IsQuickMode()) {
+		float timer = combatBootSequence_.GetTimer();
+
+		if (timer < 2.00f) {
+			// 1. 【作戦ブリーフィングフェーズ】起動開始前は待機（完全不可視）
+		} else if (timer < 4.50f) {
+			// 2. 【スキャン波形マテリアライズフェーズ（機体中心から広がる波紋に沿ってピクセル単位で構築）】
+			// 機体中心からスキャン波形が外側へ伝播：[無(不可視) -> ネオンワイヤー＆波形パルス -> 3D実写装甲]
+			float scanProg = std::clamp((timer - 2.00f) / 2.50f, 0.0f, 1.0f);
+
+			combatBootSequence_.BeginAircraftScanDraw(aircraftVisualModel_, scanProg);
+			aircraftVisualModel_.Draw();
+			combatBootSequence_.EndAircraftScanDraw(aircraftVisualModel_);
+		} else {
+			// 3. 【起動完了・完全実体装甲フェーズ】
+			aircraftVisualModel_.Draw();
+		}
+	} else {
+		// 通常戦闘時およびクイックリトライ時
+		aircraftVisualModel_.Draw();
 	}
 
-	// 敵描画
-	enemyManager_.Draw();
+	// 自機アフターバーナー（ジェットプルーム・推力炎）の描画
+	// ※MiG-21モデル本来の前後方向(Y軸180度回転)に一致させ、機体後部ノズルから後方へ噴射させる
+	if (afterburner_ && !isGameOver_ && (combatBootSequence_.IsFinished() || sortieIntroTimer_ >= 4.50f)) {
+		Matrix4x4 baseRotate = MakeAffineMatrix(Vector3{ 1.0f, 1.0f, 1.0f }, Vector3{ 0.0f, 3.14159265f, 0.0f }, Vector3{ 0.0f, 0.0f, 0.0f });
+		Matrix4x4 visualWorld = Multiply(baseRotate, flightModel_.GetWorldMatrix());
+		afterburner_->Draw(visualWorld, CameraManager::GetInstance()->GetActiveCamera());
+	}
 
-	// 地面描画（PrimitiveModelパイプライン）
-	DrawGround();
+	DebrisManager::GetInstance()->Draw();
+
+	// 敵描画（空中敵＋地上敵）
+	Camera* cam = CameraManager::GetInstance()->GetActiveCamera();
+	enemyManager_.Draw(cam);
+
+	// 地面描画（40km x 40km チャンク地形パイプライン）
+	if (terrainChunkManager_ && terrainChunkManager_->IsLoaded()) {
+		// 自機の地面投影シャドウ情報を SpotLight (b5) 経由で地形シェーダーへ渡す
+		SpotLight* shadowLight = Object3dCommon::GetInstance()->GetSpotLightData();
+		if (shadowLight) {
+			if (!isGameOver_) {
+				shadowLight->color = { 1.0f, 4.2f, 7.5f, 1200.0f }; // active, wingspan, length, maxAlt
+				shadowLight->position = flightModel_.GetPosition();
+				shadowLight->intensity = 0.88f;
+				shadowLight->direction = flightModel_.GetForwardDirection();
+				Vector3 right = flightModel_.GetRightDirection();
+				shadowLight->distance = right.x;
+				shadowLight->decay = right.y;
+				shadowLight->cosAngle = right.z;
+			} else {
+				shadowLight->color.x = 0.0f; // 撃墜・爆発後はシャドウ非表示
+			}
+		}
+
+		terrainChunkManager_->Draw();
+
+		// 地形描画後は SpotLight 定数バッファを安全なデフォルト値へ即時リセット
+		if (shadowLight) {
+			shadowLight->color = { 0.0f, 0.0f, 0.0f, 0.0f };
+			shadowLight->distance = 100.0f;
+			shadowLight->decay = 1.0f;
+			shadowLight->intensity = 0.0f;
+			shadowLight->direction = { 0.0f, -1.0f, 0.0f };
+			shadowLight->cosAngle = 0.0f;
+			shadowLight->cosFalloffStart = 0.0f;
+		}
+		Object3dCommon::GetInstance()->SetLightType(1);
+	} else {
+		DrawGround();
+	}
 
 	// 弾丸描画
-	Camera* cam = CameraManager::GetInstance()->GetActiveCamera();
+	tutorialDirector_.Draw3D(cam);
+	DrawMissionReachAreaRings(cam);
+
 	bulletManager_.Draw(cam);
 
 	// エフェクト描画
 	EffectManager::GetInstance()->Draw(cam);
 
-	GPUParticleManager::GetInstance()->Update();
+	if (!isPaused_) {
+		GPUParticleManager::GetInstance()->Update();
+	}
 	GPUParticleManager::GetInstance()->Draw(cam->GetViewProjectionMatrix(), cam->GetWorldMatrix());
 
-	// --- ベイパーコーン（プラントル・グロワート・シンギュラリティ）エフェクトの描画 ---
-	float speed = flightModel_.GetSpeed();
-	float speedKmH = speed * 3.6f; // m/s から km/h に変換
-	if (speedKmH >= 1000.0f && speedKmH <= 1200.0f) {
-		// 1000km/hで0.0、1100km/hで最大(1.0)、1200km/hで0.0になるフェードイン・アウト係数
-		float speedFactor = 0.0f;
-		if (speedKmH < 1100.0f) {
-			speedFactor = (speedKmH - 1000.0f) / 100.0f;
-		} else {
-			speedFactor = (1200.0f - speedKmH) / 100.0f;
-		}
+	// ベイパーコーンエフェクト描画
+	DrawVaporConeEffect(cam);
 
-		// 経過時間を用いたゆらぎの計算
-		float t = totalTime_ * 40.0f; // 高速で揺らす
-
-		// 基本位置・姿勢
-		Vector3 aircraftPos = flightModel_.GetPosition();
-		Vector3 forward = flightModel_.GetForwardDirection();
-		MyMath::Quaternion aircraftQ = flightModel_.GetOrientation();
-
-		// クォータニオンの乗算ヘルパー
-		auto qMul = [](const MyMath::Quaternion& a, const MyMath::Quaternion& b) -> MyMath::Quaternion {
-			return {
-				a.w * b.x + a.x * b.w + a.y * b.z - a.z * b.y,
-				a.w * b.y - a.x * b.z + a.y * b.w + a.z * b.x,
-				a.w * b.z + a.x * b.y - a.y * b.x + a.z * b.w,
-				a.w * b.w - a.x * b.x - a.y * b.y - a.z * b.z
-			};
-		};
-
-		// 軸と角度からクォータニオンを作成するヘルパー
-		auto makeRotation = [](const MyMath::Vector3& axis, float angle) -> MyMath::Quaternion {
-			float halfAngle = angle * 0.5f;
-			float sinHalf = sinf(halfAngle);
-			Vector3 normAxis = Normalize(axis);
-			return {
-				normAxis.x * sinHalf,
-				normAxis.y * sinHalf,
-				normAxis.z * sinHalf,
-				cosf(halfAngle)
-			};
-		};
-
-		// 描画用のテクスチャ取得
-		uint32_t coneTex = TextureManager::GetInstance()->GetTextureIndexByFilePath("assets/textures/circle2.png");
-
-		// -------------------------------------------------------------
-		// コーン1 (アウターシェル: 大きくて薄い)
-		// -------------------------------------------------------------
-		{
-			// ゆらぎパラメータ
-			float scaleNoise = 1.0f + 0.08f * sinf(t * 1.3f);
-			float lengthNoise = 1.0f + 0.12f * cosf(t * 0.9f);
-			float offsetNoise = 0.15f * sinf(t * 1.7f);
-
-			// スケール: Y軸が長さ、X/Z軸が半径。
-			// アウターシェルは少し大きめに。
-			float radius = 5.0f * scaleNoise;
-			float length = 4.0f * lengthNoise;
-			Vector3 scale = { radius, length, radius };
-
-			// 位置: 機体の中央付近に配置。オフセットも揺らす。
-			Vector3 pos = Add(aircraftPos, Multiply(-0.8f + offsetNoise, forward));
-
-			// 回転: 機体のクォータニオン * ローカル回転（X軸+90度 + ゆらぎ）
-			MyMath::Quaternion localPitch = makeRotation({1.0f, 0.0f, 0.0f}, 3.14159265f / 2.0f);
-			MyMath::Quaternion localYaw = makeRotation({0.0f, 1.0f, 0.0f}, 0.03f * sinf(t * 0.8f));
-			MyMath::Quaternion localRoll = makeRotation({0.0f, 0.0f, 1.0f}, t * 0.2f);
-			MyMath::Quaternion localRot = qMul(localRoll, qMul(localYaw, localPitch));
-			MyMath::Quaternion finalRot = qMul(aircraftQ, localRot);
-
-			// 色: 少し青みがかった白、フェードイン
-			float alpha = 0.22f * speedFactor * (0.8f + 0.2f * sinf(t * 2.1f));
-			Vector4 color = { 0.92f, 0.96f, 1.0f, alpha };
-
-			PrimitiveModel::GetInstance()->DrawCone(scale, finalRot, pos, color, coneTex, cam, BlendMode::kNormal);
-		}
-
-		// -------------------------------------------------------------
-		// コーン2 (インナーシェル: 小さくて濃い)
-		// -------------------------------------------------------------
-		{
-			// ゆらぎパラメータ (アウターシェルと異なる周期で)
-			float scaleNoise = 1.0f + 0.06f * sinf(t * 1.5f + 1.0f);
-			float lengthNoise = 1.0f + 0.10f * cosf(t * 1.1f + 0.5f);
-			float offsetNoise = 0.10f * sinf(t * 2.0f + 2.0f);
-
-			// スケール: インナーシェルは少し小さく、長めに。
-			float radius = 3.5f * scaleNoise;
-			float length = 5.0f * lengthNoise;
-			Vector3 scale = { radius, length, radius };
-
-			// 位置: アウターシェルより少し前寄り（-0.4f）に。
-			Vector3 pos = Add(aircraftPos, Multiply(-0.4f + offsetNoise, forward));
-
-			// 回転: 機体のクォータニオン * ローカル回転（X軸+90度 + ゆらぎ）
-			MyMath::Quaternion localPitch = makeRotation({1.0f, 0.0f, 0.0f}, 3.14159265f / 2.0f);
-			MyMath::Quaternion localYaw = makeRotation({0.0f, 1.0f, 0.0f}, 0.02f * sinf(t * 1.2f + 0.3f));
-			MyMath::Quaternion localRoll = makeRotation({0.0f, 0.0f, 1.0f}, -t * 0.15f);
-			MyMath::Quaternion localRot = qMul(localRoll, qMul(localYaw, localPitch));
-			MyMath::Quaternion finalRot = qMul(aircraftQ, localRot);
-
-			// 色: より白っぽく、少し濃い
-			float alpha = 0.28f * speedFactor * (0.85f + 0.15f * cosf(t * 1.9f));
-			Vector4 color = { 0.95f, 0.98f, 1.0f, alpha };
-
-			PrimitiveModel::GetInstance()->DrawCone(scale, finalRot, pos, color, coneTex, cam, BlendMode::kNormal);
-		}
-	}
-
-	// 追従マズルフラッシュ（板ポリ・リング）の描画
-	if (muzzleFlashTimer_ > 0.0f) {
-		Vector3 aircraftPos = flightModel_.GetPosition();
-		Vector3 forward = flightModel_.GetForwardDirection();
-		Vector3 muzzlePos = Add(aircraftPos, Multiply(8.0f, forward));
-		
-		float t = 1.0f - (muzzleFlashTimer_ / 0.08f); // 0.0(開始) -> 1.0(終了)
-		if (t < 0.0f) { t = 0.0f; }
-		if (t > 1.0f) { t = 1.0f; }
-		
-		// 機体の回転を取得（オイラー角）
-		Vector3 aircraftRot = PlayerCamera::QuaternionToEuler(flightModel_.GetOrientation());
-		
-		float randomAlpha = muzzleFlashRandomAlpha_ * (1.0f - t);
-		
-		// ============================
-		// 1. Flash (中心の閃光)
-		// ============================
-		// 銃口から前方（Z軸方向）に長く伸びる十字の板ポリゴン
-		uint32_t flashTex = TextureManager::GetInstance()->GetTextureIndexByFilePath("assets/textures/circle2.png");
-		Vector4 flashColor = { 1.0f, 0.7f, 0.2f, randomAlpha }; // 燃えるようなオレンジイエロー
-		
-		float flashLength = 4.0f * muzzleFlashRandomScale_ * (1.0f - t);
-		float flashWidth = 1.0f * muzzleFlashRandomScale_ * (1.0f - t);
-		Vector3 flashScale = { flashWidth, flashLength, 1.0f }; // Y軸方向に長くする（あとでX軸回転でZ軸方向に向ける）
-		
-		// 板ポリの中心が銃口になるため、前方に長さの半分だけオフセットする
-		Vector3 flashPos = Add(muzzlePos, Multiply(flashLength * 0.5f, forward));
-		
-		for (int i = 0; i < 2; i++) {
-			Vector3 rot = aircraftRot;
-			// 1. X軸で90度回転し、Y軸方向の伸びをZ軸方向（前方）へ向ける
-			rot.x -= 3.14159265f / 2.0f;
-			// 2. 進行方向（Z軸）を中心に十字になるように回転
-			rot.z += muzzleFlashRandomRoll_ + (i * 3.14159f / 2.0f);
-			
-			PrimitiveModel::GetInstance()->DrawPlane(flashScale, rot, flashPos, flashColor, flashTex, cam, BlendMode::kAdd);
-		}
-
-		// ============================
-		// 2. Petals (星型の広がり)
-		// ============================
-		// 銃口の横（XY平面）に広がるガス炎
-		uint32_t petalTex = TextureManager::GetInstance()->GetTextureIndexByFilePath("assets/textures/circle2.png");
-		Vector4 petalColor = { 1.0f, 0.4f, 0.05f, randomAlpha }; // 濃いオレンジ色
-		
-		// 星の「トゲ」を表現するため、細長い楕円を複数枚重ねる
-		float petalLength = 3.0f * muzzleFlashRandomScale_ * (1.0f - t);
-		float petalWidth = 0.5f * muzzleFlashRandomScale_ * (1.0f - t);
-		Vector3 petalScale = { petalWidth, petalLength, 1.0f };
-		
-		for (int i = 0; i < 4; i++) {
-			Vector3 rot = aircraftRot;
-			// ペタルは前方に伸びるのではなく、銃口の正面（XY平面）に広がるため、X軸の回転は不要！
-			// 十字/星型になるようにZ軸のみ回転させる
-			rot.z += muzzleFlashRandomRoll_ + (i * 3.14159f / 4.0f);
-			
-			PrimitiveModel::GetInstance()->DrawPlane(petalScale, rot, muzzlePos, petalColor, petalTex, cam, BlendMode::kAdd);
-		}
-	}
+	// 追従マズルフラッシュ描画
+	DrawMuzzleFlashEffect(cam);
 }
 
+void StageScene::DrawUI() {
+	// 1. 出撃イントロ用黒フェード背景描画（3Dシーンの上、最前面UIの下）
+	combatBootSequence_.DrawBackgroundFade();
+
+	// 2. 戦闘HUD（残弾数・照準・タイマー）描画
+	float hudThreshold = combatBootSequence_.IsQuickMode() ? 0.0f : 4.00f;
+	if (sortieIntroTimer_ >= hudThreshold) {
+		hud_.Draw();
+		if (endSequence_ == StageEndSequence::None) {
+			infoUI_.Draw();
+			const float screenW = static_cast<float>(WinApp::kClientWidth);
+			const float screenH = static_cast<float>(WinApp::kClientHeight);
+			radioCommunicator_.Draw(screenW, screenH);
+			tutorialDirector_.DrawUI(CameraManager::GetInstance()->GetActiveCamera(), screenW, screenH);
+			if (!tutorialDirector_.IsTutorialActive()) {
+				DrawMissionObjectivesHUD();
+				DrawMissionMessages();
+			}
+		}
+	}
+
+	// 3. AC6スタイル「メインシステム、戦闘モード起動...」ブートUI描画（最前面）
+	if (sortieIntroTimer_ < sortieIntroDuration_) {
+		combatBootSequence_.DrawBootUI();
+	}
+
+	// 3.5. ブリーフィング中のカスタムサイバーカーソル描画（最前面）
+	if (combatBootSequence_.IsWaitingForSpace() && !isPaused_) {
+		ResetPauseSpritePool();
+		DrawPauseCustomCursor();
+	}
+
+	// 4. ゲームオーバー / ステージクリア演出UI描画（最前面）
+	DrawEndSequenceUI();
+
+	// 5. ポーズメニューUI描画（最前面）
+	if (isPaused_) {
+		TextRenderer::GetInstance()->Flush();
+		DrawPauseMenuUI();
+	}
+}
 
 void StageScene::Finalize() {
+	MissionSyncManager::GetInstance()->Finalize();
+	MissionManager::GetInstance().BindEnemyManager(nullptr);
+#ifdef _DEBUG
+	TerrainSyncManager::GetInstance()->Finalize();
+#endif
+	
 	// シーン終了時にカーソルを復帰
 	Input::GetInstance()->UnlockCursor();
-
-	// エフェクトマネージャーの後片付け
-	EffectManager::GetInstance()->Finalize();
+	PostEffect::GetInstance()->ClearActiveEffects();
+	isPaused_ = false;
+	isPauseAborting_ = false;
+	pauseAbortTimer_ = 0.0f;
 }
 
+void StageScene::Restart() {
+	ResetGameplayState();
+	// リスタート直後の初フレームからカメラを正規追従位置に向ける
+	playerCamera_.Update(0.001f, &flightModel_, &mouseAimController_, mouseAimEnabled_);
+}
 
-// ===========================================================
-// 地面描画（タイル式グリッド）
-// ===========================================================
+// ============================================================
+// ポーズメニュー実装（プレイ中のみ作動）
+// ============================================================
 
-void StageScene::DrawGround() {
-	Camera* camera = CameraManager::GetInstance()->GetActiveCamera();
-	if (!camera) { return; }
+bool StageScene::IsGameplayActive() const {
+	return (sortieIntroTimer_ >= sortieIntroDuration_ &&
+	        !isGameOver_ &&
+	        !isMissionFailed_ &&
+	        !isMissionCleared_ &&
+	        endSequence_ == StageEndSequence::None &&
+	        sceneID == SCENE::STAGE);
+}
 
-	Vector3 aircraftPos = flightModel_.GetPosition();
+void StageScene::SetPaused(bool paused) {
+	isPaused_ = paused;
+	HWND hwnd = Input::GetInstance() ? Input::GetInstance()->GetHwnd() : nullptr;
+	if (isPaused_) {
+		pauseMenuIndex_ = 0;
+		pauseAnimTimer_ = 0.0f;
+		const float screenW = static_cast<float>(WinApp::kClientWidth);
+		const float screenH = static_cast<float>(WinApp::kClientHeight);
+		pauseWinPos_ = { (screenW - 500.0f) * 0.5f, (screenH - 430.0f) * 0.5f };
+		pauseIsDragging_ = false;
+		Input::GetInstance()->UnlockCursor();
+		// OSカーソルは非表示にし、自前のカスタムサイバーカーソル（TitleSceneと同一）を使用
+		if (hwnd && ::GetForegroundWindow() == hwnd) {
+			while (::ShowCursor(FALSE) >= 0) {}
+			::SetCursor(nullptr);
+		}
+		customCursorPos_ = Input::GetInstance()->GetVirtualMousePosition(screenW, screenH);
+		cursorRippleTimer_ = 0.0f;
+	} else {
+		Input::GetInstance()->LockCursor();
+		if (hwnd && ::GetForegroundWindow() == hwnd) {
+			while (::ShowCursor(FALSE) >= 0) {}
+			::SetCursor(nullptr);
+		}
+	}
+}
 
-	// --- 地面タイル ---
-	// 1タイルのサイズ（メートル）
-	const float tileSize = 100.0f;
-	// 機体を中心にタイルをいくつ並べるか（片方向）
-	const int tileRange = 10;
+void StageScene::UpdatePauseMenu() {
+	Input* input = Input::GetInstance();
+	if (!input) return;
 
-	// 機体位置をタイルサイズでスナップ（タイルの中心座標に丸める）
-	float snapX = std::floor(aircraftPos.x / tileSize) * tileSize;
-	float snapZ = std::floor(aircraftPos.z / tileSize) * tileSize;
+	// カーソルはカスタムスプライトで描画するためOSカーソルは非表示を維持
+	HWND hwnd = input->GetHwnd();
+	if (hwnd && ::GetForegroundWindow() == hwnd) {
+		while (::ShowCursor(FALSE) >= 0) {}
+		::SetCursor(nullptr);
+	}
 
-	// タイルを敷き詰めて描画
-	for (int ix = -tileRange; ix <= tileRange; ix++) {
-		for (int iz = -tileRange; iz <= tileRange; iz++) {
-			float cx = snapX + ix * tileSize;
-			float cz = snapZ + iz * tileSize;
+	// ポーズからタイトル復帰時のCRTシャットダウン演出（プツッ暗転）
+	if (isPauseAborting_) {
+		pauseAbortTimer_ += kDeltaTime;
 
-			// チェッカーボードパターンで色を交互に変える
-			int gridX = static_cast<int>(std::floor(cx / tileSize));
-			int gridZ = static_cast<int>(std::floor(cz / tileSize));
-			bool isDark = ((gridX + gridZ) % 2 != 0);
+		PostEffect* postEffect = PostEffect::GetInstance();
+		postEffect->ClearActiveEffects();
 
-			Vector4 color = isDark
-				? Vector4{ 0.25f, 0.35f, 0.20f, 1.0f }   // 暗い草色
-				: Vector4{ 0.35f, 0.50f, 0.28f, 1.0f };   // 明るい草色
+		// ブラウン管曲面ガラス歪み
+		ActivePostEffect dist;
+		dist.type = PostEffectType::kLensDistortion;
+		dist.intensity = 0.40f;
+		postEffect->AddActiveEffect(dist);
 
-			Vector3 scale = { tileSize, 1.0f, tileSize };
-			Vector3 rotate = { 0.0f, 0.0f, 0.0f };
-			Vector3 translate = { cx + tileSize * 0.5f, 0.0f, cz + tileSize * 0.5f };
+		// 背景走査線
+		ActivePostEffect scan;
+		scan.type = PostEffectType::kScanLine;
+		scan.intensity = 0.45f;
+		scan.dirX = 720.0f;
+		scan.dirY = 6.0f;
+		postEffect->AddActiveEffect(scan);
 
-			PrimitiveModel::GetInstance()->DrawPlane(
-				scale, rotate, translate, color,
-				groundTextureIndex_, camera
-			);
+		// アナログCRT特有の微細ランダム粒子ノイズ（画像のような質感）
+		ActivePostEffect noise;
+		noise.type = PostEffectType::kRandom;
+		noise.intensity = 0.12f;
+		postEffect->AddActiveEffect(noise);
+
+		if (pauseAbortTimer_ >= kPauseAbortDuration) {
+			postEffect->ClearActiveEffects();
+			isPaused_ = false;
+			isPauseAborting_ = false;
+			pauseAbortTimer_ = 0.0f;
+
+			Input::GetInstance()->UnlockCursor();
+			while (::ShowCursor(TRUE) < 0) {}
+			::SetCursor(::LoadCursor(nullptr, IDC_ARROW));
+
+			GameResult::GetInstance().titleEntryReason = TitleEntryReason::InitialBoot;
+			sceneID = SCENE::TITLE;
+		}
+		return;
+	}
+
+	pauseAnimTimer_ += kDeltaTime;
+
+	// マウス位置取得
+	customCursorPos_ = input->GetVirtualMousePosition(
+		static_cast<float>(WinApp::kClientWidth),
+		static_cast<float>(WinApp::kClientHeight)
+	);
+
+	bool isLTrig = input->TriggerMouse(0);
+	bool isLDown = input->PushMouse(0);
+
+	if (cursorRippleTimer_ > 0.0f) {
+		cursorRippleTimer_ -= kDeltaTime;
+	}
+	if (isLTrig) {
+		cursorRippleTimer_ = 0.30f;
+		cursorRipplePos_ = customCursorPos_;
+	}
+
+	// ESCキー または Pキーで再開
+	if (input->TriggerKey(DIK_ESCAPE) || input->TriggerKey(DIK_P)) {
+		SetPaused(false);
+		return;
+	}
+
+	// キーボードナビゲーション
+	if (input->TriggerKey(DIK_UP) || input->TriggerKey(DIK_W)) {
+		pauseMenuIndex_ = (pauseMenuIndex_ + 3) % 4;
+	}
+	if (input->TriggerKey(DIK_DOWN) || input->TriggerKey(DIK_S)) {
+		pauseMenuIndex_ = (pauseMenuIndex_ + 1) % 4;
+	}
+
+	// 数字キー直接選択
+	if (input->TriggerKey(DIK_1)) { ExecutePauseAction(0); return; }
+	if (input->TriggerKey(DIK_2)) { ExecutePauseAction(1); return; }
+	if (input->TriggerKey(DIK_3)) { ExecutePauseAction(2); return; }
+	if (input->TriggerKey(DIK_4)) { ExecutePauseAction(3); return; }
+
+	// 決定キー（ENTER / SPACE / NUMPADENTER）
+	if (input->TriggerKey(DIK_RETURN) || input->TriggerKey(DIK_SPACE) || input->TriggerKey(DIK_NUMPADENTER)) {
+		ExecutePauseAction(pauseMenuIndex_);
+		return;
+	}
+
+	const float winW = 500.0f;
+	const float winH = 430.0f;
+
+	const float closeW = 24.0f;
+	const float closeH = 22.0f;
+	const float closeX = pauseWinPos_.x + winW - 32.0f;
+	const float closeY = pauseWinPos_.y + 6.0f;
+
+	// 右上 [X] ボタンクリックで再開 (RESUME)
+	if (isLTrig &&
+	    customCursorPos_.x >= closeX && customCursorPos_.x <= closeX + closeW &&
+	    customCursorPos_.y >= closeY && customCursorPos_.y <= closeY + closeH) {
+		cursorRippleTimer_ = 0.30f;
+		cursorRipplePos_ = customCursorPos_;
+		SetPaused(false);
+		return;
+	}
+
+	// ウィンドウドラッグ処理 (タイトルバーのドラッグ。[X]ボタン領域は除外)
+	if (isLDown) {
+		if (!pauseIsDragging_ && isLTrig) {
+			if (customCursorPos_.x >= pauseWinPos_.x && customCursorPos_.x <= pauseWinPos_.x + winW &&
+			    customCursorPos_.y >= pauseWinPos_.y && customCursorPos_.y <= pauseWinPos_.y + 34.0f &&
+			    !(customCursorPos_.x >= closeX && customCursorPos_.y >= closeY && customCursorPos_.y <= closeY + closeH)) {
+				pauseIsDragging_ = true;
+				pauseDragOffset_ = { customCursorPos_.x - pauseWinPos_.x, customCursorPos_.y - pauseWinPos_.y };
+			}
+		}
+		if (pauseIsDragging_) {
+			pauseWinPos_ = { customCursorPos_.x - pauseDragOffset_.x, customCursorPos_.y - pauseDragOffset_.y };
+		}
+	} else {
+		pauseIsDragging_ = false;
+	}
+
+	// メニューボタンのホバー＆クリック判定
+	const float buttonWidth = 380.0f;
+	const float buttonHeight = 44.0f;
+	const float buttonX = pauseWinPos_.x + (winW - buttonWidth) * 0.5f;
+	const float buttonStartY = pauseWinPos_.y + 96.0f;
+	const float buttonSpacing = 54.0f;
+
+	for (int i = 0; i < 4; ++i) {
+		float btnY = buttonStartY + static_cast<float>(i) * buttonSpacing;
+		if (customCursorPos_.x >= buttonX && customCursorPos_.x <= buttonX + buttonWidth &&
+		    customCursorPos_.y >= btnY && customCursorPos_.y <= btnY + buttonHeight) {
+			pauseMenuIndex_ = i;
+			if (isLTrig) {
+				ExecutePauseAction(i);
+				return;
+			}
+		}
+	}
+}
+
+void StageScene::ExecutePauseAction(int actionIndex) {
+	switch (actionIndex) {
+	case 0: // RESUME
+		SetPaused(false);
+		break;
+	case 1: // RESTART
+		SetPaused(false);
+		GameResult::GetInstance().isRetry = true;
+		Restart();
+		break;
+	case 2: // TITLE（ブラウン管テレビのプツッ暗転演出を開始）
+		isPauseAborting_ = true;
+		pauseAbortTimer_ = 0.0f;
+		pauseIsDragging_ = false;
+		break;
+	case 3: // QUIT
+		::PostQuitMessage(0);
+		break;
+	default:
+		break;
+	}
+}
+
+Sprite* StageScene::GetPauseSprite() {
+	if (pauseSpritePoolIndex_ >= pauseSpritePool_.size()) {
+		auto sp = std::make_unique<Sprite>();
+		sp->Initialize(SpriteCommon::GetInstance(), "assets/textures/white1x1.png");
+		pauseSpritePool_.push_back(std::move(sp));
+	}
+	return pauseSpritePool_[pauseSpritePoolIndex_++].get();
+}
+
+void StageScene::DrawPauseSolidRect(const Vector2& pos, const Vector2& size, const Vector4& color, BlendMode blend) {
+	Sprite* sp = GetPauseSprite();
+	if (!sp) return;
+	sp->SetBlendMode(blend);
+	sp->SetPosition(pos);
+	sp->SetAnchorPoint({ 0.0f, 0.0f });
+	sp->SetSize(size);
+	sp->SetRotation(0.0f);
+	sp->SetColor(color);
+	sp->Update();
+	sp->Draw();
+}
+
+void StageScene::DrawPauseLine(const Vector2& p1, const Vector2& p2, float thickness, const MyMath::Vector4& color, BlendMode blend) {
+	Sprite* sp = GetPauseSprite();
+	if (!sp) return;
+	float dx = p2.x - p1.x;
+	float dy = p2.y - p1.y;
+	float length = std::sqrt(dx * dx + dy * dy);
+	if (length < 0.001f) return;
+
+	float angle = std::atan2(dy, dx);
+	sp->SetBlendMode(blend);
+	sp->SetPosition(p1);
+	sp->SetAnchorPoint({ 0.0f, 0.5f });
+	sp->SetSize({ length, thickness });
+	sp->SetRotation(angle);
+	sp->SetColor(color);
+	sp->Update();
+	sp->Draw();
+}
+
+Sprite* StageScene::GetPauseCircleSprite() {
+	if (pauseCircleSpritePoolIndex_ >= pauseCircleSpritePool_.size()) {
+		auto sp = std::make_unique<Sprite>();
+		sp->Initialize(SpriteCommon::GetInstance(), "assets/textures/circle2.png");
+		pauseCircleSpritePool_.push_back(std::move(sp));
+	}
+	return pauseCircleSpritePool_[pauseCircleSpritePoolIndex_++].get();
+}
+
+void StageScene::DrawPauseGlowOval(const Vector2& center, const Vector2& size, const Vector4& color, BlendMode blend) {
+	Sprite* sp = GetPauseCircleSprite();
+	if (!sp) return;
+	sp->SetBlendMode(blend);
+	sp->SetPosition(center);
+	sp->SetAnchorPoint({ 0.5f, 0.5f });
+	sp->SetSize(size);
+	sp->SetRotation(0.0f);
+	sp->SetColor(color);
+	sp->Update();
+	sp->Draw();
+}
+
+void StageScene::DrawPauseBorder(const Vector2& pos, const Vector2& size, const Vector4& color, float thickness) {
+	DrawPauseSolidRect(pos, { size.x, thickness }, color);
+	DrawPauseSolidRect({ pos.x, pos.y + size.y - thickness }, { size.x, thickness }, color);
+	DrawPauseSolidRect(pos, { thickness, size.y }, color);
+	DrawPauseSolidRect({ pos.x + size.x - thickness, pos.y }, { thickness, size.y }, color);
+}
+
+void StageScene::DrawPausePanel(const Vector2& pos, const Vector2& size, const Vector4& bgCol, const Vector4& borderCol, float thickness) {
+	DrawPauseSolidRect(pos, size, bgCol);
+	DrawPauseBorder(pos, size, borderCol, thickness);
+}
+
+void StageScene::DrawPauseCornerBrackets(const Vector2& pos, const Vector2& size, float bracketLen, float thickness, const Vector4& color) {
+	// Top-left
+	DrawPauseSolidRect(pos, { bracketLen, thickness }, color);
+	DrawPauseSolidRect(pos, { thickness, bracketLen }, color);
+	// Top-right
+	DrawPauseSolidRect({ pos.x + size.x - bracketLen, pos.y }, { bracketLen, thickness }, color);
+	DrawPauseSolidRect({ pos.x + size.x - thickness, pos.y }, { thickness, bracketLen }, color);
+	// Bottom-left
+	DrawPauseSolidRect({ pos.x, pos.y + size.y - thickness }, { bracketLen, thickness }, color);
+	DrawPauseSolidRect({ pos.x, pos.y + size.y - bracketLen }, { thickness, bracketLen }, color);
+	// Bottom-right
+	DrawPauseSolidRect({ pos.x + size.x - bracketLen, pos.y + size.y - thickness }, { bracketLen, thickness }, color);
+	DrawPauseSolidRect({ pos.x + size.x - thickness, pos.y + size.y - bracketLen }, { thickness, bracketLen }, color);
+}
+
+void StageScene::DrawPauseCustomCursor() {
+	float mx = customCursorPos_.x;
+	float my = customCursorPos_.y;
+
+	// 1. クリック波紋エフェクト
+	if (cursorRippleTimer_ > 0.0f) {
+		float rp = 1.0f - (cursorRippleTimer_ / 0.30f);
+		float rRad = 4.0f + 24.0f * rp;
+		float rAlpha = (1.0f - rp) * 0.90f;
+		Vector4 ringCol = { 0.0f, 1.0f, 0.12f, rAlpha };
+		DrawPauseSolidRect({ cursorRipplePos_.x - rRad, cursorRipplePos_.y - rRad }, { rRad * 2.0f, 1.5f }, ringCol);
+		DrawPauseSolidRect({ cursorRipplePos_.x - rRad, cursorRipplePos_.y + rRad - 1.5f }, { rRad * 2.0f, 1.5f }, ringCol);
+		DrawPauseSolidRect({ cursorRipplePos_.x - rRad, cursorRipplePos_.y - rRad }, { 1.5f, rRad * 2.0f }, ringCol);
+		DrawPauseSolidRect({ cursorRipplePos_.x + rRad - 1.5f, cursorRipplePos_.y - rRad }, { 1.5f, rRad * 2.0f }, ringCol);
+	}
+
+	// 2. 三角形カスタムカーソル (ユーザー指示: マウスカーソルを三角形へ)
+	// P0: (mx, my) 先端
+	// P1: (mx + 7.0f, my + 22.0f) 下端頂点
+	// P2: (mx + 22.0f, my + 7.0f) 右端頂点
+	const Vector4 kBlackEdge = { 0.0f, 0.0f, 0.0f, 0.95f };
+	const Vector4 kGreenBody = { 0.0f, 0.65f, 0.08f, 0.98f };
+	const Vector4 kGreenEdge = { 0.0f, 1.0f, 0.12f, 1.00f };
+	const Vector4 kGreenCore = { 0.50f, 1.0f, 0.55f, 1.00f };
+
+	// 2.1 外側黒アウトライン
+	DrawPauseLine({ mx - 0.5f, my - 0.5f }, { mx + 22.5f, my + 6.5f }, 3.5f, kBlackEdge);
+	DrawPauseLine({ mx - 0.5f, my - 0.5f }, { mx + 6.5f, my + 22.5f }, 3.5f, kBlackEdge);
+	DrawPauseLine({ mx + 6.5f, my + 22.5f }, { mx + 22.5f, my + 6.5f }, 3.5f, kBlackEdge);
+
+	// 2.2 ソリッド塗りつぶし（スキャンラインスライシング）
+	for (int y = 0; y <= 22; ++y) {
+		float fy = static_cast<float>(y);
+		float x1 = fy * (7.0f / 22.0f);
+		float x2 = (fy <= 7.0f) ? (fy * (22.0f / 7.0f)) : (22.0f - (fy - 7.0f) * (15.0f / 15.0f));
+		float w = (std::max)(1.0f, x2 - x1);
+		DrawPauseSolidRect({ mx + x1, my + fy }, { w, 1.2f }, kGreenBody);
+	}
+
+	// 2.3 内側エッジライン
+	DrawPauseLine({ mx, my }, { mx + 22.0f, my + 7.0f }, 1.5f, kGreenEdge);
+	DrawPauseLine({ mx, my }, { mx + 7.0f, my + 22.0f }, 1.5f, kGreenEdge);
+	DrawPauseLine({ mx + 7.0f, my + 22.0f }, { mx + 22.0f, my + 7.0f }, 1.5f, kGreenEdge);
+
+	// 2.4 先端コア
+	DrawPauseSolidRect({ mx, my }, { 2.5f, 2.5f }, kGreenCore);
+}
+
+void StageScene::DrawPauseMenuUI() {
+	ResetPauseSpritePool();
+	TextRenderer* tr = TextRenderer::GetInstance();
+
+	const float screenW = static_cast<float>(WinApp::kClientWidth);
+	const float screenH = static_cast<float>(WinApp::kClientHeight);
+
+	// 0. 全画面半透明ダークバックドロップ（薄暗くして背後の戦闘シーンを適度に見せる）
+	DrawPauseSolidRect({ 0.0f, 0.0f }, { screenW, screenH }, { 0.0f, 0.0f, 0.0f, 0.65f });
+
+	// =========================================================================
+	// ポーズウィンドウ本体（タイトル画面と同一の【完全な漆黒・純黒ブラック背景】）
+	// =========================================================================
+	const float winW = 500.0f;
+	const float winH = 430.0f;
+	Vector2 curPos = pauseWinPos_;
+	Vector2 curSize = { winW, winH };
+
+	const Vector4 borderCol   = { 1.0f, 1.0f, 1.0f, 0.85f }; // ウィンドウの淵は白
+	const Vector4 titleBarBg  = { 0.0f, 0.0f, 0.0f, 1.0f };  // 純黒ブラック背景色
+	const Vector4 cornerColor = { 1.0f, 1.0f, 1.0f, 1.00f }; // コーナーブラケット白
+
+	// 1. ドロップシャドウ（外側に4〜8pxの黒い半透明影を落とす）
+	DrawPauseSolidRect({ curPos.x + 8.0f, curPos.y + 10.0f }, curSize, { 0.0f, 0.0f, 0.0f, 0.70f });
+	DrawPauseSolidRect({ curPos.x - 6.0f, curPos.y - 4.0f }, { curSize.x + 12.0f, curSize.y + 10.0f }, { 0.0f, 0.0f, 0.0f, 0.35f });
+
+	// 2. ウィンドウ本体背景（純黒ブラック 100%）
+	DrawPauseSolidRect(curPos, curSize, { 0.0f, 0.0f, 0.0f, 1.0f });
+
+	// 3. タイトルバー背景
+	DrawPauseSolidRect(curPos, { curSize.x, 34.0f }, titleBarBg);
+
+	// 4. ウィンドウ外周境界線 (太さ 2px)
+	DrawPauseBorder(curPos, curSize, borderCol, 2.0f);
+
+	// タイトルバー境界線（上端アクセントライン & 下部水平区切り線）
+	DrawPauseSolidRect(curPos, { curSize.x, 2.0f }, { 1.0f, 1.0f, 1.0f, 0.95f }); // 上端白アクセントライン
+	DrawPauseSolidRect({ curPos.x, curPos.y + 32.0f }, { curSize.x, 2.0f }, { 1.0f, 1.0f, 1.0f, 0.65f }); // 下部区切り線（白）
+
+	// タイトルバー左側要素（高輝度LED & SOVI_OS タイトル）
+	DrawPauseSolidRect({ curPos.x + 14.0f, curPos.y + 13.0f }, { 8.0f, 8.0f }, { 0.0f, 1.0f, 0.12f, 1.0f }); // 高輝度LED
+	tr->Print("HackGen", "[PAUSE] TERMINAL : SOVI_OS [v4.12]", curPos.x + 28.0f, curPos.y + 9.0f, 13.0f, { 0.0f, 1.0f, 0.12f, 1.0f });
+
+	// タイトルバー右側のステータスバッジ
+	const float badgeX = curPos.x + curSize.x - 145.0f;
+	const float badgeY = curPos.y + 8.0f;
+	bool secBlink = (std::fmod(pauseAnimTimer_, 1.2f) < 0.6f);
+	Vector4 ledColor = secBlink ? Vector4{ 0.0f, 1.0f, 0.12f, 1.0f } : Vector4{ 0.0f, 0.45f, 0.05f, 0.75f };
+	DrawPauseSolidRect({ badgeX + 7.0f, badgeY + 5.0f }, { 6.0f, 6.0f }, ledColor);
+	tr->Print("HackGen", "SEC:LV5 [OK]", badgeX + 18.0f, badgeY + 2.0f, 10.5f, { 0.0f, 1.0f, 0.12f, 0.95f });
+
+	// 右上の [X] 戻る/閉じるボタン
+	const float closeX = curPos.x + curSize.x - 32.0f;
+	const float closeY = curPos.y + 6.0f;
+	const float closeW = 24.0f;
+	const float closeH = 22.0f;
+	bool isCloseHover = (customCursorPos_.x >= closeX && customCursorPos_.x <= closeX + closeW &&
+	                     customCursorPos_.y >= closeY && customCursorPos_.y <= closeY + closeH);
+	if (isCloseHover) {
+		DrawPauseSolidRect({ closeX, closeY }, { closeW, closeH }, { 0.88f, 0.15f, 0.18f, 0.95f });
+	} else {
+		DrawPausePanel({ closeX, closeY }, { closeW, closeH }, { 0.0f, 0.0f, 0.0f, 0.80f }, { 1.0f, 1.0f, 1.0f, 0.60f }, 1.0f);
+	}
+	tr->Print("HackGen", "X", closeX + closeW * 0.5f, closeY + 4.0f, 12.0f, isCloseHover ? Vector4{ 1.0f, 1.0f, 1.0f, 1.0f } : Vector4{ 0.0f, 1.0f, 0.12f, 0.95f }, { 0.5f, 0.0f });
+
+	// 5. 四隅のコーナーブラケット（太さ 2.5px、白）
+	DrawPauseCornerBrackets(curPos, curSize, 22.0f, 2.5f, cornerColor);
+
+	// 5. サブヘッダー
+	tr->Print("HackGenRegular", "/// MISSION PAUSED : PILOT DIRECTIVE ///", curPos.x + curSize.x * 0.5f, curPos.y + 44.0f, 11.5f, { 0.0f, 1.0f, 0.12f, 0.90f }, { 0.5f, 0.0f });
+
+	// 認証ステータス行（水平区切り線 ＆ 黒ベタマスク）
+	const float authY = curPos.y + 68.0f;
+	DrawPauseSolidRect({ curPos.x + 24.0f, authY }, { curSize.x - 48.0f, 1.0f }, { 1.0f, 1.0f, 1.0f, 0.40f });
+	DrawPauseSolidRect({ curPos.x + curSize.x * 0.5f - 160.0f, authY - 8.0f }, { 320.0f, 16.0f }, { 0.0f, 0.0f, 0.0f, 1.0f });
+	tr->Print("HackGenRegular", "AUTH LEVEL 5 GRANTED // READY FOR COMMAND", curPos.x + curSize.x * 0.5f, authY - 6.0f, 11.0f, { 0.0f, 1.0f, 0.12f, 0.90f }, { 0.5f, 0.0f });
+
+	// 6. メニューボタン (4つ)
+	const float buttonWidth = 380.0f;
+	const float buttonHeight = 44.0f;
+	const float buttonX = curPos.x + (curSize.x - buttonWidth) * 0.5f;
+	const float buttonStartY = curPos.y + 96.0f;
+	const float buttonSpacing = 54.0f;
+
+	static const char* kLabels[4] = {
+		"[01] RESUME FLIGHT",
+		"[02] RESTART MISSION",
+		"[03] ABORT TO TITLE",
+		"[04] QUIT APPLICATION"
+	};
+
+	for (int i = 0; i < 4; ++i) {
+		float btnY = buttonStartY + static_cast<float>(i) * buttonSpacing;
+		bool isSelected = (pauseMenuIndex_ == i);
+
+		if (isSelected) {
+			// 選択中ハイライト（白枠 ＆ (0, 255, 30) ネオングリーン文字）
+			DrawPauseSolidRect({ buttonX, btnY }, { buttonWidth, buttonHeight }, { 0.0f, 0.15f, 0.02f, 0.85f });
+			DrawPauseSolidRect({ buttonX, btnY }, { 4.0f, buttonHeight }, { 0.0f, 1.0f, 0.12f, 1.0f });
+			DrawPauseBorder({ buttonX, btnY }, { buttonWidth, buttonHeight }, { 1.0f, 1.0f, 1.0f, 0.95f }, 1.5f);
+			DrawPauseCornerBrackets({ buttonX, btnY }, { buttonWidth, buttonHeight }, 8.0f, 1.5f, { 1.0f, 1.0f, 1.0f, 1.0f });
+
+			std::string selText = ">> " + std::string(kLabels[i]);
+			tr->Print("HackGen", selText, buttonX + 24.0f, btnY + 11.0f, 20.0f, { 0.0f, 1.0f, 0.12f, 1.00f });
+		} else {
+			// 非選択（完全純黒背景 ＆ 白枠）
+			DrawPauseSolidRect({ buttonX, btnY }, { buttonWidth, buttonHeight }, { 0.0f, 0.0f, 0.0f, 1.0f });
+			DrawPauseBorder({ buttonX, btnY }, { buttonWidth, buttonHeight }, { 1.0f, 1.0f, 1.0f, 0.35f }, 1.0f);
+			DrawPauseCornerBrackets({ buttonX, btnY }, { buttonWidth, buttonHeight }, 8.0f, 1.5f, { 1.0f, 1.0f, 1.0f, 0.50f });
+			tr->Print("HackGen", kLabels[i], buttonX + 24.0f, btnY + 11.0f, 20.0f, { 0.0f, 0.85f, 0.10f, 0.90f });
 		}
 	}
 
-	// --- グリッドライン（100m間隔） ---
-	// 機体の周囲に十字のグリッド線を描画して距離感を出す
-	const float lineExtent = tileRange * tileSize;
-	const Vector4 lineColor = { 0.15f, 0.15f, 0.15f, 0.8f };
+	// 7. 操作ガイド枠（完全純黒背景）
+	const float guideY = curPos.y + 322.0f;
+	const float guideH = 34.0f;
+	DrawPausePanel({ curPos.x + 24.0f, guideY }, { curSize.x - 48.0f, guideH }, { 0.0f, 0.0f, 0.0f, 1.0f }, { 1.0f, 1.0f, 1.0f, 0.40f }, 1.0f);
+	DrawPauseCornerBrackets({ curPos.x + 24.0f, guideY }, { curSize.x - 48.0f, guideH }, 10.0f, 1.5f, { 1.0f, 1.0f, 1.0f, 0.50f });
+	tr->Print("HackGen", "[ UP / DOWN ] SELECT     [ ENTER / CLICK ] EXECUTE     [ ESC ] RESUME", curPos.x + curSize.x * 0.5f, guideY + 9.0f, 11.5f, { 0.0f, 1.0f, 0.12f, 0.90f }, { 0.5f, 0.0f });
 
-	for (int i = -tileRange; i <= tileRange; i++) {
-		float x = snapX + i * tileSize;
-		PrimitiveModel::GetInstance()->DrawLine3D(
-			{ x, 0.1f, snapZ - lineExtent },
-			{ x, 0.1f, snapZ + lineExtent },
-			lineColor, camera
-		);
+	// 8. ウィンドウ最下部ステータスバー（独立フッター領域）
+	const float sbH = 22.0f;
+	const float sbFootY = curPos.y + curSize.y - sbH;
+	DrawPauseSolidRect({ curPos.x, sbFootY }, { curSize.x, 1.0f }, { 1.0f, 1.0f, 1.0f, 0.45f }); // 白仕切り線
+	DrawPauseSolidRect({ curPos.x, sbFootY + 1.0f }, { curSize.x, sbH - 1.0f }, { 0.0f, 0.02f, 0.005f, 0.95f });
+	DrawPauseSolidRect({ curPos.x + 10.0f, sbFootY + 8.0f }, { 6.0f, 6.0f }, { 0.0f, 1.0f, 0.12f, 1.0f });
+	tr->Print("HackGenRegular", "ROOT@TACTICAL_OS: ONLINE", curPos.x + 22.0f, sbFootY + sbH * 0.5f, 11.0f, { 0.0f, 1.0f, 0.12f, 0.95f }, { 0.0f, 0.5f });
+	tr->Print("HackGenRegular", "PORT: 115200 BAUD // UTF-8", curPos.x + curSize.x - 16.0f, sbFootY + sbH * 0.5f, 11.0f, { 0.0f, 0.85f, 0.10f, 0.90f }, { 1.0f, 0.5f });
+
+	// ウィンドウテキストを描画フラッシュ
+	tr->Flush();
+
+	// 9. カスタムサイバーマウスカーソル（最前面）
+	if (!isPauseAborting_) {
+		DrawPauseCustomCursor();
 	}
 
-	for (int i = -tileRange; i <= tileRange; i++) {
-		float z = snapZ + i * tileSize;
-		PrimitiveModel::GetInstance()->DrawLine3D(
-			{ snapX - lineExtent, 0.1f, z },
-			{ snapX + lineExtent, 0.1f, z },
-			lineColor, camera
-		);
+	// 10. ポーズからタイトル復帰時のCRTシャットダウン演出（最前面）
+	if (isPauseAborting_) {
+		DrawPauseCRTShutdown(pauseAbortTimer_ / kPauseAbortDuration);
 	}
 }
 
+void StageScene::DrawPauseCRTShutdown(float progress) {
+	float screenW = static_cast<float>(WinApp::kClientWidth);
+	float screenH = static_cast<float>(WinApp::kClientHeight);
+	float crtT = std::clamp(progress, 0.0f, 1.0f);
+	float centerY = screenH * 0.5f;
+	float centerX = screenW * 0.5f;
 
-// ===========================================================
-// ===========================================================
-//
-// ・機体の後方 + 上方にカメラの「理想位置」を計算
-// ・現在のカメラ位置を Lerp で滑らかに理想位置へ追従（遅延あり）
-// ・注視点も機体の少し前方を Lerp で滑らかに追従
-// ・カメラの回転は LookAt で常に機体を見つめる
-//
+	if (crtT < 0.55f) {
+		// ==========================================================
+		// Phase 1 (0.00〜0.55): 画面垂直収束 ＆ 中央丸型楕円ブルーム発光
+		// ==========================================================
+		float p = crtT / 0.55f;
+		float collapse = 1.0f - std::pow(1.0f - p, 3.0f);
+		float halfH = (screenH * 0.5f) * (1.0f - collapse);
+		if (halfH < 2.0f) halfH = 2.0f;
 
+		// 上下の黒マスク
+		DrawPauseSolidRect({ 0.0f, 0.0f }, { screenW, centerY - halfH }, { 0.0f, 0.0f, 0.0f, 1.0f });
+		DrawPauseSolidRect({ 0.0f, centerY + halfH }, { screenW, screenH - (centerY + halfH) }, { 0.0f, 0.0f, 0.0f, 1.0f });
 
+		float bloomIntensity = (std::min)(1.0f, p / 0.12f);
 
-// ===========================================================
-// クォータニオン → オイラー角 変換
-// ===========================================================
+		// 1. 中央の大きく膨らむ楕円形蛍光体グロー（ユーザー提示画像のような丸みを帯びた発光）
+		DrawPauseGlowOval({ centerX, centerY }, { 600.0f, 230.0f }, { 0.85f, 0.82f, 0.65f, 0.40f * bloomIntensity }, BlendMode::kAdd);
+		DrawPauseGlowOval({ centerX, centerY }, { 460.0f, 160.0f }, { 0.95f, 0.95f, 0.85f, 0.60f * bloomIntensity }, BlendMode::kAdd);
+		DrawPauseGlowOval({ centerX, centerY }, { 320.0f, 100.0f }, { 1.00f, 1.00f, 0.95f, 0.85f * bloomIntensity }, BlendMode::kAdd);
+		DrawPauseGlowOval({ centerX, centerY }, { 200.0f, 50.0f },  { 1.00f, 1.00f, 1.00f, 1.00f * bloomIntensity }, BlendMode::kAdd);
 
+		// 2. 画面端まで走る水平ビーム（多層発光ライン）
+		DrawPauseSolidRect({ 0.0f, centerY - 6.0f }, { screenW, 12.0f }, { 0.70f, 0.85f, 0.95f, 0.35f * bloomIntensity }, BlendMode::kAdd);
+		DrawPauseSolidRect({ 0.0f, centerY - 2.5f }, { screenW, 5.0f },  { 0.90f, 0.95f, 1.00f, 0.70f * bloomIntensity }, BlendMode::kAdd);
+		DrawPauseSolidRect({ 0.0f, centerY - 1.0f }, { screenW, 2.0f },  { 1.00f, 1.00f, 1.00f, 1.00f * bloomIntensity }, BlendMode::kAdd);
 
+		// 3. 発光部を横切るCRT特有の黒い走査線スリット（ユーザー提示画像のような横縞スリット）
+		for (float y = centerY - 110.0f; y <= centerY + 110.0f; y += 14.0f) {
+			if (std::abs(y - centerY) > 2.0f) {
+				DrawPauseSolidRect({ 0.0f, y - 2.0f }, { screenW, 4.0f }, { 0.0f, 0.0f, 0.0f, 0.75f * bloomIntensity });
+			}
+		}
+	} else if (crtT < 0.85f) {
+		// ==========================================================
+		// Phase 2 (0.55〜0.85): 水平ビームと楕円が左右から中央へ収束
+		// ==========================================================
+		float p = (crtT - 0.55f) / 0.30f;
+		float shrink = 1.0f - p;
+		float beamW = screenW * shrink;
+		float beamX = (screenW - beamW) * 0.5f;
 
-// ===========================================================
-// カメラ位置(from) → 注視点(to) を向くオイラー角を返す
-// そのrotateに合致するオイラー角(XYZ順)を逆算する
-// ジンバルロック対策: 真上・真下付近ではヨーを前フレームの値で維持
-// ===========================================================
+		// 画面全体ブラックアウト
+		DrawPauseSolidRect({ 0.0f, 0.0f }, { screenW, screenH }, { 0.0f, 0.0f, 0.0f, 1.0f });
+
+		// 収束する中央楕円グロー
+		float ovalW = 600.0f * (1.0f - p * 0.85f);
+		float ovalH = 230.0f * (1.0f - p * 0.70f);
+		DrawPauseGlowOval({ centerX, centerY }, { ovalW, ovalH }, { 0.85f, 0.82f, 0.65f, 0.40f * shrink }, BlendMode::kAdd);
+		DrawPauseGlowOval({ centerX, centerY }, { ovalW * 0.75f, ovalH * 0.70f }, { 0.95f, 0.95f, 0.85f, 0.60f * shrink }, BlendMode::kAdd);
+		DrawPauseGlowOval({ centerX, centerY }, { ovalW * 0.50f, ovalH * 0.45f }, { 1.00f, 1.00f, 1.00f, 1.00f * shrink }, BlendMode::kAdd);
+
+		// 収束する水平ビーム
+		DrawPauseSolidRect({ beamX, centerY - 5.0f }, { beamW, 10.0f }, { 0.70f, 0.85f, 0.95f, 0.35f * shrink }, BlendMode::kAdd);
+		DrawPauseSolidRect({ beamX, centerY - 1.5f }, { beamW, 3.0f },  { 1.00f, 1.00f, 1.00f, 1.00f * shrink }, BlendMode::kAdd);
+
+		// 走査線スリット
+		for (float y = centerY - ovalH * 0.45f; y <= centerY + ovalH * 0.45f; y += 12.0f) {
+			if (std::abs(y - centerY) > 2.0f) {
+				DrawPauseSolidRect({ beamX, y - 1.5f }, { beamW, 3.0f }, { 0.0f, 0.0f, 0.0f, 0.70f * shrink });
+			}
+		}
+	} else {
+		// ==========================================================
+		// Phase 3 (0.85〜1.00): 中央の極小蛍光体光点が「プツッ」と閃光して消滅
+		// ==========================================================
+		float p = (crtT - 0.85f) / 0.15f;
+		DrawPauseSolidRect({ 0.0f, 0.0f }, { screenW, screenH }, { 0.0f, 0.0f, 0.0f, 1.0f });
+
+		if (p < 0.50f) {
+			float popAlpha = 1.0f - (p / 0.50f);
+			DrawPauseGlowOval({ centerX, centerY }, { 40.0f, 30.0f }, { 0.85f, 0.85f, 0.70f, 0.60f * popAlpha }, BlendMode::kAdd);
+			DrawPauseGlowOval({ centerX, centerY }, { 16.0f, 10.0f }, { 1.00f, 1.00f, 1.00f, 1.00f * popAlpha }, BlendMode::kAdd);
+		}
+	}
+}
+
 

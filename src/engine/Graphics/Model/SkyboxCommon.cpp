@@ -8,7 +8,7 @@ std::unique_ptr<SkyboxCommon> SkyboxCommon::instance_ = nullptr;
 
 SkyboxCommon* SkyboxCommon::GetInstance() {
 	if (instance_ == nullptr) {
-		instance_.reset(new SkyboxCommon());
+		instance_ = std::make_unique<SkyboxCommon>();
 	}
 	return instance_.get();
 }

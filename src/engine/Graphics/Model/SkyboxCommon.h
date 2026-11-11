@@ -9,10 +9,22 @@
 class DirectXCommon;
 class SrvManager;
 
+/// <summary>
+/// スカイボックス描画の共通設定管理クラス
+/// </summary>
 class SkyboxCommon
 {
 public:
+	/// <summary>
+	/// シングルトンインスタンスの取得
+	/// </summary>
+	/// <returns>インスタンスポインタ</returns>
 	static SkyboxCommon* GetInstance();
+
+	/// <summary>
+	/// デフォルトコンストラクタ (std::make_unique対応のためpublic)
+	/// </summary>
+	SkyboxCommon() = default;
 
 	void Initialize(DirectXCommon* dxCommon, SrvManager* srvManager);
 	void Finalize();
@@ -25,7 +37,6 @@ public:
 
 	~SkyboxCommon() = default;
 private:
-	SkyboxCommon() = default;
 	SkyboxCommon(const SkyboxCommon&) = delete;
 	SkyboxCommon& operator=(const SkyboxCommon&) = delete;
 

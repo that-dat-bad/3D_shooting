@@ -64,6 +64,7 @@ struct PlayingVoice {
 
 class AudioManager {
 public:
+	AudioManager() = default;
 	static AudioManager* GetInstance();
 	// 初期化
 	void Initialize();
@@ -90,7 +91,6 @@ public:
 
 private:
 	IXAudio2* xAudio2_ = nullptr;
-	AudioManager() = default;
 	static std::unique_ptr<AudioManager> instance;
 
 	IXAudio2MasteringVoice* masteringVoice_ = nullptr;

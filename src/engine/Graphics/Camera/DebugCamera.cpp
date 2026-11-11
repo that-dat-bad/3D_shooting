@@ -5,7 +5,7 @@ using namespace MyMath;
 
 
 Matrix4x4 MakeLookAtMatrix(const Vector3& eye, const Vector3& target, const Vector3& up) {
-    Vector3 zaxis = Normalize(Substract(target, eye));
+    Vector3 zaxis = Normalize(Subtract(target, eye));
     Vector3 xaxis = Normalize(Cross(up, zaxis));
     Vector3 yaxis = Cross(zaxis, xaxis);
     Matrix4x4 viewMatrix = {

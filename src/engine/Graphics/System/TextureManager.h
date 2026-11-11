@@ -1,5 +1,6 @@
 #pragma once
 #include <string>
+#include <array>
 #include "../../../external/DirectXTex/DirectXTex.h"
 #include <wrl/client.h>
 #include <d3d12.h>
@@ -13,22 +14,39 @@ class DirectXCommon;
 
 #include <memory> 
 
+/// <summary>
+/// テクスチャ管理クラス
+/// </summary>
 class TextureManager
 {
 public:
+	/// <summary>
+	/// シングルトンインスタンスの取得
+	/// </summary>
+	/// <returns>インスタンスポインタ</returns>
 	static TextureManager* GetInstance();
 
-	// 初期化
+	/// <summary>
+	/// デフォルトコンストラクタ (std::make_unique対応のためpublic)
+	/// </summary>
+	TextureManager() = default;
+
+	/// <summary>初期化処理</summary>
 	void Initialize(DirectXCommon* dxCommon,SrvManager* srvManager);
 
-	// 終了処理
+	/// <summary>終了処理</summary>
 	void Finalize();
 
-	// テクスチャ読み込み
+	/// <summary>
+	/// テクスチャ読み込み
+	/// </summary>
+	/// <param name="filePath">ファイルパス</param>
 	void LoadTexture(const std::string& filePath);
 
+	/// <summary>メモリからテクスチャ読み込み</summary>
 	void LoadTextureFromMemory(const std::string& textureName, const void* data, size_t size);
 
+	/// <summary>生ピクセルデータからテクスチャ読み込み</summary>
 	void LoadTextureFromRawPixels(const std::string& textureName, uint32_t width, uint32_t height, DXGI_FORMAT format, const void* pixels);
 
 	D3D12_GPU_DESCRIPTOR_HANDLE GetSrvHandleGPU(uint32_t textureIndex);
@@ -55,10 +73,7 @@ public:
 
 private:
 
-
-
 	static std::unique_ptr<TextureManager> instance_;
-	TextureManager() = default;
 	TextureManager(const TextureManager&) = delete;
 	TextureManager& operator=(const TextureManager&) = delete;
 
@@ -82,4 +97,7 @@ private:
 
 	// レンダーテクスチャ用 RTV インデックス（スワップチェーン2枚の次から）
 	uint32_t rtvNextIndex_ = 2;
+
+	// O(1) 高速アクセスメタデータキャッシュ（512枚対応、線形探索を完全根絶）
+	std::array<const DirectX::TexMetadata*, 512> metadataByIndex_{};
 };

@@ -1,5 +1,6 @@
 #pragma once
 #include <algorithm>
+#include "DamageModel.h"
 
 // --- 外部ファイルから読み込むためのデータ構造体（DTO） ---
 struct AirframeData {
@@ -46,6 +47,7 @@ enum class DamageZone {
 };
 
 // --- 機体フレームクラス本体 ---
+// 機体のフレームや物理的特性を管理するクラス
 class Airframe {
 public:
 	Airframe() : currentInternalFuel_(0.0f), currentHealth_(0.0f),
@@ -57,13 +59,16 @@ public:
 	}
 	~Airframe() = default;
 
-	// 初期化（外部データを受け取ってセットアップ）
+	// 初期化
+	// data: 機体データ
 	void Initialize(const AirframeData& data);
 
-	// 内蔵燃料を消費する処理
+	// 内蔵燃料を消費
+	// amount: 消費量
 	void ConsumeInternalFuel(float amount);
 
-	// ダメージを受ける処理
+	// ダメージ処理
+	// damage: ダメージ量
 	void TakeDamage(float damage);
 
 	// --- フラップ ---
@@ -82,7 +87,10 @@ public:
 
 	// --- ダメージ連動 ---
 	void ApplyZoneDamage(DamageZone zone, float amount);
-	float GetDamageState(DamageZone zone) const { return damageState_[static_cast<int>(zone)]; }
+	float GetDamageState(DamageZone zone) const;
+
+	DamageModel& GetDamageModel() { return damageModel_; }
+	const DamageModel& GetDamageModel() const { return damageModel_; }
 
 	// ダメージ補正値
 	float GetEffectiveLiftCoefficient() const;   // 翼ダメージで揚力低下
@@ -101,7 +109,7 @@ public:
 	float GetCurrentHealth() const { return currentHealth_; }
 	float GetMaxHealth() const { return maxHealth_; }
 	float GetCenterOfGravityZ() const { return centerOfGravityZ_; }
-	bool  IsDestroyed() const { return currentHealth_ <= 0.0f; }
+	bool  IsDestroyed() const;
 
 	// 揚力・失速
 	float GetCriticalAoA() const { return criticalAoA_; }
@@ -161,4 +169,8 @@ private:
 
 	// ダメージ状態（各部位 0.0～1.0）
 	float damageState_[static_cast<int>(DamageZone::Count)];
+
+	// 詳細パーツダメージモデル
+	DamageModel damageModel_;
 };
+

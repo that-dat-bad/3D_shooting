@@ -5,33 +5,33 @@
 
 class Camera;
 
-/// @brief 弾丸のオブジェクトプール管理クラス
+// 弾丸マネージャー
 class BulletManager {
 public:
 	BulletManager() = default;
 	~BulletManager() = default;
 
-	/// @brief 初期化（オブジェクトプールの確保）
-	/// @param maxBullets プールの最大数
+	// 初期化
+	// maxBullets : 最大弾数
 	void Initialize(uint32_t maxBullets = 512);
 
-	/// @brief 全弾丸の位置更新
+	// 更新
 	void Update(float dt);
 
-	/// @brief 弾丸の描画（パーティクルインスタンシングで描画）
+	// 描画
 	void Draw(Camera* camera);
 
-	/// @brief 弾丸を1発生成
-	/// @param position 発射位置
-	/// @param velocity 弾丸の初速度ベクトル (m/s)
-	/// @param damage ダメージ
-	/// @param isEnemyBullet 敵の弾かどうか
+	// 弾丸生成
+	// position : 発射位置
+	// velocity : 初速度ベクトル
+	// damage : ダメージ
+	// isEnemyBullet : 敵弾フラグ
 	void SpawnBullet(const MyMath::Vector3& position, const MyMath::Vector3& velocity, float damage, bool isEnemyBullet = false);
 
-	/// @brief アクティブな弾丸のリストへの参照を取得
+	// 弾丸リスト取得
 	std::vector<Bullet>& GetBullets() { return bullets_; }
 
-	/// @brief アクティブな弾丸数
+	// 有効弾数取得
 	uint32_t GetActiveBulletCount() const;
 
 private:

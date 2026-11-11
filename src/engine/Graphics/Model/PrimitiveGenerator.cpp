@@ -1,9 +1,10 @@
-#include "PrimitiveGenerator.h"
+#define _USE_MATH_DEFINES
 #include <cmath>
+#include "PrimitiveGenerator.h"
 
 std::vector<PrimitiveModel::VertexData> PrimitiveGenerator::CreateRing(int segments, float innerR, float outerR) {
 	std::vector<PrimitiveModel::VertexData> vertices;
-	float angleStep = (2.0f * 3.14159265f) / segments;
+	float angleStep = (2.0f * float(M_PI)) / segments;
 
 	for (int i = 0; i < segments; ++i) {
 		float a1 = i * angleStep;
@@ -31,7 +32,7 @@ std::vector<PrimitiveModel::VertexData> PrimitiveGenerator::CreateRing(int segme
 
 std::vector<PrimitiveModel::VertexData> PrimitiveGenerator::CreateCylinder(int segments, float height, float radius) {
 	std::vector<PrimitiveModel::VertexData> vertices;
-	float angleStep = (2.0f * 3.14159265f) / segments;
+	float angleStep = (2.0f * float(M_PI)) / segments;
 	float h = height; // 上下幅
 	float r = radius;
 
@@ -84,7 +85,7 @@ std::vector<PrimitiveModel::VertexData> PrimitiveGenerator::CreatePlane(float si
 
 std::vector<PrimitiveModel::VertexData> PrimitiveGenerator::CreateCone(int segments, float height, float radius) {
 	std::vector<PrimitiveModel::VertexData> vertices;
-	float angleStep = (2.0f * 3.14159265f) / segments;
+	float angleStep = (2.0f * float(M_PI)) / segments;
 	float h = height; // 原点から先端（+h）、底面（-h）
 	float r = radius;
 

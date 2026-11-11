@@ -4,83 +4,114 @@
 #include <string>
 #include <vector>
 #include <map>
-#include <span>
-#include <optional>
-#include <array>
 #include "../base/Math/MyMath.h"
+#include "../../Physics/Collider.h"
 
 using namespace MyMath;
 class ModelCommon;
 class Camera;
 
+// <summary>
+// 3Dモデルデータを保持し描画を行うクラス
+// (アセットファイルからのデータ読み込み、アニメーション対応)
+// </summary>
 class Model {
 public:
+	// <summary>
+	// モデルの初期化
+	// </summary>
+	// <param name="modelCommon">ModelCommonポインタ</param>
+	// <param name="directorypath">ディレクトリパス</param>
+	// <param name="filename">ファイル名</param>
 	void Initialize(ModelCommon* modelCommon, const std::string& directorypath, const std::string& filename);
+	
+	// <summary>
+	// モデルの描画コマンド発行
+	// </summary>
 	void Draw();
 
+	// <summary>
+	// 特定のノード（とその子孫）のみを描画するコマンド発行
+	// </summary>
+	void DrawNode(const std::string& nodeName);
+
+	// <summary>
+	// デバッグ用: スケルトンの描画
+	// </summary>
+	// <param name="objectWorldMatrix">オブジェクトのワールド行列</param>
+	// <param name="camera">カメラ</param>
+	// <param name="color">描画色</param>
 	void DebugDrawSkeleton(const Matrix4x4& objectWorldMatrix, Camera* camera, const Vector4& color = { 1.0f, 1.0f, 1.0f, 1.0f });
 
-	void SetShininess(float shininess) { materialData_->shininess = shininess; }
-	float GetShininess() const { return materialData_->shininess; }
+	void SetShininess(float shininess) { for (auto* mat : materialDatas_) { if (mat) mat->shininess = shininess; } }
+	float GetShininess() const { return !materialDatas_.empty() && materialDatas_[0] ? materialDatas_[0]->shininess : 0.0f; }
 
-	void SetEnvironmentCoefficient(float coefficient) { materialData_->environmentCoefficient = coefficient; }
-	float GetEnvironmentCoefficient() const { return materialData_->environmentCoefficient; }
+	void SetEnvironmentCoefficient(float coefficient) { for (auto* mat : materialDatas_) { if (mat) mat->environmentCoefficient = coefficient; } }
+	float GetEnvironmentCoefficient() const { return !materialDatas_.empty() && materialDatas_[0] ? materialDatas_[0]->environmentCoefficient : 0.0f; }
 
-	void SetSpecularIntensity(float intensity) { materialData_->specularIntensity = intensity; }
-	float GetSpecularIntensity() const { return materialData_->specularIntensity; }
+	void SetSpecularIntensity(float intensity) { for (auto* mat : materialDatas_) { if (mat) mat->specularIntensity = intensity; } }
+	float GetSpecularIntensity() const { return !materialDatas_.empty() && materialDatas_[0] ? materialDatas_[0]->specularIntensity : 0.0f; }
+
+	void SetColor(const Vector4& color) { for (auto* mat : materialDatas_) { if (mat) mat->color = color; } }
 
 	struct VertexData {
 		Vector4 position;
 		Vector2 texcoord;
 		Vector3 normal;
+		float padding[3] = { 0.0f, 0.0f, 0.0f };
+		Vector4 weight;
+		int32_t indices[4];
 	};
 	struct Material {
 		Vector4 color;
 		int32_t enableLighting;
 		float shininess;
 		float environmentCoefficient;
-		float specularIntensity;
-		Matrix4x4 uvTransform;
+		float specularIntensity; // 反射強度
+		Vector3 emissiveColor = { 0.0f, 0.0f, 0.0f }; // 自発光色
+		float emissiveIntensity = 0.0f;               // 自発光強度
+		Matrix4x4 uvTransform; // UV変換行列
 	};
 
+	struct BoneMatrix {
+		Matrix4x4 matrices[100];
+	};
+	struct SkinningParams {
+		uint32_t numVertices;
+		float padding[3] = { 0.0f, 0.0f, 0.0f };
+	};
 	struct MaterialData {
 		std::string textureFilePath;
 		uint32_t textureIndex = 0;
-		Vector4 baseColor = { 1.0f, 1.0f, 1.0f, 1.0f };
+		Vector4 baseColor = { 1.0f, 1.0f, 1.0f, 1.0f }; //デフォルトは白
 		float shininess = 50.0f;
-		float environmentCoefficient = 0.0f;
-		float specularIntensity = 1.0f;
+		float environmentCoefficient = 0.0f; //環境マップの反射度合い
+		float specularIntensity = 1.0f;      // 反射強度
+		Vector3 emissiveColor = { 0.0f, 0.0f, 0.0f }; // 自発光色
+		float emissiveIntensity = 0.0f;               // 自発光強度
 	};
-
-	struct QuaternionTransform {
-		Vector3 scale;
-		Quaternion rotate;
-		Vector3 translate;
+	struct MeshInfo {
+		uint32_t indexOffset;
+		uint32_t indexCount;
+		uint32_t materialIndex = 0;
 	};
-
 	struct Node {
-		QuaternionTransform transform;
 		Matrix4x4 localMatrix = { 1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1 };
 		std::string name;
 		std::vector<Node> children;
+		std::vector<MeshInfo> meshes;
 	};
-
-	struct VertexWeightData {
-		float weight;
-		uint32_t vertexIndex;
-	};
-	
-	struct JointWeightData {
-		Matrix4x4 inverseBindPoseMatrix;
-		std::vector<VertexWeightData> vertexWeights;
-	};
-
 	struct ModelData {
 		std::vector<VertexData> vertices;
 		std::vector<uint32_t> indices;
-		MaterialData material;
+		std::vector<MaterialData> materials;
 		Node rootNode;
-		std::map<std::string, JointWeightData> skinClusterData;
+		struct BoneData {
+			std::string name;
+			Matrix4x4 inverseBindPoseMatrix;//初期姿勢の逆行列
+		};
+		std::vector<BoneData> bones;//ボーンの配列
+		std::map < std::string, uint32_t> boneIndexMap;//ボーン名からインデックスへのマップ
 	};
 
 	template <typename tValue>
@@ -102,85 +133,92 @@ public:
 		std::map<std::string, NodeAnimation> nodeAnimations;
 	};
 
-	struct Joint {
-		QuaternionTransform transform;
-		Matrix4x4 localMatrix;
-		Matrix4x4 skeletonSpaceMatrix;
-		std::string name;
-		std::vector<int32_t> children;
-		int32_t index;
-		std::optional<int32_t> parent;
-	};
-
-	struct Skeleton {
-		int32_t root;
-		std::map<std::string, int32_t> jointMap;
-		std::vector<Joint> joints;
-	};
-
-	const static uint32_t kNumMaxInfluence = 4;
-	struct VertexInfluence {
-		std::array<float, kNumMaxInfluence> weights;
-		std::array<int32_t, kNumMaxInfluence> jointIndices;
-	};
-
-	struct WellForGPU {
-		Matrix4x4 skeletonSpaceMatrix;
-		Matrix4x4 skeletonSpaceInverseTransposeMatrix;
-	};
-
-	struct SkinCluster {
-		std::vector<Matrix4x4> inverseBindPoseMatrices;
-		Microsoft::WRL::ComPtr<ID3D12Resource> influenceResource;
-		D3D12_VERTEX_BUFFER_VIEW influenceBufferView;
-		std::span<VertexInfluence> mappedInfluence;
-		Microsoft::WRL::ComPtr<ID3D12Resource> paletteResource;
-		std::span<WellForGPU> mappedPalette;
-		uint32_t paletteSrvIndex = 0;
-	};
-
 	static ModelData LoadModelFile(const std::string& directoryPath, const std::string& filename);
+	// <summary>
+	// Assimp を経由しない軽量OBJローダー（静的メッシュ専用：ボーン・アニメーション非対応）
+	// 地形チャンクなど大量の単純OBJを高速に読み込むためのもの
+	// </summary>
+	static ModelData LoadObjFileFast(const std::string& filePath);
 	static Animation LoadAnimationFile(const std::string& directoryPath, const std::string& filename, const std::string& animationName);
 	static std::vector<std::string> LoadAnimationNames(const std::string& directoryPath, const std::string& filename, const std::string& animationName = "");
 	ModelData GetModelData() const { return modelData_; }
 
-	void PlayAnimation(Animation* animation, float blendDuration = 0.0f);
+	// <summary>
+	// 事前パース済みモデルデータからの初期化（マルチスレッド並列ロード対応）
+	// </summary>
+	void InitializeFromModelData(ModelCommon* modelCommon, ModelData modelData);
+
+	// アニメーションを再生スタートする関数
+	void PlayAnimation(Animation* animation);
+
+	// 毎フレーム呼んでアニメーションを進める関数
 	void Update(float deltaTime);
-	
-	bool IsSkinMesh() const { return isSkinMesh_; }
+
+	// <summary>
+	// モデル全体のメッシュに対するレイキャスト判定
+	// </summary>
+	bool IntersectRay(const Ray& ray, const Matrix4x4& worldMatrix, RaycastHit* outHit = nullptr) const;
+
+	// <summary>
+	// 特定ノードのメッシュに対するレイキャスト判定
+	// </summary>
+	bool IntersectRayNode(const std::string& nodeName, const Ray& ray, const Matrix4x4& nodeWorldMatrix, RaycastHit* outHit = nullptr) const;
+
+	// マテリアルのカラーを設定
+	void SetMaterialColor(uint32_t materialIndex, const Vector4& color);
+	// マテリアルのライティング有効/無効を設定
+	void SetMaterialEnableLighting(uint32_t materialIndex, bool enableLighting);
+	// マテリアルの反射強度を設定
+	void SetMaterialSpecularIntensity(uint32_t materialIndex, float intensity);
+	// マテリアルの自発光（エミッシブ）を設定
+	void SetMaterialEmissive(uint32_t materialIndex, const Vector3& color, float intensity);
+	// マテリアルの光沢度（シャープさ）を設定
+	void SetMaterialShininess(uint32_t materialIndex, float shininess);
+	// マテリアルの環境反射係数を設定
+	void SetMaterialEnvironmentCoefficient(uint32_t materialIndex, float coefficient);
+	// マテリアル数を取得
+	size_t GetMaterialCount() const { return materialDatas_.size(); }
 
 private:
-	ModelCommon* modelCommon_ = nullptr;
-	ModelData modelData_;
-	bool isSkinMesh_ = false;
 
+	ModelCommon* modelCommon_ = nullptr;
+
+	// モデルデータ
+	ModelData modelData_;
+
+	//--頂点データ--//
+	// バッファリソース
 	Microsoft::WRL::ComPtr<ID3D12Resource> vertexBuffer_ = nullptr;
+	// バッファリソース内のデータを指すポインタ
 	VertexData* vertexData_ = nullptr;
+	// バッファビュー
 	D3D12_VERTEX_BUFFER_VIEW vertexBufferView_{};
 
+	// CSスキニング用リソース
+	Microsoft::WRL::ComPtr<ID3D12Resource> skinnedVertexBuffer_ = nullptr;
+	D3D12_VERTEX_BUFFER_VIEW skinnedVertexBufferView_{};
+	Microsoft::WRL::ComPtr<ID3D12Resource> skinningParamsResource_ = nullptr;
+
+	uint32_t rawVertexSrvIndex_ = 0;
+	uint32_t skinnedVertexUavIndex_ = 0;
+
+	//--インデックスデータ--//
 	Microsoft::WRL::ComPtr<ID3D12Resource> indexBuffer_ = nullptr;
 	D3D12_INDEX_BUFFER_VIEW indexBufferView_{};
 
-	Microsoft::WRL::ComPtr<ID3D12Resource> materialResource_ = nullptr;
-	Material* materialData_ = nullptr;
+	//--マテリアル--//
+	std::vector<Microsoft::WRL::ComPtr<ID3D12Resource>> materialResources_;
+	std::vector<Material*> materialDatas_;
 
-	Skeleton skeleton_;
-	SkinCluster skinCluster_;
 
+	Microsoft::WRL::ComPtr<ID3D12Resource> boneResource_;
+	BoneMatrix* boneData_ = nullptr;
+
+	// 現在再生中のアニメーションデータ
 	Animation* playingAnimation_ = nullptr;
+	// 現在の再生時間（秒）
 	float animationTime_ = 0.0f;
-	
-	Animation* previousAnimation_ = nullptr;
-	float previousAnimationTime_ = 0.0f;
-	float blendDuration_ = 0.0f;
-	float blendTimer_ = 0.0f;
-
-	Skeleton CreateSkeleton(const Node& rootNode);
-	int32_t CreateJoint(const Node& node, const std::optional<int32_t>& parent, std::vector<Joint>& joints);
-	void UpdateSkeleton(Skeleton& skeleton);
-	void ApplyAnimation(Skeleton& skeleton, const Animation& animation, float animationTime, float weight);
-	SkinCluster CreateSkinCluster(const Skeleton& skeleton, const ModelData& modelData);
-	void UpdateSkinCluster(SkinCluster& skinCluster, const Skeleton& skeleton);
-	
+	void UpdateNodeAnimation(const Node& node, const Matrix4x4& parentMatrix);
 	void DebugDrawNodeSkeleton(const Node& node, const Matrix4x4& parentMatrix, const Matrix4x4& objectWorldMatrix, Camera* camera, const Vector4& color);
+	void DrawNodeRecursive(const Node& node, const std::string& targetName, bool isTargetFound);
 };

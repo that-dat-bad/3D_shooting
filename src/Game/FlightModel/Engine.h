@@ -12,15 +12,19 @@ struct EngineData {
 };
 
 // --- エンジンクラス本体 ---
+// エンジン
 class Engine {
 public:
 	Engine() : currentThrottle_(0.0f), altitudeThrottleFactor_(0.0f) {}
 	~Engine() = default;
 
-	// 初期化（外部データを受け取ってセットアップ）
+	// 初期化
+	// data: エンジンパラメータ
 	void Initialize(const EngineData& data);
 
-	// 毎フレームの更新処理（目標スロットルに向かって物理的に出力を変化させる）
+	// 更新
+	// dt: デルタタイム
+	// targetThrottle: 目標スロットル値
 	void Update(float dt, float targetThrottle);
 
 	// --- アクセッサ（外部から情報を取得） ---

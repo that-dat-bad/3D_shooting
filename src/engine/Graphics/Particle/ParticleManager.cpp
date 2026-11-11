@@ -1,4 +1,5 @@
 #include "ParticleManager.h"
+#include "../../base/WinApp.h"
 #include "../System/TextureManager.h"
 #include "../Camera/CameraManager.h"
 #include <cassert>
@@ -14,7 +15,7 @@ std::unique_ptr<ParticleManager> ParticleManager::instance_ = nullptr;
 
 ParticleManager* ParticleManager::GetInstance() {
 	if (instance_ == nullptr) {
-		instance_.reset(new ParticleManager());
+		instance_ = std::make_unique<ParticleManager>();
 	}
 	return instance_.get();
 }
@@ -53,8 +54,8 @@ void ParticleManager::Update() {
 	if (cameraDataPtr_) {
 		cameraDataPtr_->nearClip = 0.1f; // 固定値でも良いですが実際の値に合わせてください
 		cameraDataPtr_->farClip = 1000.0f; // 実際の FarClip
-		cameraDataPtr_->screenWidth = 1280.0f; // WinAppのサイズ
-		cameraDataPtr_->screenHeight = 720.0f;
+		cameraDataPtr_->screenWidth = static_cast<float>(WinApp::kClientWidth); // WinAppのサイズ
+		cameraDataPtr_->screenHeight = static_cast<float>(WinApp::kClientHeight);
 	}
 
 	Matrix4x4 cameraWorldMatrix = camera->GetWorldMatrix();
@@ -95,8 +96,48 @@ void ParticleManager::Update() {
 			}
 
 			// 移動処理 (速度を加算: パーティクルの個別加速度 + フィールド加速度)
-			it->velocity = Add(it->velocity, Add(it->acceleration, fieldAcceleration));
+			Vector3 effectiveAccel = Add(it->acceleration, fieldAcceleration);
+			if (it->maxRiseHeight > ParticleHeightCapDefaults::kNoHeightLimit) {
+				const float currentRise = it->transform.translate.y - it->spawnY;
+				const float heightRatio = std::clamp(
+					currentRise / it->maxRiseHeight,
+					ParticleHeightCapDefaults::kNoHeightLimit,
+					ParticleHeightCapDefaults::kUnitRatio);
+				if (effectiveAccel.y > ParticleHeightCapDefaults::kNoHeightLimit) {
+					effectiveAccel.y *= (ParticleHeightCapDefaults::kUnitRatio - heightRatio);
+				}
+			}
+
+			it->velocity = Add(it->velocity, effectiveAccel);
+
+			if (it->maxRiseHeight > ParticleHeightCapDefaults::kNoHeightLimit) {
+				const float currentRise = it->transform.translate.y - it->spawnY;
+				const float heightRatio = std::clamp(
+					currentRise / it->maxRiseHeight,
+					ParticleHeightCapDefaults::kNoHeightLimit,
+					ParticleHeightCapDefaults::kUnitRatio);
+				if (heightRatio > ParticleHeightCapDefaults::kSoftBrakeStartRatio &&
+					it->velocity.y > ParticleHeightCapDefaults::kNoHeightLimit) {
+					const float brakeT = std::clamp(
+						(heightRatio - ParticleHeightCapDefaults::kSoftBrakeStartRatio) /
+						ParticleHeightCapDefaults::kSoftBrakeSpanRatio,
+						ParticleHeightCapDefaults::kNoHeightLimit,
+						ParticleHeightCapDefaults::kUnitRatio);
+					it->velocity.y *= (ParticleHeightCapDefaults::kUnitRatio - brakeT);
+				}
+			}
+
 			it->transform.translate = Add(it->transform.translate, it->velocity);
+
+			if (it->maxRiseHeight > ParticleHeightCapDefaults::kNoHeightLimit) {
+				const float ceilingY = it->spawnY + it->maxRiseHeight;
+				if (it->transform.translate.y > ceilingY) {
+					it->transform.translate.y = ceilingY;
+					if (it->velocity.y > ParticleHeightCapDefaults::kNoHeightLimit) {
+						it->velocity.y = ParticleHeightCapDefaults::kNoHeightLimit;
+					}
+				}
+			}
 
 			// 経過時間を加算
 			it->currentTime += 1.0f / 60.0f; // 60FPS想定
@@ -128,7 +169,7 @@ void ParticleManager::Update() {
 				Matrix4x4 finalBillboard = billboardMatrix;
 				
 				if (it->isStretched) {
-					Vector3 camToParticle = Substract(it->transform.translate, camera->GetTranslate());
+					Vector3 camToParticle = Subtract(it->transform.translate, camera->GetTranslate());
 					if (Length(camToParticle) > 0.001f) {
 						camToParticle = Normalize(camToParticle);
 						
@@ -147,7 +188,7 @@ void ParticleManager::Update() {
 							Vector3 velDir = Normalize(stretchVec);
 							// 速度（または指定方向）ベクトルをスクリーン平面（法線camToParticle）に投影
 							float dot = Dot(velDir, camToParticle);
-							Vector3 projVel = Substract(velDir, Multiply(dot, camToParticle));
+							Vector3 projVel = Subtract(velDir, Multiply(dot, camToParticle));
 							if (Length(projVel) > 0.0001f) {
 								projVel = Normalize(projVel);
 								Vector3 right = Normalize(Cross(camToParticle, projVel));
@@ -267,6 +308,29 @@ void ParticleManager::AddAccelerationField(const std::string& name, const Vector
 	accelerationFields_[name] = field;
 }
 
+void ParticleManager::ClearAllParticles() {
+	for (auto& [name, group] : particleGroups_) {
+		group.particles.clear();
+		group.instanceCount = ParticleHeightCapDefaults::kZeroCount;
+	}
+}
+
+uint32_t ParticleManager::GetTotalActiveParticleCount() const {
+	uint32_t total = ParticleHeightCapDefaults::kZeroCount;
+	for (const auto& [name, group] : particleGroups_) {
+		total += static_cast<uint32_t>(group.particles.size());
+	}
+	return total;
+}
+
+uint32_t ParticleManager::GetGroupActiveParticleCount(const std::string& name) const {
+	auto it = particleGroups_.find(name);
+	if (it == particleGroups_.end()) {
+		return ParticleHeightCapDefaults::kZeroCount;
+	}
+	return static_cast<uint32_t>(it->second.particles.size());
+}
+
 
 void ParticleManager::Finalize() {
 	// リソースの解放など
@@ -347,6 +411,8 @@ void ParticleManager::Emit(const std::string& name, const Vector3& position, con
 		// 位置に少しランダム要素を加える
 		Vector3 randomPos = { distPos(randomEngine_), distPos(randomEngine_), distPos(randomEngine_) };
 		particle.transform.translate = Add(position, randomPos);
+		particle.spawnY = particle.transform.translate.y;
+		particle.maxRiseHeight = params.maxRiseHeight;
 
 		// 速度設定
 		particle.velocity = { distVelX(randomEngine_), distVelY(randomEngine_), distVelZ(randomEngine_) };

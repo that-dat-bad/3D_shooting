@@ -9,9 +9,9 @@ namespace {
 	constexpr float kScaleHeight = 8500.0f;      // 大気のスケールハイト (m)
 	constexpr float kPi = 3.14159265358979f;
 
-	constexpr float kPitchRate = 1.5f;           // ピッチ角速度 (rad/s)
-	constexpr float kRollRate = 2.5f;            // ロール角速度 (rad/s)
-	constexpr float kYawRate = 0.8f;             // ヨー角速度 (rad/s)
+	constexpr float kPitchRate = 1.8f;           // ピッチ角速度 (rad/s) ≈ 103 deg/s (War Thunderジェット機急旋回)
+	constexpr float kRollRate = 3.6f;            // ロール角速度 (rad/s) ≈ 206 deg/s (高速バンク＆プル)
+	constexpr float kYawRate = 0.9f;             // ヨー角速度 (rad/s)
 
 	constexpr float kGDamageRate = 0.05f;        // G超過時の翼ダメージレート
 	constexpr float kBlackoutOnsetG = 5.0f;      // ブラックアウト開始G
@@ -34,6 +34,11 @@ FlightModel::FlightModel()
 	, isStalling_(false)
 	, blackoutFactor_(0.0f)
 	, redoutFactor_(0.0f)
+	, blackoutToleranceTimer_(0.0f)
+	, redoutToleranceTimer_(0.0f)
+	, isInvulnerable_(false)
+	, gEffectsEnabled_(true)
+	, isAutopilot_(false)
 	, targetThrottle_(0.0f)
 	, inputPitch_(0.0f)
 	, inputRoll_(0.0f)
@@ -63,6 +68,12 @@ void FlightModel::Initialize(const AirframeData& airframeData, const EngineData&
 	isStalling_ = false;
 	blackoutFactor_ = 0.0f;
 	redoutFactor_ = 0.0f;
+	blackoutToleranceTimer_ = 0.0f;
+	redoutToleranceTimer_ = 0.0f;
+	isInvulnerable_ = false;
+	gEffectsEnabled_ = true;
+	isAutopilot_ = false;
+	groundElevation_ = kDefaultGroundElevation;
 
 	// 入力状態をリセット
 	targetThrottle_ = 0.0f;
@@ -77,6 +88,9 @@ void FlightModel::Initialize(const AirframeData& airframeData, const EngineData&
 // ===========================================================
 void FlightModel::Update(float deltaTime)
 {
+	// 0. ダメージモデルの火災・漏れなどの毎フレーム経過更新
+	airframe_.GetDamageModel().UpdateEffects(deltaTime);
+
 	// 1. エンジンの更新（スロットルのスプールアップ/ダウン）
 	engine_.Update(deltaTime, targetThrottle_);
 
@@ -93,6 +107,19 @@ void FlightModel::Update(float deltaTime)
 	// 4. ペイロードの更新
 	for (auto& payload : payloads_) {
 		payload->Update(deltaTime);
+	}
+
+	// 4.5. オートパイロット（クリア演出・自動操縦）モード時のバイパス
+	if (isAutopilot_) {
+		position_ = MyMath::Add(position_, MyMath::Multiply(deltaTime, velocity_));
+		currentG_ = 1.0f;
+		currentAoA_ = 0.0f;
+		isStalling_ = false;
+		blackoutFactor_ = 0.0f;
+		redoutFactor_ = 0.0f;
+		blackoutToleranceTimer_ = 0.0f;
+		redoutToleranceTimer_ = 0.0f;
+		return;
 	}
 
 	// 5. AoA計算（姿勢更新前に現在のAoAを知っておく）
@@ -122,9 +149,12 @@ void FlightModel::Update(float deltaTime)
 	// 10. 位置の更新 (p += v * dt)
 	position_ = MyMath::Add(position_, MyMath::Multiply(deltaTime, velocity_));
 
+	// 10.5. 地面との部位別物理衝突判定 & ダメージ計算・転倒トルク
+	airframe_.GetDamageModel().ProcessGroundCollision(position_, orientation_, velocity_, angularVelocity_, deltaTime, groundElevation_);
+
 	// 11. G計算
 	if (deltaTime > 0.0001f) {
-		MyMath::Vector3 deltaV = MyMath::Substract(velocity_, prevVelocity);
+		MyMath::Vector3 deltaV = MyMath::Subtract(velocity_, prevVelocity);
 		MyMath::Vector3 accelNoGravity = MyMath::Multiply(1.0f / deltaTime, deltaV);
 		// 重力を除外（重力は体感Gに含めない: 自由落下 = 0G）
 		accelNoGravity = MyMath::Add(accelNoGravity, { 0.0f, kGravity, 0.0f });
@@ -436,6 +466,21 @@ void FlightModel::UpdateOrientation(float deltaTime)
 	// 空力ピッチモーメントは角加速度として直接加算
 	angularVelocity_.x += aerodynamicPitchMoment * deltaTime;
 
+	// 左右翼の揚力差による空気力学的ロールモーメント計算
+	float asymRoll = airframe_.GetDamageModel().GetAsymmetricRollMoment();
+	if (std::fabs(asymRoll) > 0.001f && speed > 5.0f) {
+		float dynamicPress = 0.5f * CalculateAirDensity(position_.y) * speed * speed;
+		float totalWingLift = dynamicPress * airframe_.GetWingArea() * std::fabs(CalculateLiftCoefficient(currentAoA_));
+		float wingArm = 2.5f; // 翼の中心までのモーメントアーム (m)
+		
+		// 右翼揚力 > 左翼揚力 の時、asymRoll > 0 となり、正の角加速度を加算して左へロール（破損した左翼が落ちる）
+		float rollTorque = asymRoll * (totalWingLift * 0.5f) * wingArm;
+		const float kInverseInertiaZ = 0.00005f; // 慣性モーメントの逆数 (1 / Iz)
+		float rollAlpha = rollTorque * kInverseInertiaZ;
+		
+		angularVelocity_.z += rollAlpha * deltaTime;
+	}
+
 	// =====================================================
 	// 角速度から姿勢を更新
 	// =====================================================
@@ -495,6 +540,15 @@ void FlightModel::UpdateOrientation(float deltaTime)
 // ===========================================================
 void FlightModel::UpdateGEffects(float deltaTime)
 {
+	// G効果が無効化されている場合、またはオートパイロット時
+	if (!gEffectsEnabled_ || isAutopilot_) {
+		blackoutFactor_ = 0.0f;
+		redoutFactor_ = 0.0f;
+		blackoutToleranceTimer_ = 0.0f;
+		redoutToleranceTimer_ = 0.0f;
+		return;
+	}
+
 	// --- Gエフェクト進行の共通処理 ---
 	auto UpdateGEffect = [&](float currentG, float onsetG, float buildRate, float& toleranceTimer, float& factor) {
 		bool isTriggered = false;
@@ -530,6 +584,10 @@ void FlightModel::UpdateGEffects(float deltaTime)
 	UpdateGEffect(currentG_, kRedoutOnsetG, kGEffectBuildRate * 1.5f, redoutToleranceTimer_, redoutFactor_);
 
 	// --- 構造G超過ダメージ（翼に蓄積） ---
+	if (isInvulnerable_) {
+		return;
+	}
+
 	float posLimit = airframe_.GetPositiveGLimit();
 	float negLimit = airframe_.GetNegativeGLimit();
 
@@ -592,4 +650,12 @@ MyMath::Vector3 FlightModel::GetRightDirection() const
 		2.0f * (x * y + w * z),
 		2.0f * (x * z - w * y)
 	};
+}
+
+MyMath::Matrix4x4 FlightModel::GetWorldMatrix() const
+{
+	// スケール(1,1,1)、回転(orientation_)、平行移動(position_) からアフィン行列を合成
+	MyMath::Matrix4x4 rotMat = MyMath::MakeRotateMatrix(orientation_);
+	MyMath::Matrix4x4 transMat = MyMath::MakeTranslateMatrix(position_);
+	return MyMath::Multiply(rotMat, transMat);
 }

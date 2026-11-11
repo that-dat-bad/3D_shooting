@@ -47,6 +47,8 @@ void Airframe::Initialize(const AirframeData& data) {
 	for (int i = 0; i < static_cast<int>(DamageZone::Count); ++i) {
 		damageState_[i] = 0.0f;
 	}
+
+	damageModel_.Initialize();
 }
 
 void Airframe::ConsumeInternalFuel(float amount) {
@@ -61,6 +63,10 @@ void Airframe::TakeDamage(float damage) {
 
 float Airframe::GetTotalMass() const {
 	return emptyFrameMass_ + currentInternalFuel_;
+}
+
+bool Airframe::IsDestroyed() const {
+	return damageModel_.IsCriticallyDamaged() || currentHealth_ <= 0.0f;
 }
 
 
@@ -106,6 +112,44 @@ void Airframe::ApplyZoneDamage(DamageZone zone, float amount) {
 
 	damageState_[idx] += amount;
 	if (damageState_[idx] > 1.0f) { damageState_[idx] = 1.0f; }
+
+	// DamageModel にもブリッジ適用
+	switch (zone) {
+	case DamageZone::Engine:
+		damageModel_.ProcessHit(DamagePart::Engine1, amount * 20.0f);
+		break;
+	case DamageZone::LeftWing:
+		damageModel_.ProcessHit(DamagePart::Wing1_L, amount * 15.0f);
+		break;
+	case DamageZone::RightWing:
+		damageModel_.ProcessHit(DamagePart::Wing1_R, amount * 15.0f);
+		break;
+	case DamageZone::Tail:
+		damageModel_.ProcessHit(DamagePart::Tail, amount * 20.0f);
+		break;
+	case DamageZone::FuelTank:
+		damageModel_.ProcessHit(DamagePart::Tank1, amount * 15.0f);
+		break;
+	default:
+		break;
+	}
+}
+
+float Airframe::GetDamageState(DamageZone zone) const {
+	switch (zone) {
+	case DamageZone::Engine:
+		return 1.0f - damageModel_.GetEnginePowerFactor();
+	case DamageZone::LeftWing:
+		return 1.0f - damageModel_.GetLeftWingLiftFactor();
+	case DamageZone::RightWing:
+		return 1.0f - damageModel_.GetRightWingLiftFactor();
+	case DamageZone::Tail:
+		return 1.0f - damageModel_.GetPitchControlFactor();
+	case DamageZone::FuelTank:
+		return damageModel_.IsPartLeaking(DamagePart::Tank1) || damageModel_.IsPartLeaking(DamagePart::Tank2) ? 1.0f : 0.0f;
+	default:
+		return damageState_[static_cast<int>(zone)];
+	}
 }
 
 
@@ -113,30 +157,19 @@ void Airframe::ApplyZoneDamage(DamageZone zone, float amount) {
 // ダメージ補正値
 // ===========================================================
 float Airframe::GetEffectiveLiftCoefficient() const {
-	// 左右翼の平均ダメージで揚力低下（完全破壊で80%低下）
-	float wingDamage = (damageState_[static_cast<int>(DamageZone::LeftWing)]
-		+ damageState_[static_cast<int>(DamageZone::RightWing)]) * 0.5f;
-	return liftCoefficient_ * (1.0f - wingDamage * 0.8f);
+	float avgWingLift = (damageModel_.GetLeftWingLiftFactor() + damageModel_.GetRightWingLiftFactor()) * 0.5f;
+	return liftCoefficient_ * avgWingLift;
 }
 
 float Airframe::GetEffectiveBaseDrag() const {
-	// ダメージで抵抗増加（破損箇所の乱流）
-	float totalDamage = 0.0f;
-	for (int i = 0; i < static_cast<int>(DamageZone::Count); ++i) {
-		totalDamage += damageState_[i];
-	}
-	// ダメージ1部位あたり最大5%の抵抗増加
-	return baseDrag_ * (1.0f + totalDamage * 0.05f);
+	return baseDrag_ * (1.0f + damageModel_.GetDragIncreaseFactor());
 }
 
 float Airframe::GetControlDamageFactor() const {
-	// 尾翼ダメージで操舵効率低下（完全破壊で70%低下）
-	float tailDamage = damageState_[static_cast<int>(DamageZone::Tail)];
-	return 1.0f - tailDamage * 0.7f;
+	return damageModel_.GetPitchControlFactor() * damageModel_.GetRollControlFactor();
 }
 
 float Airframe::GetFuelLeakRate() const {
-	// 燃料タンクダメージで燃料漏れ（完全破壊で毎秒2kg漏出）
-	float tankDamage = damageState_[static_cast<int>(DamageZone::FuelTank)];
-	return tankDamage * 2.0f;
+	return damageModel_.GetTotalFuelLeakRate();
 }
+

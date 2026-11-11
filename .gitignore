@@ -366,10 +366,8 @@ FodyWeavers.xsd
 .aider*
 *.cso
 assets/shaders/compiled/
-
-# Exclude non-development docs and files
+/.github/upgrades/scenarios/cppbuildtoolsupgrade
+/benchmark_log.txt
+*.terrain
 docs/
-*.blend*
 skills-lock.json
-*タスク*.md
-*ロードマップ*.md

@@ -8,7 +8,7 @@ std::unique_ptr<SpriteCommon> SpriteCommon::instance = nullptr;
 
 SpriteCommon* SpriteCommon::GetInstance() {
 	if (instance == nullptr) {
-		instance.reset(new SpriteCommon());
+		instance = std::make_unique<SpriteCommon>();
 	}
 	return instance.get();
 }

@@ -70,7 +70,7 @@ private:
 	uint32_t textureIndex_ = 0;
 
 	// トランスフォーム
-	Transform transform_;
+	Transform transform_ = { {1.0f, 1.0f, 1.0f}, {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f} };
 
 	static const uint32_t kVertexCount = 24;  // 6面 × 4頂点
 	static const uint32_t kIndexCount = 36;   // 6面 × 2三角形 × 3頂点

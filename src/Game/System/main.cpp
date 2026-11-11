@@ -6,8 +6,29 @@
 #include "../engine/Debug/dump.h"
 #include "Game.h"
 #include <dxgidebug.h>
+#include <filesystem>
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int) {
+	// 作業ディレクトリが Resources / assets を含むディレクトリになるよう調整
+	std::filesystem::path cur = std::filesystem::current_path();
+	if (!std::filesystem::exists(cur / "Resources") || !std::filesystem::exists(cur / "assets")) {
+		wchar_t exePath[MAX_PATH];
+		if (GetModuleFileNameW(nullptr, exePath, MAX_PATH) > 0) {
+			std::filesystem::path dir = std::filesystem::path(exePath).parent_path();
+			for (int depth = 0; depth < 5 && !dir.empty(); ++depth) {
+				if (std::filesystem::exists(dir / "Resources") && std::filesystem::exists(dir / "assets")) {
+					std::filesystem::current_path(dir);
+					break;
+				}
+				if (std::filesystem::exists(dir / "25B_GE_CG" / "Resources")) {
+					std::filesystem::current_path(dir / "25B_GE_CG");
+					break;
+				}
+				dir = dir.parent_path();
+			}
+		}
+	}
+
 	Dump::Install();
 
 	HRESULT hr = MFStartup(MF_VERSION, MFSTARTUP_NOSOCKET);
@@ -20,7 +41,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int) {
 		game.Run();
 
 		game.Finalize();
-	} // ← game のデストラクタがここで動く（全 ComPtr メンバが解放される）
+	}
 
 	hr = MFShutdown();
 	assert(SUCCEEDED(hr));

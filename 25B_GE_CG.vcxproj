@@ -25,20 +25,20 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v145</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v145</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Development|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>v145</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
@@ -88,13 +88,11 @@
       <TreatLinkerWarningAsErrors>true</TreatLinkerWarningAsErrors>
       <AdditionalOptions>/ignore:4049 /ignore:4098 /ignore:4099 %(AdditionalOptions)</AdditionalOptions>
       <AdditionalLibraryDirectories>$(SolutionDir)external\assimp\lib\Debug;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>assimp-vc143-mtd.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>winhttp.lib;assimp-vc143-mtd.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
       <Command>copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxcompiler.dll" "$(TargetDir)dxcompiler.dll"
-copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dxil.dll"
-xcopy /E /I /Y "$(SolutionDir)assets" "$(TargetDir)assets"
-xcopy /E /I /Y "$(SolutionDir)Resources" "$(TargetDir)Resources"</Command>
+xcopy /y /d /s /e "$(ProjectDir)assets" "$(TargetDir)assets\"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -116,13 +114,11 @@ xcopy /E /I /Y "$(SolutionDir)Resources" "$(TargetDir)Resources"</Command>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalOptions>/ignore:4099 %(AdditionalOptions)</AdditionalOptions>
       <AdditionalLibraryDirectories>$(SolutionDir)external\assimp\lib\Release</AdditionalLibraryDirectories>
-      <AdditionalDependencies>assimp-vc143-mt.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>winhttp.lib;assimp-vc143-mt.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
       <Command>copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxcompiler.dll" "$(TargetDir)dxcompiler.dll"
-copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dxil.dll"
-xcopy /E /I /Y "$(SolutionDir)assets" "$(TargetDir)assets"
-xcopy /E /I /Y "$(SolutionDir)Resources" "$(TargetDir)Resources"</Command>
+copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dxil.dll"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Development|x64'">
@@ -147,17 +143,19 @@ xcopy /E /I /Y "$(SolutionDir)Resources" "$(TargetDir)Resources"</Command>
       <AdditionalOptions>/ignore:4099 %(AdditionalOptions)</AdditionalOptions>
       <LinkTimeCodeGeneration />
       <AdditionalLibraryDirectories>$(SolutionDir)external\assimp\lib\Release</AdditionalLibraryDirectories>
-      <AdditionalDependencies>assimp-vc143-mt.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>winhttp.lib;assimp-vc143-mt.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
       <Command>copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxcompiler.dll" "$(TargetDir)dxcompiler.dll"
-copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dxil.dll"
-xcopy /E /I /Y "$(SolutionDir)assets" "$(TargetDir)assets"
-xcopy /E /I /Y "$(SolutionDir)Resources" "$(TargetDir)Resources"</Command>
+copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dxil.dll"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <None Include=".editorconfig" />
+    <None Include=".github\upgrades\scenarios\cppbuildtoolsupgrade\assessment.md" />
+    <None Include=".github\upgrades\scenarios\cppbuildtoolsupgrade\plan.md" />
+    <None Include=".github\upgrades\scenarios\cppbuildtoolsupgrade\scenario-instructions.md" />
+    <None Include=".github\upgrades\scenarios\cppbuildtoolsupgrade\tasks\01.01-investigate-vcxproj\progress-details.md" />
     <None Include="assets\shaders\FullScreen.hlsli" />
     <None Include="assets\shaders\Particle.hlsli" />
     <None Include="assets\shaders\Object3d.hlsli" />
@@ -273,8 +271,14 @@ xcopy /E /I /Y "$(SolutionDir)Resources" "$(TargetDir)Resources"</Command>
     <ClInclude Include="src\engine\Graphics\Model\PrimitiveGenerator.h" />
     <ClInclude Include="src\engine\Graphics\Model\PrimitiveModel.h" />
     <ClInclude Include="src\Game\System\Game.h" />
+    <ClInclude Include="src\Game\System\MissionManager.h" />
+    <ClInclude Include="src\Game\System\MissionMapView.h" />
+    <ClInclude Include="src\Game\System\MissionObjective.h" />
+    <ClInclude Include="src\Game\System\MissionTrigger.h" />
+    <ClInclude Include="src\Game\System\Waypoint.h" />
     <ClInclude Include="src\engine\Audio\AudioManager.h" />
     <ClInclude Include="src\engine\Debug\ImguiManager.h" />
+    <ClInclude Include="src\engine\Debug\UIEditorWindow.h" />
     <ClInclude Include="src\engine\Graphics\Particle\ParticleEmitter.h" />
     <ClInclude Include="src\engine\Graphics\Particle\ParticleManager.h" />
     <ClInclude Include="src\engine\Graphics\Particle\GPUParticleManager.h" />
@@ -310,6 +314,7 @@ xcopy /E /I /Y "$(SolutionDir)Resources" "$(TargetDir)Resources"</Command>
     <ClInclude Include="src\engine\io\Input.h" />
     <ClInclude Include="src\engine\base\StringUtility.h" />
     <ClInclude Include="src\engine\base\Math\Vector2.h" />
+    <ClInclude Include="src\engine\base\Math\Easing.h" />
     <ClInclude Include="src\engine\base\Math\Vector4.h" />
     <ClInclude Include="src\engine\base\Math\Transform.h" />
     <ClInclude Include="src\engine\Graphics\System\TextureManager.h" />
@@ -317,13 +322,23 @@ xcopy /E /I /Y "$(SolutionDir)Resources" "$(TargetDir)Resources"</Command>
     <ClInclude Include="src\engine\Graphics\Text\TextRenderer.h" />
     <ClInclude Include="src\engine\Graphics\System\SrvManager.h" />
     <ClInclude Include="src\Game\Scene\ClearScene.h" />
-    <ClInclude Include="src\Game\Scene\ResultScene.h" />
+    <ClInclude Include="src\Game\Scene\ClearSceneInternal.h" />
+    <ClInclude Include="src\Game\Scene\GameOverScene.h" />
+    <ClInclude Include="src\Game\Scene\GameOverSceneInternal.h" />
     <ClInclude Include="src\Game\Scene\DebugScene.h" />
     <ClInclude Include="src\Game\Scene\Iscene.h" />
+    <ClInclude Include="src\Game\Scene\OSSceneBase.h" />
     <ClInclude Include="src\Game\Scene\SceneManager.h" />
+    <ClInclude Include="src\Game\Scene\AbstractSceneFactory.h" />
+    <ClInclude Include="src\Game\Scene\SceneFactory.h" />
+    <ClInclude Include="src\Game\Scene\MissionEditorScene.h" />
     <ClInclude Include="src\Game\Scene\StageScene.h" />
+    <ClInclude Include="src\Game\Scene\StageSceneInternal.h" />
+    <ClInclude Include="src\Game\Scene\StageHUD.h" />
+    <ClInclude Include="src\Game\Scene\CombatBootSequence.h" />
     <ClInclude Include="src\Game\Camera\PlayerCamera.h" />
     <ClInclude Include="src\Game\Scene\TitleScene.h" />
+    <ClInclude Include="src\Game\Scene\TitleSceneInternal.h" />
     <ClInclude Include="src\engine\base\Math\Quaternion.h" />
     <ClInclude Include="src\engine\Graphics\System\BlendMode.h" />
     <ClInclude Include="src\engine\Graphics\PostProcess\PostEffect.h" />
@@ -334,17 +349,52 @@ xcopy /E /I /Y "$(SolutionDir)Resources" "$(TargetDir)Resources"</Command>
     <ClInclude Include="src\engine\Physics\CollisionConfig.h" />
     <ClInclude Include="src\engine\Physics\ICollisionBody.h" />
     <ClInclude Include="src\Game\Enemy\Enemy.h" />
+    <ClInclude Include="src\Game\Enemy\BehaviorTree\BehaviorTree.h" />
+    <ClInclude Include="src\Game\Enemy\BehaviorTree\EnemyBehaviorNodes.h" />
     <ClInclude Include="src\Game\Enemy\EnemyManager.h" />
+    <ClInclude Include="src\Game\Enemy\GroundEnemy.h" />
     <ClInclude Include="src\Game\Bullet\Bullet.h" />
     <ClInclude Include="src\Game\Bullet\BulletManager.h" />
+    <ClInclude Include="src\Game\Environment\Sun.h" />
+    <ClInclude Include="src\Game\Environment\EnvironmentManager.h" />
+    <ClInclude Include="src\Game\FlightModel\DamageModel.h" />
+    <ClInclude Include="src\Game\Graphics\AircraftVisualModel.h" />
+    <ClInclude Include="src\Game\Graphics\Afterburner.h" />
+    <ClInclude Include="src\Game\Graphics\DebrisManager.h" />
+    <ClInclude Include="src\engine\Graphics\UI\UIElement.h" />
+    <ClInclude Include="src\engine\Graphics\UI\UIButton.h" />
+    <ClInclude Include="src\engine\Graphics\UI\UIText.h" />
+    <ClInclude Include="src\engine\Graphics\UI\UIPanel.h" />
+    <ClInclude Include="src\engine\Graphics\UI\PseudoOS.h" />
+    <ClInclude Include="src\engine\Graphics\UI\TypewriterEffect.h" />
+    <ClInclude Include="src\Game\System\GameResult.h" />
+    <ClInclude Include="src\engine\io\MCPClient.h" />
+    <ClInclude Include="src\engine\io\ConfigFile.h" />
+    <ClInclude Include="src\Game\FlightModel\AircraftConfig.h" />
+    <ClInclude Include="src\Game\Environment\TerrainSyncManager.h" />
+    <ClInclude Include="src\Game\Environment\TerrainChunkManager.h" />
+    <ClInclude Include="src\engine\Graphics\UI\UISelectionManager.h" />
+    <ClInclude Include="src\engine\Graphics\UI\UITextRegistry.h" />
+    <ClInclude Include="src\Game\System\AsyncPreloadManager.h" />
+    <ClInclude Include="src\Game\UI\RadioCommunicator.h" />
+    <ClInclude Include="src\Game\Mission\TutorialMissionDirector.h" />
+    <ClInclude Include="src\Game\UI\InfoUI.h" />
+    <ClInclude Include="src\Game\Mission\MissionSyncManager.h" />
+    <ClInclude Include="src\Game\Scene\EffectEditorScene.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="src\Game\Graphics\AircraftVisualModel.cpp" />
+    <ClCompile Include="src\Game\Graphics\Afterburner.cpp" />
+    <ClCompile Include="src\Game\Graphics\DebrisManager.cpp" />
+    <ClCompile Include="src\Game\Environment\Sun.cpp" />
+    <ClCompile Include="src\Game\Environment\EnvironmentManager.cpp" />
     <ClCompile Include="src\Game\FlightModel\FlightInstructor.cpp" />
     <ClCompile Include="src\Game\FlightModel\MouseAimController.cpp" />
     <ClCompile Include="src\Game\FlightModel\Payload\Gunpod.cpp" />
     <ClCompile Include="src\Game\FlightModel\Payload\IPayload.cpp">
       <DeploymentContent>true</DeploymentContent>
     </ClCompile>
+    <ClCompile Include="src\Game\FlightModel\DamageModel.cpp" />
     <ClCompile Include="src\Game\FlightModel\Engine.cpp" />
     <ClCompile Include="src\Game\FlightModel\AirFrame.cpp" />
     <ClCompile Include="src\Game\FlightModel\FlightModel.cpp" />
@@ -353,10 +403,13 @@ xcopy /E /I /Y "$(SolutionDir)Resources" "$(TargetDir)Resources"</Command>
     <ClCompile Include="src\engine\Graphics\Model\PrimitiveGenerator.cpp" />
     <ClCompile Include="src\engine\Graphics\Model\PrimitiveModel.cpp" />
     <ClCompile Include="src\Game\System\Game.cpp" />
+    <ClCompile Include="src\Game\System\MissionManager.cpp" />
+    <ClCompile Include="src\Game\System\MissionMapView.cpp" />
     <ClCompile Include="src\engine\Graphics\Text\FontManager.cpp" />
     <ClCompile Include="src\engine\Graphics\Text\TextRenderer.cpp" />
     <ClCompile Include="src\engine\Audio\AudioManager.cpp" />
     <ClCompile Include="src\engine\Debug\ImguiManager.cpp" />
+    <ClCompile Include="src\engine\Debug\UIEditorWindow.cpp" />
     <ClCompile Include="src\engine\Graphics\Particle\ParticleEmitter.cpp" />
     <ClCompile Include="src\engine\Graphics\Particle\ParticleManager.cpp" />
     <ClCompile Include="src\engine\Graphics\Particle\GPUParticleManager.cpp" />
@@ -418,21 +471,60 @@ xcopy /E /I /Y "$(SolutionDir)Resources" "$(TargetDir)Resources"</Command>
     <ClCompile Include="src\engine\Graphics\System\SrvManager.cpp" />
     <ClCompile Include="src\engine\Graphics\PostProcess\PostEffect.cpp" />
     <ClCompile Include="src\Game\Scene\ClearScene.cpp" />
-    <ClCompile Include="src\Game\Scene\ResultScene.cpp" />
+    <ClCompile Include="src\Game\Scene\ClearScene_Windows.cpp" />
+    <ClCompile Include="src\Game\Scene\ClearScene_Effects.cpp" />
+    <ClCompile Include="src\Game\Scene\GameOverScene.cpp" />
+    <ClCompile Include="src\Game\Scene\GameOverScene_Windows.cpp" />
     <ClCompile Include="src\Game\Scene\DebugScene.cpp" />
     <ClCompile Include="src\Game\Scene\IScene.cpp" />
+    <ClCompile Include="src\Game\Scene\OSSceneBase.cpp" />
     <ClCompile Include="src\Game\Scene\SceneManager.cpp" />
+    <ClCompile Include="src\Game\Scene\SceneFactory.cpp" />
+    <ClCompile Include="src\Game\Scene\MissionEditorScene.cpp" />
+    <ClCompile Include="src\Game\Scene\MissionEditorScene_Editors.cpp" />
     <ClCompile Include="src\Game\Scene\StageScene.cpp" />
+    <ClCompile Include="src\Game\Scene\StageScene_Combat.cpp" />
+    <ClCompile Include="src\Game\Scene\StageScene_Rendering.cpp" />
+    <ClCompile Include="src\Game\Scene\StageScene_Editor.cpp" />
+    <ClCompile Include="src\Game\Scene\StageScene_Gameplay.cpp" />
+    <ClCompile Include="src\Game\Scene\StageHUD.cpp" />
+    <ClCompile Include="src\Game\Scene\CombatBootSequence.cpp" />
     <ClCompile Include="src\Game\Camera\PlayerCamera.cpp" />
     <ClCompile Include="src\Game\Scene\TitleScene.cpp" />
+    <ClCompile Include="src\Game\Scene\TitleScene_Locations.cpp" />
+    <ClCompile Include="src\Game\Scene\TitleScene_States.cpp" />
+    <ClCompile Include="src\Game\Scene\TitleScene_Menu.cpp" />
+    <ClCompile Include="src\Game\Scene\TitleScene_OSDesktop.cpp" />
+    <ClCompile Include="src\Game\Scene\TitleScene_Editor.cpp" />
     <ClCompile Include="src\engine\base\Math\Quaternion.cpp" />
     <ClCompile Include="src\engine\Physics\Collision3DManager.cpp" />
     <ClCompile Include="src\engine\Physics\Collision2DManager.cpp" />
     <ClCompile Include="src\engine\Physics\CollisionSystem.cpp" />
     <ClCompile Include="src\Game\Enemy\Enemy.cpp" />
+    <ClCompile Include="src\Game\Enemy\BehaviorTree\EnemyBehaviorNodes.cpp" />
     <ClCompile Include="src\Game\Enemy\EnemyManager.cpp" />
+    <ClCompile Include="src\Game\Enemy\GroundEnemy.cpp" />
     <ClCompile Include="src\Game\Bullet\Bullet.cpp" />
     <ClCompile Include="src\Game\Bullet\BulletManager.cpp" />
+    <ClCompile Include="src\engine\Graphics\UI\UIElement.cpp" />
+    <ClCompile Include="src\engine\Graphics\UI\UIButton.cpp" />
+    <ClCompile Include="src\engine\Graphics\UI\UIText.cpp" />
+    <ClCompile Include="src\engine\Graphics\UI\UIPanel.cpp" />
+    <ClCompile Include="src\engine\Graphics\UI\PseudoOS.cpp" />
+    <ClCompile Include="src\engine\Graphics\UI\TypewriterEffect.cpp" />
+    <ClCompile Include="src\engine\io\MCPClient.cpp" />
+    <ClCompile Include="src\engine\io\ConfigFile.cpp" />
+    <ClCompile Include="src\Game\FlightModel\AircraftConfig.cpp" />
+    <ClCompile Include="src\Game\Environment\TerrainSyncManager.cpp" />
+    <ClCompile Include="src\Game\Environment\TerrainChunkManager.cpp" />
+    <ClCompile Include="src\engine\Graphics\UI\UISelectionManager.cpp" />
+    <ClCompile Include="src\engine\Graphics\UI\UITextRegistry.cpp" />
+    <ClCompile Include="src\Game\System\AsyncPreloadManager.cpp" />
+    <ClCompile Include="src\Game\UI\RadioCommunicator.cpp" />
+    <ClCompile Include="src\Game\Mission\TutorialMissionDirector.cpp" />
+    <ClCompile Include="src\Game\UI\InfoUI.cpp" />
+    <ClCompile Include="src\Game\Mission\MissionSyncManager.cpp" />
+    <ClCompile Include="src\Game\Scene\EffectEditorScene.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="external\imgui\LICENSE.txt" />

@@ -9,6 +9,7 @@ struct GunPodData {
 	float fireRate;     // 1秒間に何発撃てるか (例: 10.0f なら秒間10発)
 };
 
+// ガンポッド
 class GunPod : public IPayload {
 public:
 	GunPod() : baseMass_(0.0f), drag_(0.0f), ammoWeight_(0.0f),
@@ -16,18 +17,21 @@ public:
 	           fireInterval_(0.0f), cooldownTimer_(0.0f), isAttached_(true) {}
 	~GunPod() override = default;
 
+	// 初期化
 	void Initialize(const GunPodData& data);
 
+	// 更新
 	void Update(float dt) override;
 	float GetWeight() const override;
 	float GetDragCoeff() const override;
 
-	// トリガーを引いている間に呼ばれる関数
+	// 発射
 	void Fire() override;
 
 	// --- アクセッサ ---
 	int  GetCurrentAmmo() const { return currentAmmo_; }
 	int  GetMaxAmmo() const { return maxAmmo_; }
+	void ReplenishAmmo() { currentAmmo_ = maxAmmo_; }
 	bool IsAttached() const { return isAttached_; }
 
 	// ペイロードを投棄する

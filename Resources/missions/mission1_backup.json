@@ -1,0 +1,250 @@
+{
+    "description": "Destroy all target drones and ground defense installations.",
+    "enemies": [
+        {
+            "aiType": "ChaseAttack",
+            "health": 50.0,
+            "modelPath": "Resources/planeplane.obj",
+            "position": {
+                "x": 100.0,
+                "y": 100.0,
+                "z": 200.0
+            },
+            "waypointPathName": ""
+        },
+        {
+            "aiType": "ChaseAttack",
+            "health": 50.0,
+            "modelPath": "Resources/planeplane.obj",
+            "position": {
+                "x": -80.0,
+                "y": 100.0,
+                "z": 300.0
+            },
+            "waypointPathName": ""
+        },
+        {
+            "aiType": "ChaseAttack",
+            "health": 50.0,
+            "modelPath": "Resources/planeplane.obj",
+            "position": {
+                "x": 200.0,
+                "y": 100.0,
+                "z": 450.0
+            },
+            "waypointPathName": ""
+        },
+        {
+            "aiType": "CruiseEvade",
+            "health": 50.0,
+            "modelPath": "Resources/planeplane.obj",
+            "position": {
+                "x": -150.0,
+                "y": 100.0,
+                "z": 500.0
+            },
+            "waypointPathName": ""
+        },
+        {
+            "aiType": "CruiseEvade",
+            "health": 50.0,
+            "modelPath": "Resources/planeplane.obj",
+            "position": {
+                "x": 50.0,
+                "y": 100.0,
+                "z": 700.0
+            },
+            "waypointPathName": ""
+        }
+    ],
+    "groundEnemies": [
+        {
+            "aiType": "Turret",
+            "health": 60.0,
+            "param": {
+                "bulletDamage": 8.0,
+                "bulletSpeed": 600.0,
+                "burstCooldown": 2.0,
+                "burstCount": 6,
+                "collisionRadius": 8.0,
+                "fireInterval": 0.07999999821186066,
+                "fireRange": 1500.0,
+                "maxElevationDeg": 85.0,
+                "maxHealth": 60.0,
+                "minElevationDeg": -5.0,
+                "moveSpeed": 15.0,
+                "patrolDistance": 200.0,
+                "turnSpeedDeg": 60.0
+            },
+            "position": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 400.0
+            },
+            "waypointPathName": ""
+        },
+        {
+            "aiType": "Turret",
+            "health": 60.0,
+            "param": {
+                "bulletDamage": 8.0,
+                "bulletSpeed": 600.0,
+                "burstCooldown": 2.0,
+                "burstCount": 6,
+                "collisionRadius": 8.0,
+                "fireInterval": 0.07999999821186066,
+                "fireRange": 1500.0,
+                "maxElevationDeg": 85.0,
+                "maxHealth": 60.0,
+                "minElevationDeg": -5.0,
+                "moveSpeed": 15.0,
+                "patrolDistance": 200.0,
+                "turnSpeedDeg": 60.0
+            },
+            "position": {
+                "x": -120.0,
+                "y": 0.0,
+                "z": 600.0
+            },
+            "waypointPathName": ""
+        },
+        {
+            "aiType": "Structure",
+            "health": 120.0,
+            "param": {
+                "bulletDamage": 8.0,
+                "bulletSpeed": 600.0,
+                "burstCooldown": 2.0,
+                "burstCount": 6,
+                "collisionRadius": 8.0,
+                "fireInterval": 0.07999999821186066,
+                "fireRange": 1500.0,
+                "maxElevationDeg": 85.0,
+                "maxHealth": 60.0,
+                "minElevationDeg": -5.0,
+                "moveSpeed": 15.0,
+                "patrolDistance": 200.0,
+                "turnSpeedDeg": 60.0
+            },
+            "position": {
+                "x": 150.0,
+                "y": 0.0,
+                "z": 550.0
+            },
+            "waypointPathName": ""
+        },
+        {
+            "aiType": "PatrolVehicle",
+            "health": 45.0,
+            "param": {
+                "bulletDamage": 8.0,
+                "bulletSpeed": 600.0,
+                "burstCooldown": 2.0,
+                "burstCount": 6,
+                "collisionRadius": 8.0,
+                "fireInterval": 0.07999999821186066,
+                "fireRange": 1500.0,
+                "maxElevationDeg": 85.0,
+                "maxHealth": 60.0,
+                "minElevationDeg": -5.0,
+                "moveSpeed": 15.0,
+                "patrolDistance": 200.0,
+                "turnSpeedDeg": 60.0
+            },
+            "position": {
+                "x": -50.0,
+                "y": 0.0,
+                "z": 300.0
+            },
+            "waypointPathName": ""
+        }
+    ],
+    "name": "Mission 01: Combined Strike",
+    "objectives": [
+        {
+            "areaCenter": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "areaRadius": 100.0,
+            "description": "Destroy all enemy aircraft and ground installations.",
+            "duration": 300.0,
+            "isHidden": false,
+            "isPrimary": true,
+            "minHP": 0.0,
+            "name": "Destroy All Targets",
+            "requiredKills": 0,
+            "status": "Active",
+            "targetIndex": -1,
+            "type": "DestroyAll"
+        }
+    ],
+    "playerHP": 100.0,
+    "playerPosition": {
+        "x": 0.0,
+        "y": 100.0,
+        "z": 0.0
+    },
+    "timeLimit": 300.0,
+    "triggers": [
+        {
+            "actions": [
+                {
+                    "activateTriggerIndex": -1,
+                    "message": "Warning: Enemy reinforcements detected!",
+                    "messageDuration": 4.0,
+                    "newStatus": "Active",
+                    "objectiveIndex": -1,
+                    "type": "ShowMessage"
+                },
+                {
+                    "activateTriggerIndex": -1,
+                    "message": "",
+                    "messageDuration": 3.0,
+                    "newStatus": "Active",
+                    "objectiveIndex": -1,
+                    "spawnEnemies": [
+                        {
+                            "aiType": "ChaseAttack",
+                            "health": 50.0,
+                            "modelPath": "Resources/planeplane.obj",
+                            "position": {
+                                "x": 300.0,
+                                "y": 150.0,
+                                "z": 800.0
+                            }
+                        },
+                        {
+                            "aiType": "ChaseAttack",
+                            "health": 50.0,
+                            "modelPath": "Resources/planeplane.obj",
+                            "position": {
+                                "x": -300.0,
+                                "y": 150.0,
+                                "z": 900.0
+                            }
+                        }
+                    ],
+                    "type": "SpawnEnemies"
+                }
+            ],
+            "areaCenter": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "areaRadius": 100.0,
+            "condition": "OnTimer",
+            "enemyIndex": -1,
+            "hpThreshold": 50.0,
+            "isEnabled": true,
+            "isRepeatable": false,
+            "killCount": 0,
+            "name": "Reinforcement Wave",
+            "objectiveIndex": -1,
+            "timerSeconds": 60.0
+        }
+    ],
+    "waypointPaths": []
+}
