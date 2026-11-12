@@ -1,5 +1,5 @@
 #include "ImGuiManager.h"
-#include "../Graphics/SrvManager.h" 
+#include "../Graphics/System/SrvManager.h" 
 
 void ImGuiManager::Initialize([[maybe_unused]]WinApp* winApp, [[maybe_unused]] DirectXCommon* dxCommon, [[maybe_unused]] SrvManager* srvManager) {
 #ifdef USE_IMGUI
@@ -9,19 +9,15 @@ void ImGuiManager::Initialize([[maybe_unused]]WinApp* winApp, [[maybe_unused]] D
 	dxCommon_ = dxCommon;
 	srvManager_ = srvManager;
 
-	// ImGuiのコンテキスト生成
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
 	ImGui::StyleColorsDark();
 
-	// Win32初期化
 	ImGui_ImplWin32_Init(winApp->GetHwnd());
 
 	// --- SRVの確保 ---
-	// ImGui用のSRVインデックスを1つ確保する
 	uint32_t index = srvManager_->Allocate();
 
-	// DX12初期化
 	ImGui_ImplDX12_Init(
 		dxCommon_->GetDevice(),
 		DirectXCommon::kSwapChainBufferCount_,

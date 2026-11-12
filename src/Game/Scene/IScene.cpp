@@ -18,3 +18,7 @@ int IScene::GetSceneID() {
 	return sceneID;
 }
 
+void IScene::SetSceneID(int id) {
+	sceneID = id;
+}
+

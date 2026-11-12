@@ -276,19 +276,16 @@ namespace MyMath {
 		float cosY = cos(rotate.y), sinY = sin(rotate.y);
 		float cosZ = cos(rotate.z), sinZ = sin(rotate.z);
 
-		// X軸
 		rotateX.m[1][1] = cosX;
 		rotateX.m[1][2] = sinX;
 		rotateX.m[2][1] = -sinX;
 		rotateX.m[2][2] = cosX;
 
-		// Y軸
 		rotateY.m[0][0] = cosY;
 		rotateY.m[0][2] = -sinY;
 		rotateY.m[2][0] = sinY;
 		rotateY.m[2][2] = cosY;
 
-		// Z軸
 		rotateZ.m[0][0] = cosZ;
 		rotateZ.m[0][1] = sinZ;
 		rotateZ.m[1][0] = -sinZ;

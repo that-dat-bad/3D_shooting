@@ -1,0 +1,131 @@
+#pragma once
+#include "UIElement.h"
+#include "UIText.h"
+#include "UIPanel.h"
+#include <string>
+#include <functional>
+#include <memory>
+#include "../Sprite/Sprite.h"
+
+class SpriteCommon;
+
+// ボタンUI要素
+class UIButton : public UIElement {
+public:
+	// ボタンの状態
+	enum class State {
+		Normal,		// 通常
+		Hovered,	// マウスホバー中
+		Pressed,	// 押下中
+		Selected,	// 選択中
+	};
+
+	// 初期化
+	// spriteCommon: SpriteCommonのポインタ
+	// label: ボタンに表示するテキスト
+	// fontSize: フォントサイズ
+	void Initialize(SpriteCommon* spriteCommon, const std::string& label, float fontSize = 28.0f);
+
+	void Update() override;
+	void Draw() override;
+
+	// クリック時のコールバック設定
+	void SetOnClick(std::function<void()> callback) { onClick_ = callback; }
+	
+	// クリック実行
+	void Click() { if (onClick_) onClick_(); }
+
+	// ラベルテキスト取得
+	UIText* GetLabelText() { return &labelText_; }
+	const UIText* GetLabelText() const { return &labelText_; }
+
+	// ラベル設定
+	void SetLabel(const std::string& label);
+	const std::string& GetLabel() const;
+
+	// 選択状態の設定
+	void SetSelected(bool selected) { isSelected_ = selected; }
+	bool IsSelected() const { return isSelected_; }
+
+	// クリック判定
+	bool IsClicked() const { return isClicked_; }
+
+	// 状態取得
+	State GetState() const { return state_; }
+
+	// 色設定
+	void SetNormalColor(const Vector4& color);
+	void SetHoverColor(const Vector4& color);
+	void SetSelectedColor(const Vector4& color);
+	void SetTextColor(const Vector4& color);
+	void SetSelectedTextColor(const Vector4& color);
+
+	// テキストオフセット設定
+	void SetTextOffset(const Vector2& offset) { textOffset_ = offset; }
+	const Vector2& GetTextOffset() const { return textOffset_; }
+
+	// プロンプト装飾の有効化
+	void SetPromptDecoratorsEnabled(bool enabled) { enablePromptDecorators_ = enabled; }
+	bool IsPromptDecoratorsEnabled() const { return enablePromptDecorators_; }
+
+	// テキスト配置方式
+	enum class TextAlignment {
+		Center,		// 中央揃え
+		Left,		// 左揃え
+	};
+
+	// テキストアライメント設定
+	void SetTextAlignment(TextAlignment alignment, float leftPadding = 100.0f) {
+		textAlignment_ = alignment;
+		leftPadding_ = leftPadding;
+	}
+
+	// 左揃え設定
+	void SetLeftAligned(bool leftAligned, float leftPadding = 100.0f) {
+		textAlignment_ = leftAligned ? TextAlignment::Left : TextAlignment::Center;
+		leftPadding_ = leftPadding;
+	}
+
+	TextAlignment GetTextAlignment() const { return textAlignment_; }
+	float GetLeftPadding() const { return leftPadding_; }
+
+	// マウス判定
+	bool IsMouseInside() const;
+
+private:
+	std::string label_;
+	float fontSize_ = 28.0f;
+
+	// ラベルテキスト要素
+	UIText labelText_;
+
+	// 背景パネル
+	UIPanel backgroundPanel_;
+
+	// 状態管理
+	State state_ = State::Normal;
+	bool isSelected_ = false;
+	bool isClicked_ = false;
+	std::function<void()> onClick_;
+
+	// 色設定
+	Vector4 normalColor_ = { 0.15f, 0.15f, 0.20f, 0.85f };
+	Vector4 hoverColor_ = { 0.25f, 0.30f, 0.45f, 0.95f };
+	Vector4 selectedColor_ = { 0.20f, 0.35f, 0.55f, 0.95f };
+	Vector4 textColor_ = { 1.0f, 1.0f, 1.0f, 1.0f };
+	Vector4 selectedTextColor_ = { 0.0f, 0.0f, 0.0f, 1.0f };
+
+	// アニメーション
+	float hoverAlpha_ = 0.0f; // 0.0〜1.0のホバーブレンド値
+
+	// テキストオフセット微調整
+	Vector2 textOffset_ = { 0.0f, 0.0f };
+
+	// テキスト配置アライメント
+	TextAlignment textAlignment_ = TextAlignment::Center;
+	float leftPadding_ = 100.0f;
+
+	// プロンプト装飾（>> と _）
+	bool enablePromptDecorators_ = true;
+	float promptBlinkTimer_ = 0.0f;
+};

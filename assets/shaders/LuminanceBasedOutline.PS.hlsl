@@ -6,10 +6,11 @@ SamplerState gSamplerLinear : register(s0);
 cbuffer PostEffectParams : register(b0)
 {
     int32_t kernelSize;
-    float intensity;
+    float intensity;      // 輪郭検出の感度・乗算値 (Multiplier)
     float dirX;
     float dirY;
-    float32_t4x4 projectionInverse;
+    float time;
+    float3 colorTint;     // 輪郭線のカラー (R, G, B)
 };
 
 struct PixelShaderOutput
@@ -52,10 +53,13 @@ PixelShaderOutput main(VertexShaderOutput input)
     }
 
     float32_t weight = length(difference);
-    weight = saturate(weight * 6.0f); // 差が小さすぎて分かりづらいので適当に6倍している
+    float32_t mult = (intensity > 0.0f) ? intensity : 6.0f;
+    weight = saturate(weight * mult);
 
     PixelShaderOutput output;
-    output.color.rgb = (1.0f - weight) * gTexture.Sample(gSamplerLinear, input.texcoord).rgb;
+    float32_t3 baseColor = gTexture.Sample(gSamplerLinear, input.texcoord).rgb;
+    // 輪郭部分(weight)に指定されたカラー (colorTint) を合成
+    output.color.rgb = lerp(baseColor, colorTint, weight);
     output.color.a = 1.0f;
     return output;
 }

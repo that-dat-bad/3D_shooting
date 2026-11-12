@@ -1,0 +1,16 @@
+{
+    "name": "Free Flight",
+    "description": "Unrestricted flight operations over Sector 07. Enjoy aerobatics and scenic cruising without combat threats or time limits.",
+    "playerHP": 100.0,
+    "playerPosition": {
+        "x": 0.0,
+        "y": 150.0,
+        "z": 0.0
+    },
+    "timeLimit": 0.0,
+    "enemies": [],
+    "groundEnemies": [],
+    "objectives": [],
+    "triggers": [],
+    "waypointPaths": []
+}

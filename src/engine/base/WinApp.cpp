@@ -20,6 +20,21 @@ LRESULT CALLBACK WinApp::WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM l
 #endif // USE_IMGUI
 
 	switch (msg) {
+	case WM_ACTIVATE:
+		if (LOWORD(wparam) == WA_INACTIVE) {
+			// 他のアプリにフォーカスが移った時: カーソル制限を全解除し、OS標準カーソルを確実に復元
+			while (::ShowCursor(TRUE) < 0) {}
+			::SetCursor(::LoadCursor(nullptr, IDC_ARROW));
+			::ClipCursor(nullptr);
+		}
+		break;
+	case WM_SETCURSOR:
+		// クライアント領域外（タイトルバーやウィンドウ枠）または非アクティブ時は標準カーソルを表示
+		if (LOWORD(lparam) != HTCLIENT || ::GetForegroundWindow() != hwnd) {
+			::SetCursor(::LoadCursor(nullptr, IDC_ARROW));
+			return DefWindowProc(hwnd, msg, wparam, lparam);
+		}
+		break;
 	case WM_CLOSE:
 		DestroyWindow(hwnd);
 		return 0;
@@ -32,11 +47,10 @@ LRESULT CALLBACK WinApp::WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM l
 	return DefWindowProc(hwnd, msg, wparam, lparam);
 }
 
-void WinApp::Initialize() {
+void WinApp::Initialize(const std::wstring& title, const std::wstring& version) {
 	//システムタイマーの分解能を上げる
 	timeBeginPeriod(1);
 
-	// COMの初期化
 	CoInitializeEx(0, COINIT_MULTITHREADED);
 
 
@@ -49,9 +63,11 @@ void WinApp::Initialize() {
 	RECT wrc = { 0, 0, kClientWidth, kClientHeight };
 	AdjustWindowRect(&wrc, WS_OVERLAPPEDWINDOW, false);
 
+	std::wstring windowTitle = title + L" by Dawn Engine ver." + version;
+
 	hwnd_ = CreateWindow(
 		wc_.lpszClassName,
-		L"GE3",
+		windowTitle.c_str(),
 		WS_OVERLAPPEDWINDOW,
 		CW_USEDEFAULT,
 		CW_USEDEFAULT,

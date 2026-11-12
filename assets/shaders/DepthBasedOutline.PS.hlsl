@@ -1,18 +1,16 @@
 #include "FullScreen.hlsli"
 
 Texture2D<float32_t4> gTexture : register(t0);
-Texture2D<float32_t> gDepthTexture : register(t1);
-
 SamplerState gSamplerLinear : register(s0);
-SamplerState gSamplerPoint : register(s1);
 
 cbuffer PostEffectParams : register(b0)
 {
     int32_t kernelSize;
-    float intensity;
+    float intensity;      // 輪郭検出の感度・乗算値 (Multiplier)
     float dirX;
     float dirY;
-    float32_t4x4 projectionInverse;
+    float time;
+    float3 colorTint;     // 輪郭線のカラー (R, G, B)
 };
 
 struct PixelShaderOutput
@@ -32,6 +30,10 @@ static const float32_t kPrewittVerticalKernel[3][3] = {
     {  1.0f / 6.0f,  1.0f / 6.0f,  1.0f / 6.0f },
 };
 
+float32_t Luminance(float32_t3 v) {
+    return dot(v, float32_t3(0.2125f, 0.7154f, 0.0721f));
+}
+
 PixelShaderOutput main(VertexShaderOutput input)
 {
     uint32_t width, height;
@@ -43,21 +45,20 @@ PixelShaderOutput main(VertexShaderOutput input)
     for (int32_t y = 0; y < 3; ++y) {
         for (int32_t x = 0; x < 3; ++x) {
             float32_t2 texcoord = input.texcoord + float32_t2(x - 1, y - 1) * uvStepSize;
-            float32_t ndcDepth = gDepthTexture.Sample(gSamplerPoint, texcoord);
-            
-            float32_t4 viewSpace = mul(float32_t4(0.0f, 0.0f, ndcDepth, 1.0f), projectionInverse);
-            float32_t viewZ = viewSpace.z * rcp(viewSpace.w);
-
-            difference.x += viewZ * kPrewittHorizontalKernel[y][x];
-            difference.y += viewZ * kPrewittVerticalKernel[y][x];
+            float32_t3 fetchColor = gTexture.Sample(gSamplerLinear, texcoord).rgb;
+            float32_t val = Luminance(fetchColor);
+            difference.x += val * kPrewittHorizontalKernel[y][x];
+            difference.y += val * kPrewittVerticalKernel[y][x];
         }
     }
 
     float32_t weight = length(difference);
-    weight = saturate(weight * 6.0f); // Adjust multiplier as needed based on scene scale
+    float32_t mult = (intensity > 0.0f) ? intensity : 6.0f;
+    weight = saturate(weight * mult);
 
     PixelShaderOutput output;
-    output.color.rgb = (1.0f - weight) * gTexture.Sample(gSamplerLinear, input.texcoord).rgb;
+    float32_t3 baseColor = gTexture.Sample(gSamplerLinear, input.texcoord).rgb;
+    output.color.rgb = lerp(baseColor, colorTint, weight);
     output.color.a = 1.0f;
     return output;
 }

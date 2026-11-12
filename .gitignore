@@ -363,7 +363,11 @@ MigrationBackup/
 FodyWeavers.xsd
 /imgui.ini
 /.agents/skills/cpp-pro
-/skills-lock.json
-/.aider.chat.history.md
-/.aider.input.history
-/.aider.tags.cache.v4
+.aider*
+*.cso
+assets/shaders/compiled/
+/.github/upgrades/scenarios/cppbuildtoolsupgrade
+/benchmark_log.txt
+*.terrain
+docs/
+skills-lock.json

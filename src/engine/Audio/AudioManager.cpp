@@ -3,7 +3,6 @@
 #include <string>
 #include <vector>
 
-// Media Foundation 関連
 #include <mfapi.h>
 #include <mfidl.h>
 #include <mfreadwrite.h>
@@ -22,11 +21,8 @@ using namespace Microsoft::WRL;
 std::unique_ptr<AudioManager> AudioManager::instance = nullptr;
 
 // ============================
-// VoiceCallback 実装
 // ============================
 void VoiceCallback::OnStreamEnd() {
-	// XAudio2 のコールバックスレッドから呼ばれる
-	// SourceVoice を停止してフラグを立てる
 	// (DestroyVoice はコールバック内で呼ぶとデッドロックの恐れがあるため、
 	//  メインスレッドの Update() で回収する)
 	if (sourceVoice) {
@@ -35,21 +31,18 @@ void VoiceCallback::OnStreamEnd() {
 }
 
 // ============================
-// AudioManager 実装
 // ============================
 AudioManager* AudioManager::GetInstance() {
-	if (instance == nullptr) instance.reset(new AudioManager());
+	if (instance == nullptr) { instance = std::make_unique<AudioManager>(); }
 	return instance.get();
 }
 
 void AudioManager::Initialize() {
 	HRESULT result;
 
-	// Media Foundation の初期化
 	result = MFStartup(MF_VERSION, MFSTARTUP_NOSOCKET);
 	assert(SUCCEEDED(result));
 
-	// XAudio2の初期化
 	result = XAudio2Create(&xAudio2_, 0, XAUDIO2_DEFAULT_PROCESSOR);
 	assert(SUCCEEDED(result));
 
@@ -69,7 +62,6 @@ void AudioManager::Finalize() {
 		xAudio2_->Release();
 		xAudio2_ = nullptr;
 	}
-	// MFの終了
 	MFShutdown();
 }
 
@@ -81,7 +73,6 @@ void AudioManager::Update() {
 	while (it != playingVoices_.end()) {
 		auto& pv = *it;
 
-		// Voice の状態を問い合わせて、バッファが空なら再生完了
 		XAUDIO2_VOICE_STATE state{};
 		pv->sourceVoice->GetState(&state);
 
@@ -96,38 +87,85 @@ void AudioManager::Update() {
 	}
 }
 
+#include <filesystem>
+#include <cstdio>
+
 SoundData AudioManager::SoundLoadFile(const char* filename) {
 	HRESULT result;
 	SoundData soundData = {};
 
-	// 1. ファイルパスの変換
-	std::wstring filePathW = StringUtility::ConvertString(filename);
+	if (!filename || filename[0] == '\0') {
+		return soundData;
+	}
+
+	// 1. ファイルパス解決（カレントディレクトリ、プロジェクト相対、絶対パス対応）
+	std::filesystem::path resolvedPath = filename;
+	if (!std::filesystem::exists(resolvedPath)) {
+		// カレントディレクトリが output フォルダの場合などの探索候補
+		std::vector<std::filesystem::path> candidates = {
+			std::filesystem::path("../../25B_GE_CG") / filename,
+			std::filesystem::path("../25B_GE_CG") / filename,
+			std::filesystem::path("..") / filename,
+			std::filesystem::path("../..") / filename,
+			std::filesystem::current_path() / filename
+		};
+		for (const auto& cand : candidates) {
+			if (std::filesystem::exists(cand)) {
+				resolvedPath = cand;
+				break;
+			}
+		}
+	}
+
+	if (!std::filesystem::exists(resolvedPath)) {
+		char warnBuf[512];
+		snprintf(warnBuf, sizeof(warnBuf), "[AudioManager] WARNING: Audio file not found: %s\n", filename);
+		OutputDebugStringA(warnBuf);
+		return soundData;
+	}
+
+	// Windowsの完全修飾絶対パスに正規化
+	std::wstring filePathW = std::filesystem::absolute(resolvedPath).wstring();
 
 	// 2. SourceReader作成
 	ComPtr<IMFSourceReader> pReader;
 	result = MFCreateSourceReaderFromURL(filePathW.c_str(), nullptr, &pReader);
-	assert(SUCCEEDED(result));
+	if (FAILED(result) || !pReader) {
+		char errBuf[512];
+		snprintf(errBuf, sizeof(errBuf), "[AudioManager] ERROR: MFCreateSourceReaderFromURL failed (0x%08X): %ls\n", static_cast<unsigned int>(result), filePathW.c_str());
+		OutputDebugStringA(errBuf);
+		return soundData;
+	}
 
 	// 3. メディアタイプ設定 (PCM)
 	ComPtr<IMFMediaType> pPCMType;
-	MFCreateMediaType(&pPCMType);
+	result = MFCreateMediaType(&pPCMType);
+	if (FAILED(result) || !pPCMType) {
+		return soundData;
+	}
 	pPCMType->SetGUID(MF_MT_MAJOR_TYPE, MFMediaType_Audio);
 	pPCMType->SetGUID(MF_MT_SUBTYPE, MFAudioFormat_PCM);
 
 	result = pReader->SetCurrentMediaType((DWORD)MF_SOURCE_READER_FIRST_AUDIO_STREAM, nullptr, pPCMType.Get());
-	assert(SUCCEEDED(result));
+	if (FAILED(result)) {
+		return soundData;
+	}
 
 	// 4. WaveFormat取得
 	ComPtr<IMFMediaType> pOutType;
-	pReader->GetCurrentMediaType((DWORD)MF_SOURCE_READER_FIRST_AUDIO_STREAM, &pOutType);
+	result = pReader->GetCurrentMediaType((DWORD)MF_SOURCE_READER_FIRST_AUDIO_STREAM, &pOutType);
+	if (FAILED(result) || !pOutType) {
+		return soundData;
+	}
 
 	WAVEFORMATEX* waveFormat = nullptr;
-	MFCreateWaveFormatExFromMFMediaType(pOutType.Get(), &waveFormat, nullptr);
+	result = MFCreateWaveFormatExFromMFMediaType(pOutType.Get(), &waveFormat, nullptr);
+	if (FAILED(result) || !waveFormat) {
+		return soundData;
+	}
 
 	// 構造体にフォーマット情報をコピー
 	soundData.wfex = *waveFormat;
-
-	// MFで確保したフォーマットメモリを解放
 	CoTaskMemFree(waveFormat);
 
 	// 5. PCM波形データの取得
@@ -137,22 +175,21 @@ SoundData AudioManager::SoundLoadFile(const char* filename) {
 		LONGLONG llTimeStamp = 0;
 
 		result = pReader->ReadSample(MF_SOURCE_READER_FIRST_AUDIO_STREAM, 0, &streamIndex, &flags, &llTimeStamp, &pSample);
-		assert(SUCCEEDED(result));
+		if (FAILED(result)) { break; }
 
 		// ストリームの末尾に達したら抜ける
-		if (flags & MF_SOURCE_READERF_ENDOFSTREAM) break;
+		if (flags & MF_SOURCE_READERF_ENDOFSTREAM) { break; }
 
-		// pSampleが有効な場合、バッファを取り出す
 		if (pSample) {
 			ComPtr<IMFMediaBuffer> pBuffer;
-			pSample->ConvertToContiguousBuffer(&pBuffer);
-
-			BYTE* pData = nullptr;
-			DWORD maxLength = 0, currentLength = 0;
-
-			pBuffer->Lock(&pData, &maxLength, &currentLength);
-			soundData.buffer.insert(soundData.buffer.end(), pData, pData + currentLength);
-			pBuffer->Unlock();
+			if (SUCCEEDED(pSample->ConvertToContiguousBuffer(&pBuffer)) && pBuffer) {
+				BYTE* pData = nullptr;
+				DWORD maxLength = 0, currentLength = 0;
+				if (SUCCEEDED(pBuffer->Lock(&pData, &maxLength, &currentLength)) && pData) {
+					soundData.buffer.insert(soundData.buffer.end(), pData, pData + currentLength);
+					pBuffer->Unlock();
+				}
+			}
 		}
 	}
 

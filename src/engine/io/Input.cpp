@@ -11,7 +11,7 @@ std::unique_ptr<Input> Input::instance_ = nullptr;
 
 Input* Input::GetInstance() {
 	if (instance_ == nullptr) {
-		instance_.reset(new Input());
+		instance_ = std::make_unique<Input>();
 	}
 	return instance_.get();
 }
@@ -51,19 +51,57 @@ void Input::Initialize(HINSTANCE hInstance,HWND hwnd)
 	//排他制御レベルのセット
 	mouse_->SetCooperativeLevel(hwnd, DISCL_FOREGROUND | DISCL_NONEXCLUSIVE);
 	assert(SUCCEEDED(result));
+
+	hwnd_ = hwnd;
 }
 
 void Input::Update()
 {
 	//キー入力を保存
 	memcpy(preKeys_, keys_, sizeof(keys_));
+	memcpy(&preMouseState_, &mouseState_, sizeof(mouseState_));
 
 	// 入力取得
 	keyboard_->Acquire();
-	mouse_->Acquire();
 	keyboard_->GetDeviceState(sizeof(keys_), keys_);
 	
-	mouse_->GetDeviceState(sizeof(mouseState_), &mouseState_);
+	HRESULT hr = mouse_->Acquire();
+	hr = mouse_->GetDeviceState(sizeof(mouseState_), &mouseState_);
+	if (FAILED(hr)) {
+		mouse_->Acquire();
+		mouse_->GetDeviceState(sizeof(mouseState_), &mouseState_);
+	}
+
+	// Win32 API のマウスボタン状態も統合（フォーカス状態やDirectInput一時ロスト時にも確実に検出）
+	if ((::GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0) {
+		mouseState_.rgbButtons[0] = 0x80;
+	}
+	if ((::GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0) {
+		mouseState_.rgbButtons[1] = 0x80;
+	}
+	if ((::GetAsyncKeyState(VK_MBUTTON) & 0x8000) != 0) {
+		mouseState_.rgbButtons[2] = 0x80;
+	}
+
+	// Win32 API のキー状態も統合（フォーカス遷移時やDirectInput一時ロスト時にも確実に検出）
+	if ((::GetAsyncKeyState(VK_SPACE) & 0x8000) != 0) {
+		keys_[DIK_SPACE] = 0x80;
+	}
+	if ((::GetAsyncKeyState(VK_RETURN) & 0x8000) != 0) {
+		keys_[DIK_RETURN] = 0x80;
+	}
+
+	// カーソルロック中は自ウィンドウがフォアグラウンドの時のみ、OSカーソルをウィンドウ中央に戻す
+	bool isForeground = (hwnd_ && (::GetForegroundWindow() == hwnd_));
+	if (cursorLocked_ && isForeground) {
+		RECT rect;
+		::GetClientRect(hwnd_, &rect);
+		POINT center;
+		center.x = (rect.right - rect.left) / 2;
+		center.y = (rect.bottom - rect.top) / 2;
+		::ClientToScreen(hwnd_, &center);
+		::SetCursorPos(center.x, center.y);
+	}
 
 }
 
@@ -84,6 +122,53 @@ bool Input::PushMouse(int buttonNumber)
 	return false;
 }
 
+bool Input::TriggerMouse(int buttonNumber)
+{
+	if (!preMouseState_.rgbButtons[buttonNumber] && mouseState_.rgbButtons[buttonNumber])
+	{
+		return true;
+	}
+	return false;
+}
+
+Input::MousePosition Input::GetMouseScreenPosition(HWND hwnd)
+{
+	POINT pt;
+	::GetCursorPos(&pt);
+	HWND targetHwnd = hwnd ? hwnd : hwnd_;
+	if (targetHwnd)
+	{
+		::ScreenToClient(targetHwnd, &pt);
+	}
+	return { pt.x, pt.y };
+}
+
+Vector2 Input::GetVirtualMousePosition(float virtualWidth, float virtualHeight, HWND hwnd)
+{
+	HWND targetHwnd = hwnd ? hwnd : hwnd_;
+	if (!targetHwnd)
+	{
+		return { 0.0f, 0.0f };
+	}
+
+	POINT pt;
+	::GetCursorPos(&pt);
+	::ScreenToClient(targetHwnd, &pt);
+
+	Vector2 mousePos = { static_cast<float>(pt.x), static_cast<float>(pt.y) };
+
+	RECT rc;
+	if (::GetClientRect(targetHwnd, &rc) && (rc.right - rc.left > 0) && (rc.bottom - rc.top > 0))
+	{
+		float actualW = static_cast<float>(rc.right - rc.left);
+		float actualH = static_cast<float>(rc.bottom - rc.top);
+		mousePos.x *= (virtualWidth / actualW);
+		mousePos.y *= (virtualHeight / actualH);
+	}
+
+	return mousePos;
+}
+
 bool Input::PushKey(BYTE keyNumber)
 {
 	if (keys_[keyNumber])
@@ -101,4 +186,23 @@ bool Input::TriggerKey(BYTE keyNumber)
 	}
 
 	return false;
+}
+
+void Input::LockCursor()
+{
+	if (!cursorLocked_) {
+		cursorLocked_ = true;
+		if (hwnd_ && ::GetForegroundWindow() == hwnd_) {
+			while (::ShowCursor(FALSE) >= 0) {}
+		}
+	}
+}
+
+void Input::UnlockCursor()
+{
+	if (cursorLocked_) {
+		cursorLocked_ = false;
+		while (::ShowCursor(TRUE) < 0) {}
+		::SetCursor(::LoadCursor(nullptr, IDC_ARROW));
+	}
 }

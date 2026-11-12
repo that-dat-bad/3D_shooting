@@ -8,7 +8,7 @@ namespace MyMath {
 		return buf;
 	}
 
-	Vector3 Substract(const Vector3& v1, const Vector3& v2) {
+	Vector3 Subtract(const Vector3& v1, const Vector3& v2) {
 		Vector3 buf;
 		buf = { v1.x - v2.x, v1.y - v2.y, v1.z - v2.z };
 		return buf;

@@ -41,8 +41,8 @@ PixelShaderOutput main(PixelInput input)
     // テクスチャサンプリング
     float32_t4 texColor = gTexture.Sample(gSampler, uv.xy);
     
-    // アルファテスト
-    if (texColor.a < 0.1f) {
+    // アルファテスト (半透明の滑らかなグラデーションがパキッと途切れるのを防ぐため、閾値を下げる)
+    if (texColor.a < 0.001f) {
         discard;
     }
 

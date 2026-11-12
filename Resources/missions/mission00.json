@@ -1,0 +1,617 @@
+{
+    "name": "Obuchenie -極夜の異変-",
+    "aliasName": "ZADANIE 00",
+    "subTitle": "",
+    "difficulty": "TUTORIAL",
+    "areaName": "VERNA OUTER CANYON (POLAR DUSK)",
+    "description": "定期哨戒と基礎訓練（Obuchenie）から、監視所炎上・西側機との遭遇へ突入する導入。\n飛行隊長『Corax』の誘導に従い、M-21Aの基本機動と峡谷低空哨戒ルートを習得せよ。",
+    "playerHP": 100.0,
+    "playerPosition": {
+        "x": 220.0,
+        "y": -290.0,
+        "z": 800.0
+    },
+    "playerYawDeg": 0.0,
+    "timeLimit": 0.0,
+    "enemies": [],
+    "groundEnemies": [
+        {
+            "position": {
+                "x": -52.0,
+                "y": -472.0,
+                "z": 4950.0
+            },
+            "aiType": "Structure",
+            "health": 200.0,
+            "waypointPathName": "",
+            "param": {
+                "maxHealth": 200.0,
+                "collisionRadius": 15.0,
+                "fireRange": 0.0,
+                "minElevationDeg": 0.0,
+                "maxElevationDeg": 0.0,
+                "turnSpeedDeg": 0.0,
+                "bulletSpeed": 0.0,
+                "bulletDamage": 0.0,
+                "fireInterval": 0.0,
+                "burstCount": 0,
+                "burstCooldown": 0.0,
+                "moveSpeed": 0.0,
+                "patrolDistance": 0.0
+            }
+        }
+    ],
+    "objectives": [
+        {
+            "name": "峡谷哨戒：第1ゲート通過",
+            "description": "飛行隊長Coraxに続き、峡谷低空のガイドマーカー（第1ゲート）を通過せよ",
+            "type": "ReachArea",
+            "status": "Active",
+            "isPrimary": true,
+            "isHidden": false,
+            "requiredKills": 0,
+            "targetIndex": -1,
+            "areaCenter": {
+                "x": 195.0,
+                "y": -340.0,
+                "z": 2850.0
+            },
+            "areaRadius": 140.0,
+            "duration": 0.0,
+            "minHP": 0.0
+        },
+        {
+            "name": "峡谷哨戒：第2ゲート通過",
+            "description": "峡谷の蛇行ルートに沿って高度を保ち、第2ゲートを通過せよ",
+            "type": "ReachArea",
+            "status": "Inactive",
+            "isPrimary": true,
+            "isHidden": false,
+            "requiredKills": 0,
+            "targetIndex": -1,
+            "areaCenter": {
+                "x": 55.0,
+                "y": -348.0,
+                "z": 3500.0
+            },
+            "areaRadius": 140.0,
+            "duration": 0.0,
+            "minHP": 0.0
+        },
+        {
+            "name": "峡谷哨戒：第3ゲート通過",
+            "description": "谷底ルートの第3ゲートを通過して点検飛行を完遂せよ。",
+            "type": "ReachArea",
+            "status": "Inactive",
+            "isPrimary": true,
+            "isHidden": false,
+            "requiredKills": 0,
+            "targetIndex": -1,
+            "areaCenter": {
+                "x": -95.0,
+                "y": -355.0,
+                "z": 4150.0
+            },
+            "areaRadius": 140.0,
+            "duration": 0.0,
+            "minHP": 0.0
+        },
+        {
+            "name": "第4監視所へ接近・状況確認",
+            "description": "黒煙が上がる第4監視所の上空へ急行し、現地の被害状況を確認せよ。",
+            "type": "ReachArea",
+            "status": "Inactive",
+            "isPrimary": true,
+            "isHidden": false,
+            "requiredKills": 0,
+            "targetIndex": -1,
+            "areaCenter": {
+                "x": -52.0,
+                "y": -460.0,
+                "z": 4950.0
+            },
+            "areaRadius": 220.0,
+            "duration": 0.0,
+            "minHP": 0.0
+        },
+        {
+            "name": "暴走ドローンの撃破",
+            "description": "監視所から飛び出した自動防衛ドローンを偏差射撃で撃墜せよ。",
+            "type": "DestroyTarget",
+            "status": "Inactive",
+            "isPrimary": true,
+            "isHidden": false,
+            "requiredKills": 0,
+            "targetIndex": 0,
+            "areaCenter": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "areaRadius": 100.0,
+            "duration": 0.0,
+            "minHP": 0.0
+        },
+        {
+            "name": "侵入した西側戦闘機の排除",
+            "description": "突如急襲してきた所属不明の西側戦闘機をドッグファイトで撃墜せよ。",
+            "type": "DestroyTarget",
+            "status": "Inactive",
+            "isPrimary": true,
+            "isHidden": false,
+            "requiredKills": 0,
+            "targetIndex": 1,
+            "areaCenter": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "areaRadius": 100.0,
+            "duration": 0.0,
+            "minHP": 0.0
+        },
+        {
+            "name": "空域離脱・基地へ緊急帰投",
+            "description": "飛行隊長Coraxに続き、峡谷北端の帰投境界ラインを通過して離脱せよ。",
+            "type": "ReachArea",
+            "status": "Inactive",
+            "isPrimary": true,
+            "isHidden": false,
+            "requiredKills": 0,
+            "targetIndex": -1,
+            "areaCenter": {
+                "x": -680.0,
+                "y": -325.0,
+                "z": 7800.0
+            },
+            "areaRadius": 180.0,
+            "duration": 0.0,
+            "minHP": 0.0
+        }
+    ],
+    "triggers": [
+        {
+            "name": "Trig_00_StartBriefing",
+            "condition": "OnMissionStart",
+            "isEnabled": true,
+            "isRepeatable": false,
+            "timerSeconds": 0.0,
+            "areaCenter": { "x": 0.0, "y": 0.0, "z": 0.0 },
+            "areaRadius": 100.0,
+            "enemyIndex": -1,
+            "killCount": 0,
+            "hpThreshold": 50.0,
+            "objectiveIndex": -1,
+            "actions": [
+                {
+                    "type": "PlayRadioDialogue",
+                    "speakerName": "Corax",
+                    "message": "……感度良好。聞こえているな、新人。ようこそ条約軍外縁国境警備空隊へ。",
+                    "messageDuration": 4.5,
+                    "objectiveIndex": -1,
+                    "newStatus": "Active",
+                    "activateTriggerIndex": -1
+                },
+                {
+                    "type": "ShowMessage",
+                    "message": "【W/S】スロットル加減速 ／ 【マウス】機首誘導 ／ 【緑リング】ゲート通過",
+                    "messageDuration": 6.0,
+                    "objectiveIndex": -1,
+                    "newStatus": "Active",
+                    "activateTriggerIndex": -1
+                }
+            ]
+        },
+        {
+            "name": "Trig_01_Gate1Passed",
+            "condition": "OnObjectiveComplete",
+            "isEnabled": true,
+            "isRepeatable": false,
+            "timerSeconds": 0.0,
+            "areaCenter": { "x": 0.0, "y": 0.0, "z": 0.0 },
+            "areaRadius": 100.0,
+            "enemyIndex": -1,
+            "killCount": 0,
+            "hpThreshold": 50.0,
+            "objectiveIndex": 0,
+            "actions": [
+                {
+                    "type": "SetObjective",
+                    "message": "",
+                    "messageDuration": 0.0,
+                    "objectiveIndex": 1,
+                    "newStatus": "Active",
+                    "activateTriggerIndex": -1
+                },
+                {
+                    "type": "PlayRadioDialogue",
+                    "speakerName": "Corax",
+                    "message": "高度を上げすぎるなよ。谷底を這うのがこの辺境の生き残り方だ。",
+                    "messageDuration": 4.0,
+                    "objectiveIndex": -1,
+                    "newStatus": "Active",
+                    "activateTriggerIndex": -1
+                }
+            ]
+        },
+        {
+            "name": "Trig_02_Gate2Passed",
+            "condition": "OnObjectiveComplete",
+            "isEnabled": true,
+            "isRepeatable": false,
+            "timerSeconds": 0.0,
+            "areaCenter": { "x": 0.0, "y": 0.0, "z": 0.0 },
+            "areaRadius": 100.0,
+            "enemyIndex": -1,
+            "killCount": 0,
+            "hpThreshold": 50.0,
+            "objectiveIndex": 1,
+            "actions": [
+                {
+                    "type": "SetObjective",
+                    "message": "",
+                    "messageDuration": 0.0,
+                    "objectiveIndex": 2,
+                    "newStatus": "Active",
+                    "activateTriggerIndex": -1
+                },
+                {
+                    "type": "PlayRadioDialogue",
+                    "speakerName": "Corax",
+                    "message": "動翼の追従は順調だな。前方の最終ゲートを抜けてみろ。",
+                    "messageDuration": 3.5,
+                    "objectiveIndex": -1,
+                    "newStatus": "Active",
+                    "activateTriggerIndex": -1
+                }
+            ]
+        },
+        {
+            "name": "Trig_03_Gate3Passed",
+            "condition": "OnObjectiveComplete",
+            "isEnabled": true,
+            "isRepeatable": false,
+            "timerSeconds": 0.0,
+            "areaCenter": { "x": 0.0, "y": 0.0, "z": 0.0 },
+            "areaRadius": 100.0,
+            "enemyIndex": -1,
+            "killCount": 0,
+            "hpThreshold": 50.0,
+            "objectiveIndex": 2,
+            "actions": [
+                {
+                    "type": "SetObjective",
+                    "message": "",
+                    "messageDuration": 0.0,
+                    "objectiveIndex": 3,
+                    "newStatus": "Active",
+                    "activateTriggerIndex": -1
+                },
+                {
+                    "type": "PlayRadioDialogue",
+                    "speakerName": "第4監視所",
+                    "message": "……zzt……本部！ 応答しろ！ 峡谷上空から所属不明機が……kzz……急降下して――（爆発音）",
+                    "messageDuration": 5.0,
+                    "objectiveIndex": -1,
+                    "newStatus": "Active",
+                    "activateTriggerIndex": -1
+                },
+                {
+                    "type": "PlayRadioDialogue",
+                    "speakerName": "Corax",
+                    "message": "……おい、第4監視所が落ちたぞ！？ 新人、前方の視界を開けろ！",
+                    "messageDuration": 4.0,
+                    "objectiveIndex": -1,
+                    "newStatus": "Active",
+                    "activateTriggerIndex": -1
+                }
+            ]
+        },
+        {
+            "name": "Trig_04_OutpostReached",
+            "condition": "OnObjectiveComplete",
+            "isEnabled": true,
+            "isRepeatable": false,
+            "timerSeconds": 0.0,
+            "areaCenter": { "x": 0.0, "y": 0.0, "z": 0.0 },
+            "areaRadius": 100.0,
+            "enemyIndex": -1,
+            "killCount": 0,
+            "hpThreshold": 50.0,
+            "objectiveIndex": 3,
+            "actions": [
+                {
+                    "type": "SpawnEnemies",
+                    "message": "",
+                    "messageDuration": 0.0,
+                    "objectiveIndex": -1,
+                    "newStatus": "Active",
+                    "activateTriggerIndex": -1,
+                    "spawnEnemies": [
+                        {
+                            "position": {
+                                "x": -260.0,
+                                "y": -328.0,
+                                "z": 5450.0
+                            },
+                            "modelPath": "Resources/models/m15.gltf",
+                            "health": 40.0,
+                            "aiType": "CruiseEvade",
+                            "waypointPathName": "",
+                            "behaviorTree": {
+                                "useCustomParamsOnly": true,
+                                "overrideParams": {
+                                    "retreatHpPct": 20.0,
+                                    "retreatSafeDist": 1200.0,
+                                    "engageDist": 800.0,
+                                    "fireRange": 600.0,
+                                    "patrolThrottle": 0.55
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "type": "SetObjective",
+                    "message": "",
+                    "messageDuration": 0.0,
+                    "objectiveIndex": 4,
+                    "newStatus": "Active",
+                    "activateTriggerIndex": -1
+                },
+                {
+                    "type": "PlayRadioDialogue",
+                    "speakerName": "Corax",
+                    "message": "防衛用の自動ドローンが暴走して飛び出したか。銃の試射代わりに撃ち落とせ！",
+                    "messageDuration": 4.5,
+                    "objectiveIndex": -1,
+                    "newStatus": "Active",
+                    "activateTriggerIndex": -1
+                },
+                {
+                    "type": "ShowMessage",
+                    "message": "【左クリック】機銃射撃 ／ 目標前方のリードマーカー（○）を狙え",
+                    "messageDuration": 5.0,
+                    "objectiveIndex": -1,
+                    "newStatus": "Active",
+                    "activateTriggerIndex": -1
+                }
+            ]
+        },
+        {
+            "name": "Trig_05_DroneDestroyed",
+            "condition": "OnObjectiveComplete",
+            "isEnabled": true,
+            "isRepeatable": false,
+            "timerSeconds": 0.0,
+            "areaCenter": { "x": 0.0, "y": 0.0, "z": 0.0 },
+            "areaRadius": 100.0,
+            "enemyIndex": -1,
+            "killCount": 0,
+            "hpThreshold": 50.0,
+            "objectiveIndex": 4,
+            "actions": [
+                {
+                    "type": "SpawnEnemies",
+                    "message": "",
+                    "messageDuration": 0.0,
+                    "objectiveIndex": -1,
+                    "newStatus": "Active",
+                    "activateTriggerIndex": -1,
+                    "spawnEnemies": [
+                        {
+                            "position": {
+                                "x": -480.0,
+                                "y": -310.0,
+                                "z": 6220.0
+                            },
+                            "modelPath": "Resources/models/m15.gltf",
+                            "health": 100.0,
+                            "aiType": "ChaseAttack",
+                            "waypointPathName": "",
+                            "behaviorTree": {
+                                "useCustomParamsOnly": true,
+                                "overrideParams": {
+                                    "retreatHpPct": 35.0,
+                                    "retreatSafeDist": 1400.0,
+                                    "engageDist": 1200.0,
+                                    "fireRange": 1000.0,
+                                    "patrolThrottle": 0.75
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "type": "SetObjective",
+                    "message": "",
+                    "messageDuration": 0.0,
+                    "objectiveIndex": 5,
+                    "newStatus": "Active",
+                    "activateTriggerIndex": -1
+                },
+                {
+                    "type": "PlayRadioDialogue",
+                    "speakerName": "Corax",
+                    "message": "レーダーに所属不明の急降下機！ 所属不明戦闘機が来るぞ、新人、回避しろ！",
+                    "messageDuration": 4.5,
+                    "objectiveIndex": -1,
+                    "newStatus": "Active",
+                    "activateTriggerIndex": -1
+                },
+                {
+                    "type": "ShowMessage",
+                    "message": "【実戦】侵入した敵戦闘機を排除せよ",
+                    "messageDuration": 4.0,
+                    "objectiveIndex": -1,
+                    "newStatus": "Active",
+                    "activateTriggerIndex": -1
+                }
+            ]
+        },
+        {
+            "name": "Trig_06_WesternDestroyed",
+            "condition": "OnObjectiveComplete",
+            "isEnabled": true,
+            "isRepeatable": false,
+            "timerSeconds": 0.0,
+            "areaCenter": { "x": 0.0, "y": 0.0, "z": 0.0 },
+            "areaRadius": 100.0,
+            "enemyIndex": -1,
+            "killCount": 0,
+            "hpThreshold": 50.0,
+            "objectiveIndex": 5,
+            "actions": [
+                {
+                    "type": "SetObjective",
+                    "message": "",
+                    "messageDuration": 0.0,
+                    "objectiveIndex": 6,
+                    "newStatus": "Active",
+                    "activateTriggerIndex": -1
+                },
+                {
+                    "type": "PlayRadioDialogue",
+                    "speakerName": "Corax",
+                    "message": "命中確認！ 敵機、谷底へ落ちていくぞ！ 全機、これより基地へ緊急帰投する。",
+                    "messageDuration": 5.0,
+                    "objectiveIndex": -1,
+                    "newStatus": "Active",
+                    "activateTriggerIndex": -1
+                },
+                {
+                    "type": "ShowMessage",
+                    "message": "【緊急帰投】前方の峡谷境界ラインを通過せよ",
+                    "messageDuration": 4.0,
+                    "objectiveIndex": -1,
+                    "newStatus": "Active",
+                    "activateTriggerIndex": -1
+                }
+            ]
+        },
+        {
+            "name": "Trig_07_ExitBoundaryPassed",
+            "condition": "OnObjectiveComplete",
+            "isEnabled": true,
+            "isRepeatable": false,
+            "timerSeconds": 0.0,
+            "areaCenter": { "x": 0.0, "y": 0.0, "z": 0.0 },
+            "areaRadius": 100.0,
+            "enemyIndex": -1,
+            "killCount": 0,
+            "hpThreshold": 50.0,
+            "objectiveIndex": 6,
+            "actions": [
+                {
+                    "type": "MissionComplete",
+                    "message": "作戦空域離脱 // MISSION COMPLETE",
+                    "messageDuration": 5.0,
+                    "objectiveIndex": -1,
+                    "newStatus": "Active",
+                    "activateTriggerIndex": -1
+                },
+                {
+                    "type": "PlayRadioDialogue",
+                    "speakerName": "Corax",
+                    "message": "境界通過確認。よく生き延びたな、基地へ戻るぞ。",
+                    "messageDuration": 4.0,
+                    "objectiveIndex": -1,
+                    "newStatus": "Active",
+                    "activateTriggerIndex": -1
+                }
+            ]
+        }
+    ],
+    "waypointPaths": [
+        {
+            "name": "Obuchenie_Patrol",
+            "isLoop": false,
+            "points": [
+                {
+                    "position": {
+                        "x": 195.0,
+                        "y": -340.0,
+                        "z": 2850.0
+                    },
+                    "speed": 300.0
+                },
+                {
+                    "position": {
+                        "x": 55.0,
+                        "y": -348.0,
+                        "z": 3500.0
+                    },
+                    "speed": 300.0
+                },
+                {
+                    "position": {
+                        "x": -95.0,
+                        "y": -355.0,
+                        "z": 4150.0
+                    },
+                    "speed": 300.0
+                }
+            ]
+        }
+    ],
+    "tutorialLayout": {
+        "useCustomLayout": true,
+        "coraxStartPos": {
+            "x": 244.0,
+            "y": -278.0,
+            "z": 935.0
+        },
+        "outpostPosition": {
+            "x": -52.0,
+            "y": -472.0,
+            "z": 4950.0
+        },
+        "outpostPositions": [
+            {
+                "x": 338.0,
+                "y": -455.0,
+                "z": 1950.0
+            },
+            {
+                "x": 78.0,
+                "y": -468.0,
+                "z": 2920.0
+            },
+            {
+                "x": 172.0,
+                "y": -478.0,
+                "z": 3880.0
+            },
+            {
+                "x": -52.0,
+                "y": -472.0,
+                "z": 4950.0
+            }
+        ],
+        "droneSpawnPosition": {
+            "x": -260.0,
+            "y": -328.0,
+            "z": 5450.0
+        },
+        "westernDiveStart": {
+            "x": -110.0,
+            "y": -25.0,
+            "z": 5950.0
+        },
+        "westernDiveMid": {
+            "x": -380.0,
+            "y": -295.0,
+            "z": 5860.0
+        },
+        "westernPullUp": {
+            "x": -480.0,
+            "y": -310.0,
+            "z": 6220.0
+        },
+        "exitBoundaryPosition": {
+            "x": -680.0,
+            "y": -325.0,
+            "z": 7800.0
+        }
+    }
+}
