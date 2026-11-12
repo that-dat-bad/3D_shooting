@@ -6,8 +6,8 @@
 namespace AI {
 
 // ============================================================================
-// 待機アクション (WaitPatrolAction)
-// ミッションエディタで設定した WaypointPath に沿って飛行する
+// 待機アクション
+// ミッションエディタで設定した WaypointPath に沿って飛行
 // ============================================================================
 NodeStatus WaitPatrolAction::Tick(float deltaTime, Enemy& enemy) {
 	enemy.SetActiveBehaviorName("WaitPatrol");
