@@ -9,20 +9,11 @@
 
 #ifdef USE_IMGUI
 #include "../../../external/imgui/imgui.h"
-#include "../../engine/Debug/UIEditorWindow.h"
 #endif
 
 const char* SceneManager::GetSceneName(int sceneID) {
-	switch (sceneID) {
-	case SCENE::TITLE: return "TITLE";
-	case SCENE::STAGE: return "STAGE";
-	case SCENE::CLEAR: return "CLEAR";
-	case SCENE::GAMEOVER: return "GAMEOVER";
-	case SCENE::DEBUG: return "DEBUG";
-	case SCENE::MISSION_EDITOR: return "MISSION_EDITOR";
-	case SCENE::EFFECT_EDITOR: return "EFFECT_EDITOR";
-	default: return "UNKNOWN";
-	}
+	(void)sceneID;
+	return "DEBUG (Skybox)";
 }
 
 void SceneManager::AppendLog(const std::string& logText) {
@@ -59,11 +50,11 @@ SceneManager::SceneManager(std::unique_ptr<AbstractSceneFactory> factory)
 	auto tStart = std::chrono::high_resolution_clock::now();
 #endif
 
-	// 初期シーン生成
-	currentScene = sceneFactory_->CreateScene(SCENE::TITLE);
+	// 初期シーン生成 (DEBUG - Skybox Viewer)
+	currentScene = sceneFactory_->CreateScene(SCENE::DEBUG);
 	currentScene->Initialize();
-	currentSceneID = SCENE::TITLE;
-	IScene::SetSceneID(SCENE::TITLE);
+	currentSceneID = SCENE::DEBUG;
+	IScene::SetSceneID(SCENE::DEBUG);
 
 #ifdef _DEBUG
 	auto tEnd = std::chrono::high_resolution_clock::now();
@@ -191,62 +182,7 @@ void SceneManager::SwitchScene(int nextSceneID) {
 }
 
 void SceneManager::PrewarmAllScenes() {
-#ifdef _DEBUG
-	auto tStart = std::chrono::high_resolution_clock::now();
-#endif
-	std::vector<int> preloadIDs = { SCENE::STAGE, SCENE::GAMEOVER, SCENE::CLEAR };
-#ifdef _DEBUG
-	prewarmRecords_.clear();
-
-	std::string prewarmLog = 
-		"\n======================================================================\n"
-		"[Boot Prewarm] Initializing All Scenes in Background for 0ms Transition\n"
-		"======================================================================\n";
-#endif
-
-	for (int id : preloadIDs) {
-		if (scenePool_.find(id) == scenePool_.end() && id != currentSceneID) {
-#ifdef _DEBUG
-			auto sStart = std::chrono::high_resolution_clock::now();
-#endif
-			auto scene = sceneFactory_->CreateScene(id);
-			if (scene) {
-				scene->PrewarmAssets();
-				scenePool_[id] = std::move(scene);
-			}
-#ifdef _DEBUG
-			auto sEnd = std::chrono::high_resolution_clock::now();
-			double ms = std::chrono::duration<double, std::milli>(sEnd - sStart).count();
-
-			ScenePrewarmRecord prec;
-			prec.sceneID = id;
-			prec.timeMs = ms;
-			prewarmRecords_.push_back(prec);
-
-			char buf[128];
-			snprintf(buf, sizeof(buf), "  * Prewarmed Scene %-10s (ID: %d): %8.2f ms (%7.4f s)\n",
-				GetSceneName(id), id, ms, ms / 1000.0);
-			prewarmLog += buf;
-#endif
-		}
-	}
-
-	// 初期シーンが確実にタイトル画面であることを保証
-	IScene::SetSceneID(SCENE::TITLE);
-
-#ifdef _DEBUG
-	auto tEnd = std::chrono::high_resolution_clock::now();
-	totalPrewarmTimeMs_ = std::chrono::duration<double, std::milli>(tEnd - tStart).count();
-
-	char totalBuf[256];
-	snprintf(totalBuf, sizeof(totalBuf), 
-		"  => Total Boot Prewarm Time: %8.2f ms (%7.4f s)\n"
-		"======================================================================\n\n",
-		totalPrewarmTimeMs_, totalPrewarmTimeMs_ / 1000.0);
-	prewarmLog += totalBuf;
-
-	AppendLog(prewarmLog);
-#endif
+	// engine_natural ではゲームシーンをプリロードせず、起動を最速にする
 }
 
 void SceneManager::Update() {
@@ -267,65 +203,15 @@ void SceneManager::Update() {
 #endif
 
 #ifdef USE_IMGUI
-	// ファンクションキーによるデバッグシーン切り替えショートカット
-	if (Input::GetInstance()->TriggerKey(DIK_F5)) {
-		IScene::SetSceneID(SCENE::TITLE);
-	} else if (Input::GetInstance()->TriggerKey(DIK_F6)) {
-		IScene::SetSceneID(SCENE::STAGE);
-	} else if (Input::GetInstance()->TriggerKey(DIK_F7)) {
-		IScene::SetSceneID(SCENE::GAMEOVER);
-	} else if (Input::GetInstance()->TriggerKey(DIK_F8)) {
-		IScene::SetSceneID(SCENE::CLEAR);
-	}
-#ifdef _DEBUG
-	else if (Input::GetInstance()->TriggerKey(DIK_F9)) {
-		IScene::SetSceneID(SCENE::EFFECT_EDITOR);
-	}
-#endif
-
 	if (ImGui::BeginMainMenuBar()) {
 		if (ImGui::BeginMenu("Scene")) {
-			if (ImGui::MenuItem("Title (F5)", nullptr, currentSceneID == SCENE::TITLE)) {
-				IScene::SetSceneID(SCENE::TITLE);
-			}
-			if (ImGui::MenuItem("Stage (F6)", nullptr, currentSceneID == SCENE::STAGE)) {
-				IScene::SetSceneID(SCENE::STAGE);
-			}
-			if (ImGui::MenuItem("GameOver (F7)", nullptr, currentSceneID == SCENE::GAMEOVER)) {
-				IScene::SetSceneID(SCENE::GAMEOVER);
-			}
-			if (ImGui::MenuItem("Clear (F8)", nullptr, currentSceneID == SCENE::CLEAR)) {
-				IScene::SetSceneID(SCENE::CLEAR);
-			}
-			if (ImGui::MenuItem("Debug", nullptr, currentSceneID == SCENE::DEBUG)) {
+			if (ImGui::MenuItem("Skybox Viewer (Debug)", nullptr, currentSceneID == SCENE::DEBUG)) {
 				IScene::SetSceneID(SCENE::DEBUG);
 			}
-#ifdef _DEBUG
-			if (ImGui::MenuItem("Effect Manager (F9)", nullptr, currentSceneID == SCENE::EFFECT_EDITOR)) {
-				IScene::SetSceneID(SCENE::EFFECT_EDITOR);
-			}
-#endif
 			ImGui::Separator();
 			if (ImGui::MenuItem("Scene Profiler (F2)", nullptr, showProfilerWindow_)) {
 				ToggleProfilerWindow();
 			}
-			if (ImGui::MenuItem("Show Transition Banner (HUD)", nullptr, &showOverlayBanner_)) {
-			}
-			ImGui::EndMenu();
-		}
-		if (ImGui::BeginMenu("Tools")) {
-			bool isEditorVisible = UIEditorWindow::GetInstance()->IsVisible();
-			if (ImGui::MenuItem("Native UI Editor (F1)", nullptr, isEditorVisible)) {
-				UIEditorWindow::GetInstance()->Toggle();
-			}
-			if (ImGui::MenuItem("Scene Profiler (F2)", nullptr, showProfilerWindow_)) {
-				ToggleProfilerWindow();
-			}
-#ifdef _DEBUG
-			if (ImGui::MenuItem("Effect Manager Scene (F9)", nullptr, currentSceneID == SCENE::EFFECT_EDITOR)) {
-				IScene::SetSceneID(SCENE::EFFECT_EDITOR);
-			}
-#endif
 			ImGui::EndMenu();
 		}
 		ImGui::EndMainMenuBar();

@@ -1,26 +1,22 @@
 #pragma once
 #include "IScene.h"
-#include <vector>
-#include "../../engine/Graphics/Model/Object3d.h"
-#include "../../engine/Graphics/Sprite/Sprite.h"
 #include "../../engine/Graphics/Model/Skybox.h"
 #include <memory>
+#include <string>
+#include <vector>
 
-#include "../../engine/Physics/Collider.h"
-
-// デバッグシーン
 class DebugScene : public IScene {
 public:
 	void Initialize() override;
 	void Update() override;
 	void Draw() override;
 	void Finalize() override;
-private:
-	std::unique_ptr<Object3d> sphereObject = nullptr;
-	std::unique_ptr<Object3d> terrainObject = nullptr;
-	std::unique_ptr<Skybox> skybox_ = nullptr;
-	bool isSkyboxVisible_ = true;
 
-	Ray debugRay_;
-	RaycastHit debugHit_;
+	~DebugScene() override = default;
+
+private:
+	std::unique_ptr<Skybox> skybox_ = nullptr;
+	std::vector<std::string> skyboxTextures_;
+	int currentSkyboxIndex_ = 0;
+	Vector4 skyboxColor_ = { 1.0f, 1.0f, 1.0f, 1.0f };
 };
