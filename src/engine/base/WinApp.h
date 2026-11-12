@@ -18,7 +18,7 @@ public:
 	/// <summary>
 	/// ウィンドウの初期化
 	/// </summary>
-	void Initialize(const std::wstring& title = L"DirectXGame", const std::wstring& version = L"1.0");
+	void Initialize(const std::wstring& title = L"Window by Dawn Engine", const std::wstring& version = L"");
 
 	/// <summary>
 	/// Windowsメッセージの処理 (毎フレーム呼ぶ)

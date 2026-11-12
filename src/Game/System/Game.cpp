@@ -11,7 +11,7 @@
 void Game::Initialize() {
 	// 1. 基盤システムの初期化
 	winApp = std::make_unique<WinApp>();
-	winApp->Initialize(L"Dawn Engine (Natural - Skybox Viewer)", L"1.0");
+	winApp->Initialize(L"Window by Dawn Engine");
 	DirectXCommon::GetInstance()->Initialize(winApp.get());
 	Input::GetInstance()->Initialize(GetModuleHandle(nullptr), winApp->GetHwnd());
 

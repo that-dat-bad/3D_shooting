@@ -63,7 +63,10 @@ void WinApp::Initialize(const std::wstring& title, const std::wstring& version) 
 	RECT wrc = { 0, 0, kClientWidth, kClientHeight };
 	AdjustWindowRect(&wrc, WS_OVERLAPPEDWINDOW, false);
 
-	std::wstring windowTitle = title + L" by Dawn Engine ver." + version;
+	std::wstring windowTitle = title;
+	if (!version.empty()) {
+		windowTitle += L" ver." + version;
+	}
 
 	hwnd_ = CreateWindow(
 		wc_.lpszClassName,
