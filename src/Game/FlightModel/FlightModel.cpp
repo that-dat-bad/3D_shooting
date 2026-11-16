@@ -286,7 +286,7 @@ float FlightModel::CalculateControlEfficiency(float speed) const
 
 
 // ===========================================================
-// 合力の計算（全面改修版）
+// 合力の計算
 // ===========================================================
 MyMath::Vector3 FlightModel::CalculateTotalForce(float deltaTime)
 {

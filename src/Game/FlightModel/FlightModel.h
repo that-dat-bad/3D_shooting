@@ -39,7 +39,7 @@ public:
 	void SetAirBrakeInput(bool deploy) { airframe_.SetAirBrakeDesired(deploy); }
 
 
-	// -- getter（既存） --
+	// -- getter --
 	MyMath::Vector3 GetPosition() const { return position_; }
 	MyMath::Vector3 GetVelocity() const { return velocity_; }
 	MyMath::Quaternion GetOrientation() const { return orientation_; }
@@ -47,8 +47,6 @@ public:
 	float GetTotalMass() const;
 	float GetCurrentThrottle() const { return engine_.GetCurrentThrottle(); }
 	float GetCurrentFuel() const { return airframe_.GetCurrentInternalFuel(); }
-
-	// -- getter（新規） --
 	float GetCurrentAoA() const { return currentAoA_; }
 	float GetCurrentG() const { return currentG_; }
 	float GetAltitude() const { return position_.y; }
