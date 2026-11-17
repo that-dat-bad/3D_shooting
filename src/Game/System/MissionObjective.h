@@ -25,12 +25,14 @@ namespace MyMath {
 
 // ミッション目標の種類
 enum class ObjectiveType {
-	DestroyAll,      // 全敵を殲滅
-	DestroyCount,    // N体以上の敵を撃破
-	DestroyTarget,   // 特定のユニットを撃破（enemyIndex指定）
-	ReachArea,       // 指定エリアに到達
-	Survive,         // 制限時間まで生存
-	EscortProtect,   // 護衛対象の生存
+	DestroyAll,          // 全敵を殲滅
+	DestroyCount,        // N体以上の敵を撃破
+	DestroyTarget,       // 特定のユニットを撃破（targetIndex指定）
+	ReachArea,           // 指定エリアに到達
+	Survive,             // 制限時間まで生存
+	EscortProtect,       // 護衛対象の生存
+	AimLookDuration,     // マウス視線・機首操作の累計時間達成
+	ThrottleHoldDuration,// 指定スロットル以上の維持時間達成
 };
 
 // ミッション目標の状態
@@ -55,8 +57,32 @@ struct MissionObjective {
 	int targetIndex = -1;               // DestroyTarget / EscortProtect用: 敵インデックス
 	MyMath::Vector3 areaCenter{};       // ReachArea用: エリア中心
 	float areaRadius = 100.0f;          // ReachArea用: エリア半径
-	float duration = 300.0f;            // Survive用: 生存時間 (秒)
+	float duration = 300.0f;            // Survive / AimLookDuration / ThrottleHoldDuration用: 必要秒数
 	float minHP = 0.0f;                 // EscortProtect用: 最低HP
+
+	// --- 操縦目標・ゲート・操作制御・HUDガイド設定 ---
+	float minThrottle = 0.0f;
+	float startDelaySeconds = 0.0f;
+	float guideAppearDelaySeconds = 0.0f;
+	std::string guideTitle = "";
+	std::string guideSub = "";
+	bool showProgressBar = false;
+	int gateStepIndex = 0;
+	int gateTotalCount = 0;
+	bool enableGatePassCheck = false;
+	bool enableBoundaryLineCheck = false;
+	bool waitRadioBeforeComplete = false;
+	bool allowSteering = true;
+	bool allowThrottle = true;
+	bool allowWeapon = true;
+	bool enableAltitudeAlerts = false;
+	bool enableHighAltitudeCaution = false;
+
+	// --- ランタイム専用状態（JSONには保存しない） ---
+	float currentProgress = 0.0f;
+	float activeElapsedSeconds = 0.0f;
+	bool boundaryCrossed = false;
+	float passFlashTimer = 0.0f;
 };
 
 // ============================================================
@@ -66,23 +92,27 @@ struct MissionObjective {
 // ObjectiveType → 文字列変換
 inline const char* ObjectiveTypeToString(ObjectiveType type) {
 	switch (type) {
-	case ObjectiveType::DestroyAll:    return "DestroyAll";
-	case ObjectiveType::DestroyCount:  return "DestroyCount";
-	case ObjectiveType::DestroyTarget: return "DestroyTarget";
-	case ObjectiveType::ReachArea:     return "ReachArea";
-	case ObjectiveType::Survive:       return "Survive";
-	case ObjectiveType::EscortProtect: return "EscortProtect";
-	default:                           return "DestroyAll";
+	case ObjectiveType::DestroyAll:           return "DestroyAll";
+	case ObjectiveType::DestroyCount:         return "DestroyCount";
+	case ObjectiveType::DestroyTarget:        return "DestroyTarget";
+	case ObjectiveType::ReachArea:            return "ReachArea";
+	case ObjectiveType::Survive:              return "Survive";
+	case ObjectiveType::EscortProtect:        return "EscortProtect";
+	case ObjectiveType::AimLookDuration:      return "AimLookDuration";
+	case ObjectiveType::ThrottleHoldDuration: return "ThrottleHoldDuration";
+	default:                                  return "DestroyAll";
 	}
 }
 
 // 文字列 → ObjectiveType 変換
 inline ObjectiveType StringToObjectiveType(const std::string& str) {
-	if (str == "DestroyCount")  return ObjectiveType::DestroyCount;
-	if (str == "DestroyTarget") return ObjectiveType::DestroyTarget;
-	if (str == "ReachArea")     return ObjectiveType::ReachArea;
-	if (str == "Survive")       return ObjectiveType::Survive;
-	if (str == "EscortProtect") return ObjectiveType::EscortProtect;
+	if (str == "DestroyCount")         return ObjectiveType::DestroyCount;
+	if (str == "DestroyTarget")        return ObjectiveType::DestroyTarget;
+	if (str == "ReachArea")            return ObjectiveType::ReachArea;
+	if (str == "Survive")              return ObjectiveType::Survive;
+	if (str == "EscortProtect")        return ObjectiveType::EscortProtect;
+	if (str == "AimLookDuration")      return ObjectiveType::AimLookDuration;
+	if (str == "ThrottleHoldDuration") return ObjectiveType::ThrottleHoldDuration;
 	return ObjectiveType::DestroyAll;
 }
 
@@ -118,7 +148,23 @@ inline void to_json(nlohmann::json& j, const MissionObjective& o) {
 		{"areaCenter", o.areaCenter},
 		{"areaRadius", o.areaRadius},
 		{"duration", o.duration},
-		{"minHP", o.minHP}
+		{"minHP", o.minHP},
+		{"minThrottle", o.minThrottle},
+		{"startDelaySeconds", o.startDelaySeconds},
+		{"guideAppearDelaySeconds", o.guideAppearDelaySeconds},
+		{"guideTitle", o.guideTitle},
+		{"guideSub", o.guideSub},
+		{"showProgressBar", o.showProgressBar},
+		{"gateStepIndex", o.gateStepIndex},
+		{"gateTotalCount", o.gateTotalCount},
+		{"enableGatePassCheck", o.enableGatePassCheck},
+		{"enableBoundaryLineCheck", o.enableBoundaryLineCheck},
+		{"waitRadioBeforeComplete", o.waitRadioBeforeComplete},
+		{"allowSteering", o.allowSteering},
+		{"allowThrottle", o.allowThrottle},
+		{"allowWeapon", o.allowWeapon},
+		{"enableAltitudeAlerts", o.enableAltitudeAlerts},
+		{"enableHighAltitudeCaution", o.enableHighAltitudeCaution}
 	};
 }
 
@@ -143,4 +189,25 @@ inline void from_json(const nlohmann::json& j, MissionObjective& o) {
 	if (j.contains("areaRadius"))    j.at("areaRadius").get_to(o.areaRadius);
 	if (j.contains("duration"))      j.at("duration").get_to(o.duration);
 	if (j.contains("minHP"))         j.at("minHP").get_to(o.minHP);
+	if (j.contains("minThrottle"))             j.at("minThrottle").get_to(o.minThrottle);
+	if (j.contains("startDelaySeconds"))       j.at("startDelaySeconds").get_to(o.startDelaySeconds);
+	if (j.contains("guideAppearDelaySeconds")) j.at("guideAppearDelaySeconds").get_to(o.guideAppearDelaySeconds);
+	if (j.contains("guideTitle"))              j.at("guideTitle").get_to(o.guideTitle);
+	if (j.contains("guideSub"))                j.at("guideSub").get_to(o.guideSub);
+	if (j.contains("showProgressBar"))         j.at("showProgressBar").get_to(o.showProgressBar);
+	if (j.contains("gateStepIndex"))           j.at("gateStepIndex").get_to(o.gateStepIndex);
+	if (j.contains("gateTotalCount"))          j.at("gateTotalCount").get_to(o.gateTotalCount);
+	if (j.contains("enableGatePassCheck"))     j.at("enableGatePassCheck").get_to(o.enableGatePassCheck);
+	if (j.contains("enableBoundaryLineCheck")) j.at("enableBoundaryLineCheck").get_to(o.enableBoundaryLineCheck);
+	if (j.contains("waitRadioBeforeComplete")) j.at("waitRadioBeforeComplete").get_to(o.waitRadioBeforeComplete);
+	if (j.contains("allowSteering"))           j.at("allowSteering").get_to(o.allowSteering);
+	if (j.contains("allowThrottle"))           j.at("allowThrottle").get_to(o.allowThrottle);
+	if (j.contains("allowWeapon"))             j.at("allowWeapon").get_to(o.allowWeapon);
+	if (j.contains("enableAltitudeAlerts"))    j.at("enableAltitudeAlerts").get_to(o.enableAltitudeAlerts);
+	if (j.contains("enableHighAltitudeCaution")) j.at("enableHighAltitudeCaution").get_to(o.enableHighAltitudeCaution);
+
+	o.currentProgress = 0.0f;
+	o.activeElapsedSeconds = 0.0f;
+	o.boundaryCrossed = false;
+	o.passFlashTimer = 0.0f;
 }

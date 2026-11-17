@@ -128,6 +128,15 @@ void MouseAimController::ResetToDirection(const MyMath::Vector3& forward)
 
 
 // ===========================================================
+// PID状態を保持したまま目標方向のみを更新（AI追従用）
+// ===========================================================
+void MouseAimController::SetTargetDirection(const MyMath::Vector3& dir)
+{
+	targetDirection_ = SafeNormalize(dir, targetDirection_);
+}
+
+
+// ===========================================================
 // War Thunder準拠 インストラクター操舵入力生成 (Bank and Pull)
 // ===========================================================
 void MouseAimController::CalculateSteeringInput(

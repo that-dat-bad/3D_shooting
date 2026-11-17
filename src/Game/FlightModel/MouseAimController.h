@@ -64,8 +64,11 @@ public:
 	// マウスの相対移動量でワールド空間の目標方向を回転
 	void UpdateTargetDirection(long deltaX, long deltaY, const MyMath::Vector3& camRight, const MyMath::Vector3& camUp);
 
-	// 目標方向を指定の前方ベクトルにリセット
+	// 目標方向を指定の前方ベクトルにリセット（PID状態も初期化）
 	void ResetToDirection(const MyMath::Vector3& forward);
+
+	// PID状態を保持したまま目標方向のみを更新（AI追従用）
+	void SetTargetDirection(const MyMath::Vector3& dir);
 
 	// PID制御で操舵入力を生成
 	// orientation: 機体の現在姿勢（クォータニオン）

@@ -2,11 +2,11 @@
     "version": "1.0",
     "missions": [
         {
-            "id": "[00]",
-            "filePath": "Resources/missions/mission00.json",
-            "title": "Obuchenie -極夜の異変-",
-            "aliasName": "ZADANIE 00",
-            "subTitle": "",
+            "id": "[01]",
+            "filePath": "Resources/missions/mission_clear_demo.json",
+            "title": "CLEAR DEMO -自動クリア演出検証-",
+            "aliasName": "DEMO 01",
+            "subTitle": "即クリア＆デブリーフ自動デモ",
             "isLocked": false
         }
     ]

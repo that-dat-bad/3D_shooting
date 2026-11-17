@@ -208,6 +208,7 @@ void GameOverScene::Initialize() {
 	auto tStart = std::chrono::high_resolution_clock::now();
 #endif
 	sceneID = SCENE::GAMEOVER;
+	SetOSCursorVisible(false);
 	Input::GetInstance()->UnlockCursor();
 	selectionManager_.Clear();
 	animTimer_ = 0.0f;
@@ -282,6 +283,7 @@ void GameOverScene::Initialize() {
 }
 
 void GameOverScene::Update() {
+	SetOSCursorVisible(false);
 	float dt = 1.0f / 60.0f;
 	animTimer_ += dt;
 

@@ -44,9 +44,9 @@ void StageScene::UpdateFlightControls(float gameDeltaTime) {
 	}
 
 	if (!isGameOver_) {
-		const bool isTutorial = tutorialDirector_.IsTutorialActive();
-		const bool allowSteering = !isTutorial || tutorialDirector_.IsPlayerSteeringAllowed();
-		const bool allowThrottle = !isTutorial || tutorialDirector_.IsPlayerThrottleAllowed();
+		const auto& missionManager = MissionManager::GetInstance();
+		const bool allowSteering = missionManager.IsPlayerSteeringAllowed();
+		const bool allowThrottle = missionManager.IsPlayerThrottleAllowed();
 
 		// --- スロットル ---
 		if (allowThrottle) {
@@ -58,10 +58,8 @@ void StageScene::UpdateFlightControls(float gameDeltaTime) {
 			}
 			if (throttle_ < 0.0f) { throttle_ = 0.0f; }
 			if (throttle_ > 1.0f) { throttle_ = 1.0f; }
-		} else if (isTutorial) {
-			// チュートリアル中・操作ロック時は安全な巡航開度（65% = 約185m/s）を自動維持
-			constexpr float kTutorialAutoCruiseThrottle = 0.65f;
-			throttle_ += (kTutorialAutoCruiseThrottle - throttle_) * std::clamp(gameDeltaTime * 2.5f, 0.0f, 1.0f);
+		} else {
+			throttle_ += (0.65f - throttle_) * std::clamp(gameDeltaTime * 2.5f, 0.0f, 1.0f);
 		}
 		flightModel_.SetThrottleInput(throttle_);
 
@@ -133,28 +131,28 @@ void StageScene::UpdateFlightControls(float gameDeltaTime) {
 		finalRoll = 0.0f;
 		finalYaw = 0.0f;
 
-		// --- マウス入力による目標方向の更新 ---
-		if (mouseAimEnabled_ && input->IsCursorLocked() && !playerCamera_.GetFreeViewActive()) {
-			Input::MouseMove mouseMove = input->GetMouseMove();
-			Camera* cam = CameraManager::GetInstance()->GetActiveCamera();
-			if (cam) {
-				const Matrix4x4& mat = cam->GetWorldMatrix();
-				Vector3 camRight = { mat.m[0][0], mat.m[0][1], mat.m[0][2] };
-				Vector3 camUp = { mat.m[1][0], mat.m[1][1], mat.m[1][2] };
-				mouseAimController_.UpdateTargetDirection(mouseMove.lX, mouseMove.lY, camRight, camUp);
-			}
-		}
-
-		// 失速して機首が強制的に落ちている間は、エイム目標が空に取り残されないよう
-		// 機首の方向へ徐々に引き戻す（ドラッグする）※フリーカメラ時限定
-		if (mouseAimEnabled_ && playerCamera_.GetFreeViewActive() && flightModel_.IsStalling()) {
-			Vector3 currentTarget = mouseAimController_.GetTargetDirection();
-			Vector3 forward = flightModel_.GetForwardDirection();
-			Vector3 newTarget = MyMath::Normalize(MyMath::Lerp(currentTarget, forward, 5.0f * kDeltaTime));
-			mouseAimController_.ResetToDirection(newTarget);
-		}
-
 		if (allowSteering) {
+			// --- マウス入力による目標方向の更新 ---
+			if (mouseAimEnabled_ && input->IsCursorLocked() && !playerCamera_.GetFreeViewActive()) {
+				Input::MouseMove mouseMove = input->GetMouseMove();
+				Camera* cam = CameraManager::GetInstance()->GetActiveCamera();
+				if (cam) {
+					const Matrix4x4& mat = cam->GetWorldMatrix();
+					Vector3 camRight = { mat.m[0][0], mat.m[0][1], mat.m[0][2] };
+					Vector3 camUp = { mat.m[1][0], mat.m[1][1], mat.m[1][2] };
+					mouseAimController_.UpdateTargetDirection(mouseMove.lX, mouseMove.lY, camRight, camUp);
+				}
+			}
+
+			// 失速して機首が強制的に落ちている間は、エイム目標が空に取り残されないよう
+			// 機首の方向へ徐々に引き戻す（ドラッグする）※フリーカメラ時限定
+			if (mouseAimEnabled_ && playerCamera_.GetFreeViewActive() && flightModel_.IsStalling()) {
+				Vector3 currentTarget = mouseAimController_.GetTargetDirection();
+				Vector3 forward = flightModel_.GetForwardDirection();
+				Vector3 newTarget = MyMath::Normalize(MyMath::Lerp(currentTarget, forward, 5.0f * kDeltaTime));
+				mouseAimController_.ResetToDirection(newTarget);
+			}
+
 			if (mouseAimEnabled_ && !hasManualInput && !pauseMouseAim) {
 				// === マウスエイムモード ===
 				mouseAimController_.CalculateSteeringInput(
@@ -181,27 +179,21 @@ void StageScene::UpdateFlightControls(float gameDeltaTime) {
 				);
 			}
 		} else {
-			// 操作ガイド非表示時（無線中や演出待機中）：自動水平復帰を作動させ、安全に直進水平巡航を維持
+			if (mouseAimEnabled_) {
+				mouseAimController_.ResetToDirection(flightModel_.GetForwardDirection());
+			}
 			flightInstructor_.ApplyCorrection(
 				0.0f, 0.0f, 0.0f,
 				flightModel_.GetOrientation(),
 				finalPitch, finalRoll, finalYaw
 			);
-			if (mouseAimEnabled_) {
-				mouseAimController_.ResetToDirection(flightModel_.GetForwardDirection());
-			}
 		}
 
 		flightModel_.SetControlInput(finalPitch, finalRoll, finalYaw);
 
 		// --- フラップ / エアブレーキ ---
-		if (allowThrottle) {
-			flightModel_.SetFlapInput(input->PushKey(DIK_F));
-			flightModel_.SetAirBrakeInput(input->PushKey(DIK_B));
-		} else {
-			flightModel_.SetFlapInput(false);
-			flightModel_.SetAirBrakeInput(false);
-		}
+		flightModel_.SetFlapInput(allowThrottle && input->PushKey(DIK_F));
+		flightModel_.SetAirBrakeInput(allowThrottle && input->PushKey(DIK_B));
 	} else {
 		flightModel_.SetControlInput(0.0f, 0.0f, 0.0f);
 		flightModel_.SetThrottleInput(0.0f);
@@ -214,9 +206,7 @@ void StageScene::UpdateFlightControls(float gameDeltaTime) {
 void StageScene::UpdateCombatFiring(float gameDeltaTime) {
 	Input* input = Input::GetInstance();
 	isFiringThisFrame_ = false;
-
-	const bool isTutorial = tutorialDirector_.IsTutorialActive();
-	const bool allowWeapon = !isTutorial || tutorialDirector_.IsPlayerWeaponAllowed();
+	const bool allowWeapon = MissionManager::GetInstance().IsPlayerWeaponAllowed();
 
 	if (allowWeapon && input && input->PushMouse(0) && !isMissionCleared_ && !isMissionFailed_ && sortieIntroTimer_ >= sortieIntroDuration_) {
 		int ammoBefore = gunpod_.GetCurrentAmmo();
@@ -348,9 +338,6 @@ void StageScene::UpdateFlightAndEffects(float gameDeltaTime) {
 	// 破片オブジェクト群の物理シミュレーション更新
 	DebrisManager::GetInstance()->Update(gameDeltaTime);
 
-	// エフェクトマネージャー（爆発・炎・煙・破片・マズルフラッシュ）の更新
-	EffectManager::GetInstance()->Update();
-
 	// Blender MCP リアルタイム同期の更新
 	TerrainSyncManager::GetInstance()->Update();
 
@@ -425,13 +412,10 @@ void StageScene::UpdateFlightAndEffects(float gameDeltaTime) {
 		hasLastWingTips_ = false;
 	}
 
-	// --- 高速飛行時のスピード感演出（微細風圧シェイク ＆ 通り過ぎる空気粉塵・流線パーティクル） ---
+	// --- 高速飛行時のスピード感演出（通り過ぎる空気粉塵・流線パーティクル） ---
 	float curSpeed = flightModel_.GetSpeed();
 	if (curSpeed > 135.0f && !isGameOver_) { // 約480km/h以上
 		float shakeFactor = std::clamp((curSpeed - 135.0f) / 100.0f, 0.0f, 1.0f);
-		if (CameraManager::GetInstance()->GetActiveCamera()) {
-			CameraManager::GetInstance()->GetActiveCamera()->Shake(0.04f, 0.06f * shakeFactor);
-		}
 
 		// 自機前方の空間を高速で後方へ通り過ぎるスピードダスト（流線パーティクル）
 		if ((rand() % 100) < static_cast<int>(40 * shakeFactor)) {
@@ -491,24 +475,21 @@ void StageScene::ApplyMissionLiveSyncUpdate() {
 		mouseAimController_.ResetToDirection(flightModel_.GetForwardDirection());
 	}
 
-	if (tutorialDirector_.IsTutorialActive()) {
-		tutorialDirector_.ApplyLiveLayout(liveData, terrainChunkManager_);
-	} else {
-		static const std::vector<EnemySpawnData> kEmptyAir = {};
-		static const std::vector<GroundEnemySpawnData> kEmptyGround = {};
-		enemyManager_.SetWaypointPaths(liveData.waypointPaths);
-		enemyManager_.Initialize(
-			enableEnemies_ ? liveData.enemies : kEmptyAir,
-			aircraftConfig_.GetAirframe(),
-			aircraftConfig_.GetEngine(),
-			aircraftConfig_.GetGunpod(),
-			&flightModel_,
-			&bulletManager_,
-			enableEnemies_ ? liveData.groundEnemies : kEmptyGround
-		);
-		missionManager.BindEnemyManager(&enemyManager_);
-		missionManager.ResetRuntimeState();
-	}
+	static const std::vector<EnemySpawnData> kEmptyAir = {};
+	static const std::vector<GroundEnemySpawnData> kEmptyGround = {};
+	enemyManager_.SetWaypointPaths(liveData.waypointPaths);
+	enemyManager_.SetTerrainChunkManager(terrainChunkManager_);
+	enemyManager_.Initialize(
+		enableEnemies_ ? liveData.enemies : kEmptyAir,
+		aircraftConfig_.GetAirframe(),
+		aircraftConfig_.GetEngine(),
+		aircraftConfig_.GetGunpod(),
+		&flightModel_,
+		&bulletManager_,
+		enableEnemies_ ? liveData.groundEnemies : kEmptyGround
+	);
+	missionManager.BindEnemyManager(&enemyManager_);
+	missionManager.ResetRuntimeState();
 }
 
 void StageScene::UpdateCombatAndMission(float gameDeltaTime) {
@@ -517,63 +498,92 @@ void StageScene::UpdateCombatAndMission(float gameDeltaTime) {
 		return;
 	}
 
+	if (hitMarkerTimer_ > 0.0f) {
+		hitMarkerTimer_ = (std::max)(0.0f, hitMarkerTimer_ - gameDeltaTime);
+	}
+
 	if (gameDeltaTime > 0.0001f) {
 		gunpod_.Update(gameDeltaTime);
 		bulletManager_.Update(gameDeltaTime);
 		enemyManager_.Update(gameDeltaTime);
 	}
-	EffectManager::GetInstance()->Update();
+
+	if (enemyManager_.GetLastHitMarkerTriggered()) {
+		hitMarkerTimer_ = 0.22f;
+	}
+
+	auto& missionManager = MissionManager::GetInstance();
+	for (const auto& enemy : enemyManager_.GetEnemies()) {
+		if (!enemy) { continue; }
+		const std::string brokenLog = enemy->ConsumeBrokenPartLog();
+		if (!brokenLog.empty()) {
+			missionManager.PushSystemLog("SYS", brokenLog, false);
+		}
+	}
 
 	// ミッション目標 & トリガー評価
-	// ※チュートリアル（ZADANIE 00）実行中はTutorialMissionDirectorが一元制御するため、
-	// MissionManagerの古いトリガーによる意図しない早期敵スポーンや無線重複を抑止する
-	auto& missionManager = MissionManager::GetInstance();
-	if (!tutorialDirector_.IsTutorialActive()) {
+	const auto& activeMission = missionManager.GetCurrentMission();
+	if (IsGameplayActive()) {
+		if (activeMission.minAmmoReserve > 0 && gunpod_.GetCurrentAmmo() < activeMission.minAmmoReserve) {
+			gunpod_.ReplenishAmmo();
+		}
+
+		bool aimMovedThisFrame = false;
+		Input* input = Input::GetInstance();
+		if (input && input->IsCursorLocked()) {
+			const Input::MouseMove rawMove = input->GetMouseMove();
+			if (std::abs(rawMove.lX) >= 1 || std::abs(rawMove.lY) >= 1) {
+				aimMovedThisFrame = true;
+			}
+		}
+		const Vector3 curAimDir = mouseAimController_.GetTargetDirection();
+		if (!hasPrevAimDir_) {
+			prevAimDir_ = curAimDir;
+			hasPrevAimDir_ = true;
+		} else {
+			if (MyMath::Length(Subtract(curAimDir, prevAimDir_)) >= 0.0025f) {
+				aimMovedThisFrame = true;
+			}
+			prevAimDir_ = curAimDir;
+		}
+
 		missionManager.EvaluateObjectives(
 			flightModel_.GetPosition(),
 			playerHP_,
 			enemyManager_.GetDestroyedCount(),
 			enemyManager_.IsAllDestroyed(),
-			totalTime_
+			missionElapsedTime_,
+			&enemyManager_,
+			gameDeltaTime,
+			throttle_,
+			aimMovedThisFrame,
+			radioCommunicator_.IsActive()
 		);
 		missionManager.EvaluateTriggers(
 			flightModel_.GetPosition(),
 			playerHP_,
 			enemyManager_.GetDestroyedCount(),
-			totalTime_
+			missionElapsedTime_,
+			&enemyManager_,
+			gameDeltaTime
 		);
-		missionManager.UpdateMessages(gameDeltaTime);
-		if (enableEnemies_) {
-			const std::vector<EnemySpawnData> pendingAir = missionManager.PopPendingEnemySpawns();
-			if (!pendingAir.empty()) {
-				enemyManager_.SpawnAirEnemies(pendingAir);
-			}
-			const std::vector<GroundEnemySpawnData> pendingGround = missionManager.PopPendingGroundEnemySpawns();
-			if (!pendingGround.empty()) {
-				enemyManager_.SpawnGroundEnemies(pendingGround);
-			}
-		} else {
-			(void)missionManager.PopPendingEnemySpawns();
-			(void)missionManager.PopPendingGroundEnemySpawns();
+	}
+	missionManager.UpdateMessages(gameDeltaTime);
+	if (missionManager.ConsumePendingIgniteOutpost()) {
+		enemyManager_.IgniteLastWatchtower();
+	}
+	if (enableEnemies_) {
+		const std::vector<EnemySpawnData> pendingAir = missionManager.PopPendingEnemySpawns();
+		if (!pendingAir.empty()) {
+			enemyManager_.SpawnAirEnemies(pendingAir);
+		}
+		const std::vector<GroundEnemySpawnData> pendingGround = missionManager.PopPendingGroundEnemySpawns();
+		if (!pendingGround.empty()) {
+			enemyManager_.SpawnGroundEnemies(pendingGround);
 		}
 	} else {
-		// チュートリアル中はMissionManagerの保留敵スポーンを安全に破棄
 		(void)missionManager.PopPendingEnemySpawns();
 		(void)missionManager.PopPendingGroundEnemySpawns();
-	}
-	if (tutorialDirector_.IsTutorialActive()) {
-		TutorialUpdateContext tutCtx{};
-		tutCtx.deltaTime = gameDeltaTime;
-		tutCtx.missionElapsedTime = missionElapsedTime_;
-		tutCtx.playerThrottle = throttle_;
-		tutCtx.isGameplayActive = IsGameplayActive();
-		tutCtx.playerFlight = &flightModel_;
-		tutCtx.mouseAim = &mouseAimController_;
-		tutCtx.playerGunpod = &gunpod_;
-		tutCtx.bulletManager = &bulletManager_;
-		tutCtx.radio = &radioCommunicator_;
-		tutCtx.terrain = terrainChunkManager_;
-		tutorialDirector_.Update(tutCtx);
 	}
 	UpdateRadioCommunications(gameDeltaTime);
 
@@ -595,12 +605,17 @@ void StageScene::UpdateCombatAndMission(float gameDeltaTime) {
 	}
 
 	// クリア判定
-	if (!isMissionCleared_ && !isMissionFailed_ && !tutorialDirector_.IsTutorialActive()) {
-		const auto& activeMission = missionManager.GetCurrentMission();
+	if (!isMissionCleared_ && !isMissionFailed_) {
 		if (missionManager.IsTriggerMissionFail() || missionManager.IsAnyPrimaryObjectiveFailed()) {
 			TriggerGameOver();
 		} else if (missionManager.IsTriggerMissionComplete() || missionManager.AreAllPrimaryObjectivesCompleted()) {
-			TriggerGameClear();
+			if (activeMission.fadeOutOnClear) {
+				clearFadeOutActive_ = true;
+				clearFadeOutTimer_ = 0.0f;
+				isMissionCleared_ = true;
+			} else {
+				TriggerGameClear();
+			}
 		} else if (activeMission.objectives.empty() && enemyManager_.IsAllDestroyed()) {
 			TriggerGameClear();
 		}
@@ -632,16 +647,13 @@ void StageScene::UpdateRadioCommunications(float gameDeltaTime) {
 		return;
 	}
 
-	if (tutorialDirector_.IsTutorialActive()) {
-		radioCommunicator_.Update(gameDeltaTime);
-		return;
-	}
+	const bool suppressGenericRadio =
+		missionManager.HasRadioDialogueTriggers() ||
+		missionManager.GetCurrentMission().disableGenericRadio;
 
-	const auto& currentMission = missionManager.GetCurrentMission();
-	const bool isTutorial = (currentMission.difficulty == "TUTORIAL" || currentMission.aliasName == "ZADANIE 00");
 	if (!hasSentSortieRadio_) {
 		hasSentSortieRadio_ = true;
-		if (!isTutorial && !radioCommunicator_.IsActive()) {
+		if (!suppressGenericRadio && !radioCommunicator_.IsActive()) {
 			radioCommunicator_.Enqueue(
 				StageRadioDefaults::kAwacsName,
 				StageRadioDefaults::kSortieDialogue,
@@ -652,7 +664,7 @@ void StageScene::UpdateRadioCommunications(float gameDeltaTime) {
 	const int destroyedCount = enemyManager_.GetDestroyedCount();
 	if (destroyedCount > lastRadioKillCount_) {
 		lastRadioKillCount_ = destroyedCount;
-		if (!enemyManager_.IsAllDestroyed()) {
+		if (!suppressGenericRadio && pendingRadio.empty() && !enemyManager_.IsAllDestroyed()) {
 			const bool isWingmanLine =
 				((destroyedCount % StageRadioDefaults::kAlternateModulo) == StageRadioDefaults::kEvenRemainder);
 			if (isWingmanLine) {
@@ -669,7 +681,7 @@ void StageScene::UpdateRadioCommunications(float gameDeltaTime) {
 		}
 	}
 
-	if (!hasSentDamageWarningRadio_ && playerMaxHP_ > RadioDefaults::kZero) {
+	if (!suppressGenericRadio && !hasSentDamageWarningRadio_ && playerMaxHP_ > RadioDefaults::kZero) {
 		const float hpRatio = playerHP_ / playerMaxHP_;
 		if (hpRatio > RadioDefaults::kZero && hpRatio <= StageRadioDefaults::kCriticalHpRatioThreshold) {
 			hasSentDamageWarningRadio_ = true;
@@ -921,122 +933,6 @@ void StageScene::UpdateDebugAndStatusUI(float gameDeltaTime) {
 
 	ImGui::End();
 
-	// === レティクルの描画（ワールド空間→スクリーン投影）===
-	if (mouseAimEnabled_) {
-		Camera* cam = CameraManager::GetInstance()->GetActiveCamera();
-		if (cam) {
-			ImDrawList* drawList = ImGui::GetForegroundDrawList();
-			const Matrix4x4& vpMat = cam->GetViewProjectionMatrix();
-			float screenW = static_cast<float>(WinApp::kClientWidth);
-			float screenH = static_cast<float>(WinApp::kClientHeight);
-			Vector3 aircraftPos = flightModel_.GetPosition();
-
-			auto projectToScreen = [&](const Vector3& worldPos, float& outX, float& outY) -> bool {
-				float cX = worldPos.x * vpMat.m[0][0] + worldPos.y * vpMat.m[1][0] + worldPos.z * vpMat.m[2][0] + vpMat.m[3][0];
-				float cY = worldPos.x * vpMat.m[0][1] + worldPos.y * vpMat.m[1][1] + worldPos.z * vpMat.m[2][1] + vpMat.m[3][1];
-				float cW = worldPos.x * vpMat.m[0][3] + worldPos.y * vpMat.m[1][3] + worldPos.z * vpMat.m[2][3] + vpMat.m[3][3];
-				if (cW <= 0.001f) { return false; }
-				outX = (cX / cW * 0.5f + 0.5f) * screenW;
-				outY = (-cY / cW * 0.5f + 0.5f) * screenH;
-				return true;
-			};
-
-			// マウスエイム目標レティクル
-			Vector3 targetDir = mouseAimController_.GetTargetDirection();
-			Vector3 aimWorldPos = Add(aircraftPos, Multiply(500.0f, targetDir));
-			float cx, cy;
-			Vector2 clampedAimPt{};
-			bool isAimClamped = false;
-			StageHUD::ProjectToScreenClamped(aimWorldPos, vpMat, screenW, screenH, 38.0f, clampedAimPt, isAimClamped);
-			cx = clampedAimPt.x;
-			cy = clampedAimPt.y;
-			{
-				float crossSize = 15.0f;
-				float dotRadius = 3.0f;
-				ImU32 reticleColor = IM_COL32(118, 204, 125, 220);
-				ImU32 reticleColorDark = IM_COL32(85, 160, 92, 150);
-
-				drawList->AddLine(ImVec2(cx - crossSize, cy), ImVec2(cx - 5.0f, cy), reticleColor, 2.0f);
-				drawList->AddLine(ImVec2(cx + 5.0f, cy), ImVec2(cx + crossSize, cy), reticleColor, 2.0f);
-				drawList->AddLine(ImVec2(cx, cy - crossSize), ImVec2(cx, cy - 5.0f), reticleColor, 2.0f);
-				drawList->AddLine(ImVec2(cx, cy + 5.0f), ImVec2(cx, cy + crossSize), reticleColor, 2.0f);
-				drawList->AddCircle(ImVec2(cx, cy), dotRadius, reticleColor, 12, 2.0f);
-				drawList->AddCircle(ImVec2(cx, cy), crossSize + 5.0f, reticleColorDark, 24, 1.0f);
-
-				// 機首方向マーカー
-				Vector3 forward = flightModel_.GetForwardDirection();
-				Vector3 noseWorldPos = Add(aircraftPos, Multiply(500.0f, forward));
-				float nx, ny;
-				if (projectToScreen(noseWorldPos, nx, ny) && nx >= -48.0f && nx <= screenW + 48.0f && ny >= -48.0f && ny <= screenH + 48.0f) {
-					float noseSize = 8.0f;
-					ImU32 noseColor = IM_COL32(255, 255, 255, 200);
-					drawList->AddLine(ImVec2(nx - noseSize, ny - noseSize), ImVec2(nx + noseSize, ny + noseSize), noseColor, 2.0f);
-					drawList->AddLine(ImVec2(nx + noseSize, ny - noseSize), ImVec2(nx - noseSize, ny + noseSize), noseColor, 2.0f);
-
-					ImU32 lineColor = IM_COL32(255, 255, 255, 60);
-					drawList->AddLine(ImVec2(cx, cy), ImVec2(nx, ny), lineColor, 1.0f);
-				}
-			}
-
-			// 1. 空中敵マーカー
-			for (auto* enemy : enemyManager_.GetAliveEnemies()) {
-				float ex, ey;
-				Vector3 enemyPos = enemy->GetPosition();
-				if (projectToScreen(enemyPos, ex, ey)) {
-					float dist = MyMath::Length(MyMath::Subtract(enemyPos, aircraftPos));
-					float diamondSize = 9.0f;
-					ImU32 airMarkerColor = IM_COL32(255, 60, 60, 220);
-
-					drawList->AddQuad(
-						ImVec2(ex, ey - diamondSize),
-						ImVec2(ex + diamondSize, ey),
-						ImVec2(ex, ey + diamondSize),
-						ImVec2(ex - diamondSize, ey),
-						airMarkerColor, 1.8f
-					);
-
-					char distBuf[32];
-					snprintf(distBuf, sizeof(distBuf), "%dm", static_cast<int>(dist));
-					drawList->AddText(ImVec2(ex + diamondSize + 3.0f, ey - 7.0f), airMarkerColor, distBuf);
-				}
-			}
-
-			// 2. 地上目標マーカー
-			for (auto* ground : enemyManager_.GetAliveGroundEnemies()) {
-				float gx, gy;
-				Vector3 groundPos = ground->GetPosition();
-				Vector3 markerPos = { groundPos.x, groundPos.y + 2.0f, groundPos.z };
-				if (projectToScreen(markerPos, gx, gy)) {
-					float dist = MyMath::Length(MyMath::Subtract(groundPos, aircraftPos));
-					float boxSize = 10.0f;
-					
-					ImU32 groundColor = (ground->GetAIType() == GroundAIType::Turret) 
-						? IM_COL32(255, 120, 30, 220) 
-						: (ground->GetAIType() == GroundAIType::Structure)
-							? IM_COL32(255, 210, 40, 220)
-							: IM_COL32(80, 200, 255, 220);
-
-					float corner = 4.0f;
-					drawList->AddLine(ImVec2(gx - boxSize, gy - boxSize), ImVec2(gx - boxSize + corner, gy - boxSize), groundColor, 1.8f);
-					drawList->AddLine(ImVec2(gx - boxSize, gy - boxSize), ImVec2(gx - boxSize, gy - boxSize + corner), groundColor, 1.8f);
-					drawList->AddLine(ImVec2(gx + boxSize, gy - boxSize), ImVec2(gx + boxSize - corner, gy - boxSize), groundColor, 1.8f);
-					drawList->AddLine(ImVec2(gx + boxSize, gy - boxSize), ImVec2(gx + boxSize, gy - boxSize + corner), groundColor, 1.8f);
-					drawList->AddLine(ImVec2(gx - boxSize, gy + boxSize), ImVec2(gx - boxSize + corner, gy + boxSize), groundColor, 1.8f);
-					drawList->AddLine(ImVec2(gx - boxSize, gy + boxSize), ImVec2(gx - boxSize, gy + boxSize - corner), groundColor, 1.8f);
-					drawList->AddLine(ImVec2(gx + boxSize, gy + boxSize), ImVec2(gx + boxSize - corner, gy + boxSize), groundColor, 1.8f);
-					drawList->AddLine(ImVec2(gx + boxSize, gy + boxSize), ImVec2(gx + boxSize, gy + boxSize - corner), groundColor, 1.8f);
-
-					char labelBuf[48];
-					snprintf(labelBuf, sizeof(labelBuf), "%s %dm", 
-						(ground->GetAIType() == GroundAIType::Turret) ? "AAA" :
-						(ground->GetAIType() == GroundAIType::Structure) ? "FACILITY" : "VEHICLE",
-						static_cast<int>(dist));
-					drawList->AddText(ImVec2(gx + boxSize + 4.0f, gy - 7.0f), groundColor, labelBuf);
-				}
-			}
-		}
-	}
-
 	// === ゲーム情報UI ===
 	ImGui::Begin("Mission Status");
 	
@@ -1282,17 +1178,6 @@ void StageScene::UpdatePostEffects(float deltaTime) {
 		vig.intensity = bootVignette;
 		postEffect->AddActiveEffect(vig);
 
-		// 高速飛行時のスピード感演出（時速500km/h以上で画面周辺に微小な流線ラジアルブラー）
-		float speed = flightModel_.GetSpeed();
-		if (speed > 140.0f && !combatBootSequence_.IsWaitingForSpace()) {
-			float speedFactor = std::clamp((speed - 140.0f) / 120.0f, 0.0f, 1.0f);
-			ActivePostEffect speedBlur;
-			speedBlur.type = PostEffectType::kRadialBlur;
-			speedBlur.kernelSize = 3;
-			speedBlur.intensity = 0.012f * speedFactor;
-			postEffect->AddActiveEffect(speedBlur);
-		}
-
 		// 作戦ブリーフィング中：奥の3D景観に被写界深度（ガウス・川瀬ブラー）をかけて手前のUIを際立たせる
 		if (combatBootSequence_.IsWaitingForSpace()) {
 			ActivePostEffect bgBlur;
@@ -1337,14 +1222,209 @@ void StageScene::UpdatePostEffects(float deltaTime) {
 	hudData.maxAmmo = gunpod_.GetMaxAmmo();
 	hudData.isFiring = isFiringThisFrame_;
 	hudData.aircraftPosition = flightModel_.GetPosition();
+	hudData.aircraftVelocity = flightModel_.GetVelocity();
 	hudData.aircraftForward = flightModel_.GetForwardDirection();
 	hudData.mouseAimTargetDirection = mouseAimController_.GetTargetDirection();
-	hudData.mouseAimEnabled = mouseAimEnabled_;
+	const bool showGameplayReticles =
+		IsGameplayActive() &&
+		!isPaused_ &&
+		!combatBootSequence_.IsWaitingForSpace();
+	hudData.showReticles = showGameplayReticles;
+	hudData.mouseAimEnabled = mouseAimEnabled_ && showGameplayReticles;
 	if (cam) {
 		hudData.viewProjectionMatrix = cam->GetViewProjectionMatrix();
 	}
 	hudData.screenWidth = static_cast<float>(WinApp::kClientWidth);
 	hudData.screenHeight = static_cast<float>(WinApp::kClientHeight);
+
+	const float groundY = (terrainChunkManager_ && terrainChunkManager_->IsLoaded())
+		? terrainChunkManager_->GetTerrainHeightAt(flightModel_.GetPosition().x, flightModel_.GetPosition().z, 0.0f)
+		: flightModel_.GetGroundElevation();
+	const float currentAgl = (std::max)(0.0f, flightModel_.GetPosition().y - groundY);
+
+	if (!isGameOver_ &&
+	    !combatBootSequence_.IsWaitingForSpace()) {
+		auto& missionManager = MissionManager::GetInstance();
+		const auto& objectives = missionManager.GetCurrentMission().objectives;
+
+		float targetDamageRatio = 0.0f;
+		for (const auto& obj : objectives) {
+			if (obj.status == ObjectiveStatus::Active && obj.type == ObjectiveType::DestroyTarget) {
+				const auto& allEnemies = enemyManager_.GetEnemies();
+				if (obj.targetIndex >= 0 && obj.targetIndex < static_cast<int>(allEnemies.size())) {
+					const auto* target = allEnemies[static_cast<size_t>(obj.targetIndex)].get();
+					if (target && target->IsAlive() && target->GetAIType() == AIType::CanyonDrone) {
+						targetDamageRatio = 1.0f - target->GetHealthRatio();
+					}
+				}
+				break;
+			}
+		}
+
+		for (const auto& enemyPtr : enemyManager_.GetEnemies()) {
+			const Enemy* enemy = enemyPtr.get();
+			if (!enemy) { continue; }
+			if (enemy->GetAIType() == AIType::CanyonWesternFighter && !enemy->IsInDivePass()) {
+				hudData.structuralTelemetry.visible = true;
+				hudData.structuralTelemetry.portWingRatio = enemy->GetPortWingHpRatio();
+				hudData.structuralTelemetry.stbdWingRatio = enemy->GetStbdWingHpRatio();
+				hudData.structuralTelemetry.engineRatio = enemy->GetEngineHpRatio();
+				hudData.structuralTelemetry.brokenPartIndex = enemy->GetBrokenPartIndex();
+			}
+			if (!enemy->IsAlive()) {
+				continue;
+			}
+			if (enemy->GetAIType() == AIType::CanyonWesternFighter && enemy->IsInDivePass()) {
+				hudData.showRwrAlert = true;
+				continue;
+			}
+			StageHUDTargetMarker marker{};
+			marker.worldPos = enemy->GetPosition();
+			marker.velocity = enemy->GetVelocity();
+			switch (enemy->GetAIType()) {
+			case AIType::AllyWingman:
+				marker.label = "ALLY // CORAX [M-21A]";
+				marker.color = { 0.68f, 0.98f, 0.84f, 0.96f };
+				marker.showLeadSight = false;
+				break;
+			case AIType::CanyonDrone:
+				marker.label = "TRAINING DRONE [ORANGE]";
+				marker.color = { 1.00f, 0.58f, 0.16f, 0.98f };
+				marker.showLeadSight = true;
+				break;
+			case AIType::CanyonWesternFighter:
+				marker.label = "UNKNOWN FIGHTER [WESTERN]";
+				marker.color = { 1.00f, 0.28f, 0.26f, 0.98f };
+				marker.showLeadSight = true;
+				break;
+			default:
+				marker.label = (enemy->GetAIType() == AIType::ChaseAttack) ? "HOSTILE [FIGHTER]" : "TARGET [AIR]";
+				marker.color = { 1.00f, 0.28f, 0.26f, 0.98f };
+				marker.showLeadSight = true;
+				break;
+			}
+			hudData.targetMarkers.push_back(std::move(marker));
+		}
+
+		const GroundEnemy* lastWatchtower = nullptr;
+		for (const auto& groundPtr : enemyManager_.GetGroundEnemies()) {
+			if (groundPtr && groundPtr->IsAlive() && groundPtr->GetAIType() == GroundAIType::Watchtower) {
+				lastWatchtower = groundPtr.get();
+			}
+		}
+		bool hasOutpostObjectiveActive = false;
+		bool hasCombatStageStarted = false;
+		for (const auto& obj : objectives) {
+			if (obj.status == ObjectiveStatus::Active &&
+			    obj.type == ObjectiveType::ReachArea &&
+			    obj.startDelaySeconds > 0.0f) {
+				hasOutpostObjectiveActive = true;
+			}
+			if (obj.type == ObjectiveType::DestroyTarget && obj.status != ObjectiveStatus::Inactive) {
+				hasCombatStageStarted = true;
+			}
+		}
+
+		for (auto* ground : enemyManager_.GetAliveGroundEnemies()) {
+			if (!ground) { continue; }
+			if (ground->GetAIType() == GroundAIType::Watchtower) {
+				if (ground != lastWatchtower || hasCombatStageStarted || (!hasOutpostObjectiveActive && !ground->IsIgnited())) {
+					continue;
+				}
+				StageHUDTargetMarker marker{};
+				const Vector3 gPos = ground->GetPosition();
+				marker.worldPos = { gPos.x, gPos.y + ground->GetWatchtowerTopOffsetY(), gPos.z };
+				marker.velocity = { 0.0f, 0.0f, 0.0f };
+				marker.label = ground->IsIgnited() ? "OUTPOST 04 // CARRIER LOST" : "OUTPOST 04";
+				marker.color = ground->IsIgnited()
+					? Vector4{ 1.00f, 0.84f, 0.28f, 0.98f }
+					: Vector4{ 0.42f, 0.82f, 0.70f, 0.70f };
+				marker.showLeadSight = false;
+				hudData.targetMarkers.push_back(std::move(marker));
+				continue;
+			}
+			StageHUDTargetMarker marker{};
+			const Vector3 gPos = ground->GetPosition();
+			marker.worldPos = { gPos.x, gPos.y + 2.0f, gPos.z };
+			marker.velocity = { 0.0f, 0.0f, 0.0f };
+			switch (ground->GetAIType()) {
+			case GroundAIType::Turret:
+				marker.label = "AAA [TURRET]";
+				marker.color = { 1.00f, 0.48f, 0.16f, 0.96f };
+				break;
+			case GroundAIType::Structure:
+				marker.label = "FACILITY";
+				marker.color = { 1.00f, 0.84f, 0.24f, 0.96f };
+				break;
+			default:
+				marker.label = "VEHICLE";
+				marker.color = { 0.35f, 0.82f, 1.00f, 0.96f };
+				break;
+			}
+			marker.showLeadSight = false;
+			hudData.targetMarkers.push_back(std::move(marker));
+		}
+		for (const auto& obj : objectives) {
+			if (obj.status != ObjectiveStatus::Active || obj.type != ObjectiveType::ReachArea) {
+				continue;
+			}
+			if (obj.enableBoundaryLineCheck) {
+				if (obj.boundaryCrossed) {
+					continue;
+				}
+				StageHUDTargetMarker marker{};
+				marker.worldPos = obj.areaCenter;
+				marker.velocity = { 0.0f, 0.0f, 0.0f };
+				marker.label = "RTB SECTOR BOUNDARY";
+				marker.color = { 0.28f, 0.92f, 1.00f, 0.90f };
+				marker.showLeadSight = false;
+				hudData.targetMarkers.push_back(std::move(marker));
+			} else if (obj.gateTotalCount > 0) {
+				StageHUDTargetMarker marker{};
+				marker.worldPos = obj.areaCenter;
+				marker.velocity = { 0.0f, 0.0f, 0.0f };
+				const int stepNo = obj.gateStepIndex + 1;
+				marker.label = (stepNo < 10 ? "WAYPOINT 0" : "WAYPOINT ") + std::to_string(stepNo);
+				marker.color = { 0.30f, 1.00f, 0.65f, 1.00f };
+				marker.showLeadSight = false;
+				hudData.targetMarkers.push_back(std::move(marker));
+			} else if (obj.startDelaySeconds <= 0.0f) {
+				StageHUDTargetMarker marker{};
+				marker.worldPos = obj.areaCenter;
+				marker.velocity = { 0.0f, 0.0f, 0.0f };
+				marker.label = "WAYPOINT";
+				marker.color = { 0.35f, 0.95f, 0.45f, 0.96f };
+				marker.showLeadSight = false;
+				hudData.targetMarkers.push_back(std::move(marker));
+			}
+		}
+
+		for (const auto& log : missionManager.GetActiveSystemLogs()) {
+			StageHUDSysLogEntry hudLog{};
+			hudLog.category = log.category;
+			hudLog.timestampText = log.timestampText;
+			hudLog.message = log.message;
+			hudLog.ageSeconds = log.ageSeconds;
+			hudData.systemLogs.push_back(std::move(hudLog));
+		}
+
+		hudData.guide.visible = missionManager.BuildActiveGuideHUD(
+			throttle_,
+			targetDamageRatio,
+			hudData.guide.title,
+			hudData.guide.sub,
+			hudData.guide.showProgressBar,
+			hudData.guide.progressRatio);
+
+		missionManager.EvaluateAltitudeAlerts(
+			currentAgl,
+			flightModel_.GetPosition().y,
+			hudData.showPullUpAlert,
+			hudData.showHighAltCaution);
+	}
+
+	hudData.hitMarkerTimer = hitMarkerTimer_;
+	hudData.fadeOutAlpha = clearFadeOutActive_ ? std::clamp(clearFadeOutTimer_ / 1.65f, 0.0f, 1.0f) : 0.0f;
 
 	hud_.Update(deltaTime, hudData);
 
@@ -1355,10 +1435,7 @@ void StageScene::UpdatePostEffects(float deltaTime) {
 	infoData.currentAmmo = gunpod_.GetCurrentAmmo();
 	infoData.maxAmmo = gunpod_.GetMaxAmmo();
 	infoData.absoluteAltitude = flightModel_.GetPosition().y;
-	const float groundY = (terrainChunkManager_ && terrainChunkManager_->IsLoaded())
-		? terrainChunkManager_->GetTerrainHeightAt(flightModel_.GetPosition().x, flightModel_.GetPosition().z, 0.0f)
-		: flightModel_.GetGroundElevation();
-	infoData.relativeAltitude = (std::max)(0.0f, flightModel_.GetPosition().y - groundY);
+	infoData.relativeAltitude = currentAgl;
 	infoData.screenWidth = static_cast<float>(WinApp::kClientWidth);
 	infoData.screenHeight = static_cast<float>(WinApp::kClientHeight);
 	infoData.alpha = 1.0f;

@@ -357,13 +357,13 @@ RingEffect::RingEffect(const Vector3& pos, const Vector4& color, float lifeTime,
 	textureIndex_ = TextureManager::GetInstance()->GetTextureIndexByFilePath("assets/textures/white1x1.png");
 }
 
-void RingEffect::Update() {
-	currentTime_ += 1.0f / 60.0f;
+void RingEffect::Update(float dt) {
+	currentTime_ += dt;
 	if (currentTime_ >= lifeTime_) {
 		isDead_ = true;
 	}
 
-	float t = currentTime_ / lifeTime_;
+	float t = (lifeTime_ > 0.0f) ? (currentTime_ / lifeTime_) : 1.0f;
 	currentRadius_ = maxRadius_ * (1.0f - std::powf(1.0f - t, 3.0f));
 	color_.w = (1.0f - t);
 
@@ -386,13 +386,13 @@ CylinderEffect::CylinderEffect(const Vector3& pos, const Vector4& color, float l
 	textureIndex_ = TextureManager::GetInstance()->GetTextureIndexByFilePath("assets/textures/white1x1.png");
 }
 
-void CylinderEffect::Update() {
-	currentTime_ += 1.0f / 60.0f;
+void CylinderEffect::Update(float dt) {
+	currentTime_ += dt;
 	if (currentTime_ >= lifeTime_) {
 		isDead_ = true;
 	}
 
-	float t = currentTime_ / lifeTime_;
+	float t = (lifeTime_ > 0.0f) ? (currentTime_ / lifeTime_) : 1.0f;
 	scale_.x = maxScaleX_ * (1.0f - t);
 	scale_.z = maxScaleX_ * (1.0f - t);
 	scale_.y = maxScaleY_ * std::powf(t, 0.5f);
@@ -420,16 +420,17 @@ HitRotPlaneEffect::HitRotPlaneEffect(const Vector3& pos, const Vector4& color, f
 	};
 }
 
-void HitRotPlaneEffect::Update() {
-	currentTime_ += 1.0f / 60.0f;
+void HitRotPlaneEffect::Update(float dt) {
+	currentTime_ += dt;
 	if (currentTime_ >= lifeTime_) {
 		isDead_ = true;
 	}
 
-	float t = currentTime_ / lifeTime_;
-	rotationEulers_.x += rotationSpeed_.x;
-	rotationEulers_.y += rotationSpeed_.y;
-	rotationEulers_.z += rotationSpeed_.z;
+	float t = (lifeTime_ > 0.0f) ? (currentTime_ / lifeTime_) : 1.0f;
+	const float frameScale = dt * 60.0f;
+	rotationEulers_.x += rotationSpeed_.x * frameScale;
+	rotationEulers_.y += rotationSpeed_.y * frameScale;
+	rotationEulers_.z += rotationSpeed_.z * frameScale;
 
 	scale_.x = targetSize_ * 0.15f * (1.0f - t);
 	scale_.y = targetSize_ * 1.5f * (1.0f - t);
@@ -447,8 +448,8 @@ BillboardParticleEffect::BillboardParticleEffect(const Vector3& pos, const std::
 	lifeTime_ = 0.1f;
 	ParticleManager::GetInstance()->Emit(groupName, position_, count);
 }
-void BillboardParticleEffect::Update() {
-	currentTime_ += 1.0f / 60.0f;
+void BillboardParticleEffect::Update(float dt) {
+	currentTime_ += dt;
 	if (currentTime_ >= lifeTime_) { isDead_ = true; }
 }
 void BillboardParticleEffect::Draw(Camera* camera) {
@@ -585,8 +586,7 @@ ExplosionParticleEffect::ExplosionParticleEffect(const Vector3& pos) {
 	}
 }
 
-void ExplosionParticleEffect::Update() {
-	float dt = 1.0f / 60.0f;
+void ExplosionParticleEffect::Update(float dt) {
 	currentTime_ += dt;
 	if (currentTime_ >= lifeTime_) {
 		isDead_ = true;
@@ -742,8 +742,8 @@ MuzzleFlashEffect::MuzzleFlashEffect(const Vector3& pos, const Vector3& directio
 	}
 }
 
-void MuzzleFlashEffect::Update() {
-	currentTime_ += 1.0f / 60.0f;
+void MuzzleFlashEffect::Update(float dt) {
+	currentTime_ += dt;
 	if (currentTime_ >= lifeTime_) { isDead_ = true; }
 }
 
@@ -849,9 +849,9 @@ void EffectManager::Initialize() {
 	}
 }
 
-void EffectManager::Update() {
+void EffectManager::Update(float dt) {
 	for (auto it = effects_.begin(); it != effects_.end();) {
-		(*it)->Update();
+		(*it)->Update(dt);
 		if ((*it)->IsDead()) {
 			it = effects_.erase(it);
 		} else {
@@ -859,7 +859,6 @@ void EffectManager::Update() {
 		}
 	}
 
-	const float dt = 1.0f / 60.0f;
 	for (auto it = namedHandles_.begin(); it != namedHandles_.end();) {
 		if (!it->second || it->second->IsPendingDelete()) {
 			it = namedHandles_.erase(it);

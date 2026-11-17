@@ -1,6 +1,8 @@
 #include "GroundEnemy.h"
 #include <cmath>
 #include <algorithm>
+#include "../../engine/Graphics/Model/ModelManager.h"
+#include "../../engine/Graphics/Model/Object3dCommon.h"
 #include "../../engine/Graphics/Model/PrimitiveModel.h"
 #include "../../engine/Graphics/System/TextureManager.h"
 #include "../../engine/Graphics/Particle/EffectManager.h"
@@ -34,6 +36,7 @@ const char* GroundEnemy::GetAITypeString() const {
 	case GroundAIType::Turret: return "AAA Turret";
 	case GroundAIType::Structure: return "Structure";
 	case GroundAIType::PatrolVehicle: return "Patrol Vehicle";
+	case GroundAIType::Watchtower: return "Watchtower";
 	default: return "Unknown";
 	}
 }
@@ -78,6 +81,30 @@ void GroundEnemy::Initialize(
 	waypointIsLoop_ = false;
 	currentWaypointIndex_ = GroundWaypointDefaults::kInitialIndex;
 	waypointStepDir_ = GroundWaypointDefaults::kForwardStep;
+
+	isIgnited_ = false;
+	outpostSmokeTimer_ = 0.0f;
+	watchtowerYaw_ = 0.0f;
+	towerObject_.reset();
+
+	if (aiType_ == GroundAIType::Watchtower) {
+		TextureManager::GetInstance()->LoadTexture("assets/textures/circle2.png");
+		ringTexIndex_ = TextureManager::GetInstance()->GetTextureIndexByFilePath("assets/textures/circle2.png");
+		ModelManager::GetInstance()->LoadModel("Resources/models/tower.obj");
+
+		towerObject_ = std::make_unique<Object3d>();
+		towerObject_->Initialize(Object3dCommon::GetInstance());
+		towerObject_->SetModel("Resources/models/tower.obj");
+		towerObject_->SetScale({ 2.8f, 2.8f, 2.8f });
+		towerObject_->SetMaterialColor(0, { 0.40f, 0.44f, 0.50f, 1.0f });
+		towerObject_->SetMaterialColor(1, { 0.60f, 0.58f, 0.54f, 1.0f });
+		towerObject_->SetTranslate(position_);
+		towerObject_->SetRotate({ 0.0f, watchtowerYaw_, 0.0f });
+		if (CameraManager::GetInstance() && CameraManager::GetInstance()->GetActiveCamera()) {
+			towerObject_->SetCamera(CameraManager::GetInstance()->GetActiveCamera());
+		}
+		towerObject_->Update();
+	}
 }
 
 void GroundEnemy::SetWaypointPath(const WaypointPath& path) {
@@ -264,8 +291,178 @@ void GroundEnemy::Fire() {
 	EffectManager::GetInstance()->EmitMuzzleFlash(muzzlePos, forward);
 }
 
+void GroundEnemy::Ignite() {
+	if (isIgnited_) {
+		return;
+	}
+	isIgnited_ = true;
+	outpostSmokeTimer_ = 0.0f;
+
+	const MyMath::Vector3 towerTop = {
+		position_.x,
+		position_.y + GetWatchtowerTopOffsetY(),
+		position_.z
+	};
+	if (EffectManager::GetInstance()) {
+		EffectManager::GetInstance()->EmitDestroyEffect(towerTop);
+	}
+	if (ParticleManager::GetInstance()) {
+		ParticleParameters initFire{};
+		initFire.minVelocity = { -0.08f, 0.04f, -0.08f };
+		initFire.maxVelocity = {  0.08f, 0.16f,  0.08f };
+		initFire.randomPositionRange = 3.5f;
+		initFire.minScale = 22.0f;
+		initFire.maxScale = 34.0f;
+		initFire.endScale = 12.0f;
+		initFire.minLifeTime = 0.8f;
+		initFire.maxLifeTime = 1.4f;
+		initFire.fadeOut = true;
+		initFire.minColor = { 1.0f, 0.45f, 0.08f, 1.0f };
+		initFire.maxColor = { 1.0f, 0.88f, 0.32f, 1.0f };
+		ParticleManager::GetInstance()->Emit("ExplosionFire", towerTop, initFire, 12);
+
+		ParticleParameters initSmoke{};
+		initSmoke.minVelocity = { -0.06f, 0.03f, -0.06f };
+		initSmoke.maxVelocity = {  0.06f, 0.12f,  0.06f };
+		initSmoke.randomPositionRange = 4.0f;
+		initSmoke.minScale = 18.0f;
+		initSmoke.maxScale = 28.0f;
+		initSmoke.endScale = 52.0f;
+		initSmoke.minLifeTime = 3.5f;
+		initSmoke.maxLifeTime = 5.5f;
+		initSmoke.fadeOut = true;
+		initSmoke.minColor = { 0.05f, 0.05f, 0.06f, 0.80f };
+		initSmoke.maxColor = { 0.10f, 0.10f, 0.12f, 0.95f };
+		ParticleManager::GetInstance()->Emit("ExplosionSmoke", towerTop, initSmoke, 10);
+	}
+}
+
+void GroundEnemy::UpdateWatchtower(float deltaTime) {
+	constexpr float kOutpostColliderRadius = 6.5f;
+	const float radiusSq = kOutpostColliderRadius * kOutpostColliderRadius;
+	const float towerBaseY = position_.y;
+	const float towerTopY = position_.y + GetWatchtowerTopOffsetY();
+
+	if (playerFlightModel_) {
+		const MyMath::Vector3& pPos = playerFlightModel_->GetPosition();
+		const float dx = pPos.x - position_.x;
+		const float dz = pPos.z - position_.z;
+		if ((dx * dx + dz * dz) <= radiusSq) {
+			if (pPos.y >= towerBaseY - 5.0f && pPos.y <= towerTopY + 5.0f) {
+				playerFlightModel_->GetDamageModel().ProcessHit(DamagePart::Fuse, 150.0f);
+				if (EffectManager::GetInstance()) {
+					EffectManager::GetInstance()->EmitDestroyEffect(pPos);
+				}
+			}
+		}
+	}
+
+	if (bulletManager_) {
+		for (auto& bullet : bulletManager_->GetBullets()) {
+			if (!bullet.IsAlive() || bullet.IsEnemyBullet()) {
+				continue;
+			}
+			const MyMath::Vector3& bPos = bullet.GetPosition();
+			const float dx = bPos.x - position_.x;
+			const float dz = bPos.z - position_.z;
+			if ((dx * dx + dz * dz) <= radiusSq && bPos.y >= towerBaseY && bPos.y <= towerTopY) {
+				if (EffectManager::GetInstance()) {
+					EffectManager::GetInstance()->EmitHitEffect(bPos);
+				}
+				bullet.Kill();
+			}
+		}
+	}
+
+	if (!isIgnited_) {
+		return;
+	}
+
+	ParticleManager* pm = ParticleManager::GetInstance();
+	if (!pm) {
+		return;
+	}
+
+	const MyMath::Vector3 fireOrigin = {
+		position_.x,
+		towerTopY - 2.0f,
+		position_.z
+	};
+
+	{
+		ParticleParameters fireParams{};
+		fireParams.minVelocity = { -0.015f, 0.015f, -0.015f };
+		fireParams.maxVelocity = {  0.015f, 0.045f,  0.015f };
+		fireParams.randomPositionRange = 3.2f;
+		fireParams.minScale = 16.0f;
+		fireParams.maxScale = 26.0f;
+		fireParams.endScale = 10.0f;
+		fireParams.scaleEasing = 0.35f;
+		fireParams.minLifeTime = 0.55f;
+		fireParams.maxLifeTime = 0.95f;
+		fireParams.fadeOut = true;
+		fireParams.minColor = { 1.0f, 0.38f, 0.06f, 0.95f };
+		fireParams.maxColor = { 1.0f, 0.88f, 0.30f, 1.0f };
+		fireParams.minRotation = 0.0f;
+		fireParams.maxRotation = 2.0f * kPI;
+		fireParams.minRotationSpeed = -1.0f;
+		fireParams.maxRotationSpeed = 1.0f;
+		pm->Emit("ExplosionFire", fireOrigin, fireParams, 2);
+	}
+
+	outpostSmokeTimer_ += deltaTime;
+	if (outpostSmokeTimer_ >= 0.045f) {
+		outpostSmokeTimer_ = 0.0f;
+		const MyMath::Vector3 smokeOrigin = {
+			fireOrigin.x + static_cast<float>((rand() % 5) - 2) * 0.8f,
+			fireOrigin.y + 3.0f,
+			fireOrigin.z + static_cast<float>((rand() % 5) - 2) * 0.8f
+		};
+
+		ParticleParameters smokeParams{};
+		smokeParams.minVelocity = { -0.020f, 0.050f, -0.020f };
+		smokeParams.maxVelocity = {  0.020f, 0.110f,  0.020f };
+		smokeParams.randomPositionRange = 3.5f;
+		smokeParams.minScale = 15.0f;
+		smokeParams.maxScale = 24.0f;
+		smokeParams.endScale = 50.0f;
+		smokeParams.scaleEasing = 0.55f;
+		smokeParams.minLifeTime = 4.2f;
+		smokeParams.maxLifeTime = 6.5f;
+		smokeParams.fadeOut = true;
+		smokeParams.minColor = { 0.04f, 0.04f, 0.05f, 0.75f };
+		smokeParams.maxColor = { 0.09f, 0.09f, 0.11f, 0.90f };
+		smokeParams.minRotation = 0.0f;
+		smokeParams.maxRotation = 2.0f * kPI;
+		smokeParams.minRotationSpeed = -0.15f;
+		smokeParams.maxRotationSpeed = 0.15f;
+		pm->Emit("ExplosionSmoke", smokeOrigin, smokeParams, 1);
+	}
+
+	if ((rand() % 2) == 0) {
+		ParticleParameters sparkParams{};
+		sparkParams.minVelocity = { -0.035f, 0.030f, -0.035f };
+		sparkParams.maxVelocity = {  0.035f, 0.075f,  0.035f };
+		sparkParams.randomPositionRange = 2.0f;
+		sparkParams.minScale = 0.40f;
+		sparkParams.maxScale = 0.85f;
+		sparkParams.endScale = 0.05f;
+		sparkParams.minLifeTime = 0.35f;
+		sparkParams.maxLifeTime = 0.65f;
+		sparkParams.fadeOut = true;
+		sparkParams.minColor = { 1.0f, 0.55f, 0.10f, 1.0f };
+		sparkParams.maxColor = { 1.0f, 0.95f, 0.40f, 1.0f };
+		pm->Emit("ExplosionSpark", fireOrigin, sparkParams, 1);
+	}
+}
+
 void GroundEnemy::Update(float deltaTime) {
 	animTime_ += deltaTime;
+
+	if (aiType_ == GroundAIType::Watchtower) {
+		UpdateWatchtower(deltaTime);
+		return;
+	}
 
 	if (!isAlive_) {
 		// 撃破後の残骸から黒煙を定期的に放出
@@ -290,7 +487,7 @@ void GroundEnemy::Update(float deltaTime) {
 }
 
 void GroundEnemy::TakeDamage(float damage) {
-	if (!isAlive_) return;
+	if (!isAlive_ || !IsHostile()) return;
 
 	health_ -= damage;
 	if (health_ <= 0.0f) {
@@ -304,7 +501,7 @@ void GroundEnemy::TakeDamage(float damage) {
 }
 
 void GroundEnemy::OnCollision(ICollisionBody3D* other) {
-	if (!isAlive_) return;
+	if (!isAlive_ || !IsHostile()) return;
 
 	// プレイヤーの機銃弾との衝突
 	if (other->GetCollisionAttribute() & CollisionAttribute::kPlayerBullet) {
@@ -339,7 +536,81 @@ void GroundEnemy::Draw(Camera* camera) {
 	case GroundAIType::PatrolVehicle:
 		DrawVehicle(camera);
 		break;
+	case GroundAIType::Watchtower:
+		DrawWatchtower(camera);
+		break;
 	}
+}
+
+void GroundEnemy::DrawWatchtower(Camera* camera) {
+	if (towerObject_) {
+		Object3dCommon::GetInstance()->SetupCommonState();
+		Object3dCommon::GetInstance()->SetLightType(1);
+		towerObject_->SetCamera(camera);
+		towerObject_->SetScale({ 2.8f, 2.8f, 2.8f });
+		towerObject_->SetMaterialColor(0, { 0.40f, 0.44f, 0.50f, 1.0f });
+		towerObject_->SetMaterialColor(1, { 0.60f, 0.58f, 0.54f, 1.0f });
+		towerObject_->SetTranslate(position_);
+		towerObject_->SetRotate({ 0.0f, watchtowerYaw_, 0.0f });
+		towerObject_->Update();
+		towerObject_->Draw();
+	}
+
+	PrimitiveModel* prim = PrimitiveModel::GetInstance();
+	if (!prim) {
+		return;
+	}
+
+	const MyMath::Vector3 beaconPos = {
+		position_.x,
+		position_.y + GetWatchtowerTopOffsetY(),
+		position_.z
+	};
+	constexpr MyMath::Vector4 kBeaconColor = { 1.00f, 0.18f, 0.12f, 0.95f };
+
+	if (isIgnited_) {
+		const float shortFlicker = (std::sin(animTime_ * 22.0f) > 0.1f) ? 0.85f : 0.15f;
+		MyMath::Vector4 shortCol = kBeaconColor;
+		shortCol.w *= shortFlicker;
+		prim->DrawRing(
+			{ 2.6f * 0.9f, 2.6f * 0.9f, 4.0f },
+			{ kPI * 0.5f, 0.0f, animTime_ },
+			beaconPos,
+			shortCol,
+			ringTexIndex_,
+			camera,
+			BlendMode::kAdd);
+	} else {
+		const float pulse = (std::max)(0.0f, std::sin(animTime_ * 2.4f));
+		const float beaconAlpha = std::pow(pulse, 3.0f);
+		if (beaconAlpha > 0.05f) {
+			MyMath::Vector4 beaconCol = kBeaconColor;
+			beaconCol.w *= beaconAlpha;
+			prim->DrawRing(
+				{ 2.6f, 2.6f, 4.0f },
+				{ kPI * 0.5f, 0.0f, 0.0f },
+				beaconPos,
+				beaconCol,
+				ringTexIndex_,
+				camera,
+				BlendMode::kAdd);
+
+			constexpr float kCrossLen = 2.2f;
+			prim->DrawLine3D(
+				{ beaconPos.x - kCrossLen, beaconPos.y, beaconPos.z },
+				{ beaconPos.x + kCrossLen, beaconPos.y, beaconPos.z },
+				beaconCol,
+				camera);
+			prim->DrawLine3D(
+				{ beaconPos.x, beaconPos.y, beaconPos.z - kCrossLen },
+				{ beaconPos.x, beaconPos.y, beaconPos.z + kCrossLen },
+				beaconCol,
+				camera);
+		}
+	}
+
+	Object3dCommon::GetInstance()->SetupCommonState();
+	Object3dCommon::GetInstance()->SetLightType(1);
 }
 
 void GroundEnemy::DrawTurret(Camera* camera) {

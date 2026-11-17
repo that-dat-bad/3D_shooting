@@ -18,16 +18,16 @@ namespace InfoUIDefaults {
 	// 左上配置レイアウト定数
 	inline constexpr float kMarginLeft = 32.0f;          // 画面左端からのマージン
 	inline constexpr float kMarginTop = 32.0f;           // 画面上端からのマージン
-	inline constexpr float kFontSize = 16.0f;            // 計器フォントサイズ (px)
-	inline constexpr float kLineSpacing = 21.0f;         // 通常行間 (px)
+	inline constexpr float kFontSize = 18.5f;            // 計器フォントサイズ (px)
+	inline constexpr float kLineSpacing = 24.0f;         // 通常行間 (px)
 	inline constexpr float kSectionGap = 10.0f;          // 機関砲行の前の区切りギャップ (px)
-	inline constexpr float kValueColumnOffset = 88.0f;   // ラベル列から数値列へのオフセット (px)
+	inline constexpr float kValueColumnOffset = 104.0f;  // ラベル列から数値列へのオフセット (px)
 
 	// 会話UI（RadioCommunicator）と完全同一の2層ソフトドロップシャドウ定数
-	inline constexpr Vector2 kInnerShadowOffset = { 1.2f, 1.5f };
-	inline constexpr Vector2 kOuterShadowOffset = { 2.2f, 2.8f };
-	inline constexpr MyMath::Vector4 kInnerShadowColor = { 0.02f, 0.04f, 0.08f, 0.62f };
-	inline constexpr MyMath::Vector4 kOuterShadowColor = { 0.02f, 0.04f, 0.08f, 0.34f };
+	inline constexpr Vector2 kInnerShadowOffset = { 1.6f, 2.0f };
+	inline constexpr Vector2 kOuterShadowOffset = { 3.0f, 3.6f };
+	inline constexpr MyMath::Vector4 kInnerShadowColor = { 0.01f, 0.02f, 0.05f, 0.92f };
+	inline constexpr MyMath::Vector4 kOuterShadowColor = { 0.01f, 0.02f, 0.05f, 0.68f };
 
 	// テキストカラー定数
 	inline constexpr MyMath::Vector4 kTextColor = { 0.97f, 0.98f, 1.00f, 1.00f };        // WT準拠 ホワイト

@@ -136,7 +136,7 @@ private:
 class IEffect {
 public:
 	virtual ~IEffect() = default;
-	virtual void Update() = 0;
+	virtual void Update(float dt) = 0;
 	virtual void Draw(Camera* camera) = 0;
 	bool IsDead() const { return isDead_; }
 
@@ -151,7 +151,7 @@ protected:
 class RingEffect : public IEffect {
 public:
 	RingEffect(const Vector3& pos, const Vector4& color, float lifeTime, float maxRadius);
-	void Update() override;
+	void Update(float dt) override;
 	void Draw(Camera* camera) override;
 private:
 	Vector4 color_;
@@ -165,7 +165,7 @@ private:
 class CylinderEffect : public IEffect {
 public:
 	CylinderEffect(const Vector3& pos, const Vector4& color, float lifeTime, float maxScaleY, float maxScaleX);
-	void Update() override;
+	void Update(float dt) override;
 	void Draw(Camera* camera) override;
 private:
 	Vector4 color_;
@@ -179,7 +179,7 @@ private:
 class HitRotPlaneEffect : public IEffect {
 public:
 	HitRotPlaneEffect(const Vector3& pos, const Vector4& color, float lifeTime, float size);
-	void Update() override;
+	void Update(float dt) override;
 	void Draw(Camera* camera) override;
 private:
 	Vector4 color_;
@@ -194,7 +194,7 @@ private:
 class BillboardParticleEffect : public IEffect {
 public:
 	BillboardParticleEffect(const Vector3& pos, const std::string& groupName, uint32_t count);
-	void Update() override;
+	void Update(float dt) override;
 	void Draw(Camera* camera) override;
 };
 
@@ -202,7 +202,7 @@ public:
 class ExplosionParticleEffect : public IEffect {
 public:
 	ExplosionParticleEffect(const Vector3& pos);
-	void Update() override;
+	void Update(float dt) override;
 	void Draw(Camera* camera) override;
 
 private:
@@ -225,7 +225,7 @@ private:
 class MuzzleFlashEffect : public IEffect {
 public:
 	MuzzleFlashEffect(const Vector3& pos, const Vector3& direction);
-	void Update() override;
+	void Update(float dt) override;
 	void Draw(Camera* camera) override;
 private:
 	Vector3 direction_;
@@ -242,7 +242,8 @@ public:
 	// 初期化
 	void Initialize();
 	// 更新
-	void Update();
+	// dt: デルタタイム
+	void Update(float dt = 1.0f / 60.0f);
 	// 描画
 	// camera: 描画カメラ
 	void Draw(Camera* camera);

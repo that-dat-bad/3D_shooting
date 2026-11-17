@@ -1,7 +1,9 @@
 #include "MissionManager.h"
+#include <algorithm>
+#include <cmath>
+#include <cstdio>
 #include <fstream>
 #include <iostream>
-#include <cmath>
 
 namespace fs = std::filesystem;
 
@@ -221,7 +223,6 @@ void MissionManager::CreateDefaultMission(const std::string& filepath) {
 	currentMission_.objectives.clear();
 	currentMission_.triggers.clear();
 	currentMission_.waypointPaths.clear();
-	currentMission_.tutorialLayout = TutorialSpatialLayout{};
 
 	CacheInitialObjectiveStatuses();
 	Save(filepath);
@@ -234,13 +235,18 @@ void MissionManager::CreateDefaultMission(const std::string& filepath) {
 void MissionManager::ResetRuntimeState() {
 	triggerMissionComplete_ = false;
 	triggerMissionFail_ = false;
+	pendingIgniteOutpost_ = false;
+	runtimeMissionClock_ = 0.0f;
 	pendingEnemySpawns_.clear();
 	pendingGroundEnemySpawns_.clear();
 	activeMessages_.clear();
 	pendingRadioMessages_.clear();
+	activeSysLogs_.clear();
 
 	for (size_t i = static_cast<size_t>(MissionSchemaDefaults::kZeroIndex); i < currentMission_.triggers.size(); ++i) {
 		currentMission_.triggers[i].isFired = false;
+		currentMission_.triggers[i].isPendingDelay = false;
+		currentMission_.triggers[i].delayTimer = 0.0f;
 		if (i < initialTriggerEnabled_.size()) {
 			currentMission_.triggers[i].isEnabled = initialTriggerEnabled_[i];
 		}
@@ -250,6 +256,10 @@ void MissionManager::ResetRuntimeState() {
 		if (i < initialObjectiveStatuses_.size()) {
 			currentMission_.objectives[i].status = initialObjectiveStatuses_[i];
 		}
+		currentMission_.objectives[i].currentProgress = 0.0f;
+		currentMission_.objectives[i].activeElapsedSeconds = 0.0f;
+		currentMission_.objectives[i].boundaryCrossed = false;
+		currentMission_.objectives[i].passFlashTimer = 0.0f;
 	}
 }
 
@@ -259,53 +269,108 @@ void MissionManager::EvaluateObjectives(
 	int destroyedCount,
 	bool allDestroyed,
 	float elapsedTime,
-	const EnemyManager* enemyManager
+	const EnemyManager* enemyManager,
+	float deltaTime,
+	float playerThrottle,
+	bool aimMovedThisFrame,
+	bool radioActive
 ) {
 	(void)playerHP;
 	const EnemyManager* activeEm = enemyManager ? enemyManager : boundEnemyManager_;
+	runtimeMissionClock_ = elapsedTime;
+	const float dt = (std::max)(0.0f, deltaTime);
 	using namespace MyMath;
 
 	for (auto& obj : currentMission_.objectives) {
+		if (obj.passFlashTimer > 0.0f) {
+			obj.passFlashTimer = (std::max)(0.0f, obj.passFlashTimer - dt);
+		}
 		if (obj.status != ObjectiveStatus::Active) {
 			continue;
 		}
 
+		obj.activeElapsedSeconds += dt;
+		bool conditionMet = false;
+
 		switch (obj.type) {
 		case ObjectiveType::DestroyAll:
-			if (allDestroyed) {
-				obj.status = ObjectiveStatus::Completed;
-			}
+			conditionMet = allDestroyed;
 			break;
 
 		case ObjectiveType::DestroyCount:
-			if (destroyedCount >= obj.requiredKills) {
-				obj.status = ObjectiveStatus::Completed;
-			}
+			conditionMet = (destroyedCount >= obj.requiredKills);
 			break;
 
 		case ObjectiveType::DestroyTarget:
 			if (activeEm && activeEm->IsUnitDestroyedByIndex(obj.targetIndex)) {
-				obj.status = ObjectiveStatus::Completed;
+				conditionMet = true;
 			}
 			break;
 
 		case ObjectiveType::ReachArea: {
-			const Vector3 diff = Subtract(playerPos, obj.areaCenter);
-			const float dist = Length(diff);
-			if (dist <= obj.areaRadius) {
-				obj.status = ObjectiveStatus::Completed;
+			if (obj.activeElapsedSeconds >= obj.startDelaySeconds) {
+				const Vector3 diff = Subtract(playerPos, obj.areaCenter);
+				const float dist = Length(diff);
+				if (obj.enableGatePassCheck) {
+					const bool insideSphere = (dist <= obj.areaRadius);
+					const bool crossedGatePlane =
+						(playerPos.z >= obj.areaCenter.z) &&
+						(playerPos.z <= obj.areaCenter.z + 45.0f) &&
+						(std::fabs(diff.x) <= 65.0f) &&
+						(std::fabs(diff.y) <= 60.0f);
+					const bool missedOvershoot = (playerPos.z >= obj.areaCenter.z + 280.0f);
+					conditionMet = (insideSphere || crossedGatePlane || missedOvershoot);
+				} else if (obj.enableBoundaryLineCheck) {
+					if ((playerPos.z >= obj.areaCenter.z) ||
+					    (dist <= obj.areaRadius) ||
+					    (obj.activeElapsedSeconds >= 15.5f)) {
+						obj.boundaryCrossed = true;
+					}
+					conditionMet = obj.boundaryCrossed;
+				} else if (obj.startDelaySeconds > 0.0f) {
+					conditionMet = (dist <= obj.areaRadius) || (playerPos.z >= obj.areaCenter.z - 45.0f);
+				} else {
+					conditionMet = (dist <= obj.areaRadius);
+				}
 			}
 			break;
 		}
 
 		case ObjectiveType::Survive:
-			if (elapsedTime >= obj.duration) {
-				obj.status = ObjectiveStatus::Completed;
+			conditionMet = (elapsedTime >= obj.duration);
+			break;
+
+		case ObjectiveType::AimLookDuration:
+			if (obj.activeElapsedSeconds >= obj.startDelaySeconds && aimMovedThisFrame) {
+				obj.currentProgress = (std::min)(obj.duration, obj.currentProgress + dt);
+			}
+			if (obj.activeElapsedSeconds >= obj.guideAppearDelaySeconds && obj.currentProgress >= obj.duration) {
+				conditionMet = true;
+			}
+			break;
+
+		case ObjectiveType::ThrottleHoldDuration:
+			if (obj.activeElapsedSeconds >= obj.startDelaySeconds) {
+				if (playerThrottle >= obj.minThrottle) {
+					obj.currentProgress = (std::min)(obj.duration, obj.currentProgress + dt);
+				} else {
+					obj.currentProgress = 0.0f;
+				}
+			}
+			if (obj.activeElapsedSeconds >= obj.guideAppearDelaySeconds && obj.currentProgress >= obj.duration) {
+				conditionMet = true;
 			}
 			break;
 
 		case ObjectiveType::EscortProtect:
 			break;
+		}
+
+		if (conditionMet && (!obj.waitRadioBeforeComplete || !radioActive)) {
+			obj.status = ObjectiveStatus::Completed;
+			if (obj.enableGatePassCheck) {
+				obj.passFlashTimer = 0.55f;
+			}
 		}
 	}
 }
@@ -315,9 +380,11 @@ void MissionManager::EvaluateTriggers(
 	float playerHP,
 	int destroyedCount,
 	float elapsedTime,
-	const EnemyManager* enemyManager
+	const EnemyManager* enemyManager,
+	float deltaTime
 ) {
 	const EnemyManager* activeEm = enemyManager ? enemyManager : boundEnemyManager_;
+	const float dt = (std::max)(0.0f, deltaTime);
 	using namespace MyMath;
 
 	for (size_t i = static_cast<size_t>(MissionSchemaDefaults::kZeroIndex); i < currentMission_.triggers.size(); ++i) {
@@ -325,6 +392,19 @@ void MissionManager::EvaluateTriggers(
 
 		if (!trigger.isEnabled) continue;
 		if (trigger.isFired && !trigger.isRepeatable) continue;
+
+		if (trigger.isPendingDelay) {
+			trigger.delayTimer += dt;
+			if (trigger.delayTimer >= trigger.delaySeconds) {
+				trigger.isPendingDelay = false;
+				trigger.delayTimer = 0.0f;
+				trigger.isFired = true;
+				for (const auto& action : trigger.actions) {
+					ExecuteAction(action);
+				}
+			}
+			continue;
+		}
 
 		bool conditionMet = false;
 
@@ -374,9 +454,14 @@ void MissionManager::EvaluateTriggers(
 		}
 
 		if (conditionMet) {
-			trigger.isFired = true;
-			for (const auto& action : trigger.actions) {
-				ExecuteAction(action);
+			if (trigger.delaySeconds > 0.0f) {
+				trigger.isPendingDelay = true;
+				trigger.delayTimer = 0.0f;
+			} else {
+				trigger.isFired = true;
+				for (const auto& action : trigger.actions) {
+					ExecuteAction(action);
+				}
 			}
 		}
 	}
@@ -408,8 +493,13 @@ void MissionManager::ExecuteAction(const TriggerAction& action) {
 	case TriggerActionType::SetObjective:
 		if (action.objectiveIndex >= MissionSchemaDefaults::kZeroIndex &&
 			action.objectiveIndex < static_cast<int>(currentMission_.objectives.size())) {
-			currentMission_.objectives[static_cast<size_t>(action.objectiveIndex)].status =
-				StringToObjectiveStatus(action.newStatus);
+			auto& obj = currentMission_.objectives[static_cast<size_t>(action.objectiveIndex)];
+			obj.status = StringToObjectiveStatus(action.newStatus);
+			if (obj.status == ObjectiveStatus::Active) {
+				obj.activeElapsedSeconds = 0.0f;
+				obj.currentProgress = 0.0f;
+				obj.boundaryCrossed = false;
+			}
 		}
 		break;
 
@@ -424,8 +514,11 @@ void MissionManager::ExecuteAction(const TriggerAction& action) {
 	case TriggerActionType::ActivateTrigger:
 		if (action.activateTriggerIndex >= MissionSchemaDefaults::kZeroIndex &&
 			action.activateTriggerIndex < static_cast<int>(currentMission_.triggers.size())) {
-			currentMission_.triggers[static_cast<size_t>(action.activateTriggerIndex)].isEnabled = true;
-			currentMission_.triggers[static_cast<size_t>(action.activateTriggerIndex)].isFired = false;
+			auto& targetTrig = currentMission_.triggers[static_cast<size_t>(action.activateTriggerIndex)];
+			targetTrig.isEnabled = true;
+			targetTrig.isFired = false;
+			targetTrig.isPendingDelay = false;
+			targetTrig.delayTimer = 0.0f;
 		}
 		break;
 
@@ -442,7 +535,227 @@ void MissionManager::ExecuteAction(const TriggerAction& action) {
 		pendingRadioMessages_.push_back(radioMsg);
 		break;
 	}
+
+	case TriggerActionType::PushSystemLog:
+		PushSystemLog(action.logCategory, action.message, action.logTimestamp);
+		break;
+
+	case TriggerActionType::IgniteOutpost:
+		pendingIgniteOutpost_ = true;
+		break;
 	}
+}
+
+void MissionManager::PushSystemLog(const std::string& category, const std::string& message, bool includeTimestamp) {
+	constexpr size_t kMaxVisibleSysLogs = 4;
+	MissionSysLogEntry entry{};
+	entry.category = category.empty() ? "SYS" : category;
+	entry.message = message;
+	entry.ageSeconds = 0.0f;
+
+	if (includeTimestamp) {
+		const int totalSec = static_cast<int>((std::max)(0.0f, runtimeMissionClock_));
+		const int mins = totalSec / 60;
+		const int secs = totalSec % 60;
+		char tsBuf[32]{};
+		std::snprintf(tsBuf, sizeof(tsBuf), "[%02d:%02d] ", mins, secs);
+		entry.timestampText = tsBuf;
+	}
+
+	activeSysLogs_.push_back(std::move(entry));
+	while (activeSysLogs_.size() > kMaxVisibleSysLogs) {
+		activeSysLogs_.pop_front();
+	}
+}
+
+bool MissionManager::ConsumePendingIgniteOutpost() {
+	const bool val = pendingIgniteOutpost_;
+	pendingIgniteOutpost_ = false;
+	return val;
+}
+
+bool MissionManager::HasRadioDialogueTriggers() const {
+	for (const auto& trigger : currentMission_.triggers) {
+		for (const auto& action : trigger.actions) {
+			if (action.type == TriggerActionType::PlayRadioDialogue) {
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+bool MissionManager::HasActiveOrScriptedGuideContext() const {
+	for (const auto& obj : currentMission_.objectives) {
+		if (!obj.guideTitle.empty()) {
+			return true;
+		}
+	}
+	return false;
+}
+
+bool MissionManager::IsScriptedGuideVisible() const {
+	const MissionObjective* activeGuideObj = nullptr;
+	for (const auto& obj : currentMission_.objectives) {
+		if (obj.status == ObjectiveStatus::Active) {
+			activeGuideObj = &obj;
+			break;
+		}
+	}
+
+	if (!activeGuideObj) {
+		// ガイド付きミッションで次目標への遷移ディレイ待機中、またはフェードアウト中は非表示（操作ロック）
+		if (HasActiveOrScriptedGuideContext()) {
+			return false;
+		}
+		return true;
+	}
+
+	if (!activeGuideObj->guideTitle.empty() &&
+	    activeGuideObj->activeElapsedSeconds < activeGuideObj->guideAppearDelaySeconds) {
+		return false;
+	}
+
+	if (activeGuideObj->boundaryCrossed) {
+		return false;
+	}
+
+	if (activeGuideObj->type == ObjectiveType::DestroyTarget && boundEnemyManager_) {
+		for (const auto& enemy : boundEnemyManager_->GetEnemies()) {
+			if (enemy && enemy->GetAIType() == AIType::CanyonWesternFighter &&
+			    enemy->IsAlive() && enemy->IsInDivePass()) {
+				return false;
+			}
+		}
+	}
+
+	return true;
+}
+
+bool MissionManager::IsPlayerSteeringAllowed() const {
+	if (!HasActiveOrScriptedGuideContext()) {
+		return true;
+	}
+	if (!IsScriptedGuideVisible()) {
+		return false;
+	}
+	for (const auto& obj : currentMission_.objectives) {
+		if (obj.status == ObjectiveStatus::Active) {
+			return obj.allowSteering;
+		}
+	}
+	return true;
+}
+
+bool MissionManager::IsPlayerThrottleAllowed() const {
+	if (!HasActiveOrScriptedGuideContext()) {
+		return true;
+	}
+	if (!IsScriptedGuideVisible()) {
+		return false;
+	}
+	for (const auto& obj : currentMission_.objectives) {
+		if (obj.status == ObjectiveStatus::Active) {
+			return obj.allowThrottle;
+		}
+	}
+	return true;
+}
+
+bool MissionManager::IsPlayerWeaponAllowed() const {
+	if (!HasActiveOrScriptedGuideContext()) {
+		return true;
+	}
+	if (!IsScriptedGuideVisible()) {
+		return false;
+	}
+	for (const auto& obj : currentMission_.objectives) {
+		if (obj.status == ObjectiveStatus::Active) {
+			return obj.allowWeapon;
+		}
+	}
+	return true;
+}
+
+bool MissionManager::BuildActiveGuideHUD(
+	float playerThrottle,
+	float targetDamageRatio,
+	std::string& outTitle,
+	std::string& outSub,
+	bool& outShowProgress,
+	float& outProgressRatio
+) const {
+	if (!IsScriptedGuideVisible()) {
+		return false;
+	}
+
+	const MissionObjective* activeObj = nullptr;
+	for (const auto& obj : currentMission_.objectives) {
+		if (obj.status == ObjectiveStatus::Active && !obj.guideTitle.empty()) {
+			activeObj = &obj;
+			break;
+		}
+	}
+	if (!activeObj) {
+		return false;
+	}
+
+	outTitle = activeObj->guideTitle;
+	outSub = activeObj->guideSub;
+	outShowProgress = activeObj->showProgressBar;
+	outProgressRatio = 0.0f;
+
+	if (activeObj->gateTotalCount > 0) {
+		char titleBuf[192]{};
+		std::snprintf(
+			titleBuf,
+			sizeof(titleBuf),
+			activeObj->guideTitle.c_str(),
+			activeObj->gateStepIndex,
+			activeObj->gateTotalCount);
+		outTitle = titleBuf;
+		outProgressRatio = std::clamp(
+			static_cast<float>(activeObj->gateStepIndex) / static_cast<float>(activeObj->gateTotalCount),
+			0.0f,
+			1.0f);
+	} else if (activeObj->type == ObjectiveType::ThrottleHoldDuration) {
+		char subBuf[192]{};
+		std::snprintf(
+			subBuf,
+			sizeof(subBuf),
+			"%s  [現在開度: %d%%]",
+			activeObj->guideSub.c_str(),
+			static_cast<int>(std::round(playerThrottle * 100.0f)));
+		outSub = subBuf;
+		if (activeObj->duration > 0.0f) {
+			outProgressRatio = std::clamp(activeObj->currentProgress / activeObj->duration, 0.0f, 1.0f);
+		}
+	} else if (activeObj->type == ObjectiveType::AimLookDuration) {
+		if (activeObj->duration > 0.0f) {
+			outProgressRatio = std::clamp(activeObj->currentProgress / activeObj->duration, 0.0f, 1.0f);
+		}
+	} else if (activeObj->type == ObjectiveType::DestroyTarget && activeObj->showProgressBar) {
+		outProgressRatio = std::clamp(targetDamageRatio, 0.0f, 1.0f);
+	}
+
+	return true;
+}
+
+void MissionManager::EvaluateAltitudeAlerts(float currentAgl, float currentY, bool& outPullUp, bool& outHighAlt) const {
+	bool enableAlerts = false;
+	bool enableHighAlt = false;
+	for (const auto& obj : currentMission_.objectives) {
+		if (obj.status == ObjectiveStatus::Active) {
+			if (obj.enableAltitudeAlerts) {
+				enableAlerts = true;
+			}
+			if (obj.enableHighAltitudeCaution) {
+				enableHighAlt = true;
+			}
+		}
+	}
+	outPullUp = enableAlerts && (currentAgl < 64.0f);
+	outHighAlt = enableHighAlt && !outPullUp && (currentY > -65.0f);
 }
 
 bool MissionManager::AreAllPrimaryObjectivesCompleted() const {
@@ -493,5 +806,13 @@ void MissionManager::UpdateMessages(float deltaTime) {
 		} else {
 			++it;
 		}
+	}
+
+	constexpr float kSysLogLifetimeSeconds = 9.0f;
+	for (auto& log : activeSysLogs_) {
+		log.ageSeconds += deltaTime;
+	}
+	while (!activeSysLogs_.empty() && activeSysLogs_.front().ageSeconds >= kSysLogLifetimeSeconds) {
+		activeSysLogs_.pop_front();
 	}
 }

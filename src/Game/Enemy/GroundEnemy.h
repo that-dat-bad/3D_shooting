@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 #include "../../engine/base/Math/MyMath.h"
+#include "../../engine/Graphics/Model/Object3d.h"
 #include "../../engine/Graphics/Model/PrimitiveModel.h"
 #include "../../engine/Physics/ICollisionBody.h"
 #include "../../engine/Physics/CollisionConfig.h"
@@ -27,7 +28,8 @@ class Camera;
 enum class GroundAIType {
 	Turret,          // 対空砲台
 	Structure,       // 固定施設
-	PatrolVehicle    // 地上車両
+	PatrolVehicle,   // 地上車両
+	Watchtower       // 峡谷監視塔（非敵対・炎上演出対応）
 };
 
 // 地上目標のパラメータ
@@ -86,8 +88,20 @@ public:
 
 	// === アクセッサ ===
 	bool IsAlive() const { return isAlive_; }
+	bool IsHostile() const { return aiType_ != GroundAIType::Watchtower; }
+	bool IsIgnited() const { return isIgnited_; }
+	void Ignite();
+	void SetWatchtowerYaw(float yawRad) { watchtowerYaw_ = yawRad; }
+	float GetWatchtowerTopOffsetY() const { return 12.83f * 2.8f; }
 	const MyMath::Vector3& GetPosition() const { return position_; }
-	void SetPosition(const MyMath::Vector3& pos) { position_ = pos; initialPosition_ = pos; }
+	void SetPosition(const MyMath::Vector3& pos) {
+		position_ = pos;
+		initialPosition_ = pos;
+		if (towerObject_) {
+			towerObject_->SetTranslate(pos);
+			towerObject_->Update();
+		}
+	}
 	float GetHealth() const { return health_; }
 	float GetMaxHealth() const { return maxHealth_; }
 	GroundAIType GetAIType() const { return aiType_; }
@@ -105,11 +119,13 @@ public:
 	uint32_t GetCollisionAttribute() const override { return CollisionAttribute::kEnemy; }
 	uint32_t GetCollisionMask() const override { return CollisionMask::kEnemy; }
 	void OnCollision(ICollisionBody3D* other) override;
-	bool IsCollisionActive() const override { return isAlive_; }
+	bool IsCollisionActive() const override { return isAlive_ && IsHostile(); }
 
 private:
 	// AI更新
 	void UpdateAI(float deltaTime);
+	void UpdateWatchtower(float deltaTime);
+	void DrawWatchtower(Camera* camera);
 
 	// 射撃処理
 	void Fire();
@@ -172,4 +188,11 @@ private:
 	// アニメーション用タイマー
 	float animTime_ = 0.0f;
 	float smokeEmitTimer_ = 0.0f;    // 撃破後の発煙タイマー
+
+	// 監視塔（Watchtower）演出用状態
+	std::unique_ptr<Object3d> towerObject_ = nullptr;
+	uint32_t ringTexIndex_ = 0;
+	float watchtowerYaw_ = 0.0f;
+	bool isIgnited_ = false;
+	float outpostSmokeTimer_ = 0.0f;
 };

@@ -1,9 +1,11 @@
 #pragma once
+#include <deque>
 #include <string>
 #include <vector>
 #include <filesystem>
 #include "../../engine/base/Math/MyMath.h"
 #include "../Enemy/EnemyManager.h"
+#include "../Enemy/EnemySpawnDefinition.h"
 #include "../../engine/io/json.hpp"
 #include "MissionObjective.h"
 #include "MissionTrigger.h"
@@ -18,18 +20,6 @@ namespace MissionSchemaDefaults {
 	inline constexpr float kDefaultTimeLimitSeconds = 300.0f;
 	inline constexpr float kDefaultMessageDuration = 3.0f;
 	inline constexpr MyMath::Vector3 kDefaultPlayerStartPos = { 0.0f, 100.0f, 0.0f };
-
-	// ZADANIE 00 (Obuchenie) 3D空間レイアウト既定座標（Blenderから編集・上書き可能）
-	inline constexpr MyMath::Vector3 kDefaultCoraxStartPos = { 244.0f, -278.0f, 935.0f };
-	inline constexpr MyMath::Vector3 kDefaultOutpost01Pos = { 338.0f, -455.0f, 1950.0f };
-	inline constexpr MyMath::Vector3 kDefaultOutpost02Pos = { 78.0f, -468.0f, 2920.0f };
-	inline constexpr MyMath::Vector3 kDefaultOutpost03Pos = { 172.0f, -478.0f, 3880.0f };
-	inline constexpr MyMath::Vector3 kDefaultOutpostPos = { -52.0f, -510.1f, 4950.0f };
-	inline constexpr MyMath::Vector3 kDefaultDroneSpawnPos = { -220.0f, -328.0f, 5200.0f };
-	inline constexpr MyMath::Vector3 kDefaultWesternDiveStart = { -65.0f, -35.0f, 5600.0f };
-	inline constexpr MyMath::Vector3 kDefaultWesternDiveMid = { -310.0f, -295.0f, 5520.0f };
-	inline constexpr MyMath::Vector3 kDefaultWesternPullUp = { -420.0f, -310.0f, 5880.0f };
-	inline constexpr MyMath::Vector3 kDefaultExitBoundaryPos = { -640.0f, -325.0f, 7400.0f };
 }
 
 // ミッション一覧（マニフェスト）エントリデータ（各ミッションの件名・別名・ファイルパス等のメタデータ一元管理）
@@ -77,64 +67,6 @@ namespace MyMath {
 }
 #endif
 
-// ZADANIE 00（チュートリアル導入任務）の非会話・3D空間オブジェクト配置データ（Blender Mission Editor 対応）
-struct TutorialSpatialLayout {
-	bool useCustomLayout = false;
-	MyMath::Vector3 coraxStartPos = MissionSchemaDefaults::kDefaultCoraxStartPos;
-	MyMath::Vector3 outpostPosition = MissionSchemaDefaults::kDefaultOutpostPos;
-	std::vector<MyMath::Vector3> outpostPositions = {
-		MissionSchemaDefaults::kDefaultOutpost01Pos,
-		MissionSchemaDefaults::kDefaultOutpost02Pos,
-		MissionSchemaDefaults::kDefaultOutpost03Pos,
-		MissionSchemaDefaults::kDefaultOutpostPos
-	};
-	MyMath::Vector3 droneSpawnPosition = MissionSchemaDefaults::kDefaultDroneSpawnPos;
-	MyMath::Vector3 westernDiveStart = MissionSchemaDefaults::kDefaultWesternDiveStart;
-	MyMath::Vector3 westernDiveMid = MissionSchemaDefaults::kDefaultWesternDiveMid;
-	MyMath::Vector3 westernPullUp = MissionSchemaDefaults::kDefaultWesternPullUp;
-	MyMath::Vector3 exitBoundaryPosition = MissionSchemaDefaults::kDefaultExitBoundaryPos;
-};
-
-inline void to_json(nlohmann::json& j, const TutorialSpatialLayout& t) {
-	j = nlohmann::json{
-		{"useCustomLayout", t.useCustomLayout},
-		{"coraxStartPos", t.coraxStartPos},
-		{"outpostPosition", t.outpostPosition},
-		{"outpostPositions", t.outpostPositions},
-		{"droneSpawnPosition", t.droneSpawnPosition},
-		{"westernDiveStart", t.westernDiveStart},
-		{"westernDiveMid", t.westernDiveMid},
-		{"westernPullUp", t.westernPullUp},
-		{"exitBoundaryPosition", t.exitBoundaryPosition}
-	};
-}
-
-inline void from_json(const nlohmann::json& j, TutorialSpatialLayout& t) {
-	if (j.contains("useCustomLayout")) j.at("useCustomLayout").get_to(t.useCustomLayout);
-	if (j.contains("coraxStartPos")) j.at("coraxStartPos").get_to(t.coraxStartPos);
-	if (j.contains("outpostPosition")) j.at("outpostPosition").get_to(t.outpostPosition);
-	if (j.contains("outpostPositions")) {
-		j.at("outpostPositions").get_to(t.outpostPositions);
-	}
-	if (!t.outpostPositions.empty()) {
-		if (!j.contains("outpostPosition")) {
-			t.outpostPosition = t.outpostPositions.back();
-		}
-	} else {
-		t.outpostPositions = {
-			MissionSchemaDefaults::kDefaultOutpost01Pos,
-			MissionSchemaDefaults::kDefaultOutpost02Pos,
-			MissionSchemaDefaults::kDefaultOutpost03Pos,
-			t.outpostPosition
-		};
-	}
-	if (j.contains("droneSpawnPosition")) j.at("droneSpawnPosition").get_to(t.droneSpawnPosition);
-	if (j.contains("westernDiveStart")) j.at("westernDiveStart").get_to(t.westernDiveStart);
-	if (j.contains("westernDiveMid")) j.at("westernDiveMid").get_to(t.westernDiveMid);
-	if (j.contains("westernPullUp")) j.at("westernPullUp").get_to(t.westernPullUp);
-	if (j.contains("exitBoundaryPosition")) j.at("exitBoundaryPosition").get_to(t.exitBoundaryPosition);
-}
-
 // ミッションの構成データ
 struct MissionData {
 	std::string name = "Default Mission";
@@ -157,128 +89,13 @@ struct MissionData {
 	// --- Phase 2: ウェイポイント ---
 	std::vector<WaypointPath> waypointPaths;
 
-	// --- ZADANIE 00 3D空間配置オーバーライド ---
-	TutorialSpatialLayout tutorialLayout{};
+	// --- 弾薬補給・クリア演出・デブリーフ設定 ---
+	int minAmmoReserve = 0;
+	bool fadeOutOnClear = false;
+	bool isTutorialDebrief = false;
+	bool isClearAutoDemo = false;
+	bool disableGenericRadio = false;
 };
-
-inline void to_json(nlohmann::json& j, const EnemySpawnData& e) {
-	std::string aiStr = "ChaseAttack";
-	if (e.aiType == AIType::CruiseEvade) aiStr = "CruiseEvade";
-	else if (e.aiType == AIType::FollowWaypoint) aiStr = "FollowWaypoint";
-
-	j = nlohmann::json{
-		{"position", e.position},
-		{"modelPath", e.modelPath},
-		{"health", e.health},
-		{"aiType", aiStr},
-		{"waypointPathName", e.waypointPathName}
-	};
-
-	if (!e.behaviorTreeJson.empty()) {
-		try {
-			j["behaviorTree"] = nlohmann::json::parse(e.behaviorTreeJson);
-		} catch (...) {
-			j["behaviorTree"] = nullptr;
-		}
-	}
-}
-
-inline void from_json(const nlohmann::json& j, EnemySpawnData& e) {
-	j.at("position").get_to(e.position);
-	j.at("modelPath").get_to(e.modelPath);
-	j.at("health").get_to(e.health);
-	std::string aiStr = "ChaseAttack";
-	if (j.contains("aiType")) {
-		j.at("aiType").get_to(aiStr);
-	}
-	if (aiStr == "CruiseEvade") {
-		e.aiType = AIType::CruiseEvade;
-	} else if (aiStr == "FollowWaypoint") {
-		e.aiType = AIType::FollowWaypoint;
-	} else {
-		e.aiType = AIType::ChaseAttack;
-	}
-	if (j.contains("waypointPathName")) j.at("waypointPathName").get_to(e.waypointPathName);
-
-	if (j.contains("behaviorTree") && !j.at("behaviorTree").is_null()) {
-		try {
-			e.behaviorTreeJson = j.at("behaviorTree").dump();
-		} catch (...) {
-			e.behaviorTreeJson = "";
-		}
-	} else {
-		e.behaviorTreeJson = "";
-	}
-}
-
-inline void to_json(nlohmann::json& j, const GroundEnemyParam& p) {
-	j = nlohmann::json{
-		{"maxHealth", p.maxHealth},
-		{"collisionRadius", p.collisionRadius},
-		{"fireRange", p.fireRange},
-		{"minElevationDeg", p.minElevationDeg},
-		{"maxElevationDeg", p.maxElevationDeg},
-		{"turnSpeedDeg", p.turnSpeedDeg},
-		{"bulletSpeed", p.bulletSpeed},
-		{"bulletDamage", p.bulletDamage},
-		{"fireInterval", p.fireInterval},
-		{"burstCount", p.burstCount},
-		{"burstCooldown", p.burstCooldown},
-		{"moveSpeed", p.moveSpeed},
-		{"patrolDistance", p.patrolDistance}
-	};
-}
-
-inline void from_json(const nlohmann::json& j, GroundEnemyParam& p) {
-	if (j.contains("maxHealth")) j.at("maxHealth").get_to(p.maxHealth);
-	if (j.contains("collisionRadius")) j.at("collisionRadius").get_to(p.collisionRadius);
-	if (j.contains("fireRange")) j.at("fireRange").get_to(p.fireRange);
-	if (j.contains("minElevationDeg")) j.at("minElevationDeg").get_to(p.minElevationDeg);
-	if (j.contains("maxElevationDeg")) j.at("maxElevationDeg").get_to(p.maxElevationDeg);
-	if (j.contains("turnSpeedDeg")) j.at("turnSpeedDeg").get_to(p.turnSpeedDeg);
-	if (j.contains("bulletSpeed")) j.at("bulletSpeed").get_to(p.bulletSpeed);
-	if (j.contains("bulletDamage")) j.at("bulletDamage").get_to(p.bulletDamage);
-	if (j.contains("fireInterval")) j.at("fireInterval").get_to(p.fireInterval);
-	if (j.contains("burstCount")) j.at("burstCount").get_to(p.burstCount);
-	if (j.contains("burstCooldown")) j.at("burstCooldown").get_to(p.burstCooldown);
-	if (j.contains("moveSpeed")) j.at("moveSpeed").get_to(p.moveSpeed);
-	if (j.contains("patrolDistance")) j.at("patrolDistance").get_to(p.patrolDistance);
-}
-
-inline void to_json(nlohmann::json& j, const GroundEnemySpawnData& g) {
-	std::string aiStr = "Turret";
-	if (g.aiType == GroundAIType::Structure) aiStr = "Structure";
-	else if (g.aiType == GroundAIType::PatrolVehicle) aiStr = "PatrolVehicle";
-
-	j = nlohmann::json{
-		{"position", g.position},
-		{"aiType", aiStr},
-		{"health", g.health},
-		{"param", g.param},
-		{"waypointPathName", g.waypointPathName}
-	};
-}
-
-inline void from_json(const nlohmann::json& j, GroundEnemySpawnData& g) {
-	if (j.contains("position")) j.at("position").get_to(g.position);
-	if (j.contains("health")) j.at("health").get_to(g.health);
-
-	std::string aiStr = "Turret";
-	if (j.contains("aiType")) j.at("aiType").get_to(aiStr);
-	if (aiStr == "Structure") {
-		g.aiType = GroundAIType::Structure;
-	} else if (aiStr == "PatrolVehicle") {
-		g.aiType = GroundAIType::PatrolVehicle;
-	} else {
-		g.aiType = GroundAIType::Turret;
-	}
-
-	if (j.contains("param")) {
-		j.at("param").get_to(g.param);
-	}
-	g.param.maxHealth = g.health;
-	if (j.contains("waypointPathName")) j.at("waypointPathName").get_to(g.waypointPathName);
-}
 
 inline void to_json(nlohmann::json& j, const MissionData& m) {
 	j = nlohmann::json{
@@ -296,11 +113,13 @@ inline void to_json(nlohmann::json& j, const MissionData& m) {
 		{"timeLimit", m.timeLimit},
 		{"objectives", m.objectives},
 		{"triggers", m.triggers},
-		{"waypointPaths", m.waypointPaths}
+		{"waypointPaths", m.waypointPaths},
+		{"minAmmoReserve", m.minAmmoReserve},
+		{"fadeOutOnClear", m.fadeOutOnClear},
+		{"isTutorialDebrief", m.isTutorialDebrief},
+		{"isClearAutoDemo", m.isClearAutoDemo},
+		{"disableGenericRadio", m.disableGenericRadio}
 	};
-	if (m.tutorialLayout.useCustomLayout) {
-		j["tutorialLayout"] = m.tutorialLayout;
-	}
 }
 
 inline void from_json(const nlohmann::json& j, MissionData& m) {
@@ -319,13 +138,25 @@ inline void from_json(const nlohmann::json& j, MissionData& m) {
 	if (j.contains("objectives")) j.at("objectives").get_to(m.objectives);
 	if (j.contains("triggers")) j.at("triggers").get_to(m.triggers);
 	if (j.contains("waypointPaths")) j.at("waypointPaths").get_to(m.waypointPaths);
-	if (j.contains("tutorialLayout")) j.at("tutorialLayout").get_to(m.tutorialLayout);
+	if (j.contains("minAmmoReserve")) j.at("minAmmoReserve").get_to(m.minAmmoReserve);
+	if (j.contains("fadeOutOnClear")) j.at("fadeOutOnClear").get_to(m.fadeOutOnClear);
+	if (j.contains("isTutorialDebrief")) j.at("isTutorialDebrief").get_to(m.isTutorialDebrief);
+	if (j.contains("isClearAutoDemo")) j.at("isClearAutoDemo").get_to(m.isClearAutoDemo);
+	if (j.contains("disableGenericRadio")) j.at("disableGenericRadio").get_to(m.disableGenericRadio);
 }
 
 // ランタイム中に表示するメッセージ情報
 struct RuntimeMessage {
 	std::string text;
 	float remainingTime = MissionSchemaDefaults::kDefaultMessageDuration;
+};
+
+// HUD左上に表示するシステムテレメトリログ
+struct MissionSysLogEntry {
+	std::string category = "SYS";
+	std::string timestampText;
+	std::string message;
+	float ageSeconds = 0.0f;
 };
 
 // ミッションの管理とJSONシリアライズ・デシリアライズを担当するクラス
@@ -378,7 +209,11 @@ public:
 		int destroyedCount,
 		bool allDestroyed,
 		float elapsedTime,
-		const EnemyManager* enemyManager = nullptr
+		const EnemyManager* enemyManager = nullptr,
+		float deltaTime = 0.0f,
+		float playerThrottle = 0.0f,
+		bool aimMovedThisFrame = false,
+		bool radioActive = false
 	);
 
 	// 全トリガーの条件をチェックし、該当するアクションを実行する
@@ -387,8 +222,27 @@ public:
 		float playerHP,
 		int destroyedCount,
 		float elapsedTime,
-		const EnemyManager* enemyManager = nullptr
+		const EnemyManager* enemyManager = nullptr,
+		float deltaTime = 0.0f
 	);
+
+	// 操作許可・システムログ・HUDガイド照会
+	bool IsPlayerSteeringAllowed() const;
+	bool IsPlayerThrottleAllowed() const;
+	bool IsPlayerWeaponAllowed() const;
+	bool ConsumePendingIgniteOutpost();
+	void PushSystemLog(const std::string& category, const std::string& message, bool includeTimestamp = false);
+	const std::deque<MissionSysLogEntry>& GetActiveSystemLogs() const { return activeSysLogs_; }
+	bool HasRadioDialogueTriggers() const;
+	bool BuildActiveGuideHUD(
+		float playerThrottle,
+		float targetDamageRatio,
+		std::string& outTitle,
+		std::string& outSub,
+		bool& outShowProgress,
+		float& outProgressRatio
+	) const;
+	void EvaluateAltitudeAlerts(float currentAgl, float currentY, bool& outPullUp, bool& outHighAlt) const;
 
 	// 全主目標が達成されたかを返す
 	bool AreAllPrimaryObjectivesCompleted() const;
@@ -427,6 +281,8 @@ private:
 
 	void CacheInitialObjectiveStatuses();
 	void ExecuteAction(const TriggerAction& action);
+	bool IsScriptedGuideVisible() const;
+	bool HasActiveOrScriptedGuideContext() const;
 
 	MissionData currentMission_;
 	std::string currentFilePath_;
@@ -441,8 +297,11 @@ private:
 	const EnemyManager* boundEnemyManager_ = nullptr;
 	bool triggerMissionComplete_ = false;
 	bool triggerMissionFail_ = false;
+	bool pendingIgniteOutpost_ = false;
+	float runtimeMissionClock_ = 0.0f;
 	std::vector<EnemySpawnData> pendingEnemySpawns_;
 	std::vector<GroundEnemySpawnData> pendingGroundEnemySpawns_;
 	std::vector<RuntimeMessage> activeMessages_;
 	std::vector<RadioMessage> pendingRadioMessages_;
+	std::deque<MissionSysLogEntry> activeSysLogs_;
 };

@@ -3,7 +3,7 @@
 #include <vector>
 #include "../../engine/base/Math/MyMath.h"
 #include "../../engine/io/json.hpp"
-#include "../Enemy/EnemyManager.h"
+#include "../Enemy/EnemySpawnDefinition.h"
 #include "../UI/RadioCommunicator.h"
 
 // ============================================================
@@ -31,15 +31,19 @@ enum class TriggerActionType {
 	MissionFail,        // ミッション失敗
 	ActivateTrigger,    // 別のトリガーを有効化
 	PlayRadioDialogue,  // エースコンバット風の無線会話を再生
+	PushSystemLog,      // HUD左上へシステムテレメトリログ出力
+	IgniteOutpost,      // 監視塔の炎上・爆炎演出を開始
 };
 
 // トリガーアクションのデータ
 struct TriggerAction {
 	TriggerActionType type = TriggerActionType::ShowMessage;
 
-	// --- ShowMessage 用 ---
+	// --- ShowMessage / PushSystemLog 用 ---
 	std::string message = "";
 	float messageDuration = 3.0f;
+	std::string logCategory = "SYS";
+	bool logTimestamp = false;
 
 	// --- SetObjective 用 ---
 	int objectiveIndex = -1;         // 対象の目標インデックス
@@ -65,6 +69,9 @@ struct MissionTrigger {
 	bool isEnabled = true;          // 有効/無効（無効なら評価をスキップ）
 	bool isFired = false;           // 発火済みフラグ（ランタイム用、JSONには保存しない）
 	bool isRepeatable = false;      // true: 条件を満たすたびに何度でも発火
+	float delaySeconds = 0.0f;      // 条件成立後の発火ディレイ（秒）
+	bool isPendingDelay = false;    // ランタイム用ディレイ待機フラグ
+	float delayTimer = 0.0f;        // ランタイム用ディレイ経過時間
 
 	// --- 条件パラメータ ---
 	float timerSeconds = 0.0f;             // OnTimer用: 発火までの秒数
@@ -117,6 +124,8 @@ inline const char* TriggerActionTypeToString(TriggerActionType t) {
 	case TriggerActionType::MissionFail:       return "MissionFail";
 	case TriggerActionType::ActivateTrigger:   return "ActivateTrigger";
 	case TriggerActionType::PlayRadioDialogue: return "PlayRadioDialogue";
+	case TriggerActionType::PushSystemLog:     return "PushSystemLog";
+	case TriggerActionType::IgniteOutpost:     return "IgniteOutpost";
 	default:                                   return "ShowMessage";
 	}
 }
@@ -128,6 +137,8 @@ inline TriggerActionType StringToTriggerActionType(const std::string& str) {
 	if (str == "MissionFail")       return TriggerActionType::MissionFail;
 	if (str == "ActivateTrigger")   return TriggerActionType::ActivateTrigger;
 	if (str == "PlayRadioDialogue") return TriggerActionType::PlayRadioDialogue;
+	if (str == "PushSystemLog")     return TriggerActionType::PushSystemLog;
+	if (str == "IgniteOutpost")     return TriggerActionType::IgniteOutpost;
 	return TriggerActionType::ShowMessage;
 }
 
@@ -140,6 +151,8 @@ inline void to_json(nlohmann::json& j, const TriggerAction& a) {
 		{"type", TriggerActionTypeToString(a.type)},
 		{"message", a.message},
 		{"messageDuration", a.messageDuration},
+		{"logCategory", a.logCategory},
+		{"logTimestamp", a.logTimestamp},
 		{"objectiveIndex", a.objectiveIndex},
 		{"newStatus", a.newStatus},
 		{"activateTriggerIndex", a.activateTriggerIndex},
@@ -147,56 +160,11 @@ inline void to_json(nlohmann::json& j, const TriggerAction& a) {
 		{"speakerFaction", RadioFactionToString(a.speakerFaction)},
 		{"radioInterrupt", a.radioInterrupt}
 	};
-	// SpawnEnemies: EnemySpawnData のJSON変換は MissionManager.h で定義されるため
-	// ここでは手動でシリアライズする
 	if (!a.spawnEnemies.empty()) {
-		nlohmann::json arr = nlohmann::json::array();
-		for (const auto& e : a.spawnEnemies) {
-			std::string aiStr = "ChaseAttack";
-			if (e.aiType == AIType::CruiseEvade) {
-				aiStr = "CruiseEvade";
-			} else if (e.aiType == AIType::FollowWaypoint) {
-				aiStr = "FollowWaypoint";
-			}
-			arr.push_back({
-				{"position", e.position},
-				{"modelPath", e.modelPath},
-				{"health", e.health},
-				{"aiType", aiStr},
-				{"waypointPathName", e.waypointPathName}
-			});
-		}
-		j["spawnEnemies"] = arr;
+		j["spawnEnemies"] = a.spawnEnemies;
 	}
 	if (!a.spawnGroundEnemies.empty()) {
-		nlohmann::json arr = nlohmann::json::array();
-		for (const auto& g : a.spawnGroundEnemies) {
-			std::string aiStr = "Turret";
-			if (g.aiType == GroundAIType::Structure) aiStr = "Structure";
-			else if (g.aiType == GroundAIType::PatrolVehicle) aiStr = "PatrolVehicle";
-			arr.push_back({
-				{"position", g.position},
-				{"aiType", aiStr},
-				{"health", g.health},
-				{"waypointPathName", g.waypointPathName},
-				{"param", {
-					{"maxHealth", g.param.maxHealth},
-					{"collisionRadius", g.param.collisionRadius},
-					{"fireRange", g.param.fireRange},
-					{"minElevationDeg", g.param.minElevationDeg},
-					{"maxElevationDeg", g.param.maxElevationDeg},
-					{"turnSpeedDeg", g.param.turnSpeedDeg},
-					{"bulletSpeed", g.param.bulletSpeed},
-					{"bulletDamage", g.param.bulletDamage},
-					{"fireInterval", g.param.fireInterval},
-					{"burstCount", g.param.burstCount},
-					{"burstCooldown", g.param.burstCooldown},
-					{"moveSpeed", g.param.moveSpeed},
-					{"patrolDistance", g.param.patrolDistance}
-				}}
-			});
-		}
-		j["spawnGroundEnemies"] = arr;
+		j["spawnGroundEnemies"] = a.spawnGroundEnemies;
 	}
 }
 
@@ -209,6 +177,8 @@ inline void from_json(const nlohmann::json& j, TriggerAction& a) {
 	if (j.contains("message"))              j.at("message").get_to(a.message);
 	if (j.contains("dialogue") && a.message.empty()) j.at("dialogue").get_to(a.message);
 	if (j.contains("messageDuration"))      j.at("messageDuration").get_to(a.messageDuration);
+	if (j.contains("logCategory"))          j.at("logCategory").get_to(a.logCategory);
+	if (j.contains("logTimestamp"))         j.at("logTimestamp").get_to(a.logTimestamp);
 	if (j.contains("objectiveIndex"))       j.at("objectiveIndex").get_to(a.objectiveIndex);
 	if (j.contains("newStatus"))            j.at("newStatus").get_to(a.newStatus);
 	if (j.contains("activateTriggerIndex")) j.at("activateTriggerIndex").get_to(a.activateTriggerIndex);
@@ -219,61 +189,11 @@ inline void from_json(const nlohmann::json& j, TriggerAction& a) {
 		a.speakerFaction = StringToRadioFaction(factionStr);
 	}
 	if (j.contains("radioInterrupt"))       j.at("radioInterrupt").get_to(a.radioInterrupt);
-	// SpawnEnemies: 手動デシリアライズ
 	if (j.contains("spawnEnemies")) {
-		a.spawnEnemies.clear();
-		for (const auto& elem : j.at("spawnEnemies")) {
-			EnemySpawnData e;
-			if (elem.contains("position")) elem.at("position").get_to(e.position);
-			if (elem.contains("modelPath")) elem.at("modelPath").get_to(e.modelPath);
-			if (elem.contains("health")) elem.at("health").get_to(e.health);
-			if (elem.contains("aiType")) {
-				std::string aiStr;
-				elem.at("aiType").get_to(aiStr);
-				if (aiStr == "CruiseEvade") {
-					e.aiType = AIType::CruiseEvade;
-				} else if (aiStr == "FollowWaypoint") {
-					e.aiType = AIType::FollowWaypoint;
-				} else {
-					e.aiType = AIType::ChaseAttack;
-				}
-			}
-			if (elem.contains("waypointPathName")) elem.at("waypointPathName").get_to(e.waypointPathName);
-			a.spawnEnemies.push_back(e);
-		}
+		j.at("spawnEnemies").get_to(a.spawnEnemies);
 	}
 	if (j.contains("spawnGroundEnemies")) {
-		a.spawnGroundEnemies.clear();
-		for (const auto& elem : j.at("spawnGroundEnemies")) {
-			GroundEnemySpawnData g;
-			if (elem.contains("position")) elem.at("position").get_to(g.position);
-			if (elem.contains("health")) elem.at("health").get_to(g.health);
-			if (elem.contains("aiType")) {
-				std::string aiStr;
-				elem.at("aiType").get_to(aiStr);
-				if (aiStr == "Structure") g.aiType = GroundAIType::Structure;
-				else if (aiStr == "PatrolVehicle") g.aiType = GroundAIType::PatrolVehicle;
-				else g.aiType = GroundAIType::Turret;
-			}
-			if (elem.contains("param")) {
-				const auto& pj = elem.at("param");
-				if (pj.contains("collisionRadius")) pj.at("collisionRadius").get_to(g.param.collisionRadius);
-				if (pj.contains("fireRange")) pj.at("fireRange").get_to(g.param.fireRange);
-				if (pj.contains("minElevationDeg")) pj.at("minElevationDeg").get_to(g.param.minElevationDeg);
-				if (pj.contains("maxElevationDeg")) pj.at("maxElevationDeg").get_to(g.param.maxElevationDeg);
-				if (pj.contains("turnSpeedDeg")) pj.at("turnSpeedDeg").get_to(g.param.turnSpeedDeg);
-				if (pj.contains("bulletSpeed")) pj.at("bulletSpeed").get_to(g.param.bulletSpeed);
-				if (pj.contains("bulletDamage")) pj.at("bulletDamage").get_to(g.param.bulletDamage);
-				if (pj.contains("fireInterval")) pj.at("fireInterval").get_to(g.param.fireInterval);
-				if (pj.contains("burstCount")) pj.at("burstCount").get_to(g.param.burstCount);
-				if (pj.contains("burstCooldown")) pj.at("burstCooldown").get_to(g.param.burstCooldown);
-				if (pj.contains("moveSpeed")) pj.at("moveSpeed").get_to(g.param.moveSpeed);
-				if (pj.contains("patrolDistance")) pj.at("patrolDistance").get_to(g.param.patrolDistance);
-			}
-			g.param.maxHealth = g.health;
-			if (elem.contains("waypointPathName")) elem.at("waypointPathName").get_to(g.waypointPathName);
-			a.spawnGroundEnemies.push_back(g);
-		}
+		j.at("spawnGroundEnemies").get_to(a.spawnGroundEnemies);
 	}
 }
 
@@ -283,6 +203,7 @@ inline void to_json(nlohmann::json& j, const MissionTrigger& t) {
 		{"condition", TriggerConditionToString(t.condition)},
 		{"isEnabled", t.isEnabled},
 		{"isRepeatable", t.isRepeatable},
+		{"delaySeconds", t.delaySeconds},
 		{"timerSeconds", t.timerSeconds},
 		{"areaCenter", t.areaCenter},
 		{"areaRadius", t.areaRadius},
@@ -303,6 +224,7 @@ inline void from_json(const nlohmann::json& j, MissionTrigger& t) {
 	}
 	if (j.contains("isEnabled"))    j.at("isEnabled").get_to(t.isEnabled);
 	if (j.contains("isRepeatable")) j.at("isRepeatable").get_to(t.isRepeatable);
+	if (j.contains("delaySeconds")) j.at("delaySeconds").get_to(t.delaySeconds);
 	if (j.contains("timerSeconds")) j.at("timerSeconds").get_to(t.timerSeconds);
 	if (j.contains("areaCenter"))   j.at("areaCenter").get_to(t.areaCenter);
 	if (j.contains("areaRadius"))   j.at("areaRadius").get_to(t.areaRadius);
@@ -311,6 +233,8 @@ inline void from_json(const nlohmann::json& j, MissionTrigger& t) {
 	if (j.contains("hpThreshold"))  j.at("hpThreshold").get_to(t.hpThreshold);
 	if (j.contains("objectiveIndex")) j.at("objectiveIndex").get_to(t.objectiveIndex);
 	if (j.contains("actions"))      j.at("actions").get_to(t.actions);
-	// isFired はランタイム専用なのでJSONからは読まない
+	// isFired / isPendingDelay / delayTimer はランタイム専用なのでJSONからは読まない
 	t.isFired = false;
+	t.isPendingDelay = false;
+	t.delayTimer = 0.0f;
 }

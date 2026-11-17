@@ -240,6 +240,7 @@ void ClearScene::Initialize() {
 	auto tStart = std::chrono::high_resolution_clock::now();
 #endif
 	sceneID = SCENE::CLEAR;
+	SetOSCursorVisible(false);
 	Input::GetInstance()->UnlockCursor();
 	selectionManager_.Clear();
 	animTimer_ = 0.0f;
@@ -290,6 +291,9 @@ void ClearScene::Initialize() {
 	rewindTimer_ = 0.0f;
 	btnClickFlashTimer_ = 0.0f;
 	clickedButtonIdx_ = -1;
+	isAutoDemoActive_ = result.isClearAutoDemo;
+	autoDemoTimer_ = 0.0f;
+	isDemoUploadPreview_ = false;
 
 	if (auto* w0 = pseudoOS_.GetWindow(HalcyonClearDefaults::kDefaultMainWinId)) {
 		w0->title = result.isHalcyonDaysTutorial
@@ -332,6 +336,7 @@ void ClearScene::Initialize() {
 }
 
 void ClearScene::Update() {
+	SetOSCursorVisible(false);
 	float dt = 1.0f / 60.0f;
 	animTimer_ += dt;
 
@@ -346,9 +351,25 @@ void ClearScene::Update() {
 	}
 
 	Input* input = Input::GetInstance();
+	if (isAutoDemoActive_ && input) {
+		if (input->TriggerMouse(0) ||
+		    input->TriggerKey(DIK_SPACE) ||
+		    input->TriggerKey(DIK_RETURN) ||
+		    input->TriggerKey(DIK_ESCAPE)) {
+			isAutoDemoActive_ = false;
+			isDemoUploadPreview_ = false;
+		}
+	}
 
 	// 疑似OSデスクトップ環境更新（入力自動取得＆ウィンドウ開閉アニメーション自動管理）
 	pseudoOS_.Update(dt);
+
+	if (isAutoDemoActive_) {
+		UpdateAutoDemo(dt);
+		if (sceneID != SCENE::CLEAR) {
+			return;
+		}
+	}
 
 	// VHS巻き戻し演出
 	if (isRewinding_) {
@@ -362,12 +383,12 @@ void ClearScene::Update() {
 	// アップロード＆タイトル復帰演出
 	else if (isUploading_) {
 		uploadTimer_ += dt;
-		if (uploadTimer_ >= 1.40f) {
+		if (!isDemoUploadPreview_ && uploadTimer_ >= 1.40f) {
 			GameResult::GetInstance().titleEntryReason = TitleEntryReason::ReturnFromClear;
 			sceneID = SCENE::TITLE;
 			return;
 		}
-	} else {
+	} else if (!isAutoDemoActive_) {
 		int prevIndex = selectionManager_.GetSelectedIndex();
 		selectionManager_.Update();
 		int currIndex = selectionManager_.GetSelectedIndex();
@@ -508,6 +529,24 @@ void ClearScene::DrawUI() {
 	// 2. 疑似OSデスクトップ環境（マルチウィンドウ、タスクバー、カスタムカーソル）
 	pseudoOS_.Draw();
 
+	if (isAutoDemoActive_) {
+		const float bannerW = 480.0f;
+		const float bannerH = 24.0f;
+		const float bannerX = (kScreenWidth - bannerW) * 0.5f;
+		const float bannerY = 10.0f;
+		const float blink = (std::fmod(animTimer_, 1.0f) < 0.72f) ? 1.0f : 0.65f;
+		pseudoOS_.DrawPanel({ bannerX, bannerY }, { bannerW, bannerH },
+			{ 0.01f, 0.05f, 0.08f, 0.94f }, { 0.30f, 0.95f, 1.0f, 0.85f * blink }, 1.0f);
+		TextRenderer::GetInstance()->Print(
+			"HackGen",
+			"[ AUTO DEMO PLAYBACK // CLICK OR PRESS SPACE FOR MANUAL ]",
+			kScreenWidth * 0.5f,
+			bannerY + 5.0f,
+			11.5f,
+			{ 0.45f, 1.0f, 0.85f, blink },
+			{ 0.5f, 0.0f });
+	}
+
 	// ------------------------------------------------------------
 	// ボタン決定フラッシュ＆波紋フィードバック（0.18秒）
 	// ------------------------------------------------------------
@@ -525,6 +564,62 @@ void ClearScene::DrawUI() {
 	// データアップロードと帰還システムログブリッジ演出
 	// ------------------------------------------------------------
 	DrawUploadSequenceUI();
+}
+
+void ClearScene::UpdateAutoDemo(float dt) {
+	const float prevT = autoDemoTimer_;
+	autoDemoTimer_ += dt;
+	const float t = autoDemoTimer_;
+
+	auto crossed = [&](float triggerT) {
+		return prevT < triggerT && t >= triggerT;
+	};
+
+	if (crossed(1.2f)) {
+		pseudoOS_.BringWindowToFront(1);
+	}
+	if (crossed(2.0f)) {
+		pseudoOS_.BringWindowToFront(3);
+	}
+	if (crossed(2.8f)) {
+		if (auto* w2 = pseudoOS_.GetWindow(2)) {
+			w2->isMinimized = true;
+		}
+	}
+	if (crossed(3.6f)) {
+		if (auto* w2 = pseudoOS_.GetWindow(2)) {
+			w2->isOpen = true;
+			w2->isMinimized = false;
+		}
+		pseudoOS_.BringWindowToFront(2);
+	}
+	if (crossed(4.4f)) {
+		pseudoOS_.BringWindowToFront(0);
+		selectionManager_.SetSelectedIndex(HalcyonClearDefaults::kReturnButtonIndex);
+	}
+	if (crossed(4.9f)) {
+		btnClickFlashTimer_ = 0.18f;
+		clickedButtonIdx_ = 1;
+		isUploading_ = true;
+		isDemoUploadPreview_ = true;
+		uploadTimer_ = 0.0f;
+		pseudoOS_.PlayWindowCloseAnimation(0.28f);
+	}
+	if (crossed(6.2f)) {
+		isUploading_ = false;
+		isDemoUploadPreview_ = false;
+		uploadTimer_ = 0.0f;
+		pseudoOS_.PlayWindowOpenAnimation(0.35f);
+		pseudoOS_.BringWindowToFront(0);
+		selectionManager_.SetSelectedIndex(HalcyonClearDefaults::kReplayButtonIndex);
+	}
+	if (crossed(7.0f)) {
+		isAutoDemoActive_ = false;
+		isDemoUploadPreview_ = false;
+		GameResult::GetInstance().isRetry = true;
+		sceneID = SCENE::STAGE;
+		return;
+	}
 }
 
 void ClearScene::Finalize() {

@@ -1,0 +1,57 @@
+{
+  "name": "CLEAR DEMO -自動クリア演出検証-",
+  "aliasName": "DEMO 01",
+  "subTitle": "即座にミッション達成・クリア画面自動実演デモ",
+  "difficulty": "DEMO",
+  "areaName": "VERNA OUTER CANYON // TACTICAL DEBRIEF SIM",
+  "description": "出撃後1.0秒で自動的に作戦目標を達成し、クリア演出（離脱・戦術マップ）からクリア画面（DAWN_OS デブリーフィング）のウィンドウ操作・アップロード・リワインド演出を自動実演します。",
+  "playerHP": 100.0,
+  "playerPosition": {
+    "x": 220.0,
+    "y": -250.0,
+    "z": 800.0
+  },
+  "playerYawDeg": 0.0,
+  "timeLimit": 0.0,
+  "minAmmoReserve": 0,
+  "fadeOutOnClear": false,
+  "isTutorialDebrief": false,
+  "isClearAutoDemo": true,
+  "disableGenericRadio": true,
+  "enemies": [],
+  "groundEnemies": [],
+  "objectives": [
+    {
+      "name": "Auto Clear Verification (1.0s)",
+      "description": "1.0秒間の飛行で自動的に作戦目標を達成します。",
+      "type": "Survive",
+      "status": "Active",
+      "isPrimary": true,
+      "isHidden": false,
+      "targetIndex": -1,
+      "requiredKills": 0,
+      "areaCenter": { "x": 0.0, "y": 0.0, "z": 0.0 },
+      "areaRadius": 100.0,
+      "duration": 1.0,
+      "minHP": 0.0
+    }
+  ],
+  "triggers": [
+    {
+      "name": "Auto Demo Start Log",
+      "condition": "OnMissionStart",
+      "delaySeconds": 0.0,
+      "isEnabled": true,
+      "isRepeatable": false,
+      "actions": [
+        {
+          "type": "PushSystemLog",
+          "logCategory": "SYS",
+          "logTimestamp": true,
+          "message": "AUTO CLEAR DEMO MODE // ENGAGING SEQUENCE..."
+        }
+      ]
+    }
+  ],
+  "waypointPaths": []
+}

@@ -58,18 +58,18 @@ namespace RadioDefaults {
 	// --- フローティング字幕レイアウト定数（ウィンドウ枠なし・画面上部中央） ---
 	inline constexpr float kCenterAnchorRatioX = 0.5f;
 	inline constexpr float kTopAnchorRatioY = 0.145f;
-	inline constexpr float kSpeakerFontSize = 18.0f;      // 話者名フォントサイズ
-	inline constexpr float kDialogueFontSize = 20.5f;     // セリフフォントサイズ
+	inline constexpr float kSpeakerFontSize = 19.5f;      // 話者名フォントサイズ
+	inline constexpr float kDialogueFontSize = 22.0f;     // セリフフォントサイズ
 	inline constexpr float kSpeakerToDialogueGap = 6.0f;  // 間隔
 	inline constexpr float kDialogueLineGap = 5.0f;       // 行間
 
 	// --- 雲・青空背景でもくっきり読める2層ソフトドロップシャドウ定数 ---
-	inline constexpr float kInnerShadowOffsetX = 1.2f;
-	inline constexpr float kInnerShadowOffsetY = 1.5f;
-	inline constexpr float kOuterShadowOffsetX = 2.2f;
-	inline constexpr float kOuterShadowOffsetY = 2.8f;
-	inline constexpr MyMath::Vector4 kInnerShadowColor = { 0.02f, 0.04f, 0.08f, 0.62f };
-	inline constexpr MyMath::Vector4 kOuterShadowColor = { 0.02f, 0.04f, 0.08f, 0.34f };
+	inline constexpr float kInnerShadowOffsetX = 1.6f;
+	inline constexpr float kInnerShadowOffsetY = 2.0f;
+	inline constexpr float kOuterShadowOffsetX = 3.0f;
+	inline constexpr float kOuterShadowOffsetY = 3.6f;
+	inline constexpr MyMath::Vector4 kInnerShadowColor = { 0.01f, 0.02f, 0.05f, 0.92f };
+	inline constexpr MyMath::Vector4 kOuterShadowColor = { 0.01f, 0.02f, 0.05f, 0.68f };
 
 	// --- タイミング・フェード定数 ---
 	inline constexpr float kDefaultHoldSeconds = 3.00f;

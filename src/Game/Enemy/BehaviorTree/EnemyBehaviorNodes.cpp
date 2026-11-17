@@ -13,11 +13,18 @@ NodeStatus WaitPatrolAction::Tick(float deltaTime, Enemy& enemy) {
 	enemy.SetActiveBehaviorName("WaitPatrol");
 
 	const auto& waypoints = enemy.GetWaypointPoints();
+	const bool hasPlayer = enemy.IsPlayerValid();
+	const float distToPlayer = hasPlayer ? enemy.GetDistanceToPlayer() : 0.0f;
 
-	// ウェイポイントが設定されていない場合は、現在の巡航方向へ安定飛行
-	if (waypoints.empty()) {
-		enemy.SetAimTargetDirection(enemy.GetCruiseDirection(), deltaTime);
-		enemy.SetThrottleInput(cruiseThrottle_);
+	// ウェイポイント未設定、またはプレイヤーから1500m以上離れた場合はプレイヤー方向へ接近してエリア外離脱を防ぐ
+	if (waypoints.empty() || (hasPlayer && distToPlayer > 1500.0f)) {
+		MyMath::Vector3 targetDir = enemy.GetCruiseDirection();
+		if (hasPlayer) {
+			targetDir = enemy.GetDirectionToPlayer();
+			enemy.SetCruiseDirection(targetDir);
+		}
+		enemy.SetAimTargetDirection(targetDir, deltaTime);
+		enemy.SetThrottleInput(hasPlayer ? 0.85f : cruiseThrottle_);
 		return NodeStatus::Running;
 	}
 
@@ -105,22 +112,48 @@ NodeStatus AggressionAction::Tick(float deltaTime, Enemy& enemy) {
 	futurePos = MyMath::Add(playerPos, MyMath::Multiply(timeToHit, playerVel));
 
 	const MyMath::Vector3 toFuture = MyMath::Subtract(futurePos, myPos);
-	if (MyMath::Length(toFuture) > EnemyWaypointDefaults::kMinTargetDirectionLength) {
-		const MyMath::Vector3 targetDir = MyMath::Normalize(toFuture);
-		enemy.SetAimTargetDirection(targetDir, deltaTime);
-	}
 
-	// 距離に応じたスロットル調整（交戦距離に応じて追従・減速）
-	if (distance > engagementRange_ * 0.8f) {
-		enemy.SetThrottleInput(1.0f);
-	} else if (distance < 300.0f) {
-		enemy.SetThrottleInput(0.4f);
+	// ワールド水平面上で直交する一定ブレイク方向（ロールによる左右反転を防止）
+	MyMath::Vector3 breakHoriz = { -toPlayer.z, 0.0f, toPlayer.x };
+	const float breakHorizLen = MyMath::Length(breakHoriz);
+	if (breakHorizLen > EnemyWaypointDefaults::kMinTargetDirectionLength) {
+		breakHoriz = MyMath::Multiply(1.0f / breakHorizLen, breakHoriz);
 	} else {
-		enemy.SetThrottleInput(0.7f);
+		breakHoriz = { 1.0f, 0.0f, 0.0f };
+	}
+	const MyMath::Vector3 breakDir = MyMath::Normalize(MyMath::Add(
+		MyMath::Multiply(0.85f, breakHoriz),
+		MyMath::Vector3{ 0.0f, 0.35f, 0.0f }));
+
+	// 距離 110m〜220m でブレイク方向とリード射撃方向を SmoothStep で連続ブレンド
+	constexpr float kBreakMinDist = 110.0f;
+	constexpr float kBreakMaxDist = 220.0f;
+	const float rawT = std::clamp((distance - kBreakMinDist) / (kBreakMaxDist - kBreakMinDist), 0.0f, 1.0f);
+	const float leadWeight = rawT * rawT * (3.0f - 2.0f * rawT);
+
+	MyMath::Vector3 aimDir = breakDir;
+	if (MyMath::Length(toFuture) > EnemyWaypointDefaults::kMinTargetDirectionLength) {
+		const MyMath::Vector3 leadDir = MyMath::Normalize(toFuture);
+		const MyMath::Vector3 blended = MyMath::Lerp(breakDir, leadDir, leadWeight);
+		if (MyMath::Length(blended) > EnemyWaypointDefaults::kMinTargetDirectionLength) {
+			aimDir = MyMath::Normalize(blended);
+		} else {
+			aimDir = leadDir;
+		}
+	}
+	enemy.SetAimTargetDirection(aimDir, deltaTime);
+
+	// 距離に応じたスロットル調整（交戦距離に応じて食らいつく積極制御）
+	if (leadWeight < 0.5f || distance > engagementRange_ * 0.6f) {
+		enemy.SetThrottleInput(1.0f);
+	} else if (distance < 320.0f) {
+		enemy.SetThrottleInput(0.60f);
+	} else {
+		enemy.SetThrottleInput(0.85f);
 	}
 
-	// 射撃判定：機首が未来位置に対して約5度以内、かつ指定射程内なら射撃
-	if (MyMath::Length(toFuture) > EnemyWaypointDefaults::kMinTargetDirectionLength) {
+	// 射撃判定：リード追従時かつ機首が未来位置に対して一定角度以内、指定射程内なら射撃
+	if (leadWeight > 0.5f && MyMath::Length(toFuture) > EnemyWaypointDefaults::kMinTargetDirectionLength) {
 		const MyMath::Vector3 leadDir = MyMath::Normalize(toFuture);
 		enemy.TryFireGunpod(leadDir, fireRange_);
 	}
@@ -130,7 +163,7 @@ NodeStatus AggressionAction::Tick(float deltaTime, Enemy& enemy) {
 
 // ============================================================================
 // 撤退アクション (RetreatAction)
-// プレイヤーから距離を取って高速離脱・回避運動
+// 戦術的ブレイクターン（旋回離脱→即再突入）
 // ============================================================================
 NodeStatus RetreatAction::Tick(float deltaTime, Enemy& enemy) {
 	if (!enemy.IsPlayerValid()) {
@@ -145,25 +178,31 @@ NodeStatus RetreatAction::Tick(float deltaTime, Enemy& enemy) {
 	const MyMath::Vector3 awayVector = MyMath::Subtract(myPos, playerPos);
 	const float distance = MyMath::Length(awayVector);
 
-	// 安全距離まで十分に離脱できたら成功（再評価サイクルへ移行）
-	if (distance >= safeDistanceMeters_) {
+	// 一定距離を確保したら即座に成功（再交戦サイクルへ移行）
+	if (distance >= safeDistanceMeters_ || distance >= 600.0f) {
 		Reset();
 		return NodeStatus::Success;
 	}
 
-	// プレイヤーとは反対方向を基本離脱ベクトルとする
+	// プレイヤーに対する横方向ベクトル＋上昇成分を混ぜた戦術的ブレイクターン
 	MyMath::Vector3 evadeDir = enemy.GetForward();
 	if (distance > EnemyWaypointDefaults::kMinTargetDirectionLength) {
 		evadeDir = MyMath::Normalize(awayVector);
 	}
 
-	// 回避機動（蛇行・上昇）
-	const float wobbleX = useEvadeWobble_ ? (std::sin(evadeWobbleTimer_ * 1.8f) * 0.22f) : 0.0f;
-	const float climbY = useEvadeWobble_ ? 0.20f : 0.0f;
+	MyMath::Vector3 lateralDir = { -evadeDir.z, 0.0f, evadeDir.x };
+	const float lateralLen = MyMath::Length(lateralDir);
+	if (lateralLen > EnemyWaypointDefaults::kMinTargetDirectionLength) {
+		lateralDir = MyMath::Multiply(1.0f / lateralLen, lateralDir);
+	} else {
+		lateralDir = { 1.0f, 0.0f, 0.0f };
+	}
+
+	const float wobbleY = useEvadeWobble_ ? (std::sin(evadeWobbleTimer_ * 2.2f) * 0.15f) : 0.0f;
 	MyMath::Vector3 dynamicEvadeDir = {
-		evadeDir.x + wobbleX,
-		evadeDir.y + climbY,
-		evadeDir.z
+		evadeDir.x * 0.45f + lateralDir.x * 0.85f,
+		evadeDir.y * 0.35f + 0.32f + wobbleY,
+		evadeDir.z * 0.45f + lateralDir.z * 0.85f
 	};
 	if (MyMath::Length(dynamicEvadeDir) > EnemyWaypointDefaults::kMinTargetDirectionLength) {
 		dynamicEvadeDir = MyMath::Normalize(dynamicEvadeDir);
@@ -171,7 +210,7 @@ NodeStatus RetreatAction::Tick(float deltaTime, Enemy& enemy) {
 
 	enemy.SetAimTargetDirection(dynamicEvadeDir, deltaTime);
 
-	// 離脱時は全力加速（スロットル100% / WEP）
+	// 離脱ターン時は全力加速（スロットル100%）
 	enemy.SetThrottleInput(1.0f);
 
 	return NodeStatus::Running;
@@ -190,19 +229,20 @@ std::unique_ptr<BehaviorTree> EnemyBehaviorTreeBuilder::CreateEnemyTree(AIType a
 
 	// ------------------------------------------------------------------------
 	// 1. 撤退シーケンス (優先度：高)
-	// HPが35%未満の危機的状況、またはCruiseEvadeで接近された場合に発動
+	// HPが20%未満かつ350m以内の危機的状況、またはCruiseEvadeで300m以内に接近された場合にブレイクターン
 	// ------------------------------------------------------------------------
 	auto retreatSeq = std::make_unique<SequenceNode>("RetreatSequence");
 	retreatSeq->AddChild(std::make_unique<ConditionNode>("ShouldRetreat", [aiType](Enemy& e) {
 		if (!e.IsPlayerValid()) {
 			return false;
 		}
-		// 重度ダメージ時の緊急撤退
-		if (e.GetHealthRatio() < 0.35f) {
+		const float dist = e.GetDistanceToPlayer();
+		// 重度ダメージ時の近距離ブレイクターン
+		if (e.GetHealthRatio() < 0.20f && dist < 350.0f) {
 			return true;
 		}
-		// 回避AIタイプの場合、プレイヤーが接近（600m以内）したら撤退
-		if (aiType == AIType::CruiseEvade && e.GetDistanceToPlayer() < 600.0f) {
+		// 回避AIタイプの場合、プレイヤーが至近距離（300m以内）に迫ったらブレイクターン
+		if (aiType == AIType::CruiseEvade && dist < 300.0f) {
 			return true;
 		}
 		return false;
@@ -212,7 +252,7 @@ std::unique_ptr<BehaviorTree> EnemyBehaviorTreeBuilder::CreateEnemyTree(AIType a
 
 	// ------------------------------------------------------------------------
 	// 2. アグレッションシーケンス (優先度：中)
-	// ChaseAttack設定、または索敵・交戦距離内に自機がいる場合に発動
+	// ChaseAttack設定、または2500m以内に自機がいる場合に積極交戦
 	// ------------------------------------------------------------------------
 	auto aggressionSeq = std::make_unique<SequenceNode>("AggressionSequence");
 	aggressionSeq->AddChild(std::make_unique<ConditionNode>("ShouldEngage", [aiType](Enemy& e) {
@@ -223,9 +263,9 @@ std::unique_ptr<BehaviorTree> EnemyBehaviorTreeBuilder::CreateEnemyTree(AIType a
 		if (aiType == AIType::ChaseAttack) {
 			return true;
 		}
-		// ウェイポイント巡航または回避AIであっても、プレイヤーが1200m以内に接近したら迎撃
+		// 他タイプであっても、プレイヤーが2500m以内にいれば積極迎撃
 		const float dist = e.GetDistanceToPlayer();
-		if (dist < 1200.0f) {
+		if (dist <= 2500.0f) {
 			return true;
 		}
 		return false;
@@ -300,14 +340,14 @@ static std::unique_ptr<BTNode> ParseNodeRecursive(const nlohmann::json& nodeJson
 	}
 
 	if (nodeType == "BTActionRetreatNode") {
-		const float safeDist = nodeJson.value("safeDistance", 1400.0f);
+		const float safeDist = (std::min)(nodeJson.value("safeDistance", 450.0f), 500.0f);
 		const bool useEvadeWobble = nodeJson.value("useEvadeWobble", true);
 		return std::make_unique<RetreatAction>(safeDist, useEvadeWobble);
 	}
 
 	if (nodeType == "BTActionAggressionNode") {
-		const float engageDist = nodeJson.value("engagementRange", 1200.0f);
-		const float fireRange = nodeJson.value("fireRange", 1000.0f);
+		const float engageDist = (std::max)(nodeJson.value("engagementRange", 2500.0f), 2500.0f);
+		const float fireRange = (std::max)(nodeJson.value("fireRange", 1200.0f), 1200.0f);
 		return std::make_unique<AggressionAction>(engageDist, fireRange);
 	}
 
@@ -351,22 +391,23 @@ std::unique_ptr<BehaviorTree> EnemyBehaviorTreeBuilder::BuildFromJson(
 			params = rootJson["overrideParams"];
 		}
 
-		const float retreatHpPct = params.value("retreatHpPct", 35.0f);
-		const float retreatSafeDist = params.value("retreatSafeDist", 1400.0f);
-		const float engageDist = params.value("engageDist", 1200.0f);
-		const float fireRange = params.value("fireRange", 1000.0f);
-		const float patrolThrottle = params.value("patrolThrottle", 0.72f);
+		const float retreatHpPct = (std::min)(params.value("retreatHpPct", 20.0f), 20.0f);
+		const float retreatSafeDist = (std::min)(params.value("retreatSafeDist", 450.0f), 500.0f);
+		const float engageDist = (std::max)(params.value("engageDist", 2500.0f), 2500.0f);
+		const float fireRange = (std::max)(params.value("fireRange", 1200.0f), 1200.0f);
+		const float patrolThrottle = params.value("patrolThrottle", 0.85f);
 
 		auto tree = std::make_unique<BehaviorTree>();
 		auto rootSelector = std::make_unique<SelectorNode>("DynamicRootSelector");
 
-		// (A) 撤退シーケンス
+		// (A) 撤退シーケンス（近距離ブレイクターン）
 		auto retreatSeq = std::make_unique<SequenceNode>("RetreatSequence");
 		const float retreatRatio = retreatHpPct * 0.01f;
 		retreatSeq->AddChild(std::make_unique<ConditionNode>("LowHealthCheck", [retreatRatio, fallbackType](Enemy& e) {
 			if (!e.IsPlayerValid()) return false;
-			if (e.GetHealthRatio() < retreatRatio) return true;
-			if (fallbackType == AIType::CruiseEvade && e.GetDistanceToPlayer() < 600.0f) return true;
+			const float dist = e.GetDistanceToPlayer();
+			if (e.GetHealthRatio() < retreatRatio && dist < 350.0f) return true;
+			if (fallbackType == AIType::CruiseEvade && dist < 300.0f) return true;
 			return false;
 		}));
 		retreatSeq->AddChild(std::make_unique<RetreatAction>(retreatSafeDist, true));

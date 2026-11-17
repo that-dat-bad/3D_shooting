@@ -10,7 +10,12 @@
 #include "../FlightModel/Payload/Gunpod.h"
 #include "../Bullet/BulletManager.h"
 #include "../FlightModel/MouseAimController.h"
+#include "../Graphics/AircraftVisualModel.h"
+#include "../Graphics/Afterburner.h"
 #include "../System/Waypoint.h"
+
+class EffectHandle;
+class TerrainChunkManager;
 
 namespace EnemyWaypointDefaults {
 	inline constexpr size_t kInitialWaypointIndex = 0;
@@ -28,7 +33,7 @@ namespace EnemyWaypointDefaults {
 	inline constexpr float kThrottleSpeedErrorGain = 0.025f;
 	inline constexpr float kDefaultWaypointSpeedKmh = 280.0f;
 	inline constexpr float kOpportunisticFireRangeMeters = 850.0f;
-	inline constexpr float kOpportunisticFireDotThreshold = 0.995f;
+	inline constexpr float kOpportunisticFireDotThreshold = 0.980f;
 	inline constexpr float kMuzzleForwardOffset = 8.0f;
 	inline constexpr float kBulletMuzzleSpeed = 500.0f;
 	inline constexpr float kBulletDamage = 10.0f;
@@ -45,7 +50,10 @@ namespace AI {
 enum class AIType {
 	ChaseAttack,
 	CruiseEvade,
-	FollowWaypoint
+	FollowWaypoint,
+	AllyWingman,
+	CanyonDrone,
+	CanyonWesternFighter
 };
 
 enum class TypeBState {
@@ -96,8 +104,33 @@ public:
 	// ウェイポイントパス設定
 	void SetWaypointPath(const WaypointPath& path);
 
+	// 地形・僚機ターゲット参照設定
+	void SetTerrainChunkManager(TerrainChunkManager* terrain) { terrain_ = terrain; }
+	void SetTargetEnemy(Enemy* target) { targetEnemy_ = target; }
+
+	// 峡谷中心X評価（地形に沿った低空誘導用）
+	static float EvaluateCanyonCenterX(float worldZ);
+
 	// === アクセッサ ===
 	bool IsAlive() const { return isAlive_; }
+	bool IsAlly() const { return aiType_ == AIType::AllyWingman; }
+	bool IsRenderActive() const { return isAlive_ || (isDownedSpiral_ && !isCrashedFloor_); }
+	bool IsInDivePass() const { return isInDivePass_; }
+	bool IsDownedSpiral() const { return isDownedSpiral_; }
+	float GetPortWingHpRatio() const { return portWingMaxHp_ > 0.0f ? (portWingHp_ / portWingMaxHp_) : 0.0f; }
+	float GetStbdWingHpRatio() const { return stbdWingMaxHp_ > 0.0f ? (stbdWingHp_ / stbdWingMaxHp_) : 0.0f; }
+	float GetEngineHpRatio() const { return engineCoreMaxHp_ > 0.0f ? (engineCoreHp_ / engineCoreMaxHp_) : 0.0f; }
+	int GetBrokenPartIndex() const { return brokenPart_; }
+	bool ConsumeHitMarkerTriggered() {
+		bool triggered = hitMarkerTriggered_;
+		hitMarkerTriggered_ = false;
+		return triggered;
+	}
+	std::string ConsumeBrokenPartLog() {
+		std::string log = std::move(pendingBrokenPartLog_);
+		pendingBrokenPartLog_.clear();
+		return log;
+	}
 	MyMath::Vector3 GetPosition() const { return flightModel_.GetPosition(); }
 	float GetCollisionRadius() const { return collisionRadius_; }
 	float GetHealth() const { return health_; }
@@ -150,11 +183,17 @@ public:
 	uint32_t GetCollisionAttribute() const override { return CollisionAttribute::kEnemy; }
 	uint32_t GetCollisionMask() const override { return CollisionMask::kEnemy; }
 	void OnCollision(ICollisionBody3D* other) override;
-	bool IsCollisionActive() const override { return isAlive_; }
+	bool IsCollisionActive() const override { return isAlive_ && !IsAlly() && !isInDivePass_; }
 
 private:
 	// AI更新
 	void UpdateAI(float deltaTime);
+	void UpdateAllyWingman(float deltaTime);
+	void UpdateCanyonDrone(float deltaTime);
+	void UpdateCanyonWesternFighter(float deltaTime);
+	void UpdateDownedSpiral(float deltaTime);
+	void TriggerWesternStructuralBreak(int partIndex);
+	float QueryTerrainY(float worldX, float worldZ) const;
 
 	// 物理モデルとAIコントローラー
 	FlightModel flightModel_;
@@ -164,10 +203,13 @@ private:
 	// 参照ポインタ
 	FlightModel* playerFlightModel_ = nullptr;
 	BulletManager* bulletManager_ = nullptr;
+	TerrainChunkManager* terrain_ = nullptr;
+	Enemy* targetEnemy_ = nullptr;
 
 	float health_ = 0.0f;
 	float maxHealth_ = 0.0f;
 	bool isAlive_ = true;
+	bool hitMarkerTriggered_ = false;
 
 	// 衝突判定用の半径
 	float collisionRadius_ = 5.0f;
@@ -178,6 +220,49 @@ private:
 
 	// 描画用3Dオブジェクト
 	std::unique_ptr<Object3d> object3d_ = nullptr;
+	AircraftVisualModel visualModel_;
+	std::unique_ptr<Afterburner> afterburner_ = nullptr;
+	uint32_t ringTexIndex_ = 0;
+
+	// 特殊機体・演出用状態（僚機 / 峡谷ドローン / 多部位西側機）
+	float specialAnimTimer_ = 0.0f;
+	float specialPhaseTimer_ = 0.0f;
+	MyMath::Vector3 specialPos_{};
+	MyMath::Vector3 specialVel_{};
+	MyMath::Vector3 specialForward_{ 0.0f, 0.0f, 1.0f };
+	float specialRollRad_ = 0.0f;
+	float specialFireTimer_ = 0.0f;
+	MyMath::Vector3 lastWingTipL_{};
+	MyMath::Vector3 lastWingTipR_{};
+	bool hasLastWingTips_ = false;
+
+	float droneCruiseZ_ = 0.0f;
+	float droneCurrentSpeed_ = 26.0f;
+	float droneSmoothedGroundY_ = -485.0f;
+	float droneRotorAngle_ = 0.0f;
+
+	bool isInDivePass_ = false;
+	bool isDownedSpiral_ = false;
+	bool isCrashedFloor_ = false;
+	MyMath::Vector3 diveStartPos_{};
+	MyMath::Vector3 diveMidPos_{};
+	MyMath::Vector3 diveEndPos_{};
+	float westernStrafeTimer_ = 0.0f;
+	float westernCruiseZ_ = 0.0f;
+	float westernCurrentSpeed_ = 68.0f;
+	float westernWeavePhaseX_ = 0.0f;
+	float westernWeavePhaseY_ = 0.0f;
+	float westernSmoothedGroundY_ = -485.0f;
+	float portWingHp_ = 45.0f;
+	float portWingMaxHp_ = 45.0f;
+	float stbdWingHp_ = 45.0f;
+	float stbdWingMaxHp_ = 45.0f;
+	float engineCoreHp_ = 50.0f;
+	float engineCoreMaxHp_ = 50.0f;
+	int brokenPart_ = 0; // 0: None, 1: PortWing, 2: StbdWing, 3: EngineCore
+	std::string pendingBrokenPartLog_;
+	EffectHandle* damageSmokeEffect_ = nullptr;
+	EffectHandle* crashPlumeEffect_ = nullptr;
 
 	// AI設定・ステート
 	AIType aiType_ = AIType::ChaseAttack;

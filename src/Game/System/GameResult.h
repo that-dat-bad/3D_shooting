@@ -21,6 +21,7 @@ struct GameResult {
 	bool missionCleared = false;	// ミッションクリアしたか
 	bool isRetry = false;           // リトライ出撃か（trueなら起動シーケンスを高速短縮）
 	bool isHalcyonDaysTutorial = false; // Operation Halcyon Days チュートリアルクリアか
+	bool isClearAutoDemo = false;       // クリア画面自動デモ再生フラグ
 	GameOverReason gameOverReason = GameOverReason::Destroyed; // 失敗要因
 	TitleEntryReason titleEntryReason = TitleEntryReason::InitialBoot; // タイトル画面への突入理由
 
@@ -33,6 +34,7 @@ struct GameResult {
 		missionCleared = false;
 		isRetry = false;
 		isHalcyonDaysTutorial = false;
+		isClearAutoDemo = false;
 		gameOverReason = GameOverReason::Destroyed;
 		titleEntryReason = TitleEntryReason::InitialBoot;
 	}

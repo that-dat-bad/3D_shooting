@@ -4,6 +4,7 @@
 #include <string>
 #include "../../engine/base/Math/MyMath.h"
 #include "Enemy.h"
+#include "EnemySpawnDefinition.h"
 #include "GroundEnemy.h"
 
 namespace EnemyManagerDefaults {
@@ -11,31 +12,16 @@ namespace EnemyManagerDefaults {
 }
 
 class Camera;
-
-// 敵の配置データ（空中目標）
-struct EnemySpawnData {
-	MyMath::Vector3 position;
-	std::string modelPath;
-	float health;
-	AIType aiType = AIType::ChaseAttack;
-	std::string waypointPathName = "";
-	std::string behaviorTreeJson = "";
-};
-
-// 地上敵の配置データ
-struct GroundEnemySpawnData {
-	MyMath::Vector3 position{ 0.0f, 0.0f, 0.0f };
-	GroundAIType aiType = GroundAIType::Turret;
-	float health = 60.0f;
-	GroundEnemyParam param{};
-	std::string waypointPathName = "";
-};
+class TerrainChunkManager;
 
 // 敵の生成・管理クラス
 class EnemyManager {
 public:
 	EnemyManager() = default;
 	~EnemyManager() = default;
+
+	// 地形マネージャー設定（監視塔接地・低空飛行の高度参照用）
+	void SetTerrainChunkManager(TerrainChunkManager* terrain) { terrain_ = terrain; }
 
 	// 初期化
 	void Initialize(
@@ -66,6 +52,10 @@ public:
 	// 撃破判定
 	bool IsUnitDestroyedByIndex(int unitIndex) const;
 
+	// 監視塔炎上・ヒットマーカー照会
+	void IgniteLastWatchtower();
+	bool GetLastHitMarkerTriggered();
+
 	// === ステータス照会 ===
 
 	int GetAliveCount() const;
@@ -79,10 +69,14 @@ public:
 	std::vector<Enemy*> GetAliveEnemies();
 	std::vector<GroundEnemy*> GetAliveGroundEnemies();
 
+	const std::vector<std::unique_ptr<Enemy>>& GetEnemies() const { return enemies_; }
+	std::vector<std::unique_ptr<Enemy>>& GetEnemies() { return enemies_; }
 	const std::vector<std::unique_ptr<GroundEnemy>>& GetGroundEnemies() const { return groundEnemies_; }
 	std::vector<std::unique_ptr<GroundEnemy>>& GetGroundEnemies() { return groundEnemies_; }
 
 private:
+	void GroundWatchtowersToTerrain();
+
 	std::vector<std::unique_ptr<Enemy>> enemies_;
 	std::vector<std::unique_ptr<GroundEnemy>> groundEnemies_;
 	std::vector<WaypointPath> waypointPaths_;
@@ -91,7 +85,9 @@ private:
 	GunPodData cachedGunpod_{};
 	FlightModel* playerFlightModel_ = nullptr;
 	BulletManager* bulletManager_ = nullptr;
+	TerrainChunkManager* terrain_ = nullptr;
 	bool hasCachedInitContext_ = false;
+	bool watchtowersGrounded_ = false;
 
 	const WaypointPath* FindWaypointPathByName(const std::string& pathName) const;
 };

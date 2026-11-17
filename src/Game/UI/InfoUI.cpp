@@ -27,10 +27,10 @@ void InfoUI::Initialize(SpriteCommon* spriteCommon) {
 	SetupTextElement(labelSpeed_, "速度");
 	SetupTextElement(valSpeed_, "0 km/h");
 
-	SetupTextElement(labelAlt_, "高度");
+	SetupTextElement(labelAlt_, "海抜高度");
 	SetupTextElement(valAlt_, "0 m");
 
-	SetupTextElement(labelRalt_, "RALT");
+	SetupTextElement(labelRalt_, "対地高度");
 	SetupTextElement(valRalt_, "0 m");
 
 	SetupTextElement(labelAmmo_, "機関砲");

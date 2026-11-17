@@ -352,6 +352,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="src\Game\Enemy\BehaviorTree\BehaviorTree.h" />
     <ClInclude Include="src\Game\Enemy\BehaviorTree\EnemyBehaviorNodes.h" />
     <ClInclude Include="src\Game\Enemy\EnemyManager.h" />
+    <ClInclude Include="src\Game\Enemy\EnemySpawnDefinition.h" />
     <ClInclude Include="src\Game\Enemy\GroundEnemy.h" />
     <ClInclude Include="src\Game\Bullet\Bullet.h" />
     <ClInclude Include="src\Game\Bullet\BulletManager.h" />
@@ -377,7 +378,6 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="src\engine\Graphics\UI\UITextRegistry.h" />
     <ClInclude Include="src\Game\System\AsyncPreloadManager.h" />
     <ClInclude Include="src\Game\UI\RadioCommunicator.h" />
-    <ClInclude Include="src\Game\Mission\TutorialMissionDirector.h" />
     <ClInclude Include="src\Game\UI\InfoUI.h" />
     <ClInclude Include="src\Game\Mission\MissionSyncManager.h" />
     <ClInclude Include="src\Game\Scene\EffectEditorScene.h" />
@@ -521,7 +521,6 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="src\engine\Graphics\UI\UITextRegistry.cpp" />
     <ClCompile Include="src\Game\System\AsyncPreloadManager.cpp" />
     <ClCompile Include="src\Game\UI\RadioCommunicator.cpp" />
-    <ClCompile Include="src\Game\Mission\TutorialMissionDirector.cpp" />
     <ClCompile Include="src\Game\UI\InfoUI.cpp" />
     <ClCompile Include="src\Game\Mission\MissionSyncManager.cpp" />
     <ClCompile Include="src\Game\Scene\EffectEditorScene.cpp" />

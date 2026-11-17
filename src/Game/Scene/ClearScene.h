@@ -118,6 +118,12 @@ private:
     float uploadTimer_ = 0.0f;
     std::unique_ptr<Sprite> uploadSprite_;
 
+    // クリア画面自動デモ実演シーケンス
+    bool isAutoDemoActive_ = false;
+    float autoDemoTimer_ = 0.0f;
+    bool isDemoUploadPreview_ = false;
+    void UpdateAutoDemo(float dt);
+
     // 各ウィンドウ描画ヘルパー
     void DrawDebriefWindow(const PseudoOS::Window& win);
     void DrawFlightLogWindow(const PseudoOS::Window& win);

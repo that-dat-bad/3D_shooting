@@ -431,10 +431,13 @@ void CombatBootSequence::Update(float dt) {
 		fadeAlpha_ = 0.95f;
 
 		Input* input = Input::GetInstance();
-		if (input) {
-			if (input->TriggerKey(DIK_SPACE) || input->TriggerKey(DIK_RETURN) || input->TriggerMouse(0)) {
-				isWaitingForSpace_ = false;
-				timer_ = 1.60f; // 1.60s〜2.00sでブリーフィングが中央へ圧縮されながら消滅し、2.00sでPhase 1(レーザー走査)へシームレス移行！
+		const bool manualStart = input &&
+			(input->TriggerKey(DIK_SPACE) || input->TriggerKey(DIK_RETURN) || input->TriggerMouse(0));
+		const bool autoStart = (autoAdvanceDelay_ > 0.0f && briefingTimer_ >= autoAdvanceDelay_);
+		if (manualStart || autoStart) {
+			isWaitingForSpace_ = false;
+			timer_ = 1.60f; // 1.60s〜2.00sでブリーフィングが中央へ圧縮されながら消滅し、2.00sでPhase 1(レーザー走査)へシームレス移行！
+			if (input) {
 				input->LockCursor();
 			}
 		}

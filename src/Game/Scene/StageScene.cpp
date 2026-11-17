@@ -167,7 +167,6 @@ void StageScene::InitializeAssets() {
 	combatBootSequence_.Initialize(spriteCommon);
 	hud_.Initialize(spriteCommon);
 	radioCommunicator_.Initialize(spriteCommon);
-	tutorialDirector_.Initialize(spriteCommon);
 	infoUI_.Initialize(spriteCommon);
 
 	seqOverlaySprite_ = std::make_unique<Sprite>();
@@ -269,7 +268,7 @@ void StageScene::ResetGameplayState() {
 	auto& missionManager = MissionManager::GetInstance();
 	std::string loadPath = missionManager.GetCurrentFilePath();
 	if (loadPath.empty()) {
-		loadPath = "Resources/missions/mission00.json";
+		loadPath = "Resources/missions/mission_clear_demo.json";
 	}
 	if (!AsyncPreloadManager::GetInstance()->ApplyPreloadedMission(missionManager)) {
 		auto t0 = std::chrono::high_resolution_clock::now();
@@ -304,13 +303,13 @@ void StageScene::ResetGameplayState() {
 			-485.0f));
 	}
 	playerCamera_.Initialize(mission.playerPosition, flightModel_.GetForwardDirection());
-	tutorialDirector_.ResetForMission(mission, loadPath, mission.playerPosition);
-	const bool isTutorial = tutorialDirector_.IsTutorialActive() || (mission.difficulty == "TUTORIAL" || mission.aliasName == "ZADANIE 00" || loadPath.find("mission00") != std::string::npos);
-	GameResult::GetInstance().isHalcyonDaysTutorial = isTutorial;
+	GameResult::GetInstance().isHalcyonDaysTutorial = mission.isTutorialDebrief;
+	GameResult::GetInstance().isClearAutoDemo = mission.isClearAutoDemo;
 
 	static const std::vector<EnemySpawnData> kEmptyAirEnemies = {};
 	static const std::vector<GroundEnemySpawnData> kEmptyGroundEnemies = {};
 	enemyManager_.SetWaypointPaths(mission.waypointPaths);
+	enemyManager_.SetTerrainChunkManager(terrainChunkManager_);
 
 	enemyManager_.Initialize(
 		enableEnemies_ ? mission.enemies : kEmptyAirEnemies,
@@ -372,11 +371,17 @@ void StageScene::ResetGameplayState() {
 	UITextRegistry::GetInstance()->Register("Stage_Time", &timeText_);
 
 	// 出撃イントロ
-	if (GameResult::GetInstance().isRetry) {
+	if (mission.isClearAutoDemo) {
+		combatBootSequence_.SetQuickMode(false);
+		combatBootSequence_.SetAutoAdvanceDelay(1.8f);
+		GameResult::GetInstance().isRetry = false;
+	} else if (GameResult::GetInstance().isRetry) {
 		combatBootSequence_.SetQuickMode(true);
+		combatBootSequence_.SetAutoAdvanceDelay(0.0f);
 		GameResult::GetInstance().isRetry = false;
 	} else {
 		combatBootSequence_.SetQuickMode(false);
+		combatBootSequence_.SetAutoAdvanceDelay(0.0f);
 	}
 	combatBootSequence_.Start();
 	sortieIntroDuration_ = combatBootSequence_.GetCurrentDuration();
@@ -393,6 +398,10 @@ void StageScene::ResetGameplayState() {
 	}
 
 	// HUDリセット
+	StageHUDData emptyHudData{};
+	emptyHudData.mouseAimEnabled = false;
+	emptyHudData.showReticles = false;
+	hud_.Update(0.0f, emptyHudData);
 	hud_.SetWarningColorMode(false);
 	hud_.ResetShutdown();
 	hud_.ResetDeploy();
@@ -401,6 +410,11 @@ void StageScene::ResetGameplayState() {
 	hasSentDamageWarningRadio_ = false;
 	lastRadioKillCount_ = StageRadioDefaults::kInitialKillCount;
 	isFiringThisFrame_ = false;
+	clearFadeOutActive_ = false;
+	clearFadeOutTimer_ = 0.0f;
+	hitMarkerTimer_ = 0.0f;
+	hasPrevAimDir_ = false;
+	prevAimDir_ = {};
 
 	endSequence_ = StageEndSequence::None;
 	endSeqTimer_ = 0.0f;
@@ -498,6 +512,7 @@ void StageScene::Update() {
 	UpdateCombatFiring(gameDeltaTime);
 	UpdateFlightAndEffects(gameDeltaTime);
 	UpdateCombatAndMission(gameDeltaTime);
+	EffectManager::GetInstance()->Update(gameDeltaTime);
 	UpdateCamera(gameDeltaTime);
 	UpdateDebugAndStatusUI(gameDeltaTime);
 	UpdatePostEffects(gameDeltaTime);
@@ -507,17 +522,23 @@ void StageScene::Update() {
 		terrainChunkManager_->Update(flightModel_.GetPosition());
 	}
 
-	if (tutorialDirector_.IsReadyForDebriefScene()) {
-		PostEffect::GetInstance()->ClearActiveEffects();
-		auto& res = GameResult::GetInstance();
-		res.missionCleared = true;
-		res.isHalcyonDaysTutorial = true;
-		res.enemiesDestroyed = StageRadioDefaults::kTutorialConfirmedHostileCount;
-		res.clearTimeSeconds = missionElapsedTime_;
-		res.playerHPRemaining = playerHP_;
-		res.playerMaxHP = playerMaxHP_;
-		sceneID = SCENE::CLEAR;
-		return;
+	if (clearFadeOutActive_) {
+		clearFadeOutTimer_ += gameDeltaTime;
+		if (clearFadeOutTimer_ >= 1.65f) {
+			if (PostEffect* postEffect = PostEffect::GetInstance()) {
+				postEffect->ClearActiveEffects();
+			}
+			auto& res = GameResult::GetInstance();
+			res.missionCleared = true;
+			res.isHalcyonDaysTutorial = MissionManager::GetInstance().GetCurrentMission().isTutorialDebrief;
+			res.isClearAutoDemo = MissionManager::GetInstance().GetCurrentMission().isClearAutoDemo;
+			res.enemiesDestroyed = enemyManager_.GetDestroyedCount();
+			res.clearTimeSeconds = missionElapsedTime_;
+			res.playerHPRemaining = playerHP_;
+			res.playerMaxHP = playerMaxHP_;
+			sceneID = SCENE::CLEAR;
+			return;
+		}
 	}
 }
 
@@ -608,8 +629,7 @@ void StageScene::Draw() {
 		DrawGround();
 	}
 
-	// 弾丸描画
-	tutorialDirector_.Draw3D(cam);
+	// 目標リング・弾丸描画
 	DrawMissionReachAreaRings(cam);
 
 	bulletManager_.Draw(cam);
@@ -634,7 +654,7 @@ void StageScene::DrawUI() {
 	combatBootSequence_.DrawBackgroundFade();
 
 	// 2. 戦闘HUD（残弾数・照準・タイマー）描画
-	float hudThreshold = combatBootSequence_.IsQuickMode() ? 0.0f : 4.00f;
+	float hudThreshold = combatBootSequence_.IsQuickMode() ? sortieIntroDuration_ : 4.00f;
 	if (sortieIntroTimer_ >= hudThreshold) {
 		hud_.Draw();
 		if (endSequence_ == StageEndSequence::None) {
@@ -642,12 +662,10 @@ void StageScene::DrawUI() {
 			const float screenW = static_cast<float>(WinApp::kClientWidth);
 			const float screenH = static_cast<float>(WinApp::kClientHeight);
 			radioCommunicator_.Draw(screenW, screenH);
-			tutorialDirector_.DrawUI(CameraManager::GetInstance()->GetActiveCamera(), screenW, screenH);
-			if (!tutorialDirector_.IsTutorialActive()) {
-				DrawMissionObjectivesHUD();
-				DrawMissionMessages();
-			}
+			DrawMissionObjectivesHUD();
+			DrawMissionMessages();
 		}
+		hud_.DrawFadeOverlay();
 	}
 
 	// 3. AC6スタイル「メインシステム、戦闘モード起動...」ブートUI描画（最前面）

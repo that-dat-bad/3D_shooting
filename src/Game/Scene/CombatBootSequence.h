@@ -50,6 +50,9 @@ public:
 	void SetQuickMode(bool quick) { isQuickMode_ = quick; }
 	bool IsQuickMode() const { return isQuickMode_; }
 
+	// ブリーフィングSPACE待ちを一定秒数後に自動進行する（0以下で無効）
+	void SetAutoAdvanceDelay(float delaySeconds) { autoAdvanceDelay_ = delaySeconds; }
+
 	// 毎フレーム更新
 	// dt: 経過時間
 	void Update(float dt);
@@ -129,6 +132,7 @@ private:
 	static constexpr float kDuration = 5.20f;      // 演出の総時間（秒: 作戦ブリーフィング＋戦闘起動＋操縦権移行）
 	static constexpr float kQuickDuration = 0.90f; // リトライ時高速演出の総時間（秒）
 	bool isQuickMode_ = false;                    // リトライ用高速ブートフラグ
+	float autoAdvanceDelay_ = 0.0f;               // 0より大きい場合、ブリーフィング待機を自動解除する秒数
 	float fadeAlpha_ = 1.0f;
 
 	// スキャンパイプライン（案1: 自機専用GSマテリアライズ）

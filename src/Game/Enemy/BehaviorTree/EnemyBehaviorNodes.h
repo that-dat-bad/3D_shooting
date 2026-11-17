@@ -35,8 +35,8 @@ private:
 class AggressionAction : public BTNode {
 public:
 	explicit AggressionAction(
-		float engagementRange = 1200.0f,
-		float fireRange = 1000.0f,
+		float engagementRange = 2500.0f,
+		float fireRange = 1200.0f,
 		const char* name = "AggressionAction")
 		: engagementRange_(engagementRange),
 		  fireRange_(fireRange),
@@ -51,8 +51,8 @@ public:
 	float GetFireRange() const { return fireRange_; }
 
 private:
-	float engagementRange_ = 1200.0f;
-	float fireRange_ = 1000.0f;
+	float engagementRange_ = 2500.0f;
+	float fireRange_ = 1200.0f;
 	const char* name_ = "AggressionAction";
 };
 
@@ -60,7 +60,7 @@ private:
 class RetreatAction : public BTNode {
 public:
 	explicit RetreatAction(
-		float safeDistanceMeters = 1400.0f,
+		float safeDistanceMeters = 450.0f,
 		bool useEvadeWobble = true,
 		const char* name = "RetreatAction")
 		: safeDistanceMeters_(safeDistanceMeters),
@@ -77,7 +77,7 @@ public:
 	bool GetUseEvadeWobble() const { return useEvadeWobble_; }
 
 private:
-	float safeDistanceMeters_ = 1400.0f;
+	float safeDistanceMeters_ = 450.0f;
 	bool useEvadeWobble_ = true;
 	float evadeWobbleTimer_ = 0.0f;
 	const char* name_ = "RetreatAction";

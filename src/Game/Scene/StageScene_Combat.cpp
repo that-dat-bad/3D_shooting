@@ -756,8 +756,9 @@ void StageScene::UpdateEndSequence(float dt) {
 			// クリアリザルトへ記録を保存して遷移
 			auto& res = GameResult::GetInstance();
 			res.missionCleared = true;
-			const auto& curMission = MissionManager::GetInstance().GetCurrentMission();
-			res.isHalcyonDaysTutorial = tutorialDirector_.IsTutorialActive() || (res.isHalcyonDaysTutorial || curMission.difficulty == "TUTORIAL" || curMission.aliasName == "ZADANIE 00");
+			res.isHalcyonDaysTutorial = MissionManager::GetInstance().GetCurrentMission().isTutorialDebrief;
+			res.isClearAutoDemo = MissionManager::GetInstance().GetCurrentMission().isClearAutoDemo;
+			res.enemiesDestroyed = enemyManager_.GetDestroyedCount();
 			res.clearTimeSeconds = missionElapsedTime_;
 			res.playerHPRemaining = playerHP_;
 			res.playerMaxHP = playerMaxHP_;

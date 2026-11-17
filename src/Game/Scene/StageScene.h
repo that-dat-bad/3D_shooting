@@ -26,7 +26,6 @@
 #include "../System/MissionMapView.h"
 #include "../UI/RadioCommunicator.h"
 #include "../UI/InfoUI.h"
-#include "../Mission/TutorialMissionDirector.h"
 #include "../Graphics/Afterburner.h"
 
 namespace StageRadioDefaults {
@@ -51,7 +50,6 @@ namespace StageRadioDefaults {
 	inline constexpr const char* kImGuiDefaultDialogue = "今はやめだ";
 	inline constexpr float kZeroTimeLimit = 0.0f;
 	inline constexpr float kTimeWarningThresholdSeconds = 30.0f;
-	inline constexpr int kTutorialConfirmedHostileCount = 1;
 	inline constexpr float kDegToRad = 3.14159265358979f / 180.0f;
 	inline constexpr float kHalfAngleFactor = 0.5f;
 	inline constexpr float kReachAreaRingDepthScale = 3.5f;
@@ -214,13 +212,17 @@ private:
 	// 戦闘HUD（残弾数・照準・タイマー）
 	StageHUD hud_;
 	RadioCommunicator radioCommunicator_;
-	TutorialMissionDirector tutorialDirector_;
 	InfoUI infoUI_;
 	bool hasSentSortieRadio_ = false;
 	bool hasSentDamageWarningRadio_ = false;
 	int lastRadioKillCount_ = StageRadioDefaults::kInitialKillCount;
 	void UpdateRadioCommunications(float gameDeltaTime);
 	bool isFiringThisFrame_ = false;
+	bool clearFadeOutActive_ = false;
+	float clearFadeOutTimer_ = 0.0f;
+	float hitMarkerTimer_ = 0.0f;
+	bool hasPrevAimDir_ = false;
+	MyMath::Vector3 prevAimDir_{};
 
 	// プレイヤーのステータス
 	float playerMaxHP_ = 100.0f;

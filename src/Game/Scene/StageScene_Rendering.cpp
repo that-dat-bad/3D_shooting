@@ -97,10 +97,135 @@ void StageScene::DrawMissionReachAreaRings(Camera* cam) {
 	const uint32_t ringTex = TextureManager::GetInstance()->GetTextureIndexByFilePath(StageRadioDefaults::kRingTexPath);
 	const float spinAngle = totalTime_ * StageRadioDefaults::kReachAreaRingSpinSpeed;
 
-	for (const auto& obj : objectives) {
-		if (obj.status != ObjectiveStatus::Active || obj.type != ObjectiveType::ReachArea) {
+	auto drawDashedStreamer = [&](const Vector3& fromPos, const Vector3& toPos, const Vector4& col) {
+		constexpr int kDashCount = 14;
+		const float phase = std::fmod(totalTime_ * 1.6f, 1.0f);
+		for (int i = 0; i < kDashCount; ++i) {
+			float t0 = (static_cast<float>(i) + phase) / static_cast<float>(kDashCount);
+			if (t0 >= 1.0f) {
+				t0 -= 1.0f;
+			}
+			const float t1 = (std::min)(1.0f, t0 + (0.45f / static_cast<float>(kDashCount)));
+			if (t1 <= t0) {
+				continue;
+			}
+			const Vector3 p0 = Lerp(fromPos, toPos, t0);
+			const Vector3 p1 = Lerp(fromPos, toPos, t1);
+			prim->DrawLine3D(p0, p1, col, cam);
+		}
+	};
+
+	const MissionObjective* prevGate = nullptr;
+	for (size_t i = 0; i < objectives.size(); ++i) {
+		const auto& obj = objectives[i];
+		if (obj.type != ObjectiveType::ReachArea) {
 			continue;
 		}
+
+		if (obj.enableGatePassCheck) {
+			if (obj.status == ObjectiveStatus::Completed) {
+				prevGate = &obj;
+				if (obj.passFlashTimer > 0.0f) {
+					const float t = std::clamp(1.0f - (obj.passFlashTimer / 0.55f), 0.0f, 1.0f);
+					const float flashRadius = 52.0f * (1.0f + t * 0.85f);
+					const Vector4 flashCol = { 1.0f, 1.0f, 1.0f, 0.90f * (1.0f - t) };
+					prim->DrawRing(
+						{ flashRadius, flashRadius, 1.0f },
+						{ 0.0f, 0.0f, spinAngle },
+						obj.areaCenter,
+						flashCol,
+						ringTex,
+						cam,
+						BlendMode::kAdd);
+				}
+				continue;
+			}
+			if (obj.status != ObjectiveStatus::Active) {
+				continue;
+			}
+
+			const float pulse = 0.85f + 0.15f * std::sin(totalTime_ * 4.5f);
+			constexpr float kGateRadius = 52.0f;
+			constexpr float kTickLength = 16.0f;
+			const Vector4 mainCol = { 0.28f, 1.00f, 0.58f, 0.92f * pulse };
+			const Vector4 glowCol = { 0.28f, 1.00f, 0.58f, 0.38f * pulse };
+			const Vector4 tickCol = { 0.35f, 1.00f, 0.68f, 0.95f * pulse };
+
+			prim->DrawRing(
+				{ kGateRadius, kGateRadius, 1.0f },
+				{ 0.0f, 0.0f, spinAngle },
+				obj.areaCenter,
+				mainCol,
+				ringTex,
+				cam,
+				BlendMode::kAdd);
+			prim->DrawRing(
+				{ kGateRadius * 1.25f, kGateRadius * 1.25f, 1.0f },
+				{ 0.0f, 0.0f, -spinAngle * 0.6f },
+				obj.areaCenter,
+				glowCol,
+				ringTex,
+				cam,
+				BlendMode::kAdd);
+
+			const Vector3& c = obj.areaCenter;
+			prim->DrawLine3D({ c.x + kGateRadius, c.y, c.z }, { c.x + kGateRadius + kTickLength, c.y, c.z }, tickCol, cam);
+			prim->DrawLine3D({ c.x - kGateRadius, c.y, c.z }, { c.x - kGateRadius - kTickLength, c.y, c.z }, tickCol, cam);
+			prim->DrawLine3D({ c.x, c.y + kGateRadius, c.z }, { c.x, c.y + kGateRadius + kTickLength, c.z }, tickCol, cam);
+			prim->DrawLine3D({ c.x, c.y - kGateRadius, c.z }, { c.x, c.y - kGateRadius - kTickLength, c.z }, tickCol, cam);
+
+			const Vector3 streamerStart = prevGate
+				? prevGate->areaCenter
+				: Add(flightModel_.GetPosition(), Multiply(40.0f, flightModel_.GetForwardDirection()));
+			drawDashedStreamer(streamerStart, c, { 0.30f, 1.00f, 0.65f, 0.75f });
+
+			for (size_t j = i + 1; j < objectives.size(); ++j) {
+				const auto& nextObj = objectives[j];
+				if (nextObj.type == ObjectiveType::ReachArea && nextObj.enableGatePassCheck) {
+					prim->DrawRing(
+						{ kGateRadius, kGateRadius, 1.0f },
+						{ 0.0f, 0.0f, spinAngle * 0.7f },
+						nextObj.areaCenter,
+						{ 0.22f, 0.85f, 0.72f, 0.55f },
+						ringTex,
+						cam,
+						BlendMode::kAdd);
+					drawDashedStreamer(c, nextObj.areaCenter, { 0.22f, 0.85f, 0.72f, 0.35f });
+					break;
+				}
+			}
+			continue;
+		}
+
+		if (obj.status != ObjectiveStatus::Active) {
+			continue;
+		}
+
+		if (obj.enableBoundaryLineCheck) {
+			if (obj.boundaryCrossed) {
+				continue;
+			}
+			const Vector3& c = obj.areaCenter;
+			prim->DrawRing(
+				{ 64.0f, 64.0f, 1.0f },
+				{ 0.0f, 0.0f, spinAngle },
+				c,
+				{ 0.28f, 0.92f, 1.00f, 0.90f },
+				ringTex,
+				cam,
+				BlendMode::kAdd);
+			prim->DrawLine3D(
+				{ c.x - 65.0f, c.y, c.z },
+				{ c.x + 65.0f, c.y, c.z },
+				{ 0.28f, 0.92f, 1.00f, 0.85f },
+				cam);
+			continue;
+		}
+
+		if (obj.startDelaySeconds > 0.0f) {
+			continue;
+		}
+
 		prim->DrawRing(
 			{ obj.areaRadius, obj.areaRadius, StageRadioDefaults::kReachAreaRingDepthScale },
 			{ StageRadioDefaults::kZeroTimeLimit, StageRadioDefaults::kZeroTimeLimit, spinAngle },
@@ -120,6 +245,11 @@ void StageScene::DrawMissionObjectivesHUD() {
 	const auto& objectives = mm.GetCurrentMission().objectives;
 
 	if (objectives.empty()) return;
+	for (const auto& obj : objectives) {
+		if (!obj.guideTitle.empty()) {
+			return;
+		}
+	}
 
 	// 画面右上に目標リストを表示
 	float startX = WinApp::kClientWidth - 350.0f;
