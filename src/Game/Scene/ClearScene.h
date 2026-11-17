@@ -2,6 +2,7 @@
 #include "OSSceneBase.h"
 #include <vector>
 #include <memory>
+#include "../../engine/Graphics/Camera/Camera.h"
 #include "../../engine/Graphics/UI/UIElement.h"
 #include "../../engine/Graphics/UI/UIText.h"
 #include "../../engine/Graphics/UI/UIButton.h"
@@ -129,6 +130,20 @@ private:
     void DrawFlightLogWindow(const PseudoOS::Window& win);
     void DrawIntelAssessmentWindow(const PseudoOS::Window& win);
     void DrawTheaterReconWindow(const PseudoOS::Window& win);
+
+    // クリア背景 3D等高線マップ & プレイヤー軌跡
+    Camera tacticalCam_;
+    Vector3 trajCenter_ = { 0.0f, 0.0f, 0.0f };
+    float trajOrbitDist_ = 2800.0f;
+    float trajDurationSec_ = 0.0f;
+    void UpdateTacticalCamera();
+    void DrawTacticalAircraftMarker(
+        class PrimitiveModel* prim,
+        const Vector3& pos,
+        const Vector3& forward,
+        const Vector3& up,
+        float groundY,
+        const Vector4& color);
 
     // 演出UI描画ヘルパー
     void DrawRewindEffectUI();

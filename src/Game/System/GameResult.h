@@ -1,5 +1,8 @@
 #pragma once
 #include <cstdint>
+#include <vector>
+#include <string>
+#include "../../engine/base/Math/Vector3.h"
 
 enum class TitleEntryReason {
 	InitialBoot,          // 通常の初回起動（ドローン視点）
@@ -10,6 +13,13 @@ enum class TitleEntryReason {
 enum class GameOverReason {
 	Destroyed,   // 撃墜・爆発
 	TimeOver     // 時間切れ・作戦離脱
+};
+
+struct TrajectorySample {
+	Vector3 pos{};
+	Vector3 forward{ 0.0f, 0.0f, 1.0f };
+	Vector3 up{ 0.0f, 1.0f, 0.0f };
+	float timeSec = 0.0f;
 };
 
 // ゲームのクリア結果データ。シーン間でstatic共有する。
@@ -24,6 +34,8 @@ struct GameResult {
 	bool isClearAutoDemo = false;       // クリア画面自動デモ再生フラグ
 	GameOverReason gameOverReason = GameOverReason::Destroyed; // 失敗要因
 	TitleEntryReason titleEntryReason = TitleEntryReason::InitialBoot; // タイトル画面への突入理由
+	std::vector<TrajectorySample> flightTrajectory; // ステージ中のプレイヤー飛行軌跡（実座標・実姿勢・実時刻）
+	std::string terrainPath = "Resources/terrains/demo2/chunks_info.json"; // 使用中の地形パス
 
 	// 結果をリセットする
 	void Reset() {
@@ -37,6 +49,7 @@ struct GameResult {
 		isClearAutoDemo = false;
 		gameOverReason = GameOverReason::Destroyed;
 		titleEntryReason = TitleEntryReason::InitialBoot;
+		flightTrajectory.clear();
 	}
 
 	// シーン間の受け渡し用グローバルインスタンス

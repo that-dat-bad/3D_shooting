@@ -81,7 +81,7 @@ void AsyncPreloadManager::WaitForStagePreload() {
     }
 }
 
-bool AsyncPreloadManager::ApplyPreloadedMission(MissionManager& missionManager) {
+bool AsyncPreloadManager::ApplyPreloadedMission(MissionManager& missionManager, const std::string& expectedMissionPath) {
 #if BENCHMARK_DISABLE_ASYNC_PRELOAD
     return false; // 同期ロードにフォールバックさせる
 #endif
@@ -98,8 +98,10 @@ bool AsyncPreloadManager::ApplyPreloadedMission(MissionManager& missionManager) 
     }
 
     if (cachedResult_ && cachedResult_->missionLoaded) {
-        missionManager.GetCurrentMission() = cachedResult_->missionData;
-        missionManager.SetCurrentFilePath(cachedResult_->missionPath);
+        if (!expectedMissionPath.empty() && cachedResult_->missionPath != expectedMissionPath) {
+            return false;
+        }
+        missionManager.ApplyLiveMissionData(cachedResult_->missionData, cachedResult_->missionPath);
         missionManager.ResetRuntimeState();
 
         auto end = std::chrono::high_resolution_clock::now();

@@ -77,6 +77,8 @@ struct StageHUDData {
 	bool showRwrAlert = false;
 	float hitMarkerTimer = 0.0f;
 	float fadeOutAlpha = 0.0f;
+	bool isClearDemoMode = false;
+	float clearCountdownSec = -1.0f;
 };
 
 // 戦闘ステージ用HUD
@@ -166,6 +168,7 @@ private:
 	// --- 各HUD要素の描画 ---
 	void DrawTimer();
 	void DrawBailoutGuide();
+	void DrawClearDemoCountdown();
 	void DrawTargetMarkers();
 	void DrawSystemLogs();
 	void DrawGuidePanel();

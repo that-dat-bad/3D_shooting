@@ -1,0 +1,7 @@
+newmtl TerrainBakedMat
+Ka 0.15 0.15 0.15
+Kd 1.0 1.0 1.0
+Ks 0.05 0.05 0.05
+Ns 16.0
+map_Kd terrain_albedo.png
+map_Bump terrain_normal.png

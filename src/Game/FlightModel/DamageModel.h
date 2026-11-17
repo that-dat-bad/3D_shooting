@@ -165,6 +165,19 @@ public:
 		float groundY = 0.0f
 	);
 
+	// 水面（海・川）との衝突・水没・浮力判定（War Thunder準拠）
+	// 戻り値: 深水域で水面に接触した場合 true（極浅瀬では false を返し海底の地上判定へ委ねる）
+	bool ProcessWaterCollision(
+		MyMath::Vector3& position,
+		const MyMath::Quaternion& orientation,
+		MyMath::Vector3& velocity,
+		MyMath::Vector3& angularVelocity,
+		float dt,
+		float waterY,
+		float waterDepth,
+		bool isSeaplane = false
+	);
+
 	// ============================================================
 	// パーツ状態の取得
 	// ============================================================

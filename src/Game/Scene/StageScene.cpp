@@ -198,7 +198,7 @@ void StageScene::InitializeAssets() {
 
 	// 地形チャンクマネージャー初期化（4000mチャンク分割 40km x 40km）
 	terrainChunkManager_ = TerrainChunkManager::GetInstance();
-	terrainChunkManager_->Initialize(Object3dCommon::GetInstance(), CameraManager::GetInstance()->GetActiveCamera(), "Resources/terrains/demo/chunks_info.json");
+	terrainChunkManager_->Initialize(Object3dCommon::GetInstance(), CameraManager::GetInstance()->GetActiveCamera(), "Resources/terrains/demo2/chunks_info.json");
 
 	// 初回のみテクスチャアップロードを確定
 	DirectXCommon::GetInstance()->FlushTextureUploads();
@@ -239,15 +239,6 @@ void StageScene::ResetGameplayState() {
 	// Blender MCP リアルタイム同期の初期化＆自動開始
 	TerrainSyncManager::GetInstance()->Initialize("localhost", 8765);
 	TerrainSyncManager::GetInstance()->StartSync();
-	{
-		std::string syncMissionPath = MissionManager::GetInstance().GetCurrentFilePath();
-		if (syncMissionPath.empty()) {
-			syncMissionPath = MissionSyncDefaults::kDefaultMissionFilePath;
-		}
-		MissionSyncManager::GetInstance()->Initialize();
-		MissionSyncManager::GetInstance()->SetActiveMissionFilePath(syncMissionPath);
-		MissionSyncManager::GetInstance()->StartSync();
-	}
 
 	// カメラ初期位置
 	Vector3 initPos = flightModel_.GetPosition();
@@ -270,7 +261,7 @@ void StageScene::ResetGameplayState() {
 	if (loadPath.empty()) {
 		loadPath = "Resources/missions/mission_clear_demo.json";
 	}
-	if (!AsyncPreloadManager::GetInstance()->ApplyPreloadedMission(missionManager)) {
+	if (!AsyncPreloadManager::GetInstance()->ApplyPreloadedMission(missionManager, loadPath)) {
 		auto t0 = std::chrono::high_resolution_clock::now();
 		missionManager.Load(loadPath);
 		auto t1 = std::chrono::high_resolution_clock::now();
@@ -281,6 +272,11 @@ void StageScene::ResetGameplayState() {
 	}
 
 	const auto& mission = missionManager.GetCurrentMission();
+	if (loadPath.find("mission_clear_demo") == std::string::npos) {
+		MissionSyncManager::GetInstance()->Initialize();
+		MissionSyncManager::GetInstance()->SetActiveMissionFilePath(loadPath);
+		MissionSyncManager::GetInstance()->StartSync();
+	}
 	playerMaxHP_ = mission.playerHP;
 	playerHP_ = mission.playerHP;
 	flightModel_.SetPosition(mission.playerPosition);
@@ -419,6 +415,11 @@ void StageScene::ResetGameplayState() {
 	endSequence_ = StageEndSequence::None;
 	endSeqTimer_ = 0.0f;
 
+	GameResult::GetInstance().flightTrajectory.clear();
+	if (terrainChunkManager_) {
+		GameResult::GetInstance().terrainPath = terrainChunkManager_->GetActiveTerrainPath();
+	}
+
 	missionManager.BindEnemyManager(&enemyManager_);
 	missionManager.ResetRuntimeState();
 }
@@ -458,10 +459,16 @@ void StageScene::Update() {
 			SetPaused(true);
 			return;
 		}
-		// ベイルアウト（脱出）入力（Jキーで被撃墜と同じゲームオーバー演出）
+		// ベイルアウト（脱出）入力（クリアデモ時は即時クリア、通常時はゲームオーバー演出）
 		if (input && input->TriggerKey(DIK_J)) {
-			isBailout_ = true;
-			TriggerGameOver();
+			const bool isClearDemo =
+				MissionManager::GetInstance().GetCurrentMission().name.find("CLEAR DEMO") != std::string::npos;
+			if (isClearDemo) {
+				TriggerGameClear();
+			} else {
+				isBailout_ = true;
+				TriggerGameOver();
+			}
 			return;
 		}
 	}
@@ -656,8 +663,8 @@ void StageScene::DrawUI() {
 	// 2. 戦闘HUD（残弾数・照準・タイマー）描画
 	float hudThreshold = combatBootSequence_.IsQuickMode() ? sortieIntroDuration_ : 4.00f;
 	if (sortieIntroTimer_ >= hudThreshold) {
-		hud_.Draw();
-		if (endSequence_ == StageEndSequence::None) {
+		if (endSequence_ == StageEndSequence::None && !isMissionCleared_ && !isMissionFailed_ && !isGameOver_) {
+			hud_.Draw();
 			infoUI_.Draw();
 			const float screenW = static_cast<float>(WinApp::kClientWidth);
 			const float screenH = static_cast<float>(WinApp::kClientHeight);

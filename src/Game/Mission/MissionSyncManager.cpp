@@ -1,4 +1,5 @@
 #include "MissionSyncManager.h"
+#include "../Environment/TerrainChunkManager.h"
 #include <filesystem>
 #include <algorithm>
 
@@ -46,10 +47,20 @@ std::string MissionSyncManager::BuildLiveEndpoint() const {
 	}
 	std::string fullJsonStr = fullJsonPath.generic_string();
 
-	// /mission/live?file=<FullPath>&projectRoot=<ProjectRoot>
+	// /mission/live?file=<FullPath>&projectRoot=<ProjectRoot>&terrain=<TerrainPath>
+	std::string terrainRel = TerrainChunkManager::GetInstance()->GetActiveTerrainPath();
+	fs::path fullTerrainPath(terrainRel);
+	if (!terrainRel.empty() && !fullTerrainPath.is_absolute()) {
+		fullTerrainPath = rootPath / fullTerrainPath;
+	}
+	std::string fullTerrainStr = terrainRel.empty() ? "" : fullTerrainPath.generic_string();
+
 	std::string endpoint = std::string(MissionSyncDefaults::kLiveMissionFileQueryPrefix)
 		+ fullJsonStr
 		+ "&projectRoot=" + rootStr;
+	if (!fullTerrainStr.empty()) {
+		endpoint += "&terrain=" + fullTerrainStr;
+	}
 
 	return endpoint;
 }

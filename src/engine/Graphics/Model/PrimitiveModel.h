@@ -57,6 +57,9 @@ public:
 	// 3D直線描画関数 (デバッグ用などに使用)
 	void DrawLine3D(const Vector3& p1, const Vector3& p2, const Vector4& color, Camera* camera);
 
+	// 3D三角形描画関数（ソリッド面描画用）
+	void DrawTriangle3D(const Vector3& p0, const Vector3& p1, const Vector3& p2, const Vector4& color, Camera* camera, BlendMode blendMode = BlendMode::kOpaque);
+
 	// 頂点データ構造体（無駄なウェイトやインデックスを省いた軽量版）
 	struct VertexData {
 		Vector4 position;
@@ -103,6 +106,11 @@ private:
 	Microsoft::WRL::ComPtr<ID3D12Resource> lineVertexBuffer_;
 	D3D12_VERTEX_BUFFER_VIEW lineVertexBufferView_{};
 	uint32_t lineVertexCount_ = 0;
+
+	// 三角形のバッファ
+	Microsoft::WRL::ComPtr<ID3D12Resource> triangleVertexBuffer_;
+	D3D12_VERTEX_BUFFER_VIEW triangleVertexBufferView_{};
+	uint32_t triangleVertexCount_ = 0;
 
 	// トランスフォームとマテリアルを定数バッファとしてGPUに送る構造体
 	struct TransformationMatrix {

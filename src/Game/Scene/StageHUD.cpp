@@ -98,6 +98,7 @@ void StageHUD::Draw() {
 
 	DrawTimer();
 	DrawBailoutGuide();
+	DrawClearDemoCountdown();
 	DrawTargetMarkers();
 	DrawSystemLogs();
 	DrawGuidePanel();
@@ -568,10 +569,13 @@ void StageHUD::DrawBailoutGuide() {
 		{ 0.5f, 0.0f }
 	);
 
-	// BAIL OUT / 緊急脱出
+	// BAIL OUT / 緊急脱出（クリアデモ時は即時クリア表示）
+	const char* titleStr = hudData_.isClearDemoMode ? "INSTANT CLEAR" : "BAIL OUT";
+	const char* subStr = hudData_.isClearDemoMode ? "即時クリア (CLEAR)" : "緊急脱出 (EJECT)";
+
 	TextRenderer::GetInstance()->Print(
 		"HackGen",
-		"BAIL OUT",
+		titleStr,
 		panelX + 54.0f,
 		panelY + 8.0f,
 		15.0f,
@@ -580,11 +584,57 @@ void StageHUD::DrawBailoutGuide() {
 
 	TextRenderer::GetInstance()->Print(
 		"HackGen",
-		"緊急脱出 (EJECT)",
+		subStr,
 		panelX + 54.0f,
 		panelY + 27.0f,
 		12.0f,
 		subColor
+	);
+}
+
+void StageHUD::DrawClearDemoCountdown() {
+	if (!hudData_.isClearDemoMode || hudData_.clearCountdownSec < 0.0f) {
+		return;
+	}
+	if (isShuttingDown_ && shutdownTimer_ >= 0.70f) {
+		return;
+	}
+
+	float shutdownAlpha = 1.0f;
+	if (isShuttingDown_ && shutdownTimer_ >= 0.30f) {
+		shutdownAlpha = 1.0f - (shutdownTimer_ - 0.30f) / 0.40f;
+	}
+	float alpha = std::clamp(shutdownAlpha, 0.0f, 1.0f);
+	if (alpha <= 0.01f) {
+		return;
+	}
+
+	const int countSec = (std::max)(0, static_cast<int>(std::ceil(hudData_.clearCountdownSec)));
+	const std::string text = "クリアまで..." + std::to_string(countSec) + "....";
+
+	const float x = hudData_.screenWidth - 36.0f;
+	const float y = hudData_.screenHeight - 28.0f;
+	const float fontSize = 44.0f;
+
+	// 視認性向上のためのドロップシャドウ
+	TextRenderer::GetInstance()->Print(
+		"HackGen",
+		text,
+		x + 2.0f,
+		y + 2.0f,
+		fontSize,
+		{ 0.0f, 0.05f, 0.02f, 0.75f * alpha },
+		{ 1.0f, 1.0f }
+	);
+
+	TextRenderer::GetInstance()->Print(
+		"HackGen",
+		text,
+		x,
+		y,
+		fontSize,
+		{ 0.52f, 0.96f, 0.62f, 0.96f * alpha },
+		{ 1.0f, 1.0f }
 	);
 }
 

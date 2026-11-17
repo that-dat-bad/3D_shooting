@@ -1,0 +1,14 @@
+# Blender 5.2.4 LTS MTL File: 'demo2.blend'
+# www.blender.org
+
+newmtl Material_Ocean_Water
+Ns 462.399994
+Ka 1.000000 1.000000 1.000000
+Kd 0.015000 0.110000 0.280000
+Ks 0.250000 0.250000 0.250000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 0.960000
+illum 9
+
+map_Kd shore_sdf.png

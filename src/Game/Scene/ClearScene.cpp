@@ -5,6 +5,9 @@
 #include "../../engine/Graphics/Text/TextRenderer.h"
 #include "../../engine/Graphics/System/TextureManager.h"
 #include "../../engine/Graphics/PostProcess/PostEffect.h"
+#include "../../engine/Graphics/Model/Object3dCommon.h"
+#include "../../engine/Graphics/Model/PrimitiveModel.h"
+#include "../Environment/TerrainChunkManager.h"
 #include "../System/GameResult.h"
 #include "../System/AsyncPreloadManager.h"
 #include "../../engine/Graphics/UI/UITextRegistry.h"
@@ -63,62 +66,11 @@ void ClearScene::PrewarmAssets() {
 
 		pseudoOS_.ClearWindows();
 
-		// Window 1: フライトレコーダーテレメトリ（左列上）
-		PseudoOS::Window win1;
-		win1.id = 1;
-		win1.title = "TELEMETRY : FLIGHT RECORDER LOG";
-		win1.pos = { 16.0f, 44.0f };
-		win1.size = { 346.0f, 300.0f };
-		win1.normalPos = win1.pos;
-		win1.normalSize = win1.size;
-		win1.titleBarHeight = 34.0f;
-		win1.isOpen = true;
-		win1.isMinimized = false;
-		win1.animScale = 0.0f;
-		win1.onDrawContent = [this](const PseudoOS::Window& win, PseudoOS* os) {
-			DrawFlightLogWindow(win);
-		};
-		pseudoOS_.AddWindow(win1);
-
-		// Window 2: 敵損害・戦果分析（左列下）
-		PseudoOS::Window win2;
-		win2.id = 2;
-		win2.title = "INTEL : ENEMY CASUALTY ANALYSIS";
-		win2.pos = { 16.0f, 356.0f };
-		win2.size = { 346.0f, 320.0f };
-		win2.normalPos = win2.pos;
-		win2.normalSize = win2.size;
-		win2.titleBarHeight = 34.0f;
-		win2.isOpen = true;
-		win2.isMinimized = false;
-		win2.animScale = 0.0f;
-		win2.onDrawContent = [this](const PseudoOS::Window& win, PseudoOS* os) {
-			DrawIntelAssessmentWindow(win);
-		};
-		pseudoOS_.AddWindow(win2);
-
-		// Window 3: 作戦エリア地形図 & BDA機体損害評価
-		PseudoOS::Window win3;
-		win3.id = 3;
-		win3.title = "THEATER_RECON : AIRSPACE TOPOGRAPHY & BDA";
-		win3.pos = { 926.0f, 44.0f };
-		win3.size = { 338.0f, 632.0f };
-		win3.normalPos = win3.pos;
-		win3.normalSize = win3.size;
-		win3.titleBarHeight = 34.0f;
-		win3.isOpen = true;
-		win3.isMinimized = false;
-		win3.animScale = 0.0f;
-		win3.onDrawContent = [this](const PseudoOS::Window& win, PseudoOS* os) {
-			DrawTheaterReconWindow(win);
-		};
-		pseudoOS_.AddWindow(win3);
-
-		// Window 0: メインデブリーフィングコンソール（中央列・操作対象メインウィンドウ）
+		// Window 0: メインデブリーフィングコンソール（右側配置・左側に3D軌跡と等高線を広く見せる）
 		PseudoOS::Window win0;
 		win0.id = 0;
 		win0.title = "DEBRIEF : OPERATION DAWN [SUCCESS]";
-		win0.pos = { 374.0f, 44.0f };
+		win0.pos = { 700.0f, 44.0f };
 		win0.size = { 540.0f, 632.0f };
 		win0.normalPos = win0.pos;
 		win0.normalSize = win0.size;
@@ -191,7 +143,12 @@ void ClearScene::PrewarmAssets() {
 			clickedButtonIdx_ = 0;
 			isRewinding_ = true;
 			rewindTimer_ = 0.0f;
-			AsyncPreloadManager::GetInstance()->StartStagePreloadAsync();
+			const std::string curMissionPath = MissionManager::GetInstance().GetCurrentFilePath();
+			if (!curMissionPath.empty()) {
+				AsyncPreloadManager::GetInstance()->StartStagePreloadAsync(curMissionPath);
+			} else {
+				AsyncPreloadManager::GetInstance()->StartStagePreloadAsync();
+			}
 		});
 
 		titleButton_.Initialize(spriteCommon, "[02] RETURN TO BASE", 18.0f);
@@ -254,6 +211,47 @@ void ClearScene::Initialize() {
 	pseudoOS_.ResetWindowPositions();
 	pseudoOS_.PlayWindowOpenAnimation(0.35f);
 	pseudoOS_.BringWindowToFront(0);
+
+	// 3D等高線マップ & プレイヤー飛行軌跡用カメラの初期化
+	trajCenter_ = { 0.0f, 0.0f, 0.0f };
+	trajOrbitDist_ = 2800.0f;
+	trajDurationSec_ = 0.0f;
+	if (!result.flightTrajectory.empty()) {
+		Vector3 minP = result.flightTrajectory.front().pos;
+		Vector3 maxP = result.flightTrajectory.front().pos;
+		for (const auto& s : result.flightTrajectory) {
+			minP.x = (std::min)(minP.x, s.pos.x);
+			minP.y = (std::min)(minP.y, s.pos.y);
+			minP.z = (std::min)(minP.z, s.pos.z);
+			maxP.x = (std::max)(maxP.x, s.pos.x);
+			maxP.y = (std::max)(maxP.y, s.pos.y);
+			maxP.z = (std::max)(maxP.z, s.pos.z);
+		}
+		trajDurationSec_ = (std::max)(0.0f, result.flightTrajectory.back().timeSec - result.flightTrajectory.front().timeSec);
+		const Vector3& endP = result.flightTrajectory.back().pos;
+		// 自機最終位置の少し下を注視点にし、自機・軌跡・地表等高線がすべて画面内に収まるようにする
+		trajCenter_ = {
+			endP.x,
+			endP.y - 120.0f,
+			endP.z
+		};
+		float span = (std::max)(maxP.x - minP.x, maxP.z - minP.z);
+		trajOrbitDist_ = std::clamp(span * 1.35f, 2200.0f, 5500.0f);
+	}
+	tacticalCam_.SetFovY(0.55f);
+	tacticalCam_.SetNearClip(20.0f);
+	tacticalCam_.SetFarClip(80000.0f);
+	UpdateTacticalCamera();
+
+	auto* tcm = TerrainChunkManager::GetInstance();
+	if (tcm) {
+		if (!tcm->IsLoaded()) {
+			tcm->Initialize(Object3dCommon::GetInstance(), &tacticalCam_, result.terrainPath);
+		}
+		tcm->SetCamera(&tacticalCam_);
+		tcm->SetDrawDistance(32000.0f);
+		tcm->Update(trajCenter_);
+	}
 
 	// 最新リザルト値の反映
 	char enemyBuf[32];
@@ -350,6 +348,12 @@ void ClearScene::Update() {
 		if (btnClickFlashTimer_ < 0.0f) btnClickFlashTimer_ = 0.0f;
 	}
 
+	UpdateTacticalCamera();
+	if (auto* tcm = TerrainChunkManager::GetInstance(); tcm && tcm->IsLoaded()) {
+		tcm->SetCamera(&tacticalCam_);
+		tcm->Update(trajCenter_);
+	}
+
 	Input* input = Input::GetInstance();
 	if (isAutoDemoActive_ && input) {
 		if (input->TriggerMouse(0) ||
@@ -430,7 +434,201 @@ void ClearScene::Update() {
 #endif
 }
 
+void ClearScene::UpdateTacticalCamera() {
+	const float pitch = 0.52f;
+	const float yaw = animTimer_ * 0.06f + 0.45f;
+	Vector3 camPos = {
+		trajCenter_.x - trajOrbitDist_ * std::cos(pitch) * std::sin(yaw),
+		trajCenter_.y + trajOrbitDist_ * std::sin(pitch),
+		trajCenter_.z - trajOrbitDist_ * std::cos(pitch) * std::cos(yaw)
+	};
+	tacticalCam_.SetRotate({ pitch, yaw, 0.0f });
+	tacticalCam_.SetTranslate(camPos);
+	tacticalCam_.Update();
+}
+
+void ClearScene::DrawTacticalAircraftMarker(
+	PrimitiveModel* prim,
+	const Vector3& pos,
+	const Vector3& forward,
+	const Vector3& up,
+	float groundY,
+	const Vector4& color) {
+	if (!prim) return;
+
+	// 垂直ドロップライン（AC7風の機体下への垂線）
+	prim->DrawLine3D(pos, { pos.x, groundY + 4.0f, pos.z }, { color.x, color.y, color.z, 0.85f }, &tacticalCam_);
+
+	Vector3 dir = forward;
+	float dLen = std::sqrt(dir.x * dir.x + dir.y * dir.y + dir.z * dir.z);
+	if (dLen > 0.001f) {
+		dir = { dir.x / dLen, dir.y / dLen, dir.z / dLen };
+	} else {
+		dir = { 0.0f, 0.0f, 1.0f };
+	}
+
+	Vector3 rightV = {
+		up.y * dir.z - up.z * dir.y,
+		up.z * dir.x - up.x * dir.z,
+		up.x * dir.y - up.y * dir.x
+	};
+	float rLen = std::sqrt(rightV.x * rightV.x + rightV.y * rightV.y + rightV.z * rightV.z);
+	if (rLen < 0.001f) {
+		rightV = { 1.0f, 0.0f, 0.0f };
+	} else {
+		rightV = { rightV.x / rLen, rightV.y / rLen, rightV.z / rLen };
+	}
+	Vector3 upV = {
+		dir.y * rightV.z - dir.z * rightV.y,
+		dir.z * rightV.x - dir.x * rightV.z,
+		dir.x * rightV.y - dir.y * rightV.x
+	};
+
+	auto makePt = [&](float fOff, float rOff, float uOff) -> Vector3 {
+		return {
+			pos.x + dir.x * fOff + rightV.x * rOff + upV.x * uOff,
+			pos.y + dir.y * fOff + rightV.y * rOff + upV.y * uOff,
+			pos.z + dir.z * fOff + rightV.z * rOff + upV.z * uOff
+		};
+	};
+
+	// コンパクトで視認性の高いカーナビ風3Dシェブロン（複数機表示対応サイズ）
+	const float hThick = 6.5f;
+	Vector3 topPts[4] = {
+		makePt( 48.0f,   0.0f,  hThick),
+		makePt(-34.0f, -28.0f,  hThick),
+		makePt(-16.0f,   0.0f,  hThick),
+		makePt(-34.0f,  28.0f,  hThick)
+	};
+	Vector3 botPts[4] = {
+		makePt( 48.0f,   0.0f, -hThick),
+		makePt(-34.0f, -28.0f, -hThick),
+		makePt(-16.0f,   0.0f, -hThick),
+		makePt(-34.0f,  28.0f, -hThick)
+	};
+	// 緑単色ソリッド面（上面2枚・下面2枚・側面8枚）
+	prim->DrawTriangle3D(topPts[0], topPts[1], topPts[2], color, &tacticalCam_);
+	prim->DrawTriangle3D(topPts[0], topPts[2], topPts[3], color, &tacticalCam_);
+	prim->DrawTriangle3D(botPts[0], botPts[1], botPts[2], color, &tacticalCam_);
+	prim->DrawTriangle3D(botPts[0], botPts[2], botPts[3], color, &tacticalCam_);
+	for (int k = 0; k < 4; ++k) {
+		int nk = (k + 1) % 4;
+		prim->DrawTriangle3D(topPts[k], botPts[k], botPts[nk], color, &tacticalCam_);
+		prim->DrawTriangle3D(topPts[k], botPts[nk], topPts[nk], color, &tacticalCam_);
+	}
+
+	// 枠線（面よりちょっと濃いめの緑・Zファイティング防止のため極小オフセット）
+	const float edgeExpand = 0.4f;
+	Vector3 edgeTopPts[4] = {
+		makePt( 48.0f + edgeExpand,   0.0f,               hThick + edgeExpand),
+		makePt(-34.0f - edgeExpand, -28.0f - edgeExpand,  hThick + edgeExpand),
+		makePt(-16.0f - edgeExpand,   0.0f,               hThick + edgeExpand),
+		makePt(-34.0f - edgeExpand,  28.0f + edgeExpand,  hThick + edgeExpand)
+	};
+	Vector3 edgeBotPts[4] = {
+		makePt( 48.0f + edgeExpand,   0.0f,              -hThick - edgeExpand),
+		makePt(-34.0f - edgeExpand, -28.0f - edgeExpand, -hThick - edgeExpand),
+		makePt(-16.0f - edgeExpand,   0.0f,              -hThick - edgeExpand),
+		makePt(-34.0f - edgeExpand,  28.0f + edgeExpand, -hThick - edgeExpand)
+	};
+	const Vector4 edgeCol = { color.x * 0.30f, color.y * 0.46f, color.z * 0.34f, 1.00f };
+	for (int k = 0; k < 4; ++k) {
+		int nk = (k + 1) % 4;
+		prim->DrawLine3D(edgeTopPts[k], edgeTopPts[nk], edgeCol, &tacticalCam_);
+		prim->DrawLine3D(edgeBotPts[k], edgeBotPts[nk], edgeCol, &tacticalCam_);
+		prim->DrawLine3D(edgeTopPts[k], edgeBotPts[k], edgeCol, &tacticalCam_);
+	}
+	prim->DrawLine3D(edgeTopPts[0], edgeTopPts[2], edgeCol, &tacticalCam_);
+
+	// 地表の小さな着地点リング
+	uint32_t ringTex = TextureManager::GetInstance()->GetTextureIndexByFilePath("assets/textures/circle2.png");
+	float pulse = 1.0f + 0.18f * std::sin(animTimer_ * 4.5f);
+	prim->DrawRing(
+		{ 65.0f * pulse, 65.0f * pulse, 1.0f },
+		{ 1.5707963f, 0.0f, animTimer_ * 0.9f },
+		{ pos.x, groundY + 8.0f, pos.z },
+		{ color.x, color.y, color.z, 0.75f },
+		ringTex,
+		&tacticalCam_,
+		BlendMode::kAdd);
+}
+
 void ClearScene::Draw() {
+	// 1. 3D等高線地形 + プレイヤー飛行軌跡の描画（余計な情報なし）
+	if (auto* tcm = TerrainChunkManager::GetInstance(); tcm && tcm->IsLoaded()) {
+		tcm->DrawContourMap(&tacticalCam_);
+	}
+
+	const auto& traj = GameResult::GetInstance().flightTrajectory;
+	if (PrimitiveModel* prim = PrimitiveModel::GetInstance(); prim && !traj.empty()) {
+		const Vector4 playerGreen = { 0.16f, 0.90f, 0.34f, 1.00f };
+		const Vector4 trajCol = playerGreen;
+		const Vector4 trajFutureCol = { playerGreen.x, playerGreen.y, playerGreen.z, 0.25f };
+		const Vector4 trajGroundCol = { playerGreen.x, playerGreen.y, playerGreen.z, 0.40f };
+		auto* tcm = TerrainChunkManager::GetInstance();
+
+		// 記録された実時刻に基づき1回再生し、クリア地点で静止表示
+		const float playDuration = (trajDurationSec_ > 0.1f) ? (std::min)(trajDurationSec_, 10.0f) : 1.0f;
+		const float playFrac = std::clamp(animTimer_ / playDuration, 0.0f, 1.0f);
+		const float targetTime = traj.front().timeSec + trajDurationSec_ * playFrac;
+
+		Vector3 curPos = traj.back().pos;
+		Vector3 curForward = traj.back().forward;
+		Vector3 curUp = traj.back().up;
+		size_t activeSegIdx = (traj.size() >= 2) ? (traj.size() - 2) : 0;
+
+		if (traj.size() >= 2 && trajDurationSec_ > 0.001f) {
+			for (size_t i = 0; i + 1 < traj.size(); ++i) {
+				if (targetTime <= traj[i + 1].timeSec || i + 2 == traj.size()) {
+					activeSegIdx = i;
+					float segDt = (std::max)(0.0001f, traj[i + 1].timeSec - traj[i].timeSec);
+					float localT = std::clamp((targetTime - traj[i].timeSec) / segDt, 0.0f, 1.0f);
+					const auto& s0 = traj[i];
+					const auto& s1 = traj[i + 1];
+					curPos = {
+						s0.pos.x + (s1.pos.x - s0.pos.x) * localT,
+						s0.pos.y + (s1.pos.y - s0.pos.y) * localT,
+						s0.pos.z + (s1.pos.z - s0.pos.z) * localT
+					};
+					curForward = {
+						s0.forward.x + (s1.forward.x - s0.forward.x) * localT,
+						s0.forward.y + (s1.forward.y - s0.forward.y) * localT,
+						s0.forward.z + (s1.forward.z - s0.forward.z) * localT
+					};
+					curUp = {
+						s0.up.x + (s1.up.x - s0.up.x) * localT,
+						s0.up.y + (s1.up.y - s0.up.y) * localT,
+						s0.up.z + (s1.up.z - s0.up.z) * localT
+					};
+					break;
+				}
+			}
+
+			// 実際の飛行軌跡を描画（通過済み発光 + 未到達薄線）
+			for (size_t i = 0; i + 1 < traj.size(); ++i) {
+				const Vector3& a = traj[i].pos;
+				const Vector3& b = (i == activeSegIdx) ? curPos : traj[i + 1].pos;
+				if (i <= activeSegIdx) {
+					prim->DrawLine3D(a, b, trajCol, &tacticalCam_);
+					prim->DrawLine3D({ a.x, a.y + 4.0f, a.z }, { b.x, b.y + 4.0f, b.z }, trajCol, &tacticalCam_);
+					if (tcm && tcm->IsLoaded()) {
+						float ga = tcm->GetTerrainHeightAt(a.x, a.z, 0.0f) + 5.0f;
+						float gb = tcm->GetTerrainHeightAt(b.x, b.z, 0.0f) + 5.0f;
+						prim->DrawLine3D({ a.x, ga, a.z }, { b.x, gb, b.z }, trajGroundCol, &tacticalCam_);
+					}
+					if (i == activeSegIdx && playFrac < 1.0f) {
+						prim->DrawLine3D(curPos, traj[i + 1].pos, trajFutureCol, &tacticalCam_);
+					}
+				} else {
+					prim->DrawLine3D(a, traj[i + 1].pos, trajFutureCol, &tacticalCam_);
+				}
+			}
+		}
+
+		float groundY = (tcm && tcm->IsLoaded()) ? tcm->GetTerrainHeightAt(curPos.x, curPos.z, 0.0f) : 0.0f;
+		DrawTacticalAircraftMarker(prim, curPos, curForward, curUp, groundY, playerGreen);
+	}
+
 	// CRTモニター感・走査線・ブルーム・微細色収差の適用
 	PostEffect* postEffect = PostEffect::GetInstance();
 	if (postEffect) {
@@ -510,17 +708,7 @@ void ClearScene::DrawUI() {
 		uploadSprite_->Draw();
 	};
 
-	// 1. 背景パネル
-	backgroundPanel_.Draw();
-
-	// 背景ミリタリーグリッドパターン
-	const float gridStep = 48.0f;
-	for (float gx = 0.0f; gx < kScreenWidth; gx += gridStep) {
-		DrawRectHelper({ gx, 0.0f }, { 1.0f, kScreenHeight - 32.0f }, { 0.15f, 0.40f, 0.60f, 0.08f });
-	}
-	for (float gy = 0.0f; gy < kScreenHeight - 32.0f; gy += gridStep) {
-		DrawRectHelper({ 0.0f, gy }, { kScreenWidth, 1.0f }, { 0.15f, 0.40f, 0.60f, 0.08f });
-	}
+	// 1. 背景パネルは3D等高線マップを見せるため透過（非描画）
 
 	// 画面全体のゆっくり動くサイバースキャンビーム
 	float beamY = std::fmod(animTimer_ * 80.0f, kScreenHeight - 32.0f);

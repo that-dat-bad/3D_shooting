@@ -22,7 +22,7 @@ public:
     void WaitForStagePreload();
 
     // キャッシュされたミッションデータを適用
-    bool ApplyPreloadedMission(MissionManager& missionManager);
+    bool ApplyPreloadedMission(MissionManager& missionManager, const std::string& expectedMissionPath = "");
 
     // キャッシュされた機体CFGを適用
     bool ApplyPreloadedAircraftConfig(AircraftConfig& aircraftConfig);

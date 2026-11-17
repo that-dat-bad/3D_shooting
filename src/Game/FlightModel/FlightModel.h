@@ -87,6 +87,12 @@ public:
 	void SetVelocity(const MyMath::Vector3& vel) { velocity_ = vel; }
 	void SetGroundElevation(float groundY) { groundElevation_ = groundY; }
 	float GetGroundElevation() const { return groundElevation_; }
+	void SetWaterSurface(bool hasWater, float waterY, float waterDepth) {
+		hasWaterSurface_ = hasWater;
+		waterElevation_ = waterY;
+		waterDepth_ = waterDepth;
+	}
+	bool IsInWaterContact() const { return inWaterContact_; }
 
 	// 方向ベクトルの取得（クォータニオンから計算）
 	MyMath::Vector3 GetForwardDirection() const;
@@ -127,6 +133,10 @@ private:
 	bool  gEffectsEnabled_ = true;       // G効果有効フラグ
 	bool  isAutopilot_ = false;          // オートパイロット演出フラグ
 	float groundElevation_ = kDefaultGroundElevation; // 現在XZ座標直下の地形標高Y
+	bool  hasWaterSurface_ = false;
+	float waterElevation_ = 0.0f;
+	float waterDepth_ = 0.0f;
+	bool  inWaterContact_ = false;
 
 	// プレイヤーからの入力状態
 	float targetThrottle_;  // 目標スロットル

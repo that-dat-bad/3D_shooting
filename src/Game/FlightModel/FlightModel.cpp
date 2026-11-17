@@ -149,7 +149,12 @@ void FlightModel::Update(float deltaTime)
 	// 10. 位置の更新 (p += v * dt)
 	position_ = MyMath::Add(position_, MyMath::Multiply(deltaTime, velocity_));
 
-	// 10.5. 地面との部位別物理衝突判定 & ダメージ計算・転倒トルク
+	// 10.5. 地面・水面との部位別物理衝突判定 & ダメージ計算・転倒トルク
+	inWaterContact_ = false;
+	if (hasWaterSurface_ && waterDepth_ >= 1.2f) {
+		inWaterContact_ = airframe_.GetDamageModel().ProcessWaterCollision(
+			position_, orientation_, velocity_, angularVelocity_, deltaTime, waterElevation_, waterDepth_, false);
+	}
 	airframe_.GetDamageModel().ProcessGroundCollision(position_, orientation_, velocity_, angularVelocity_, deltaTime, groundElevation_);
 
 	// 11. G計算

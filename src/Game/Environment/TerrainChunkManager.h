@@ -2,6 +2,7 @@
 #include <vector>
 #include <string>
 #include <memory>
+#include <chrono>
 #include <d3d12.h>
 #include <wrl.h>
 #include "../../engine/Graphics/Model/Object3d.h"
@@ -79,7 +80,7 @@ public:
 	// object3dCommon: 描画共通基盤
 	// camera: 描画カメラ
 	// terrainPath: 設定ファイルパス
-	void Initialize(Object3dCommon* object3dCommon, Camera* camera, const std::string& terrainPath = "Resources/terrains/demo/chunks_info.json");
+	void Initialize(Object3dCommon* object3dCommon, Camera* camera, const std::string& terrainPath = "Resources/terrains/demo2/chunks_info.json");
 
 	// モード切り替え
 	void SetTerrainMode(TerrainMode mode);
@@ -91,6 +92,8 @@ public:
 
 	// 描画
 	void Draw();
+	void DrawContourMap(Camera* cam);
+	void SetCamera(Camera* cam) { camera_ = cam; }
 
 	// 終了処理
 	void Finalize();
@@ -121,6 +124,44 @@ public:
 		float worldZ,
 		float fallbackY = TerrainHeightDefaults::kDefaultFallbackHeight) const;
 
+	// 地表種別（陸地 / 水面）
+	enum class SurfaceType {
+		Land,
+		Water
+	};
+
+	struct SurfaceHit {
+		SurfaceType type = SurfaceType::Land;
+		float landY = 0.0f;
+		float waterY = 0.0f;
+		float waterDepth = 0.0f;
+		bool isRiver = false;
+	};
+
+	struct RiverPoint {
+		float x = 0.0f;
+		float y = 0.0f; // 水面標高
+		float z = 0.0f;
+		float width = 120.0f;
+	};
+
+	struct RiverSpline {
+		float width = 120.0f;
+		std::vector<RiverPoint> points;
+	};
+
+	// 水面標高取得（海・川）
+	bool GetWaterSurfaceHeightAt(float worldX, float worldZ, float& outWaterY, bool* outIsRiver = nullptr) const;
+
+	// 陸地・水面を統合したサーフェス判定
+	SurfaceHit QuerySurfaceAt(float worldX, float worldZ, float fallbackY = TerrainHeightDefaults::kDefaultFallbackHeight) const;
+
+	bool HasWater() const { return hasWaterLevel_ || !rivers_.empty(); }
+	float GetWaterLevel() const { return waterLevel_; }
+	const std::string& GetActiveTerrainPath() const {
+		return (mode_ == TerrainMode::SingleMesh) ? singleMeshPath_ : chunkJsonPath_;
+	}
+
 	// デバッグ用UI
 	void DrawImGui();
 
@@ -132,13 +173,14 @@ private:
 
 	void LoadSingleMesh(const std::string& objPath);
 	void LoadChunked(const std::string& jsonPath);
+	void LoadWaterFromJson(const std::string& jsonPath);
 	bool LoadPackage(const std::string& packagePath);
 	bool SavePackage(const std::string& packagePath);
 	static void BuildChunkHeightGrid(TerrainChunk& chunk, const Model* model);
 
 	TerrainMode mode_ = TerrainMode::Chunked;
 	std::string singleMeshPath_ = "Resources/terrains/demo.obj";
-	std::string chunkJsonPath_ = "Resources/terrains/demo/chunks_info.json";
+	std::string chunkJsonPath_ = "Resources/terrains/demo2/chunks_info.json";
 
 	std::unique_ptr<Object3d> singleMeshObject_;
 	std::vector<TerrainChunk> chunks_;
@@ -153,5 +195,19 @@ private:
 	double lastLoadTimeMs_ = 0.0;
 
 	void CreateTerrainPipeline();
+	void CreateWaterPipeline();
+	void CreateContourPipeline();
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> terrainPipelineState_;
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> waterPipelineState_;
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> contourPipelineState_;
+
+	// 水系データ（海・川）
+	bool hasWaterLevel_ = false;
+	float waterLevel_ = 0.0f;
+	float waterTimeSec_ = 0.0f;
+	std::chrono::steady_clock::time_point lastWaterTick_{};
+	bool hasWaterTick_ = false;
+	std::vector<RiverSpline> rivers_;
+	std::unique_ptr<Object3d> oceanObject_;
+	std::unique_ptr<Object3d> riverObject_;
 };

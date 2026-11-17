@@ -72,12 +72,112 @@ void TerrainChunkManager::CreateTerrainPipeline() {
 	}
 }
 
+void TerrainChunkManager::CreateWaterPipeline() {
+	if (waterPipelineState_ || !object3dCommon_) return;
+
+	DirectXCommon* dxCommon = object3dCommon_->GetDirectXCommon();
+	if (!dxCommon) return;
+
+	D3D12_INPUT_ELEMENT_DESC inputElementDescs[5] = {};
+	inputElementDescs[0] = { "POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 };
+	inputElementDescs[1] = { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 16, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 };
+	inputElementDescs[2] = { "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 };
+	inputElementDescs[3] = { "WEIGHT", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 48, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 };
+	inputElementDescs[4] = { "BLENDINDICES", 0, DXGI_FORMAT_R32G32B32A32_SINT, 0, 64, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 };
+
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc{};
+	psoDesc.pRootSignature = object3dCommon_->GetRootSignature();
+	psoDesc.InputLayout = { inputElementDescs, _countof(inputElementDescs) };
+
+	Microsoft::WRL::ComPtr<IDxcBlob> vsBlob = dxCommon->CompileShader(L"./assets/shaders/Water.VS.hlsl", L"vs_6_0");
+	Microsoft::WRL::ComPtr<IDxcBlob> psBlob = dxCommon->CompileShader(L"./assets/shaders/Water.PS.hlsl", L"ps_6_0");
+	if (!vsBlob || !psBlob) return;
+
+	psoDesc.VS = { vsBlob->GetBufferPointer(), vsBlob->GetBufferSize() };
+	psoDesc.PS = { psBlob->GetBufferPointer(), psBlob->GetBufferSize() };
+
+	D3D12_RASTERIZER_DESC rasterizerDesc{};
+	rasterizerDesc.CullMode = D3D12_CULL_MODE_NONE;
+	rasterizerDesc.FillMode = D3D12_FILL_MODE_SOLID;
+	psoDesc.RasterizerState = rasterizerDesc;
+
+	D3D12_DEPTH_STENCIL_DESC depthStencilDesc{};
+	depthStencilDesc.DepthEnable = true;
+	depthStencilDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+	depthStencilDesc.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
+	psoDesc.DepthStencilState = depthStencilDesc;
+	psoDesc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
+
+	psoDesc.NumRenderTargets = 1;
+	psoDesc.RTVFormats[0] = dxCommon->GetRTVFormat();
+	psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+	psoDesc.SampleDesc.Count = 1;
+	psoDesc.SampleMask = D3D12_DEFAULT_SAMPLE_MASK;
+	psoDesc.BlendState = GetBlendDesc(BlendMode::kNormal);
+
+	HRESULT hr = dxCommon->GetDevice()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&waterPipelineState_));
+	if (FAILED(hr)) {
+		waterPipelineState_.Reset();
+	}
+}
+
+void TerrainChunkManager::CreateContourPipeline() {
+	if (contourPipelineState_ || !object3dCommon_) return;
+
+	DirectXCommon* dxCommon = object3dCommon_->GetDirectXCommon();
+	if (!dxCommon) return;
+
+	D3D12_INPUT_ELEMENT_DESC inputElementDescs[5] = {};
+	inputElementDescs[0] = { "POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 };
+	inputElementDescs[1] = { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 16, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 };
+	inputElementDescs[2] = { "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 };
+	inputElementDescs[3] = { "WEIGHT", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 48, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 };
+	inputElementDescs[4] = { "BLENDINDICES", 0, DXGI_FORMAT_R32G32B32A32_SINT, 0, 64, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 };
+
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc{};
+	psoDesc.pRootSignature = object3dCommon_->GetRootSignature();
+	psoDesc.InputLayout = { inputElementDescs, _countof(inputElementDescs) };
+
+	Microsoft::WRL::ComPtr<IDxcBlob> vsBlob = dxCommon->CompileShader(L"./assets/shaders/Object3D.VS.hlsl", L"vs_6_0");
+	Microsoft::WRL::ComPtr<IDxcBlob> psBlob = dxCommon->CompileShader(L"./assets/shaders/ContourMap.PS.hlsl", L"ps_6_0");
+	if (!vsBlob || !psBlob) return;
+
+	psoDesc.VS = { vsBlob->GetBufferPointer(), vsBlob->GetBufferSize() };
+	psoDesc.PS = { psBlob->GetBufferPointer(), psBlob->GetBufferSize() };
+
+	D3D12_RASTERIZER_DESC rasterizerDesc{};
+	rasterizerDesc.CullMode = D3D12_CULL_MODE_BACK;
+	rasterizerDesc.FillMode = D3D12_FILL_MODE_SOLID;
+	psoDesc.RasterizerState = rasterizerDesc;
+
+	D3D12_DEPTH_STENCIL_DESC depthStencilDesc{};
+	depthStencilDesc.DepthEnable = true;
+	depthStencilDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+	depthStencilDesc.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
+	psoDesc.DepthStencilState = depthStencilDesc;
+	psoDesc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
+
+	psoDesc.NumRenderTargets = 1;
+	psoDesc.RTVFormats[0] = dxCommon->GetRTVFormat();
+	psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+	psoDesc.SampleDesc.Count = 1;
+	psoDesc.SampleMask = D3D12_DEFAULT_SAMPLE_MASK;
+	psoDesc.BlendState = GetBlendDesc(BlendMode::kNormal);
+
+	HRESULT hr = dxCommon->GetDevice()->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&contourPipelineState_));
+	if (FAILED(hr)) {
+		contourPipelineState_.Reset();
+	}
+}
+
 void TerrainChunkManager::Initialize(Object3dCommon* object3dCommon, Camera* camera, const std::string& terrainPath) {
 	object3dCommon_ = object3dCommon;
 	camera_ = camera;
 	isLoaded_ = false;
 
 	CreateTerrainPipeline();
+	CreateWaterPipeline();
+	CreateContourPipeline();
 
 	if (terrainPath.ends_with(".obj")) {
 		mode_ = TerrainMode::SingleMesh;
@@ -442,6 +542,88 @@ bool TerrainChunkManager::LoadPackage(const std::string& packagePath) {
 	return true;
 }
 
+void TerrainChunkManager::LoadWaterFromJson(const std::string& jsonPath) {
+	if (!std::filesystem::exists(jsonPath)) return;
+	std::ifstream file(jsonPath);
+	if (!file.is_open()) return;
+	json j;
+	try {
+		file >> j;
+	} catch (...) {
+		return;
+	}
+
+	std::string baseDir = std::filesystem::path(jsonPath).parent_path().string();
+	hasWaterLevel_ = j.contains("water_level") && !j["water_level"].is_null();
+	waterLevel_ = hasWaterLevel_ ? j["water_level"].get<float>() : 0.0f;
+	rivers_.clear();
+	if (j.contains("rivers") && j["rivers"].is_array()) {
+		for (const auto& rItem : j["rivers"]) {
+			RiverSpline rs;
+			rs.width = rItem.value("width", 120.0f);
+			if (rItem.contains("points") && rItem["points"].is_array()) {
+				for (const auto& pt : rItem["points"]) {
+					if (pt.is_array() && pt.size() >= 3) {
+						RiverPoint rp;
+						rp.x = -pt[0].get<float>();
+						rp.z = -pt[1].get<float>();
+						rp.y = pt[2].get<float>();
+						rp.width = (pt.size() >= 4) ? pt[3].get<float>() : rs.width;
+						rs.points.push_back(rp);
+					}
+				}
+			}
+			if (rs.points.size() >= 2) {
+				rivers_.push_back(std::move(rs));
+			}
+		}
+	}
+
+	std::vector<std::string> waterModels;
+	std::string oceanObjPath;
+	if (j.contains("ocean_mesh") && j["ocean_mesh"].is_string()) {
+		oceanObjPath = (baseDir.empty() ? "" : baseDir + "/") + j["ocean_mesh"].get<std::string>();
+		std::replace(oceanObjPath.begin(), oceanObjPath.end(), '\\', '/');
+		if (std::filesystem::exists(oceanObjPath)) waterModels.push_back(oceanObjPath);
+		else oceanObjPath.clear();
+	}
+	std::string riverObjPath;
+	if (j.contains("river_mesh") && j["river_mesh"].is_string()) {
+		riverObjPath = (baseDir.empty() ? "" : baseDir + "/") + j["river_mesh"].get<std::string>();
+		std::replace(riverObjPath.begin(), riverObjPath.end(), '\\', '/');
+		if (std::filesystem::exists(riverObjPath)) waterModels.push_back(riverObjPath);
+		else riverObjPath.clear();
+	}
+
+	if (!waterModels.empty()) {
+		ModelManager::GetInstance()->LoadModelsParallel(waterModels, /*useFastObjLoader=*/true);
+	}
+
+	oceanObject_.reset();
+	if (!oceanObjPath.empty() && ModelManager::GetInstance()->FindModel(oceanObjPath)) {
+		oceanObject_ = std::make_unique<Object3d>();
+		oceanObject_->Initialize(object3dCommon_);
+		oceanObject_->SetCamera(camera_);
+		oceanObject_->SetModel(oceanObjPath);
+		oceanObject_->SetBlendMode(BlendMode::kNormal);
+		if (waterPipelineState_) oceanObject_->SetCustomPipelineState(waterPipelineState_.Get());
+		oceanObject_->SetMaterialEmissive(0, { 0.0f, 0.0f, 0.0f }, 0.0f);
+		oceanObject_->Update();
+	}
+
+	riverObject_.reset();
+	if (!riverObjPath.empty() && ModelManager::GetInstance()->FindModel(riverObjPath)) {
+		riverObject_ = std::make_unique<Object3d>();
+		riverObject_->Initialize(object3dCommon_);
+		riverObject_->SetCamera(camera_);
+		riverObject_->SetModel(riverObjPath);
+		riverObject_->SetBlendMode(BlendMode::kNormal);
+		if (waterPipelineState_) riverObject_->SetCustomPipelineState(waterPipelineState_.Get());
+		riverObject_->SetMaterialEmissive(0, { 1.0f, 0.0f, 0.0f }, 0.0f);
+		riverObject_->Update();
+	}
+}
+
 void TerrainChunkManager::LoadChunked(const std::string& jsonPath) {
 	chunks_.clear();
 	singleMeshObject_.reset();
@@ -465,6 +647,7 @@ void TerrainChunkManager::LoadChunked(const std::string& jsonPath) {
 	if (packageValid) {
 		auto startTime = std::chrono::high_resolution_clock::now();
 		if (LoadPackage(packagePath.string())) {
+			LoadWaterFromJson(jsonPath);
 			auto endTime = std::chrono::high_resolution_clock::now();
 			lastLoadTimeMs_ = std::chrono::duration<double, std::milli>(endTime - startTime).count();
 			char logBuf[256];
@@ -508,6 +691,55 @@ void TerrainChunkManager::LoadChunked(const std::string& jsonPath) {
 
 	std::string baseDir = std::filesystem::path(jsonPath).parent_path().string();
 	std::vector<std::string> modelPathsToLoad;
+
+	// 水系メタデータ（water_level / rivers / ocean_mesh / river_mesh）の読み込み
+	hasWaterLevel_ = j.contains("water_level") && !j["water_level"].is_null();
+	waterLevel_ = hasWaterLevel_ ? j["water_level"].get<float>() : 0.0f;
+	rivers_.clear();
+	if (j.contains("rivers") && j["rivers"].is_array()) {
+		for (const auto& rItem : j["rivers"]) {
+			RiverSpline rs;
+			rs.width = rItem.value("width", 120.0f);
+			if (rItem.contains("points") && rItem["points"].is_array()) {
+				for (const auto& pt : rItem["points"]) {
+					if (pt.is_array() && pt.size() >= 3) {
+						RiverPoint rp;
+						// Blender (x, y, z) -> DirectX (-x, z, -y)
+						rp.x = -pt[0].get<float>();
+						rp.z = -pt[1].get<float>();
+						rp.y = pt[2].get<float>();
+						rp.width = (pt.size() >= 4) ? pt[3].get<float>() : rs.width;
+						rs.points.push_back(rp);
+					}
+				}
+			}
+			if (rs.points.size() >= 2) {
+				rivers_.push_back(std::move(rs));
+			}
+		}
+	}
+
+	std::string oceanObjPath;
+	if (j.contains("ocean_mesh") && j["ocean_mesh"].is_string()) {
+		oceanObjPath = (baseDir.empty() ? "" : baseDir + "/") + j["ocean_mesh"].get<std::string>();
+		std::replace(oceanObjPath.begin(), oceanObjPath.end(), '\\', '/');
+		if (std::filesystem::exists(oceanObjPath)) {
+			modelPathsToLoad.push_back(oceanObjPath);
+		} else {
+			oceanObjPath.clear();
+		}
+	}
+
+	std::string riverObjPath;
+	if (j.contains("river_mesh") && j["river_mesh"].is_string()) {
+		riverObjPath = (baseDir.empty() ? "" : baseDir + "/") + j["river_mesh"].get<std::string>();
+		std::replace(riverObjPath.begin(), riverObjPath.end(), '\\', '/');
+		if (std::filesystem::exists(riverObjPath)) {
+			modelPathsToLoad.push_back(riverObjPath);
+		} else {
+			riverObjPath.clear();
+		}
+	}
 
 	for (const auto& item : j["chunks"]) {
 		TerrainChunk chunk;
@@ -603,6 +835,35 @@ void TerrainChunkManager::LoadChunked(const std::string& jsonPath) {
 		}
 	}
 
+	// 4.5 水面メッシュ（海・川）の初期化
+	oceanObject_.reset();
+	if (!oceanObjPath.empty() && ModelManager::GetInstance()->FindModel(oceanObjPath)) {
+		oceanObject_ = std::make_unique<Object3d>();
+		oceanObject_->Initialize(object3dCommon_);
+		oceanObject_->SetCamera(camera_);
+		oceanObject_->SetModel(oceanObjPath);
+		oceanObject_->SetBlendMode(BlendMode::kNormal);
+		if (waterPipelineState_) {
+			oceanObject_->SetCustomPipelineState(waterPipelineState_.Get());
+		}
+		oceanObject_->SetMaterialEmissive(0, { 0.0f, 0.0f, 0.0f }, 0.0f);
+		oceanObject_->Update();
+	}
+
+	riverObject_.reset();
+	if (!riverObjPath.empty() && ModelManager::GetInstance()->FindModel(riverObjPath)) {
+		riverObject_ = std::make_unique<Object3d>();
+		riverObject_->Initialize(object3dCommon_);
+		riverObject_->SetCamera(camera_);
+		riverObject_->SetModel(riverObjPath);
+		riverObject_->SetBlendMode(BlendMode::kNormal);
+		if (waterPipelineState_) {
+			riverObject_->SetCustomPipelineState(waterPipelineState_.Get());
+		}
+		riverObject_->SetMaterialEmissive(0, { 1.0f, 0.0f, 0.0f }, 0.0f);
+		riverObject_->Update();
+	}
+
 	// 5. 次回起動のために 1 つの統合パッケージ（chunks.terrain）へ保存
 	SavePackage(packagePath.string());
 
@@ -630,9 +891,28 @@ int TerrainChunkManager::GetLoadedChunkCount() const {
 void TerrainChunkManager::Update(const Vector3& viewerPos) {
 	if (!isLoaded_ || !isVisible_) return;
 
+	auto nowTick = std::chrono::steady_clock::now();
+	if (hasWaterTick_) {
+		float dt = std::chrono::duration<float>(nowTick - lastWaterTick_).count();
+		waterTimeSec_ += std::clamp(dt, 0.0f, 0.1f);
+	}
+	lastWaterTick_ = nowTick;
+	hasWaterTick_ = true;
+
 	Camera* activeCam = CameraManager::GetInstance()->GetActiveCamera();
 	if (activeCam) {
 		camera_ = activeCam;
+	}
+
+	if (oceanObject_) {
+		oceanObject_->SetCamera(camera_);
+		oceanObject_->SetMaterialEmissive(0, { 0.0f, 0.0f, 0.0f }, waterTimeSec_);
+		oceanObject_->Update();
+	}
+	if (riverObject_) {
+		riverObject_->SetCamera(camera_);
+		riverObject_->SetMaterialEmissive(0, { 1.0f, 0.0f, 0.0f }, waterTimeSec_);
+		riverObject_->Update();
 	}
 
 	if (mode_ == TerrainMode::SingleMesh) {
@@ -690,11 +970,54 @@ void TerrainChunkManager::Draw() {
 			renderedChunkCount_++;
 		}
 	}
+
+	if (oceanObject_) {
+		oceanObject_->Draw();
+	}
+	if (riverObject_) {
+		riverObject_->Draw();
+	}
+}
+
+void TerrainChunkManager::DrawContourMap(Camera* cam) {
+	if (!isLoaded_ || !cam) return;
+	if (!contourPipelineState_) {
+		CreateContourPipeline();
+	}
+	if (!contourPipelineState_) return;
+
+	Object3dCommon::GetInstance()->SetupCommonState();
+
+	if (mode_ == TerrainMode::SingleMesh) {
+		if (singleMeshObject_) {
+			singleMeshObject_->SetCamera(cam);
+			singleMeshObject_->SetCustomPipelineState(contourPipelineState_.Get());
+			singleMeshObject_->Update();
+			singleMeshObject_->Draw();
+			singleMeshObject_->SetCustomPipelineState(terrainPipelineState_.Get());
+		}
+		return;
+	}
+
+	for (auto& chunk : chunks_) {
+		if (chunk.isVisible && chunk.object3d) {
+			chunk.object3d->SetCamera(cam);
+			chunk.object3d->SetCustomPipelineState(contourPipelineState_.Get());
+			chunk.object3d->Update();
+			chunk.object3d->Draw();
+			chunk.object3d->SetCustomPipelineState(terrainPipelineState_.Get());
+		}
+	}
 }
 
 void TerrainChunkManager::Finalize() {
 	chunks_.clear();
 	singleMeshObject_.reset();
+	oceanObject_.reset();
+	riverObject_.reset();
+	rivers_.clear();
+	hasWaterLevel_ = false;
+	hasWaterTick_ = false;
 	isLoaded_ = false;
 }
 
@@ -812,6 +1135,70 @@ float TerrainChunkManager::GetTerrainHeightAt(float worldX, float worldZ, float 
 	}
 
 	return fallbackY;
+}
+
+bool TerrainChunkManager::GetWaterSurfaceHeightAt(float worldX, float worldZ, float& outWaterY, bool* outIsRiver) const {
+	bool found = false;
+	float bestY = -1.0e8f;
+	bool isRiverHit = false;
+
+	if (hasWaterLevel_) {
+		// CPU側ではパイプラインストールを避けるため低周波解析波で海面高を近似（Dagor方式）
+		float waveOffset =
+			0.85f * std::sin(worldX * 0.018f * 0.866f + worldZ * 0.018f * 0.500f + waterTimeSec_ * 1.15f) +
+			0.42f * std::sin(worldX * 0.037f * 0.422f - worldZ * 0.037f * 0.906f + waterTimeSec_ * 1.65f);
+		bestY = waterLevel_ + waveOffset;
+		found = true;
+	}
+
+	for (const auto& river : rivers_) {
+		if (river.points.size() < 2) continue;
+		for (size_t i = 0; i + 1 < river.points.size(); ++i) {
+			const auto& p0 = river.points[i];
+			const auto& p1 = river.points[i + 1];
+			float vx = p1.x - p0.x;
+			float vz = p1.z - p0.z;
+			float len2 = vx * vx + vz * vz;
+			float t = (len2 > 1e-4f) ? std::clamp(((worldX - p0.x) * vx + (worldZ - p0.z) * vz) / len2, 0.0f, 1.0f) : 0.0f;
+			float cx = p0.x + vx * t;
+			float cz = p0.z + vz * t;
+			float dist = std::hypot(worldX - cx, worldZ - cz);
+			float halfW = (p0.width + (p1.width - p0.width) * t) * 0.55f;
+			if (dist <= halfW) {
+				float ry = p0.y + (p1.y - p0.y) * t;
+				if (!found || ry > bestY) {
+					bestY = ry;
+					found = true;
+					isRiverHit = true;
+				}
+			}
+		}
+	}
+
+	if (found) {
+		outWaterY = bestY;
+		if (outIsRiver) *outIsRiver = isRiverHit;
+	}
+	return found;
+}
+
+TerrainChunkManager::SurfaceHit TerrainChunkManager::QuerySurfaceAt(float worldX, float worldZ, float fallbackY) const {
+	SurfaceHit hit;
+	hit.landY = GetTerrainHeightAt(worldX, worldZ, fallbackY);
+	float wy = 0.0f;
+	bool isRiv = false;
+	if (GetWaterSurfaceHeightAt(worldX, worldZ, wy, &isRiv) && wy > hit.landY) {
+		hit.type = SurfaceType::Water;
+		hit.waterY = wy;
+		hit.waterDepth = wy - hit.landY;
+		hit.isRiver = isRiv;
+	} else {
+		hit.type = SurfaceType::Land;
+		hit.waterY = hit.landY;
+		hit.waterDepth = 0.0f;
+		hit.isRiver = false;
+	}
+	return hit;
 }
 
 void TerrainChunkManager::DrawImGui() {

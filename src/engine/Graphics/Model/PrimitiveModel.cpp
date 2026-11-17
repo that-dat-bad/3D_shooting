@@ -43,6 +43,7 @@ void PrimitiveModel::Initialize(DirectXCommon* dxCommon) {
 	materialBuffer_->Map(0, nullptr, reinterpret_cast<void**>(&materialMappedData_));
 	
 	TextureManager::GetInstance()->LoadTexture("assets/textures/uvChecker.png");
+	TextureManager::GetInstance()->LoadTexture("assets/textures/white1x1.png");
 
 	Reset();
 }
@@ -123,13 +124,28 @@ void PrimitiveModel::DrawLine3D(const Vector3& p1, const Vector3& p2, const Vect
 	commandList->SetGraphicsRootConstantBufferView(0, materialBuffer_->GetGPUVirtualAddress() + (index * kCbAlignment));
 	commandList->SetGraphicsRootConstantBufferView(1, transformBuffer_->GetGPUVirtualAddress() + (index * kCbAlignment));
 
-	// ダミーテクスチャをセット
-	uint32_t texIndex = TextureManager::GetInstance()->GetTextureIndexByFilePath("assets/textures/uvChecker.png");
+	// 単色描画用白テクスチャをセット
+	uint32_t texIndex = TextureManager::GetInstance()->GetTextureIndexByFilePath("assets/textures/white1x1.png");
 	if (texIndex != 0) {
 		commandList->SetGraphicsRootDescriptorTable(2, TextureManager::GetInstance()->GetSrvHandleGPU(texIndex));
 	}
 
 	commandList->DrawInstanced(lineVertexCount_, 1, 0, 0);
+}
+
+void PrimitiveModel::DrawTriangle3D(const Vector3& p0, const Vector3& p1, const Vector3& p2, const Vector4& color, Camera* camera, BlendMode blendMode) {
+	if (!camera) { return; }
+
+	Vector3 e1 = { p1.x - p0.x, p1.y - p0.y, p1.z - p0.z };
+	Vector3 e2 = { p2.x - p0.x, p2.y - p0.y, p2.z - p0.z };
+	Matrix4x4 wMatrix = {
+		e1.x, e1.y, e1.z, 0.0f,
+		e2.x, e2.y, e2.z, 0.0f,
+		0.0f, 0.0f, 1.0f, 0.0f,
+		p0.x, p0.y, p0.z, 1.0f
+	};
+	uint32_t texIndex = TextureManager::GetInstance()->GetTextureIndexByFilePath("assets/textures/white1x1.png");
+	CallDrawCommand(triangleVertexBufferView_, triangleVertexCount_, wMatrix, color, texIndex, camera, blendMode);
 }
 
 void PrimitiveModel::CallDrawCommand(D3D12_VERTEX_BUFFER_VIEW& vbView, uint32_t vertexCount, const Vector3& scale, const Vector3& rotate, const Vector3& translate, const Vector4& color, uint32_t textureIndex, Camera* camera, BlendMode blendMode) {
@@ -470,4 +486,20 @@ void PrimitiveModel::CreatePrimitiveBuffers() {
 	lineMapped[0] = { {0.0f, 0.0f, 0.0f, 1.0f}, {0.0f, 0.0f}, {0.0f, 1.0f, 0.0f} };
 	lineMapped[1] = { {1.0f, 0.0f, 0.0f, 1.0f}, {1.0f, 0.0f}, {0.0f, 1.0f, 0.0f} };
 	lineVertexBuffer_->Unmap(0, nullptr);
+
+	// ===================================
+	// 三角形の頂点データ生成 (0,0,0), (1,0,0), (0,1,0)
+	// ===================================
+	triangleVertexCount_ = 3;
+	triangleVertexBuffer_ = dxCommon_->CreateBufferResource(sizeof(VertexData) * triangleVertexCount_);
+	triangleVertexBufferView_.BufferLocation = triangleVertexBuffer_->GetGPUVirtualAddress();
+	triangleVertexBufferView_.SizeInBytes = sizeof(VertexData) * triangleVertexCount_;
+	triangleVertexBufferView_.StrideInBytes = sizeof(VertexData);
+
+	VertexData* triMapped = nullptr;
+	triangleVertexBuffer_->Map(0, nullptr, reinterpret_cast<void**>(&triMapped));
+	triMapped[0] = { {0.0f, 0.0f, 0.0f, 1.0f}, {0.0f, 0.0f}, {0.0f, 0.0f, 1.0f} };
+	triMapped[1] = { {1.0f, 0.0f, 0.0f, 1.0f}, {1.0f, 0.0f}, {0.0f, 0.0f, 1.0f} };
+	triMapped[2] = { {0.0f, 1.0f, 0.0f, 1.0f}, {0.0f, 1.0f}, {0.0f, 0.0f, 1.0f} };
+	triangleVertexBuffer_->Unmap(0, nullptr);
 }

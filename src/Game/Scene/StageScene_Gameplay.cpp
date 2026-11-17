@@ -86,10 +86,16 @@ void StageScene::UpdateFlightControls(float gameDeltaTime) {
 			isNvdActive_ = !isNvdActive_;
 		}
 
-		// --- ベイルアウト / 緊急脱出 (J キー: 被撃墜と同じゲームオーバー演出) ---
+		// --- ベイルアウト / 緊急脱出 (J キー: クリアデモ時は即時クリア、通常時はゲームオーバー演出) ---
 		if (input->TriggerKey(DIK_J)) {
-			isBailout_ = true;
-			TriggerGameOver();
+			const bool isClearDemo =
+				MissionManager::GetInstance().GetCurrentMission().name.find("CLEAR DEMO") != std::string::npos;
+			if (isClearDemo) {
+				TriggerGameClear();
+			} else {
+				isBailout_ = true;
+				TriggerGameOver();
+			}
 			return;
 		}
 
@@ -309,11 +315,60 @@ void StageScene::UpdateFlightAndEffects(float gameDeltaTime) {
 	// 飛行モデルの更新
 	if (terrainChunkManager_ && terrainChunkManager_->IsLoaded()) {
 		const Vector3 curPos = flightModel_.GetPosition();
-		const float terrainGroundY = terrainChunkManager_->GetTerrainHeightAt(
-			curPos.x,
-			curPos.z,
-			0.0f);
-		flightModel_.SetGroundElevation(terrainGroundY);
+		// クリア画面用の実飛行軌跡を記録（0.05秒ごと・位置/姿勢/時刻・最大6000点）
+		if (!isMissionCleared_ && !isGameOver_) {
+			auto& traj = GameResult::GetInstance().flightTrajectory;
+			if (traj.empty() || (traj.size() < 6000 && (missionElapsedTime_ - traj.back().timeSec) >= 0.05f)) {
+				TrajectorySample sample;
+				sample.pos = curPos;
+				sample.forward = flightModel_.GetForwardDirection();
+				sample.up = flightModel_.GetUpDirection();
+				sample.timeSec = missionElapsedTime_;
+				traj.push_back(sample);
+			}
+		}
+		const auto surf = terrainChunkManager_->QuerySurfaceAt(curPos.x, curPos.z, 0.0f);
+		flightModel_.SetGroundElevation(surf.landY);
+		flightModel_.SetWaterSurface(
+			surf.type == TerrainChunkManager::SurfaceType::Water,
+			surf.waterY,
+			surf.waterDepth);
+
+		// War Thunder 風: 超低空水面飛行（高度 < 15m）のウォータースプレー & 着水柱エフェクト
+		if (!isGameOver_ && surf.type == TerrainChunkManager::SurfaceType::Water) {
+			const float altAboveWater = curPos.y - surf.waterY;
+			const float acSpeed = flightModel_.GetSpeed();
+			if (flightModel_.IsInWaterContact()) {
+				ParticleParameters splash;
+				splash.minVelocity = { -18.0f, 12.0f, -18.0f };
+				splash.maxVelocity = { 18.0f, 45.0f, 18.0f };
+				splash.randomPositionRange = 3.5f;
+				splash.minColor = { 0.85f, 0.93f, 1.0f, 0.75f };
+				splash.maxColor = { 0.96f, 0.99f, 1.0f, 0.90f };
+				splash.minLifeTime = 0.6f;
+				splash.maxLifeTime = 1.4f;
+				splash.minScale = 1.5f;
+				splash.maxScale = 4.2f;
+				splash.endScale = 7.5f;
+				splash.fadeOut = true;
+				ParticleManager::GetInstance()->Emit("Vortex", { curPos.x, surf.waterY + 0.5f, curPos.z }, splash, 12);
+			} else if (altAboveWater > 0.2f && altAboveWater < 15.0f && acSpeed > 40.0f) {
+				float intensity = (1.0f - altAboveWater / 15.0f) * (std::min)(1.0f, acSpeed / 120.0f);
+				ParticleParameters spray;
+				spray.minVelocity = { -6.0f, 2.0f, -6.0f };
+				spray.maxVelocity = { 6.0f, 9.0f * intensity + 2.0f, 6.0f };
+				spray.randomPositionRange = 2.0f;
+				spray.minColor = { 0.90f, 0.96f, 1.0f, 0.30f * intensity };
+				spray.maxColor = { 0.98f, 1.00f, 1.0f, 0.48f * intensity };
+				spray.minLifeTime = 0.35f;
+				spray.maxLifeTime = 0.65f;
+				spray.minScale = 0.8f;
+				spray.maxScale = 1.8f;
+				spray.endScale = 3.6f;
+				spray.fadeOut = true;
+				ParticleManager::GetInstance()->Emit("Vortex", { curPos.x, surf.waterY + 0.3f, curPos.z }, spray, 3);
+			}
+		}
 	}
 	flightModel_.Update(gameDeltaTime);
 
@@ -446,6 +501,9 @@ void StageScene::UpdateFlightAndEffects(float gameDeltaTime) {
 // 戦闘・敵・ミッション・当たり判定更新
 // ============================================================
 void StageScene::ApplyMissionLiveSyncUpdate() {
+	if (MissionManager::GetInstance().GetCurrentMission().name.find("CLEAR DEMO") != std::string::npos) {
+		return;
+	}
 	MissionData liveData{};
 	std::string livePath;
 	bool restartRequested = false;
@@ -1228,6 +1286,10 @@ void StageScene::UpdatePostEffects(float deltaTime) {
 	const bool showGameplayReticles =
 		IsGameplayActive() &&
 		!isPaused_ &&
+		!isMissionCleared_ &&
+		!isMissionFailed_ &&
+		!isGameOver_ &&
+		endSequence_ == StageEndSequence::None &&
 		!combatBootSequence_.IsWaitingForSpace();
 	hudData.showReticles = showGameplayReticles;
 	hudData.mouseAimEnabled = mouseAimEnabled_ && showGameplayReticles;
@@ -1236,6 +1298,18 @@ void StageScene::UpdatePostEffects(float deltaTime) {
 	}
 	hudData.screenWidth = static_cast<float>(WinApp::kClientWidth);
 	hudData.screenHeight = static_cast<float>(WinApp::kClientHeight);
+
+	const auto& currentMission = MissionManager::GetInstance().GetCurrentMission();
+	const bool isClearDemo = currentMission.name.find("CLEAR DEMO") != std::string::npos;
+	hudData.isClearDemoMode = isClearDemo;
+	if (isClearDemo) {
+		for (const auto& obj : currentMission.objectives) {
+			if (obj.type == ObjectiveType::Survive) {
+				hudData.clearCountdownSec = (std::max)(0.0f, obj.duration - missionElapsedTime_);
+				break;
+			}
+		}
+	}
 
 	const float groundY = (terrainChunkManager_ && terrainChunkManager_->IsLoaded())
 		? terrainChunkManager_->GetTerrainHeightAt(flightModel_.GetPosition().x, flightModel_.GetPosition().z, 0.0f)

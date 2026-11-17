@@ -769,3 +769,98 @@ const char* DamageModel::GetPartName(DamagePart part)
 	default:                      return "Unknown";
 	}
 }
+
+
+// ============================================================
+// 水面（海・川）との衝突・水没・浮力判定（War Thunder準拠）
+// ============================================================
+bool DamageModel::ProcessWaterCollision(
+	MyMath::Vector3& position,
+	const MyMath::Quaternion& orientation,
+	MyMath::Vector3& velocity,
+	MyMath::Vector3& angularVelocity,
+	float dt,
+	float waterY,
+	float waterDepth,
+	bool isSeaplane)
+{
+	if (isInvulnerable_ || waterDepth < 1.2f) {
+		return false;
+	}
+
+	MyMath::Vector3 right = {
+		1.0f - 2.0f * (orientation.y * orientation.y + orientation.z * orientation.z),
+		2.0f * (orientation.x * orientation.y + orientation.w * orientation.z),
+		2.0f * (orientation.x * orientation.z - orientation.w * orientation.y)
+	};
+	MyMath::Vector3 up = {
+		2.0f * (orientation.x * orientation.y - orientation.w * orientation.z),
+		1.0f - 2.0f * (orientation.x * orientation.x + orientation.z * orientation.z),
+		2.0f * (orientation.y * orientation.z + orientation.w * orientation.x)
+	};
+	MyMath::Vector3 forward = {
+		2.0f * (orientation.x * orientation.z + orientation.w * orientation.y),
+		2.0f * (orientation.y * orientation.z - orientation.w * orientation.x),
+		1.0f - 2.0f * (orientation.x * orientation.x + orientation.y * orientation.y)
+	};
+
+	float maxPenetration = 0.0f;
+	bool hitWater = false;
+
+	for (const auto& col : subColliders_) {
+		MyMath::Vector3 centerWorld = {
+			position.x + right.x * col.center.x + up.x * col.center.y + forward.x * col.center.z,
+			position.y + right.y * col.center.x + up.y * col.center.y + forward.y * col.center.z,
+			position.z + right.z * col.center.x + up.z * col.center.y + forward.z * col.center.z
+		};
+		float extentY = std::fabs(col.halfSize.x * right.y) +
+		                std::fabs(col.halfSize.y * up.y) +
+		                std::fabs(col.halfSize.z * forward.y);
+		float lowestY = centerWorld.y - extentY;
+
+		if (lowestY < waterY) {
+			hitWater = true;
+			float pen = waterY - lowestY;
+			if (pen > maxPenetration) {
+				maxPenetration = pen;
+			}
+			if (!isSeaplane) {
+				ProcessHit(col.part, 280.0f);
+			}
+		}
+	}
+
+	if (!hitWater) {
+		return false;
+	}
+
+	float speed = MyMath::Length(velocity);
+	if (!isSeaplane) {
+		// War Thunder 実仕様: 通常陸上機の深水域接触は強大な流体抵抗＋機体破壊（即クラッシュ）
+		float dragFactor = std::max(0.05f, 1.0f - 6.5f * dt);
+		velocity.x *= dragFactor;
+		velocity.y *= std::max(0.05f, 1.0f - 8.0f * dt);
+		velocity.z *= dragFactor;
+		angularVelocity.x -= 2.5f * dt; // 水面に機首が突っ込む強いピッチダウントルク
+
+		if (speed > 22.0f) {
+			ProcessHit(DamagePart::Fuse, 400.0f);
+			ProcessHit(DamagePart::Engine1, 400.0f);
+			ProcessHit(DamagePart::Wing_L, 350.0f);
+			ProcessHit(DamagePart::Wing_R, 350.0f);
+		} else {
+			// 低速着水でも深水域では浸水により沈没・大破
+			ProcessHit(DamagePart::Fuse, 80.0f * dt);
+			ProcessHit(DamagePart::Engine1, 120.0f * dt);
+		}
+	} else {
+		// 水上機フック: 浮力＋水抵抗で水面滑走・着水可能
+		float buoyancy = std::min(maxPenetration * 35.0f, 45.0f);
+		velocity.y += buoyancy * dt;
+		float waterDrag = std::max(0.5f, 1.0f - 0.85f * dt);
+		velocity.x *= waterDrag;
+		velocity.z *= waterDrag;
+	}
+
+	return true;
+}
