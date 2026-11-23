@@ -21,13 +21,13 @@ enum class PostEffectType : uint32_t {
 	kDissolve,      // ディゾルブ
 	kRandom,        // ランダム
 	kScanLine,      // 走査線
-	kLightAmp,      // 光量増幅 (Light Amp)
-	kLensDistortion,// レンズ歪み (Lens Distortion)
-	kChromaticAberration, // 色収差 (Chromatic Aberration)
-	kBloom,         // ブルーム (Bloom)
-	kColorIsolation,// カラーアイソレーション (Color Isolation / パートカラー)
-	kLuminanceOutline, // 輝度ベースアウトライン (Luminance Outline)
-	kDepthOutline,     // 深度ベースアウトライン (Depth Outline)
+	kLightAmp,      // 光量増幅
+	kLensDistortion,// レンズ歪み
+	kChromaticAberration, // 色収差
+	kBloom,         // ブルーム
+	kColorIsolation,// カラーアイソレーション
+	kLuminanceOutline, // 輝度ベースアウトライン
+	kDepthOutline,     // 深度ベースアウトライン
 	kCountOfPostEffects, // エフェクトの種類
 };
 
@@ -68,12 +68,12 @@ public:
 	static PostEffect* GetInstance();
 
 	/// <summary>
-	/// デフォルトコンストラクタ (std::make_unique対応のためpublic)
+	/// デフォルトコンストラクタ
 	/// </summary>
 	PostEffect() = default;
 
 	/// <summary>
-	/// 初期化（PSO 生成、SRV 登録）
+	/// 初期化
 	/// </summary>
 	void Initialize(DirectXCommon* dxCommon, SrvManager* srvManager);
 
@@ -147,7 +147,7 @@ private:
 	DirectXCommon* dxCommon_ = nullptr;
 	SrvManager* srvManager_ = nullptr;
 
-	// ルートシグネチャ（全エフェクト共通）
+	// ルートシグネチャ
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> rootSignature_;
 
 	// エフェクトごとの PSO

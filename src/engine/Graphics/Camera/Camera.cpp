@@ -33,8 +33,7 @@ void Camera::StepShakeOncePerFrame() {
 			shakeTimer_ = 0.0f;
 			shakeOffset_ = { 0.0f, 0.0f, 0.0f };
 		} else {
-			// 乱数で揺れを計算（平行移動ではなく回転を揺らすことで、スカイボックスへの不自然な影響を防ぐ）
-			// magnitude が Translate用の値（5.0等）になっているため、Rotate用のスケールに調整
+			// カメラシェイクの回転オフセット計算
 			float angleScale = 0.01f * shakeMagnitude_;
 			shakeOffset_.x = ((rand() % 100) / 100.0f - 0.5f) * 2.0f * angleScale;
 			shakeOffset_.y = ((rand() % 100) / 100.0f - 0.5f) * 2.0f * angleScale;

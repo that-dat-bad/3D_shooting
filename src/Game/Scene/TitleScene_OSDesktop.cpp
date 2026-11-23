@@ -79,7 +79,7 @@ std::vector<std::string> WrapTextByWidth(
 
 }
 
-// アプリアイコン描画ヘルパー (14x14px ビットマップ風)
+// アプリアイコン描画ヘルパー
 void TitleScene::DrawOSAppIcon(const Vector2& pos, int iconType, const Vector4& col) {
 	DrawOSBorder(pos, { 14.0f, 14.0f }, col, 1.0f);
 	if (iconType == 0) {
@@ -107,14 +107,14 @@ void TitleScene::DrawOSAppIcon(const Vector2& pos, int iconType, const Vector4& 
 	}
 }
 
-// 工業的なインデックス刻み（チックマーク & 3連ドット）
+// 工業的なインデックス刻み
 void TitleScene::DrawOSIndexTicks(const Vector2& pos, const Vector2& size, const Vector4& col) {
-	// 左枠チックマーク (4本)
+	// 左枠チックマーク
 	float tickMidY = pos.y + size.y * 0.5f - 8.0f;
 	for (int i = 0; i < 4; ++i) {
 		DrawOSRect({ pos.x - 3.0f, tickMidY + static_cast<float>(i) * 5.0f }, { 3.0f, 1.0f }, col);
 	}
-	// 右枠チックマーク (4本)
+	// 右枠チックマーク
 	for (int i = 0; i < 4; ++i) {
 		DrawOSRect({ pos.x + size.x, tickMidY + static_cast<float>(i) * 5.0f }, { 3.0f, 1.0f }, col);
 	}
@@ -175,11 +175,11 @@ void TitleScene::DrawOSTitleBar3Buttons(
 }
 
 // =========================================================================
-// フルOSデスクトップ環境の実装 (DAWN_OS Desktop Environment)
+// フルOSデスクトップ環境の実装
 // =========================================================================
 
 void TitleScene::InitializeOSDesktop(SpriteCommon* spriteCommon) {
-	// スプライトプールの初期化（512枚：プール枯渇防止）
+	// スプライトプールの初期化
 	osSpritePool_.clear();
 	for (int i = 0; i < 512; ++i) {
 		auto sp = std::make_unique<Sprite>();
@@ -193,11 +193,10 @@ void TitleScene::InitializeOSDesktop(SpriteCommon* spriteCommon) {
 	}
 	osSpritePoolIdx_ = 0;
 
-	// テキストレンダラーのスプライトプールを事前確保（2500個）
-	// これによりミッション選択モーダル展開時のD3D12 CommittedResource動的生成（数千回のシステムコール）によるヒッチを完全根絶
+	// スプライトプールを事前確保
 	TextRenderer::GetInstance()->PrewarmPool(2500);
 
-	// 専用カーソルスプライトの初期化（64個：プール枯渇と完全分離：項目5）
+	// 専用カーソルスプライトの初期化
 	while (cursorSprites_.size() < 64) {
 		auto sp = std::make_unique<Sprite>();
 		sp->Initialize(spriteCommon, "assets/textures/white1x1.png");
@@ -209,7 +208,7 @@ void TitleScene::InitializeOSDesktop(SpriteCommon* spriteCommon) {
 		cursorSprites_.push_back(std::move(sp));
 	}
 
-	// 疑似OS共通基盤の初期化（テーマ設定）
+	// 疑似OS共通基盤の初期化
 	pseudoOS_.Initialize(spriteCommon, PseudoOS::Theme::TerminalGreen);
 
 	ResetOSDesktopWindows();
@@ -257,7 +256,7 @@ void TitleScene::ResetOSDesktopWindows() {
 	isStartMenuOpen_ = false;
 	osWindows_.clear();
 
-	// Window 0: メインターミナル (SOVI_OS)
+	// Window 0: メインターミナル
 	OSWindow win0;
 	win0.id = 0;
 	win0.title = "TERMINAL : SOVI_OS [v4.12]";
@@ -271,7 +270,7 @@ void TitleScene::ResetOSDesktopWindows() {
 	win0.animScale = 1.0f;
 	osWindows_.push_back(win0);
 
-	// Window 1: 監視カメラ (CAM-01: LIVE FEED)
+	// Window 1: 監視カメラ
 	OSWindow win1;
 	win1.id = 1;
 	win1.title = "CAM-01 : LIVE FEED";
@@ -285,7 +284,7 @@ void TitleScene::ResetOSDesktopWindows() {
 	win1.animScale = 1.0f;
 	osWindows_.push_back(win1);
 
-	// Window 2: 機体テレメトリ (SYS_DIAG: TELEMETRY)
+	// Window 2: 機体テレメトリ
 	OSWindow win2;
 	win2.id = 2;
 	win2.title = "SYS_DIAG : TELEMETRY";
@@ -300,7 +299,7 @@ void TitleScene::ResetOSDesktopWindows() {
 	osWindows_.push_back(win2);
 
 	activeWindowId_ = 0; // メインターミナルがデフォルトアクティブ
-	windowZOrder_ = { 1, 2, 0 }; // メインターミナル（0）が最前面
+	windowZOrder_ = { 1, 2, 0 }; // メインターミナルが最前面
 
 	desktopIcons_.clear();
 
@@ -349,7 +348,7 @@ void TitleScene::UpdateOSDesktop(float dt, const Vector2& mousePos, bool isLDown
 	if (isMissionSelectModalOpen_) {
 		isLDown = false;
 		isLTrig = false;
-		activeWindowId_ = 0; // メインターミナル（ミッション選択）にフォーカス固定
+		activeWindowId_ = 0; // メインターミナルにフォーカス固定
 		for (auto& win : osWindows_) {
 			win.isDragging = false;
 		}
@@ -390,7 +389,7 @@ void TitleScene::UpdateOSDesktop(float dt, const Vector2& mousePos, bool isLDown
 					MissionManager::GetInstance().SetCurrentFilePath(missionCards_[idx].filePath);
 				}
 			} else if (pendingStartMenuAction_ == 2) {
-				// ロック中のためシーン遷移しない（開けないように徹底）
+				// ロック中のためシーン遷移しない
 				lockedAlertTimer_ = 1.8f;
 			} else if (pendingStartMenuAction_ == 3) {
 				if (osWindows_.size() >= 3) {
@@ -420,8 +419,7 @@ void TitleScene::UpdateOSDesktop(float dt, const Vector2& mousePos, bool isLDown
 		return; // クッション演出中は以降の入力を遮断
 	}
 
-	// --- 1. タスクバー & スタートメニューの判定 ---
-	// スタートボタン (X: 8〜114, Y: 690〜718)
+	// 1. タスクバー & スタートメニューの判定
 	if (isLTrig && mx >= 8.0f && mx <= 114.0f && my >= 690.0f && my <= 718.0f) {
 		isStartMenuOpen_ = !isStartMenuOpen_;
 	}
@@ -442,7 +440,7 @@ void TitleScene::UpdateOSDesktop(float dt, const Vector2& mousePos, bool isLDown
 					pendingStartMenuAction_ = 1;
 					isStartMenuOpen_ = false;
 				} else if (relY >= 60.0f && relY < 88.0f) {
-					// [02] FREE FLIGHT (LOCKED)
+					// [02] FREE FLIGHT
 					lockedAlertTimer_ = 1.8f;
 					isStartMenuOpen_ = false;
 				} else if (relY >= 88.0f && relY < 116.0f) {
@@ -472,7 +470,7 @@ void TitleScene::UpdateOSDesktop(float dt, const Vector2& mousePos, bool isLDown
 			float tabW = 142.0f;
 			if (mx >= tabX && mx <= tabX + tabW) {
 				if (!win.isOpen || win.isMinimized) {
-					// 最小化・閉状態からの拡大復元アニメーション（項目3 & 9）
+					// 最小化・閉状態からの拡大復元アニメーション
 					win.isOpen = true;
 					win.isMinimized = false;
 					BringWindowToFront(win.id);
@@ -502,7 +500,7 @@ void TitleScene::UpdateOSDesktop(float dt, const Vector2& mousePos, bool isLDown
 		}
 	}
 
-	// 手前（最前面＝windowZOrder_ の末尾）から奥に向かって逆順に判定
+	// 手前から奥に向かって逆順に判定
 	std::vector<int> testOrder;
 	for (auto it = windowZOrder_.rbegin(); it != windowZOrder_.rend(); ++it) {
 		testOrder.push_back(*it);
@@ -522,7 +520,6 @@ void TitleScene::UpdateOSDesktop(float dt, const Vector2& mousePos, bool isLDown
 			const float minX   = win.pos.x + win.size.x - 68.0f;
 
 			// 右上 3連操作ボタン判定
-			// 1. [X] 閉じる / タスクバーへ最小化
 			if (my >= btnY && my <= btnY + btnH && mx >= closeX && mx <= closeX + btnW) {
 				win.isMinimized = true;
 				if (activeWindowId_ == win.id) {
@@ -612,7 +609,7 @@ void TitleScene::UpdateOSDesktop(float dt, const Vector2& mousePos, bool isLDown
 						}
 					}
 				} else if (win.id == 2) {
-					// 左下サブウィンドウのボタン判定（ステータスバーとのマージンを完全確保）
+					// 左下サブウィンドウのボタン判定
 					int selIdx = selectionManager_.GetSelectedIndex();
 					const float footH = 22.0f;
 					const float footY = win.pos.y + win.size.y - footH;
@@ -626,14 +623,12 @@ void TitleScene::UpdateOSDesktop(float dt, const Vector2& mousePos, bool isLDown
 							cursorRipplePos_ = { mx, my };
 							if (selIdx == 0) {
 								if (b == 0) {
-									// [ENG TEST]: 推力テスト開始！
 									isEngineTesting_ = true;
 									engineTestTimer_ = 4.5f;
 								} else if (b == 1) {
 									// [DEFCON 1/2]: 警戒レベル切替
 									defconLevel_ = (defconLevel_ == 2) ? 1 : 2;
 								} else if (b == 2) {
-									// [SORTIE >>]: 出撃シーケンス発火！
 									startButton_.Click();
 								}
 							} else if (selIdx == 1) {
@@ -735,7 +730,7 @@ void TitleScene::DrawOSTaskbar() {
 	DrawOSPanel({ 8.0f, tbY + 3.0f }, { 104.0f, 26.0f }, startBg, startLine, 1.5f);
 	tr->Print("HackGen", "[⯈ SOVI_OS]", 14.0f, tbY + 16.0f, 12.0f, { 0.0f, 1.0f, 0.12f, 0.98f }, { 0.0f, 0.5f });
 
-	// 3. 全ウィンドウのタスクバータブ常時表示（上下完全センター揃え ＆ アクティブ枠線強調）
+	// 3. 全ウィンドウのタスクバータブ常時表示
 	float tabX = 120.0f;
 	for (auto& win : osWindows_) {
 		float tabW = 142.0f;
@@ -760,7 +755,7 @@ void TitleScene::DrawOSTaskbar() {
 			DrawOSRect({ tabX, tabY }, { tabW, 2.0f }, { 0.35f, 1.0f, 0.42f, 1.0f }); // アクティブタブ上端ネオンライン
 		}
 
-		// ステータスLED（最小化中はアンバー点滅）
+		// ステータスLED
 		bool amberBlink = (std::fmod(animTimer_, 0.6f) < 0.35f);
 		Vector4 dotCol = isAct ? Vector4{ 0.0f, 1.0f, 0.12f, 1.0f }
 		               : (isMin ? (amberBlink ? Vector4{ 1.0f, 0.80f, 0.20f, 1.0f } : Vector4{ 0.45f, 0.35f, 0.08f, 0.6f })
@@ -795,7 +790,7 @@ void TitleScene::DrawOSTaskbar() {
 		Vector4 textCol = isAct ? Vector4{ 1.0f, 1.0f, 1.0f, 1.0f }
 		                : (isMin ? Vector4{ 0.95f, 0.85f, 0.35f, 0.90f }
 		                : (isHov ? Vector4{ 0.72f, 0.92f, 0.74f, 0.95f } : Vector4{ 0.42f, 0.74f, 0.45f, 0.85f }));
-		// 上下完全センター揃え ({ 0.0f, 0.5f })
+		// 上下完全センター揃え
 		tr->Print("HackGen", tabLabel, tabX + 18.0f, tabY + 12.0f, 11.0f, textCol, { 0.0f, 0.5f });
 
 		tabX += tabW + 6.0f;
@@ -880,13 +875,13 @@ void TitleScene::DrawOSWindowCam(const OSWindow& win) {
 	Vector4 borderCol = isActive ? Vector4{ 1.0f, 1.0f, 1.0f, 0.95f * smoothS } : Vector4{ 0.35f, 0.45f, 0.38f, 0.50f * smoothS };
 	Vector4 titleBarBg = isActive ? Vector4{ 0.0f, 0.05f, 0.01f, 0.95f } : Vector4{ 0.0f, 0.015f, 0.005f, 0.90f };
 
-	// 連動切り替え演出（切り替え直後のサイバー発光）
+	// 連動切り替え演出
 	float switchRatio = (kSubWindowSwitchDuration > 0.0f) ? (subWindowSwitchTimer_ / kSubWindowSwitchDuration) : 0.0f;
 	if (switchRatio > 0.0f) {
 		borderCol.w = (std::min)(1.0f, borderCol.w + 0.20f * switchRatio);
 	}
 
-	// 1. ウィンドウ本体パネル（メインウィンドウと同じ完全な漆黒・純黒ブラック { 0.0f, 0.0f, 0.0f, 1.0f }）
+	// 1. ウィンドウ本体パネル
 	DrawOSPanel(curPos, curSize, { 0.0f, 0.0f, 0.0f, 1.0f }, borderCol, isActive ? 2.0f : 1.2f);
 	if (isActive) {
 		// アクティブウィンドウ外周ネオングロー線
@@ -895,25 +890,25 @@ void TitleScene::DrawOSWindowCam(const OSWindow& win) {
 
 	if (smoothS < 0.25f) { return; } // アニメーション極小時は枠のみ描画
 
-	// 2. タイトルバー（上部ヘッダーとコンテンツの明確な分離）
+	// 2. タイトルバー
 	DrawOSRect(curPos, { curSize.x, win.titleBarHeight * smoothS }, titleBarBg);
-	// タイトルバー下部区切り線（白）
+	// タイトルバー下部区切り線
 	DrawOSRect({ curPos.x, curPos.y + (win.titleBarHeight - 2.0f) * smoothS }, { curSize.x, 2.0f }, isActive ? Vector4{ 1.0f, 1.0f, 1.0f, 0.75f } : Vector4{ 0.45f, 0.55f, 0.48f, 0.40f });
 	if (isActive) {
 		DrawOSRect(curPos, { curSize.x, 2.0f }, { 1.0f, 1.0f, 1.0f, 0.95f }); // 上端白アクセントライン
 	}
 
-	// 2.1 左端のアプリアイコン (14x14px カメラアイコン)
+	// 2.1 左端のアプリアイコン
 	Vector4 iconCol = isActive ? Vector4{ 0.0f, 1.0f, 0.12f, 1.0f } : Vector4{ 0.0f, 0.50f, 0.06f, 0.55f };
 	DrawOSAppIcon({ curPos.x + 8.0f, curPos.y + 10.0f }, 1, iconCol);
 
 	// 2.2 LEDインジケーター
 	DrawOSRect({ curPos.x + 26.0f, curPos.y + 13.0f }, { 8.0f, 8.0f }, isActive ? Vector4{ 0.0f, 1.0f, 0.12f, 1.0f } : Vector4{ 0.0f, 0.25f, 0.03f, 0.45f });
 
-	// 2.3 プロセス情報 (PID: 0422) - 右側ボタン群の左に安全配置
+	// 2.3 プロセス情報 - 右側ボタン群の左に安全配置
 	tr->Print("HackGen", "PID: 0422", curPos.x + curSize.x - 130.0f, curPos.y + 10.0f, 10.0f * smoothS, isActive ? Vector4{ 0.0f, 0.75f, 0.09f, 0.80f } : Vector4{ 0.0f, 0.40f, 0.05f, 0.50f });
 
-	// 2.4 タイトル名（セーフエリア自動クリッピング/縮小: 右側PIDやボタンと絶対に衝突しない）
+	// 2.4 タイトル名
 	std::string fullTitle = (isActive ? "[FOCUS] " : "[IDLE]  ") + win.title;
 	float titleStartX = curPos.x + 38.0f;
 	float titleMaxW = (std::max)(60.0f, (curPos.x + curSize.x - 136.0f) - titleStartX - 6.0f);
@@ -925,7 +920,7 @@ void TitleScene::DrawOSWindowCam(const OSWindow& win) {
 	Vector4 titleColor = isActive ? Vector4{ 0.0f, 1.0f, 0.12f, 1.0f } : Vector4{ 0.0f, 0.50f, 0.06f, 0.55f };
 	tr->Print("HackGen", fullTitle, titleStartX, curPos.y + 10.0f, titleFontSize, titleColor);
 
-	// 2.5 操作ボタン（[_][口][X]）の3連ボタン化
+	// 2.5 操作ボタンの3連ボタン化
 	DrawOSTitleBar3Buttons(curPos, curSize, customCursorPos_.x, customCursorPos_.y, isMissionSelectModalOpen_, isActive, { 0.0f, 1.0f, 0.12f, 1.0f }, { 1.0f, 1.0f, 1.0f, 0.85f });
 
 	// ボタンホバー判定ラムダ
@@ -935,7 +930,7 @@ void TitleScene::DrawOSWindowCam(const OSWindow& win) {
 		        customCursorPos_.y >= by && customCursorPos_.y <= by + bh);
 	};
 
-	// 3. ウィンドウ内コンテンツ（中央メニュー連動 ＋ 実際のインタラクティブ操作）
+	// 3. ウィンドウ内コンテンツ
 	int selIdx = selectionManager_.GetSelectedIndex();
 	float cy = curPos.y + win.titleBarHeight + 10.0f;
 
@@ -950,7 +945,7 @@ void TitleScene::DrawOSWindowCam(const OSWindow& win) {
 		tr->Print("HackGen", "1080p 60FPS", curPos.x + curSize.x - 90.0f, cy, 11.0f, { 0.46f, 0.80f, 0.49f, 0.85f });
 		cy += 24.0f;
 
-		// プレビュー枠（完全な漆黒背景 & メインウィンドウのセパレーター枠線色）
+		// プレビュー枠
 		DrawOSPanel({ curPos.x + 14.0f, cy }, { curSize.x - 28.0f, 112.0f }, { 0.0f, 0.0f, 0.0f, 0.95f }, { 0.33f, 0.64f, 0.36f, 0.65f }, 1.0f);
 
 		float cx = curPos.x + curSize.x * 0.5f;
@@ -964,7 +959,7 @@ void TitleScene::DrawOSWindowCam(const OSWindow& win) {
 		tr->Print("HackGen", "AZ: 042° | EL: +12° | OPTICAL LINK: OK", cx, midY + 18.0f, 10.5f, { 0.38f, 0.68f, 0.41f, 0.80f }, { 0.5f, 0.5f });
 		cy += 124.0f;
 
-		// チャンネル切替ボタン（クリックで実際にカメラ位置が切替）
+		// チャンネル切替ボタン
 		tr->Print("HackGen", "CAMERA CHANNEL (CLICK TO SWITCH):", curPos.x + 16.0f, cy + 2.0f, 10.5f, { 0.40f, 0.70f, 0.43f, 0.85f });
 		cy += 18.0f;
 
@@ -1131,14 +1126,14 @@ void TitleScene::DrawOSWindowCam(const OSWindow& win) {
 		}
 	}
 
-	// 連動切り替え演出（走査線スキャン＆同期プロンプト）
+	// 連動切り替え演出
 	if (switchRatio > 0.0f) {
 		float scanY = curPos.y + win.titleBarHeight + (1.0f - switchRatio) * (curSize.y - win.titleBarHeight);
 		DrawOSRect({ curPos.x + 2.0f, scanY }, { curSize.x - 4.0f, 2.0f }, { 0.58f, 0.90f, 0.60f, 0.85f * switchRatio });
 		tr->Print("HackGen", ">> SYNCING DATA STREAM...", curPos.x + curSize.x * 0.5f, curPos.y + curSize.y * 0.5f, 11.0f, { 1.0f, 1.0f, 1.0f, 0.95f * switchRatio }, { 0.5f, 0.5f });
 	}
 
-	// 四隅コーナーブラケット（白 / 非アクティブ時は沈み階層表現）
+	// 四隅コーナーブラケット
 	const float cLen = 16.0f;
 	const float cThick = 2.5f;
 	const Vector4 cCol = isActive ? Vector4{ 1.0f, 1.0f, 1.0f, 1.0f } : Vector4{ 0.38f, 0.45f, 0.40f, 0.45f };
@@ -1151,10 +1146,10 @@ void TitleScene::DrawOSWindowCam(const OSWindow& win) {
 	DrawOSRect({ curPos.x + curSize.x - cLen, curPos.y + curSize.y - cThick }, { cLen, cThick }, cCol);
 	DrawOSRect({ curPos.x + curSize.x - cThick, curPos.y + curSize.y - cLen }, { cThick, cLen }, cCol);
 
-	// 工業的なインデックス刻み（チックマーク & 3連ドット）
+	// 工業的なインデックス刻み
 	DrawOSIndexTicks(curPos, curSize, isActive ? Vector4{ 1.0f, 1.0f, 1.0f, 0.65f } : Vector4{ 0.30f, 0.38f, 0.32f, 0.30f });
 
-	// ウィンドウ最下部ステータスバー（独立フッター領域: 上下中央アライメント）
+	// ウィンドウ最下部ステータスバー
 	const float footH = 20.0f;
 	const float footY = curPos.y + curSize.y - footH;
 	DrawOSRect({ curPos.x, footY }, { curSize.x, 1.0f }, isActive ? Vector4{ 1.0f, 1.0f, 1.0f, 0.45f } : Vector4{ 0.30f, 0.38f, 0.32f, 0.25f });
@@ -1163,7 +1158,7 @@ void TitleScene::DrawOSWindowCam(const OSWindow& win) {
 	tr->Print("HackGenRegular", "LINK: OPTICAL_SAT // ENCRYPTED", curPos.x + 18.0f, footY + footH * 0.5f, 10.0f, isActive ? Vector4{ 0.0f, 0.90f, 0.11f, 0.90f } : Vector4{ 0.0f, 0.40f, 0.05f, 0.55f }, { 0.0f, 0.5f });
 	tr->Print("HackGenRegular", "60 FPS // BUFFER: 100%", curPos.x + curSize.x - 12.0f, footY + footH * 0.5f, 10.0f, isActive ? Vector4{ 0.0f, 0.80f, 0.10f, 0.85f } : Vector4{ 0.0f, 0.35f, 0.04f, 0.50f }, { 1.0f, 0.5f });
 
-	// 非アクティブ時のディム沈みマスク（約10%暗く奥へ沈め、手前の中央ウィンドウを浮き立たせる）
+	// 非アクティブ時のディム沈みマスク
 	if (!isActive) {
 		DrawOSRect(curPos, curSize, { 0.0f, 0.012f, 0.005f, 0.50f });
 	}
@@ -1190,13 +1185,13 @@ void TitleScene::DrawOSWindowTelemetry(const OSWindow& win) {
 	Vector4 borderCol = isActive ? Vector4{ 1.0f, 1.0f, 1.0f, 0.95f * smoothS } : Vector4{ 0.35f, 0.45f, 0.38f, 0.50f * smoothS };
 	Vector4 titleBarBg = isActive ? Vector4{ 0.0f, 0.05f, 0.01f, 0.95f } : Vector4{ 0.0f, 0.015f, 0.005f, 0.90f };
 
-	// 連動切り替え演出（切り替え直後のサイバー発光）
+	// 連動切り替え演出
 	float switchRatio = (kSubWindowSwitchDuration > 0.0f) ? (subWindowSwitchTimer_ / kSubWindowSwitchDuration) : 0.0f;
 	if (switchRatio > 0.0f) {
 		borderCol.w = (std::min)(1.0f, borderCol.w + 0.20f * switchRatio);
 	}
 
-	// 1. ウィンドウ本体パネル（メインウィンドウと同じ完全な漆黒・純黒ブラック { 0.0f, 0.0f, 0.0f, 1.0f }）
+	// 1. ウィンドウ本体パネル
 	DrawOSPanel(curPos, curSize, { 0.0f, 0.0f, 0.0f, 1.0f }, borderCol, isActive ? 2.0f : 1.2f);
 	if (isActive) {
 		// アクティブウィンドウ外周ネオングロー線
@@ -1205,25 +1200,25 @@ void TitleScene::DrawOSWindowTelemetry(const OSWindow& win) {
 
 	if (smoothS < 0.25f) { return; } // アニメーション極小時は枠のみ描画
 
-	// 2. タイトルバー（上部ヘッダーとコンテンツの明確な分離）
+	// 2. タイトルバー
 	DrawOSRect(curPos, { curSize.x, win.titleBarHeight * smoothS }, titleBarBg);
-	// タイトルバー下部区切り線（白）
+	// タイトルバー下部区切り線
 	DrawOSRect({ curPos.x, curPos.y + (win.titleBarHeight - 2.0f) * smoothS }, { curSize.x, 2.0f }, isActive ? Vector4{ 1.0f, 1.0f, 1.0f, 0.75f } : Vector4{ 0.45f, 0.55f, 0.48f, 0.40f });
 	if (isActive) {
 		DrawOSRect(curPos, { curSize.x, 2.0f }, { 1.0f, 1.0f, 1.0f, 0.95f }); // 上端白アクセントライン
 	}
 
-	// 2.1 左端のアプリアイコン (14x14px テレメトリアイコン)
+	// 2.1 左端のアプリアイコン
 	Vector4 iconCol = isActive ? Vector4{ 0.0f, 1.0f, 0.12f, 1.0f } : Vector4{ 0.0f, 0.50f, 0.06f, 0.55f };
 	DrawOSAppIcon({ curPos.x + 8.0f, curPos.y + 10.0f }, 2, iconCol);
 
 	// 2.2 LEDインジケーター
 	DrawOSRect({ curPos.x + 26.0f, curPos.y + 13.0f }, { 8.0f, 8.0f }, isActive ? Vector4{ 0.0f, 1.0f, 0.12f, 1.0f } : Vector4{ 0.0f, 0.25f, 0.03f, 0.45f });
 
-	// 2.3 プロセス情報 (PID: 0423) - 右側ボタン群の左に安全配置
+	// 2.3 プロセス情報 - 右側ボタン群の左に安全配置
 	tr->Print("HackGen", "PID: 0423", curPos.x + curSize.x - 130.0f, curPos.y + 10.0f, 10.0f * smoothS, isActive ? Vector4{ 0.0f, 0.75f, 0.09f, 0.80f } : Vector4{ 0.0f, 0.40f, 0.05f, 0.50f });
 
-	// 2.4 タイトル名（セーフエリア自動クリッピング/縮小: 右側PIDやボタンと絶対に衝突しない）
+	// 2.4 タイトル名
 	std::string fullTitle = (isActive ? "[FOCUS] " : "[IDLE]  ") + win.title;
 	float titleStartX = curPos.x + 38.0f;
 	float titleMaxW = (std::max)(60.0f, (curPos.x + curSize.x - 136.0f) - titleStartX - 6.0f);
@@ -1235,7 +1230,7 @@ void TitleScene::DrawOSWindowTelemetry(const OSWindow& win) {
 	Vector4 titleColor = isActive ? Vector4{ 0.0f, 1.0f, 0.12f, 1.0f } : Vector4{ 0.0f, 0.50f, 0.06f, 0.55f };
 	tr->Print("HackGen", fullTitle, titleStartX, curPos.y + 10.0f, titleFontSize, titleColor);
 
-	// 2.5 操作ボタン（[_][口][X]）の3連ボタン化
+	// 2.5 操作ボタンの3連ボタン化
 	DrawOSTitleBar3Buttons(curPos, curSize, customCursorPos_.x, customCursorPos_.y, isMissionSelectModalOpen_, isActive, { 0.0f, 1.0f, 0.12f, 1.0f }, { 1.0f, 1.0f, 1.0f, 0.85f });
 
 	// ホバー判定ヘルパーラムダ
@@ -1245,21 +1240,21 @@ void TitleScene::DrawOSWindowTelemetry(const OSWindow& win) {
 		        customCursorPos_.y >= by && customCursorPos_.y <= by + bh);
 	};
 
-	// 3. ウィンドウ内コンテンツ（中央メニューのカーソル選択に連動したインタラクティブ表示）
+	// 3. ウィンドウ内コンテンツ
 	int selIdx = selectionManager_.GetSelectedIndex();
 	float cy = curPos.y + win.titleBarHeight + 10.0f;
 	const float gW = curSize.x - 28.0f;
 
 	if (selIdx == 0) {
 		// ==========================================
-		// [01] EXECUTE SORTIE: 機体ステータス (MiG-21)
+		// [01] EXECUTE SORTIE: 機体ステータス
 		// ==========================================
 		tr->Print("HackGen", "AIRFRAME : MiG-21 [FISHBED-J]", curPos.x + 14.0f, cy, 12.0f, { 0.46f, 0.82f, 0.49f, 0.95f });
 		cy += 20.0f;
 		tr->Print("HackGen", "ENGINES  : TUMANSKY R-25-300 x1", curPos.x + 14.0f, cy, 11.0f, { 0.38f, 0.68f, 0.41f, 0.85f });
 		cy += 22.0f;
 
-		// 推力・ノズル開度リアルタイム動的変動（テスト時はアフターバーナー急上昇）
+		// 推力・ノズル開度リアルタイム動的変動
 		float thrustRatio = 0.94f + 0.04f * std::sin(animTimer_ * 2.8f) + 0.015f * std::cos(animTimer_ * 5.2f);
 		if (isEngineTesting_) {
 			thrustRatio = 1.085f + 0.02f * std::sin(animTimer_ * 14.0f);
@@ -1281,7 +1276,7 @@ void TitleScene::DrawOSWindowTelemetry(const OSWindow& win) {
 		DrawOSBorder({ curPos.x + 14.0f, cy }, { gW, 7.0f }, { 0.33f, 0.64f, 0.36f, 0.75f }, 1.0f);
 		cy += 18.0f;
 
-		// EGT排気温度のリアルタイム微動（テスト時は885℃赤字警告）
+		// EGT排気温度のリアルタイム微動
 		float egtTemp = 641.0f + 4.5f * std::sin(animTimer_ * 1.8f) + 1.8f * std::cos(animTimer_ * 4.3f);
 		if (isEngineTesting_) {
 			egtTemp = 885.0f + 14.0f * std::sin(animTimer_ * 8.0f);
@@ -1295,14 +1290,14 @@ void TitleScene::DrawOSWindowTelemetry(const OSWindow& win) {
 		tr->Print("HackGen", egtBuf, curPos.x + 14.0f, cy, 10.5f, isEngineTesting_ ? Vector4{ 1.0f, 0.30f, 0.20f, 1.0f } : Vector4{ 0.42f, 0.76f, 0.45f, 0.85f });
 		cy += 16.0f;
 
-		// 油圧系統（テスト時はMAX FLOW 24.8MPa）
+		// 油圧系統
 		float hydPress = isEngineTesting_ ? 24.8f : (21.0f + 0.22f * std::sin(animTimer_ * 2.5f));
 		char hydBuf[48];
 		snprintf(hydBuf, sizeof(hydBuf), "HYDRAULIC SYS : %4.1f MPa [%s]", hydPress, isEngineTesting_ ? "MAX FLOW" : "ONLINE");
 		tr->Print("HackGen", hydBuf, curPos.x + 14.0f, cy, 10.5f, { 0.42f, 0.76f, 0.45f, 0.85f });
 		cy += 16.0f;
 
-		// ノズル開度（テスト時は100%全開）
+		// ノズル開度
 		float nozPos = isEngineTesting_ ? 100.0f : (78.5f + 2.8f * std::cos(animTimer_ * 1.4f));
 		char nozBuf[48];
 		snprintf(nozBuf, sizeof(nozBuf), "NOZZLE POS    : %4.1f %%   [%s]", nozPos, isEngineTesting_ ? "MAX DIVERG" : "ACTIVE");
@@ -1345,7 +1340,7 @@ void TitleScene::DrawOSWindowTelemetry(const OSWindow& win) {
 		tr->Print("HackGen", "THREAT LEVEL  : CRITICAL [4 BOGEYS]", curPos.x + 14.0f, cy, 11.0f, { 1.0f, 0.85f, 0.25f, 0.90f });
 		cy += 22.0f;
 
-		// 脅威度メーター 1: 空対空脅威度 (84%)
+		// 脅威度メーター 1: 空対空脅威度
 		float a2aRatio = 0.84f + 0.03f * std::sin(animTimer_ * 3.5f);
 		tr->Print("HackGen", "AIR-TO-AIR THREAT :", curPos.x + 14.0f, cy, 10.5f, { 1.0f, 0.40f, 0.35f, 0.90f });
 		tr->Print("HackGen", "84 % [CRITICAL]", curPos.x + curSize.x - 100.0f, cy, 10.5f, { 1.0f, 0.30f, 0.25f, 0.98f });
@@ -1355,7 +1350,7 @@ void TitleScene::DrawOSWindowTelemetry(const OSWindow& win) {
 		DrawOSBorder({ curPos.x + 14.0f, cy }, { gW, 6.0f }, { 0.65f, 0.20f, 0.15f, 0.75f }, 1.0f);
 		cy += 16.0f;
 
-		// 脅威度メーター 2: 地対空ミサイル脅威度 (52%)
+		// 脅威度メーター 2: 地対空ミサイル脅威度
 		float samRatio = 0.52f + 0.02f * std::cos(animTimer_ * 2.2f);
 		tr->Print("HackGen", "SAM / AAA DANGER  :", curPos.x + 14.0f, cy, 10.5f, { 1.0f, 0.75f, 0.30f, 0.90f });
 		tr->Print("HackGen", "52 % [MODERATE]", curPos.x + curSize.x - 100.0f, cy, 10.5f, { 1.0f, 0.80f, 0.25f, 0.95f });
@@ -1365,7 +1360,7 @@ void TitleScene::DrawOSWindowTelemetry(const OSWindow& win) {
 		DrawOSBorder({ curPos.x + 14.0f, cy }, { gW, 6.0f }, { 0.65f, 0.45f, 0.15f, 0.75f }, 1.0f);
 		cy += 16.0f;
 
-		// 敵戦力探知リスト（選択中ターゲットにハイライト枠）
+		// 敵戦力探知リスト
 		const char* intelList[] = {
 			"BANDIT [A] : Su-27 FLANKER x2 [CAP]",
 			"BANDIT [B] : MiG-29 FULCRUM x4 [INT]",
@@ -1471,7 +1466,7 @@ void TitleScene::DrawOSWindowTelemetry(const OSWindow& win) {
 		tr->Print("HackGen", "READY // CONFIRM SHUTDOWN IN MAIN TERM", curPos.x + curSize.x * 0.5f, cy + 5.0f, 11.5f, { 1.0f, 0.75f, 0.30f, 0.98f }, { 0.5f, 0.0f });
 	}
 
-	// 4. 下部インタラクティブ・アクションボタン群（最下部ステータスバーとの間に1行分のマージンを空けて配置）
+	// 4. 下部インタラクティブ・アクションボタン群
 	const float footH = 22.0f;
 	const float footY = curPos.y + curSize.y - footH;
 	const float actBtnH = 22.0f;
@@ -1595,14 +1590,14 @@ void TitleScene::DrawOSWindowTelemetry(const OSWindow& win) {
 		tr->Print("HackGen", def.label, bx + actBtnW * 0.5f, actBtnY + 5.0f, 10.5f, tCol, { 0.5f, 0.0f });
 	}
 
-	// 連動切り替え演出（走査線スキャン＆同期プロンプト）
+	// 連動切り替え演出
 	if (switchRatio > 0.0f) {
 		float scanY = curPos.y + win.titleBarHeight + (1.0f - switchRatio) * (curSize.y - win.titleBarHeight);
 		DrawOSRect({ curPos.x + 2.0f, scanY }, { curSize.x - 4.0f, 2.0f }, { 0.53f, 0.88f, 0.55f, 0.85f * switchRatio });
 		tr->Print("HackGen", ">> RE-CONFIGURING METRICS...", curPos.x + curSize.x * 0.5f, curPos.y + curSize.y * 0.5f, 11.0f, { 1.0f, 1.0f, 1.0f, 0.95f * switchRatio }, { 0.5f, 0.5f });
 	}
 
-	// 四隅コーナーブラケット（白 / 非アクティブ時は沈み階層表現）
+	// 四隅コーナーブラケット
 	const float cLen = 16.0f;
 	const float cThick = 2.5f;
 	const Vector4 cCol = isActive ? Vector4{ 1.0f, 1.0f, 1.0f, 1.0f } : Vector4{ 0.38f, 0.45f, 0.40f, 0.45f };
@@ -1615,17 +1610,17 @@ void TitleScene::DrawOSWindowTelemetry(const OSWindow& win) {
 	DrawOSRect({ curPos.x + curSize.x - cLen, curPos.y + curSize.y - cThick }, { cLen, cThick }, cCol);
 	DrawOSRect({ curPos.x + curSize.x - cThick, curPos.y + curSize.y - cLen }, { cThick, cLen }, cCol);
 
-	// 工業的なインデックス刻み（チックマーク & 3連ドット）
+	// 工業的なインデックス刻み
 	DrawOSIndexTicks(curPos, curSize, isActive ? Vector4{ 1.0f, 1.0f, 1.0f, 0.65f } : Vector4{ 0.30f, 0.38f, 0.32f, 0.30f });
 
-	// ウィンドウ最下部ステータスバー（独立フッター領域: 上下中央アライメント）
+	// ウィンドウ最下部ステータスバー
 	DrawOSRect({ curPos.x, footY }, { curSize.x, 1.0f }, isActive ? Vector4{ 1.0f, 1.0f, 1.0f, 0.45f } : Vector4{ 0.30f, 0.38f, 0.32f, 0.25f });
 	DrawOSRect({ curPos.x, footY + 1.0f }, { curSize.x, footH - 1.0f }, { 0.0f, 0.02f, 0.005f, 0.95f });
 	DrawOSRect({ curPos.x + 8.0f, footY + 8.0f }, { 5.0f, 5.0f }, isActive ? Vector4{ 0.0f, 1.0f, 0.12f, 0.95f } : Vector4{ 0.0f, 0.35f, 0.04f, 0.50f });
 	tr->Print("HackGenRegular", "BUS: ARINC-429 // MIL-STD-1553B", curPos.x + 18.0f, footY + footH * 0.5f, 10.0f, isActive ? Vector4{ 0.0f, 0.90f, 0.11f, 0.90f } : Vector4{ 0.0f, 0.40f, 0.05f, 0.55f }, { 0.0f, 0.5f });
 	tr->Print("HackGenRegular", "CH-A ONLINE // LATENCY: 2ms", curPos.x + curSize.x - 12.0f, footY + footH * 0.5f, 10.0f, isActive ? Vector4{ 0.0f, 0.80f, 0.10f, 0.85f } : Vector4{ 0.0f, 0.35f, 0.04f, 0.50f }, { 1.0f, 0.5f });
 
-	// 非アクティブ時のディム沈みマスク（約10%暗く奥へ沈め、手前の中央ウィンドウを浮き立たせる）
+	// 非アクティブ時のディム沈みマスク
 	if (!isActive) {
 		DrawOSRect(curPos, curSize, { 0.0f, 0.012f, 0.005f, 0.50f });
 	}
@@ -1672,26 +1667,23 @@ void TitleScene::DrawCustomCursor() {
 		sp->Draw();
 	};
 
-	// 1. クリック波紋エフェクト（クリック地点から放射状に広がるサイバーパルス）
+	// 1. クリック波紋エフェクト
 	if (cursorRippleTimer_ > 0.0f) {
 		float rp = 1.0f - (cursorRippleTimer_ / 0.30f);
 		float rRad = 4.0f + 24.0f * rp;
 		float rAlpha = (1.0f - rp) * 0.90f;
 		Vector4 ringCol = { 0.0f, 1.0f, 0.12f, rAlpha };
-		// リング（外枠4本）
+		// リング
 		drawCursorRect({ cursorRipplePos_.x - rRad, cursorRipplePos_.y - rRad }, { rRad * 2.0f, 1.5f }, ringCol);
 		drawCursorRect({ cursorRipplePos_.x - rRad, cursorRipplePos_.y + rRad - 1.5f }, { rRad * 2.0f, 1.5f }, ringCol);
 		drawCursorRect({ cursorRipplePos_.x - rRad, cursorRipplePos_.y - rRad }, { 1.5f, rRad * 2.0f }, ringCol);
 		drawCursorRect({ cursorRipplePos_.x + rRad - 1.5f, cursorRipplePos_.y - rRad }, { 1.5f, rRad * 2.0f }, ringCol);
 	}
 
-	// 2. 三角形カスタムカーソル (ユーザー指示: マウスカーソルを三角形へ)
-	// P0: (mx, my) 先端
-	// P1: (mx + 7.0f, my + 22.0f) 下端頂点
-	// P2: (mx + 22.0f, my + 7.0f) 右端頂点
+	// 三角形カスタムカーソル
 	const MyMath::Vector4 kBlackEdge = { 0.0f, 0.0f, 0.0f, 0.95f };
 	const MyMath::Vector4 kGreenBody = { 0.0f, 0.92f, 0.11f, 0.98f };
-	const MyMath::Vector4 kGreenEdge = { 0.0f, 1.0f, 0.12f, 1.00f }; // (0, 255, 30) ネオングリーンエッジ
+	const MyMath::Vector4 kGreenEdge = { 0.0f, 1.0f, 0.12f, 1.00f }; // ネオングリーンエッジ
 	const MyMath::Vector4 kGreenCore = { 0.40f, 1.0f, 0.48f, 1.00f };
 
 	// 2.1 外側黒アウトライン
@@ -1699,7 +1691,7 @@ void TitleScene::DrawCustomCursor() {
 	drawCursorLine({ mx - 0.5f, my - 0.5f }, { mx + 6.5f, my + 22.5f }, 3.5f, kBlackEdge);
 	drawCursorLine({ mx + 6.5f, my + 22.5f }, { mx + 22.5f, my + 6.5f }, 3.5f, kBlackEdge);
 
-	// 2.2 ネオングリーン三角形内部ソリッド塗りつぶし（スキャンラインスライシング）
+	// 2.2 ネオングリーン三角形内部ソリッド塗りつぶし
 	for (int y = 0; y <= 22; ++y) {
 		float fy = static_cast<float>(y);
 		float x1 = fy * (7.0f / 22.0f);
@@ -1721,15 +1713,15 @@ void TitleScene::DrawOSDesktop() {
 	TextRenderer* tr = TextRenderer::GetInstance();
 	osSpritePoolIdx_ = 0;
 
-	// OSデスクトップ同期立ち上がりアニメーション進行度（0.0: ブート直後, 1.0: 立ち上がり完了）
+	// OSデスクトップ同期立ち上がりアニメーション進行度
 	float enterProg = 1.0f;
 	if (menuEnterTimer_ > 0.0f) {
 		enterProg = std::clamp(1.0f - (menuEnterTimer_ / kMenuEnterDuration), 0.0f, 1.0f);
 	}
-	// 滑らかなイーズアウト進行度 (Ease-Out Sine: 最初素早く、最後しっとり定着)
+	// 滑らかなイーズアウト進行度
 	float smoothProg = (enterProg >= 1.0f) ? 1.0f : std::sin(enterProg * 1.5707963f);
 
-	// 1. デスクトップ上部ヘッダー（OSウォーターマーク & 戦闘連続性ログ：指摘4）
+	// 1. デスクトップ上部ヘッダー
 	{
 		float hAlpha = smoothProg;
 		tr->Print("HackGen", "SOVI_OS TACTICAL DEFENSE MAINFRAME [v4.12.0]", 24.0f, 18.0f, 12.0f, { 0.40f, 0.76f, 0.43f, 0.70f * hAlpha });
@@ -1741,7 +1733,6 @@ void TitleScene::DrawOSDesktop() {
 	}
 	tr->Flush(); // ヘッダーテキストを先に描画
 
-	// 2. ウィンドウ描画（全ウィンドウが時間差なく完全に同時にアニメーション展開！）
 	for (int winId : windowZOrder_) {
 		if (winId >= 0 && winId < static_cast<int>(osWindows_.size())) {
 			auto& win = osWindows_[winId];
@@ -1769,13 +1760,13 @@ void TitleScene::DrawOSDesktop() {
 		for (size_t wi = 0; wi < osWindows_.size(); ++wi) {
 			const auto& win = osWindows_[wi];
 			if (win.isOpen && !win.isMinimized) {
-				// 走査線（VRAMバッファ書き込み演出: 画面上から下へ一気に走査）
+				// 走査線
 				float curH = win.size.y * enterProg;
 				float scanY = win.pos.y + curH;
 				DrawOSRect({ win.pos.x, scanY - 1.0f }, { win.size.x, 2.0f }, { 0.0f, 1.0f, 0.12f, (1.0f - enterProg) * 0.90f });
 				DrawOSRect({ win.pos.x, scanY - 4.0f }, { win.size.x, 8.0f }, { 0.0f, 0.85f, 0.10f, (1.0f - enterProg) * 0.25f });
 
-				// 四隅のサイバーブラケット（(0, 255, 30) ネオングリーン発光）
+				// 四隅のサイバーブラケット
 				const float bLen = 16.0f;
 				const float bThick = 2.0f;
 				Vector4 bCol = { 0.0f, 1.0f, 0.12f, (1.0f - enterProg) * 0.95f };
@@ -1791,25 +1782,24 @@ void TitleScene::DrawOSDesktop() {
 		}
 	}
 
-	// 3. デスクトップアイコン（同時にフェードイン）
+	// 3. デスクトップアイコン
 	DrawDesktopIcons();
 	tr->Flush();
 
-	// 4. タスクバー & スタートメニュー（同時にフェードイン）
+	// 4. タスクバー & スタートメニュー
 	DrawOSTaskbar();
 	tr->Flush();
 
-	// 5. 専用ミッション選択ウィンドウ（開いている場合は最前面に展開！）
 	if (isMissionSelectModalOpen_) {
 		DrawMissionSelectModal();
 		tr->Flush();
 	}
 
-	// 6. ターミナルの色に合わせた緑色のカスタムカーソル（最前面: 同時に表示）
+	// 6. ターミナルの色に合わせた緑色のカスタムカーソル
 	DrawCustomCursor();
 	tr->Flush();
 
-	// 起動時の短い立ち上がりHUDインジケーター（画面中央下に一瞬表示してフェード）
+	// 起動時の短い立ち上がりHUDインジケーター
 	if (menuEnterTimer_ > 0.0f) {
 		float hudAlpha = (1.0f - enterProg);
 		tr->Print("HackGen", "[ SOVI-OS ALL SYSTEMS ONLINE ]", kScreenWidth * 0.5f, kScreenHeight - 65.0f, 13.0f, { 0.48f, 0.84f, 0.50f, 0.85f * hudAlpha }, { 0.5f, 0.5f });
@@ -1827,7 +1817,7 @@ void TitleScene::UpdateMissionSelectModal(float dt, const Vector2& mousePos, boo
 		cursorRipplePos_ = mousePos;
 	}
 
-	// OSデスクトップ全体の更新（モーダル展開中はクリック・ドラッグ入力を遮断し、アニメーション更新のみ維持）
+	// OSデスクトップ全体の更新
 	UpdateOSDesktop(dt, mousePos, false, false);
 
 	if (!isMissionSelectModalOpen_) {
@@ -1863,7 +1853,7 @@ void TitleScene::UpdateMissionSelectModal(float dt, const Vector2& mousePos, boo
 
 	int totalSlots = static_cast<int>(missionCards_.size());
 
-	// 1. 閉じる判定 (ESCキー, 右上3連ボタン[_][口][X], 戻るボタン)
+	// 1. 閉じる判定
 	bool escTriggered = input->TriggerKey(DIK_ESCAPE);
 	const float topBtnY = modalY + 7.0f;
 	const float topBtnH = 18.0f;
@@ -1909,7 +1899,6 @@ void TitleScene::UpdateMissionSelectModal(float dt, const Vector2& mousePos, boo
 			cursorRippleTimer_ = 0.25f;
 			cursorRipplePos_ = mousePos;
 			if (selectedMissionIdx_ == i) {
-				// 既に選択中の項目を再クリック -> 即時出撃発火！
 				isMissionSelectModalOpen_ = false;
 				StartSortieSequence();
 				return;
@@ -1956,7 +1945,7 @@ void TitleScene::DrawMissionSelectModal() {
 		DrawOSRect({ pos.x + size.x - bThick, pos.y + size.y - bLen }, { bThick, bLen }, col);
 	};
 
-	// 0. 全画面半透明ダークバックドロップ（OSデスクトップの存在感を保ちつつモーダルに視線集中）
+	// 0. 全画面半透明ダークバックドロップ
 	DrawOSRect({ 0.0f, 0.0f }, { kScreenWidth, kScreenHeight }, { 0.0f, 0.0f, 0.0f, 0.65f });
 
 	// 1. ドロップシャドウ
@@ -1970,14 +1959,14 @@ void TitleScene::DrawMissionSelectModal() {
 	DrawOSRect({ modalX, modalY }, { modalW, 2.0f }, { 1.0f, 1.0f, 1.0f, 0.95f }); // 上端白アクセントライン
 	DrawOSRect({ modalX, modalY + 32.0f }, { modalW, 2.0f }, { 1.0f, 1.0f, 1.0f, 0.65f }); // 下部区切り線
 
-	// 3.1 左端のアプリアイコン (14x14px ターミナルアイコン)
+	// 3.1 左端のアプリアイコン
 	DrawOSAppIcon({ modalX + 8.0f, modalY + 10.0f }, 0, { 0.0f, 1.0f, 0.12f, 1.0f });
 
 	// 3.2 LEDランプ ＆ タイトル名
 	DrawOSRect({ modalX + 26.0f, modalY + 13.0f }, { 8.0f, 8.0f }, { 0.0f, 1.0f, 0.12f, 1.0f }); // 高輝度LED
 	tr->Print("HackGen", "[FOCUS] MISSION SELECT : OPERATION DISPATCH [v4.12]", modalX + 38.0f, modalY + 9.0f, 12.0f, { 0.0f, 1.0f, 0.12f, 1.0f });
 
-	// 3.3 プロセス情報 (PID: 0801)
+	// 3.3 プロセス情報
 	tr->Print("HackGen", "PID: 0801", modalX + modalW - 240.0f, modalY + 10.0f, 10.5f, { 0.0f, 0.75f, 0.09f, 0.80f });
 
 	// 3.4 タイトルバー右側のステータスバッジ
@@ -1988,17 +1977,17 @@ void TitleScene::DrawMissionSelectModal() {
 	DrawOSRect({ badgeX + 7.0f, badgeY + 5.0f }, { 6.0f, 6.0f }, ledColor);
 	tr->Print("HackGen", "SEC:LV5 [OK]", badgeX + 18.0f, badgeY + 2.0f, 10.5f, { 0.0f, 1.0f, 0.12f, 0.95f });
 
-	// 3.5 操作ボタン（[_][口][X]）の3連ボタン化
+	// 3.5 操作ボタンの3連ボタン化
 	DrawOSTitleBar3Buttons({ modalX, modalY }, { modalW, modalH }, customCursorPos_.x, customCursorPos_.y, false, true, { 0.0f, 1.0f, 0.12f, 1.0f }, { 1.0f, 1.0f, 1.0f, 0.85f });
 
-	// 4. 四隅のコーナーブラケット（太さ 2.5px）
+	// 4. 四隅のコーナーブラケット
 	drawCornerBrackets({ modalX, modalY }, { modalW, modalH }, 22.0f, 2.5f, cornerColor);
 
-	// 工業的なインデックス刻み（チックマーク & 3連ドット）
+	// 工業的なインデックス刻み
 	DrawOSIndexTicks({ modalX, modalY }, { modalW, modalH }, Vector4{ 1.0f, 1.0f, 1.0f, 0.65f });
 
 	// =========================================================================
-	// 左カラム: ミッション選択リスト (幅 370px, 高さ 482px)
+	// 左カラム: ミッション選択リスト
 	// =========================================================================
 	const float listX = modalX + 16.0f;
 	const float listY = modalY + 44.0f;
@@ -2040,7 +2029,7 @@ void TitleScene::DrawMissionSelectModal() {
 		}
 
 		if (isSel) {
-			// 選択中ハイライト（白枠 ＆ (0, 255, 30) ネオングリーン文字）
+			// 選択中ハイライト
 			DrawOSPanel({ listX, cy }, { cardW, cardH }, { 0.0f, 0.15f, 0.02f, 0.85f }, { 1.0f, 1.0f, 1.0f, 0.95f }, 1.5f);
 			DrawOSRect({ listX, cy }, { 4.0f, cardH }, { 0.0f, 1.0f, 0.12f, 1.0f });
 			drawCornerBrackets({ listX, cy }, { cardW, cardH }, 8.0f, 1.5f, { 1.0f, 1.0f, 1.0f, 1.0f });
@@ -2061,7 +2050,7 @@ void TitleScene::DrawMissionSelectModal() {
 				tr->Print("HackGen", ("[" + aliasStr + "]").c_str(), listX + cardW - 14.0f, cy + 14.0f, 11.0f, { 0.0f, 0.90f, 0.11f, 0.90f }, { 1.0f, 0.0f });
 			}
 		} else {
-			// 非選択（純黒ブラック背景）
+			// 非選択
 			DrawOSPanel({ listX, cy }, { cardW, cardH }, { 0.0f, 0.0f, 0.0f, 1.0f }, { 1.0f, 1.0f, 1.0f, 0.40f }, 1.0f);
 			drawCornerBrackets({ listX, cy }, { cardW, cardH }, 8.0f, 1.5f, { 1.0f, 1.0f, 1.0f, 0.50f });
 
@@ -2072,7 +2061,7 @@ void TitleScene::DrawMissionSelectModal() {
 			}
 		}
 
-		// カード内メタ情報（区切り線 ＋ 空域 ＋ 制限時間 ＋ 脅威）
+		// カード内メタ情報
 		DrawOSRect({ listX + 12.0f, cy + 38.0f }, { cardW - 24.0f, 1.0f }, isSel ? Vector4{ 1.0f, 1.0f, 1.0f, 0.40f } : Vector4{ 1.0f, 1.0f, 1.0f, 0.20f });
 
 		std::string areaStr = card.data.areaName.empty() ? "SECTOR 04" : card.data.areaName;
@@ -2093,14 +2082,14 @@ void TitleScene::DrawMissionSelectModal() {
 	}
 
 	// =========================================================================
-	// 右カラム: 作戦ブリーフィング詳細パネル (幅 644px, 高さ 482px)
+	// 右カラム: 作戦ブリーフィング詳細パネル
 	// =========================================================================
 	const float detX = modalX + 400.0f;
 	const float detY = modalY + 44.0f;
 	const float detW = 644.0f;
 	const float detH = 482.0f;
 
-	// パネル本体（純黒ブラック背景）
+	// パネル本体
 	DrawOSPanel({ detX, detY }, { detW, detH }, { 0.0f, 0.0f, 0.0f, 1.0f }, borderCol, 1.8f);
 	drawCornerBrackets({ detX, detY }, { detW, detH }, 16.0f, 2.0f, cornerColor);
 
@@ -2120,7 +2109,7 @@ void TitleScene::DrawMissionSelectModal() {
 		tr->Print("HackGen", protoHeader, dx, dy, 14.0f, { 0.0f, 0.90f, 0.11f, 0.90f });
 		dy += 22.0f;
 
-		// 大見出し: 作戦名（subTitle が空、または name と同一の場合は重複表示しない）
+		// 大見出し: 作戦名
 		std::string nameAndSub = curCard.data.name;
 		if (!curCard.data.subTitle.empty() && curCard.data.subTitle != curCard.data.name) {
 			nameAndSub += " // " + curCard.data.subTitle;
@@ -2134,7 +2123,7 @@ void TitleScene::DrawMissionSelectModal() {
 		tr->Print("HackGen", nameAndSub, dx, dy, titleFontSize, { 0.0f, 1.0f, 0.12f, 1.0f });
 		dy += 34.0f;
 
-		// 空域・制限時間（難易度は存在しないため除外）
+		// 空域・制限時間
 		char timeStr[64];
 		if (curCard.data.timeLimit > 0.0f) {
 			int tSec = static_cast<int>(curCard.data.timeLimit);
@@ -2216,10 +2205,10 @@ void TitleScene::DrawMissionSelectModal() {
 		}
 		const float objBoxH = (std::max)(62.0f, contentH + 16.0f);
 
-		// パネル描画（白枠 ＆ 黒背景）
+		// パネル描画
 		DrawOSPanel({ dx + 4.0f, dy }, { objBoxW, objBoxH }, { 0.0f, 0.0f, 0.0f, 0.90f }, { 1.0f, 1.0f, 1.0f, 0.50f }, 1.0f);
 
-		// ボックス内のテキスト配置（上下中央寄せ）
+		// ボックス内のテキスト配置
 		float objY = dy + 8.0f;
 		if (objBoxH > contentH + 16.0f) {
 			objY = dy + (objBoxH - contentH) * 0.5f;
@@ -2253,7 +2242,7 @@ void TitleScene::DrawMissionSelectModal() {
 	}
 
 	// =========================================================================
-	// 最下部アクションバー (Y: modalY + modalH - 72px)
+	// 最下部アクションバー
 	// =========================================================================
 	const float actBtnY = modalY + modalH - 72.0f;
 	const float actBtnH = 42.0f;
@@ -2280,7 +2269,7 @@ void TitleScene::DrawMissionSelectModal() {
 	drawCornerBrackets({ sortieBtnX, actBtnY }, { sortieBtnW, actBtnH }, 10.0f, 1.5f, Vector4{ 1.0f, 1.0f, 1.0f, 1.0f });
 	tr->Print("HackGen", ">> EXECUTE COMBAT SORTIE [ENTER] >>", sortieBtnX + sortieBtnW * 0.5f, actBtnY + 12.0f, 14.5f, sBtnHov ? Vector4{ 0.25f, 1.0f, 0.35f, 1.0f } : Vector4{ 0.0f, 1.0f, 0.12f, 1.0f }, { 0.5f, 0.0f });
 
-	// 中央案内: 戻るボタンと出撃ボタンの中間スペースに正確にセンタリング配置（出撃ボタンとの重複・被りを完全に解消）
+	// 中央案内: 戻るボタンと出撃ボタンの中間スペースに正確にセンタリング配置
 	const float guideAreaLeft = backBtnX + backBtnW;
 	const float guideAreaRight = sortieBtnX;
 	const float guideCenterX = (guideAreaLeft + guideAreaRight) * 0.5f;
@@ -2293,10 +2282,10 @@ void TitleScene::DrawMissionSelectModal() {
 	}
 	tr->Print("HackGen", guideText, guideCenterX, actBtnY + 13.0f, guideFontSize, { 0.0f, 1.0f, 0.12f, 0.90f }, { 0.5f, 0.0f });
 
-	// 5. 最下部ステータスバー（独立フッター領域）
+	// 5. 最下部ステータスバー
 	const float sbH = 24.0f;
 	const float sbY = modalY + modalH - sbH;
-	DrawOSRect({ modalX, sbY }, { modalW, 1.0f }, { 1.0f, 1.0f, 1.0f, 0.45f }); // 水平仕切り線（白）
+	DrawOSRect({ modalX, sbY }, { modalW, 1.0f }, { 1.0f, 1.0f, 1.0f, 0.45f }); // 水平仕切り線
 	DrawOSRect({ modalX, sbY + 1.0f }, { modalW, sbH - 1.0f }, { 0.0f, 0.03f, 0.005f, 0.98f }); // 独立フッター背景
 	DrawOSRect({ modalX + 12.0f, sbY + 9.0f }, { 6.0f, 6.0f }, { 0.0f, 1.0f, 0.12f, 1.0f }); // ステータスLED
 	tr->Print("HackGenRegular", "ROOT@TACTICAL_OS: ONLINE", modalX + 24.0f, sbY + 12.0f, 11.5f, { 0.0f, 1.0f, 0.12f, 0.95f }, { 0.0f, 0.5f });

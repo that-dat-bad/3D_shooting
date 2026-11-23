@@ -49,12 +49,12 @@ void AircraftVisualModel::SetModelForPart(DamagePart part, Model* model, const s
 	if (node.object->GetModel()) {
 		node.object->GetModel()->SetShininess(32.0f);
 		node.object->GetModel()->SetSpecularIntensity(0.50f);
-		node.object->GetModel()->SetEnvironmentCoefficient(0.15f); // 落ち着いたミリタリー機体金属感（過度な白飛び・まぶしさを防止）
+		node.object->GetModel()->SetEnvironmentCoefficient(0.15f); // 落ち着いたミリタリー機体金属感
 	}
 }
 
 static const Model::Node* FindMatchingNode(const Model::Node& node, const std::string& baseName) {
-	// 完全一致、または Blender の自動連番サフィックス（例: "Fuse.001"）に一致
+	// 完全一致、または Blender の自動連番サフィックスに一致
 	if (node.name == baseName || node.name.starts_with(baseName + ".")) {
 		return &node;
 	}
@@ -121,7 +121,7 @@ void AircraftVisualModel::SetupFromSingleModel(Model* model) {
 		}
 	}
 
-	// 2. 各部位について、サブツリー内の付随ノード（ギアや追加装備など、他の部位に含まれないノード）も含めて登録
+	// 2. 各部位について、サブツリー内の付随ノードも含めて登録
 	for (const auto& [part, node] : matchedNodes) {
 		std::vector<std::string> partNodeNames;
 		CollectSubtreeNodesExcept(*node, matchedRootNames, partNodeNames);
@@ -175,7 +175,7 @@ void AircraftVisualModel::Update(const Matrix4x4& parentWorldMatrix, float delta
 			continue;
 		}
 
-		// ローカル回転の計算（プロペラなどの自転も追加）
+		// ローカル回転の計算
 		Vector3 localRot = node.localTransform.rotate;
 		if (part == DamagePart::Propeller1) {
 			localRot.z += propellerAngle_; // Roll軸周りに回転
@@ -258,7 +258,7 @@ void AircraftVisualModel::SetupCanopyMaterial() {
 			const auto& modelData = model->GetModelData();
 			for (size_t m = 0; m < modelData.materials.size(); ++m) {
 				const auto& matData = modelData.materials[m];
-				// キャノピー（風防）専用マテリアル（m21_wg のマテリアル4: baseColor [0.8, 0.8, 0.8, 1]）のみを対象
+				// キャノピー専用マテリアルのみを対象
 				bool isCanopy = (m == 4 && matData.baseColor.x > 0.75f && matData.baseColor.y > 0.75f && matData.baseColor.z > 0.75f);
 				if (isCanopy) {
 					// 航空機用キャノピーガラス：自然なディープスモーク、滑らかなハイライト、適正な環境反射

@@ -23,8 +23,7 @@ std::unique_ptr<AudioManager> AudioManager::instance = nullptr;
 // ============================
 // ============================
 void VoiceCallback::OnStreamEnd() {
-	// (DestroyVoice はコールバック内で呼ぶとデッドロックの恐れがあるため、
-	//  メインスレッドの Update() で回収する)
+	// Voiceの破棄はメインスレッドのUpdateで行う
 	if (sourceVoice) {
 		sourceVoice->Stop();
 	}
@@ -98,7 +97,7 @@ SoundData AudioManager::SoundLoadFile(const char* filename) {
 		return soundData;
 	}
 
-	// 1. ファイルパス解決（カレントディレクトリ、プロジェクト相対、絶対パス対応）
+	// 1. ファイルパス解決
 	std::filesystem::path resolvedPath = filename;
 	if (!std::filesystem::exists(resolvedPath)) {
 		// カレントディレクトリが output フォルダの場合などの探索候補
@@ -137,7 +136,7 @@ SoundData AudioManager::SoundLoadFile(const char* filename) {
 		return soundData;
 	}
 
-	// 3. メディアタイプ設定 (PCM)
+	// 3. メディアタイプ設定
 	ComPtr<IMFMediaType> pPCMType;
 	result = MFCreateMediaType(&pPCMType);
 	if (FAILED(result) || !pPCMType) {

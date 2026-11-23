@@ -20,7 +20,7 @@ MyMath::Vector3 MissionMapView::ScreenToWorld(const Vector2& screenPos, const Ve
 	Vector2 center = { canvasPos.x + canvasSize.x * 0.5f, canvasPos.y + canvasSize.y * 0.5f };
 	float worldX = (screenPos.x - center.x) / zoom_ + cameraPos_.x;
 	float worldZ = (screenPos.y - center.y) / zoom_ + cameraPos_.y;
-	return { worldX, 0.0f, worldZ }; // Y(高度)は0として返す
+	return { worldX, 0.0f, worldZ }; // Yは0として返す
 }
 
 void MissionMapView::Draw(MissionData& missionData, const MyMath::Vector3& playerPos) {
@@ -89,13 +89,13 @@ void MissionMapView::Draw(MissionData& missionData, const MyMath::Vector3& playe
 		cameraPos_.y -= (worldAfterZoom.z - worldBeforeZoom.z);
 	}
 
-	// パン操作 (右ドラッグ)
+	// パン操作
 	if (is_active && ImGui::IsMouseDragging(ImGuiMouseButton_Right)) {
 		cameraPos_.x -= ImGui::GetIO().MouseDelta.x / zoom_;
 		cameraPos_.y -= ImGui::GetIO().MouseDelta.y / zoom_;
 	}
 
-	// グリッド描画 (1000m間隔)
+	// グリッド描画
 	float gridSize = 1000.0f * zoom_;
 	Vector2 center = { canvasPosVec.x + canvasSizeVec.x * 0.5f, canvasPosVec.y + canvasSizeVec.y * 0.5f };
 	float startX = std::fmod(center.x - cameraPos_.x * zoom_, gridSize);
@@ -110,7 +110,7 @@ void MissionMapView::Draw(MissionData& missionData, const MyMath::Vector3& playe
 		draw_list->AddLine(ImVec2(canvas_p0.x, canvas_p0.y + y), ImVec2(canvas_p1.x, canvas_p0.y + y), IM_COL32(200, 200, 200, 40));
 	}
 
-	// ドラッグ操作（左ドラッグ）
+	// ドラッグ操作
 	bool isLeftDragging = is_active && ImGui::IsMouseDragging(ImGuiMouseButton_Left);
 	if (!isLeftDragging) {
 		currentDragTarget_ = DragTarget::None;
@@ -161,7 +161,7 @@ void MissionMapView::Draw(MissionData& missionData, const MyMath::Vector3& playe
 		if (isLeftDragging && currentDragTarget_ == targetType && dragIndex1_ == index1 && dragIndex2_ == index2) {
 			Vector2 mouseScreen = { ImGui::GetIO().MousePos.x, ImGui::GetIO().MousePos.y };
 			MyMath::Vector3 newWorldPos = ScreenToWorld(mouseScreen, canvasSizeVec, canvasPosVec);
-			return { newWorldPos.x, worldPos.y, newWorldPos.z }; // Y(高度)は維持
+			return { newWorldPos.x, worldPos.y, newWorldPos.z }; // Yは維持
 		}
 
 		return worldPos;

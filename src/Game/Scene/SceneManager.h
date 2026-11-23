@@ -29,7 +29,7 @@ struct ScenePrewarmRecord {
 };
 
 /// <summary>
-/// シーンの遷移やライフサイクルを管理するクラス（シーンプーリング対応で0msシームレス遷移）
+/// シーンの遷移やライフサイクルを管理するクラス
 /// </summary>
 class SceneManager {
 private:
@@ -37,7 +37,7 @@ private:
 	int currentSceneID; // 現在管理しているシーンIDを保持
 	std::unique_ptr<AbstractSceneFactory> sceneFactory_; // シーンファクトリ
 
-	// シーンキャッシュプール（生成済みシーンを保持し、再生成負荷を根絶してミリ秒切り替えを実現）
+	// シーンキャッシュプール
 	std::unordered_map<int, std::unique_ptr<IScene>> scenePool_;
 
 	// --- シーン遷移プロファイリング情報 ---
@@ -50,7 +50,7 @@ private:
 	bool showProfilerWindow_ = false; // ImGui プロファイラウィンドウ表示フラグ
 	bool showOverlayBanner_ = true;   // 画面HUD表示フラグ
 
-	/// <summary>シーン切り替え処理（プール再利用または新規生成）</summary>
+	/// <summary>シーン切り替え処理</summary>
 	void SwitchScene(int nextSceneID);
 
 	/// <summary>ログファイルへの追記とデバッグ出力</summary>
@@ -63,7 +63,7 @@ private:
 	void DrawOverlayHUD();
 
 public:
-	/// <summary>コンストラクタ（初期シーンの生成を行う）</summary>
+	/// <summary>コンストラクタ</summary>
 	SceneManager(std::unique_ptr<AbstractSceneFactory> factory);
 	~SceneManager();
 
@@ -83,7 +83,7 @@ public:
 	void DrawUI();
 
 	/// <summary>
-	/// 全シーン（STAGE, GAMEOVER, CLEAR）を事前生成・初期化してプールに保管（0ms完全シームレス遷移）
+	/// 全シーンを事前生成・初期化してプールに保管
 	/// </summary>
 	void PrewarmAllScenes();
 

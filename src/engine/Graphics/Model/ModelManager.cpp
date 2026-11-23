@@ -69,10 +69,7 @@ void ModelManager::LoadModelsParallel(const std::vector<std::string>& filePaths,
 		return;
 	}
 
-	// 1. 固定数ワーカーによる並列パース（Assimp）
-	//    ファイルごとに std::async を立てると（例: 100チャンク=100スレッド）
-	//    コア数を大幅に超えてコンテキストスイッチ・ヒープ競合が多発し、逆に遅くなるため
-	//    (論理コア数 - 1) 本のワーカーがジョブを取り合う形式にする
+	// 固定数ワーカーによる並列パース
 	auto parseStart = std::chrono::high_resolution_clock::now();
 
 	const size_t jobCount = toLoad.size();
@@ -111,7 +108,7 @@ void ModelManager::LoadModelsParallel(const std::vector<std::string>& filePaths,
 
 	auto parseEnd = std::chrono::high_resolution_clock::now();
 
-	// 2. GPUリソース生成と登録（メインスレッド）
+	// 2. GPUリソース生成と登録
 	for (size_t i = 0; i < jobCount; ++i) {
 		auto model = std::make_unique<Model>();
 		model->InitializeFromModelData(modelCommon_.get(), std::move(results[i]));

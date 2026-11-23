@@ -3,7 +3,7 @@
 #include "Collision2DManager.h"
 
 /// <summary>
-/// 衝突判定の統合マネージャ（Facade）
+/// 衝突判定の統合マネージャ
 /// 3D・2D の判定マネージャをまとめて管理する
 /// Scene 側はこのクラスのみに依存すればよい
 /// </summary>
@@ -22,7 +22,7 @@ public:
 	const Collision2DManager& Get2D() const { return manager2d_; }
 
 	// ============================================================
-	// ショートカット（直接登録）
+	// ショートカット
 	// ============================================================
 
 	/// <summary>3Dコライダーを登録</summary>
@@ -35,10 +35,10 @@ public:
 	// フレーム制御
 	// ============================================================
 
-	/// <summary>全判定を実行（3D → 2D の順）</summary>
+	/// <summary>全判定を実行</summary>
 	void UpdateAll();
 
-	/// <summary>全登録をクリア（フレーム開始時）</summary>
+	/// <summary>全登録をクリア</summary>
 	void ClearAll();
 
 private:

@@ -12,7 +12,7 @@ using namespace MyMath;
 class DirectXCommon;
 class AircraftVisualModel;
 
-// 戦闘モード起動スキャン定数バッファ構造体 (HLSL register b3 と同一アライメント)
+// 戦闘モード起動スキャン定数バッファ構造体
 struct CombatBootScanSettings {
 	float scanProgress = 0.0f;      // 0.0: 未起動 -> 1.0: スキャン完了
 	float scanBandWidth = 3.5f;     // スキャン波形帯の幅
@@ -20,10 +20,10 @@ struct CombatBootScanSettings {
 	float scanWaveFreq = 3.5f;      // 波形干渉縞の周波数
 	Vector4 scanColor = { 0.15f, 1.0f, 0.55f, 1.0f }; // エメラルドグリーン強烈発光
 	float scanTime = 0.0f;          // 脈動パルス用タイマー
-	Vector3 centerOffset = { 0.0f, 0.0f, 0.0f }; // スキャン起点（中心オフセット）
+	Vector3 centerOffset = { 0.0f, 0.0f, 0.0f }; // スキャン起点
 };
 
-// AC6（アーマード・コア6）スタイルの「メインシステム、戦闘モード起動...」演出シーケンス管理クラス
+// AC6スタイルの「メインシステム、戦闘モード起動...」演出シーケンス管理クラス
 class CombatBootSequence {
 public:
 	CombatBootSequence() = default;
@@ -31,36 +31,36 @@ public:
 
 	// 初期化
 	// spriteCommon: SpriteCommonポインタ
-	// dxCommon: DirectXCommonポインタ (nullptrの場合はシングルトン利用)
+	// dxCommon: DirectXCommonポインタ
 	void Initialize(SpriteCommon* spriteCommon, DirectXCommon* dxCommon = nullptr);
 
-	// 自機戦闘モード起動スキャン描画開始（案1: GSマテリアライズパイプライン適用）
+	// 自機戦闘モード起動スキャン描画開始
 	// visualModel: 自機ビジュアルモデル
-	// scanProgress: スキャン進行度（0.0f: 完全不可視 〜 1.0f: 完全実体化）
+	// scanProgress: スキャン進行度
 	void BeginAircraftScanDraw(AircraftVisualModel& visualModel, float scanProgress);
 
-	// 自機戦闘モード起動スキャン描画終了（通常パイプラインに復元）
+	// 自機戦闘モード起動スキャン描画終了
 	// visualModel: 自機ビジュアルモデル
 	void EndAircraftScanDraw(AircraftVisualModel& visualModel);
 
-	// 演出開始（音声再生とタイマーリセット）
+	// 演出開始
 	void Start();
 
-	// リトライ用高速ブートモード設定（0.9秒で即座に戦闘復帰）
+	// リトライ用高速ブートモード設定
 	void SetQuickMode(bool quick) { isQuickMode_ = quick; }
 	bool IsQuickMode() const { return isQuickMode_; }
 
-	// ブリーフィングSPACE待ちを一定秒数後に自動進行する（0以下で無効）
+	// ブリーフィングSPACE待ちを一定秒数後に自動進行する
 	void SetAutoAdvanceDelay(float delaySeconds) { autoAdvanceDelay_ = delaySeconds; }
 
 	// 毎フレーム更新
 	// dt: 経過時間
 	void Update(float dt);
 
-	// 背景の黒フェード描画（3Dシーンの直後に描画）
+	// 背景の黒フェード描画
 	void DrawBackgroundFade();
 
-	// AC6風ブートUI描画（最前面に描画）
+	// AC6風ブートUI描画
 	void DrawBootUI();
 
 	// 演出が完了したか
@@ -76,10 +76,10 @@ public:
 	// ブリーフィング中、SPACEキー入力待ち状態か
 	bool IsWaitingForSpace() const { return isWaitingForSpace_; }
 
-	// カーソル位置設定（ブリーフィング時のボタンホバー判定用）
+	// カーソル位置設定
 	void SetCursorPos(const Vector2& pos) { cursorPos_ = pos; }
 
-	// 黒フェードの現在のアルファ値（0.0f〜1.0f）
+	// 黒フェードの現在のアルファ値
 	float GetFadeAlpha() const { return fadeAlpha_; }
 
 	// 演出終了処理
@@ -111,7 +111,7 @@ private:
 	std::unique_ptr<Sprite> rectSprite_;    // ライン・矩形描画用
 	std::unique_ptr<Sprite> ringSprite_;    // 円形リング描画用
 
-	// スプライトプール（複数Rect/Line同時描画時のCBV競合解消）
+	// スプライトプール
 	std::vector<std::unique_ptr<Sprite>> bootSpritePool_;
 	size_t bootSpritePoolIndex_ = 0;
 	Sprite* GetBootSprite();
@@ -129,16 +129,16 @@ private:
 	float briefingTimer_ = 0.0f;                  // ブリーフィング中のアニメーションタイマー
 	bool isWaitingForSpace_ = false;              // SPACEキーでの出撃待機中フラグ
 	Vector2 cursorPos_ = { -999.0f, -999.0f };    // ブリーフィング中マウス座標
-	static constexpr float kDuration = 5.20f;      // 演出の総時間（秒: 作戦ブリーフィング＋戦闘起動＋操縦権移行）
+	static constexpr float kDuration = 5.20f;      // 演出の総時間
 	static constexpr float kQuickDuration = 0.90f; // リトライ時高速演出の総時間（秒）
 	bool isQuickMode_ = false;                    // リトライ用高速ブートフラグ
 	float autoAdvanceDelay_ = 0.0f;               // 0より大きい場合、ブリーフィング待機を自動解除する秒数
 	float fadeAlpha_ = 1.0f;
 
-	// スキャンパイプライン（案1: 自機専用GSマテリアライズ）
+	// スキャンパイプライン
 	void InitializeScanPipeline(DirectXCommon* dxCommon);
 
-	// 実地形等高線（3D Terrain Chunk Manager 連携 Marching Squares）
+	// 実地形等高線
 	struct RealContourSegment {
 		Vector2 normP1; // [0.0f, 1.0f] 範囲
 		Vector2 normP2;

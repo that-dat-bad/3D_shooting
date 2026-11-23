@@ -4,7 +4,7 @@
 #include "../../engine/base/Math/MyMath.h"
 #include "../../engine/io/json.hpp"
 
-// Vector3 の JSON 変換（複数ヘッダーで必要なためここで定義）
+// Vector3 の JSON 変換
 #ifndef MYMATH_VECTOR3_JSON_DEFINED
 #define MYMATH_VECTOR3_JSON_DEFINED
 namespace MyMath {
@@ -20,14 +20,14 @@ namespace MyMath {
 #endif
 
 // ============================================================
-// ミッション目標 (Mission Objective) の型定義
+// ミッション目標の型定義
 // ============================================================
 
 // ミッション目標の種類
 enum class ObjectiveType {
 	DestroyAll,          // 全敵を殲滅
 	DestroyCount,        // N体以上の敵を撃破
-	DestroyTarget,       // 特定のユニットを撃破（targetIndex指定）
+	DestroyTarget,       // 特定のユニットを撃破
 	ReachArea,           // 指定エリアに到達
 	Survive,             // 制限時間まで生存
 	EscortProtect,       // 護衛対象の生存
@@ -37,7 +37,7 @@ enum class ObjectiveType {
 
 // ミッション目標の状態
 enum class ObjectiveStatus {
-	Inactive,   // 未開始（トリガーで有効化されるまで非表示）
+	Inactive,   // 未開始
 	Active,     // 進行中
 	Completed,  // 達成
 	Failed,     // 失敗
@@ -50,7 +50,7 @@ struct MissionObjective {
 	ObjectiveType type = ObjectiveType::DestroyAll;
 	ObjectiveStatus status = ObjectiveStatus::Active;
 	bool isPrimary = true;       // true: 主目標, false: 副目標
-	bool isHidden = false;       // true: HUDに表示しない（隠し目標）
+	bool isHidden = false;       // true: HUDに表示しない
 
 	// --- 各目標タイプのパラメータ ---
 	int requiredKills = 0;              // DestroyCount用: 必要撃破数
@@ -78,7 +78,7 @@ struct MissionObjective {
 	bool enableAltitudeAlerts = false;
 	bool enableHighAltitudeCaution = false;
 
-	// --- ランタイム専用状態（JSONには保存しない） ---
+	// --- ランタイム専用状態 ---
 	float currentProgress = 0.0f;
 	float activeElapsedSeconds = 0.0f;
 	bool boundaryCrossed = false;

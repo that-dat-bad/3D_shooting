@@ -46,7 +46,7 @@ void GameOverScene::PrewarmAssets() {
 		rebootBlackoutSprite_->Initialize(spriteCommon, "assets/textures/white1x1.png");
 
 		// ============================
-		// 疑似OS環境（カーネルパニック仕様：KernelPanicRed）および背景パネル初期化
+		// 疑似OS環境および背景パネル初期化
 		// ============================
 		InitializeOS(spriteCommon, PseudoOS::Theme::KernelPanicRed,
 			"DAWN_OS CRITICAL EXCEPTION RECOVERY [v4.12.0]",
@@ -292,7 +292,7 @@ void GameOverScene::Update() {
 		if (fadeInAlpha_ > 1.0f) fadeInAlpha_ = 1.0f;
 	}
 
-	// 疑似OSデスクトップ環境更新（入力自動取得＆ウィンドウ開閉アニメーション自動管理）
+	// 疑似OSデスクトップ環境更新
 	pseudoOS_.Update(dt);
 
 	// ログ展開アニメーション
@@ -310,7 +310,7 @@ void GameOverScene::Update() {
 		}
 	}
 
-	// ヘッダータイピングアニメーション（共通TypewriterEffectを使用）
+	// ヘッダータイピングアニメーション
 	headerTypewriter_.Update(dt);
 	gameOverText_.SetText(headerTypewriter_.GetCurrentText());
 
@@ -320,7 +320,7 @@ void GameOverScene::Update() {
 	}
 
 	// ============================
-	// ポストエフェクト制御（画面全体のCRTモニター質感＆リアルタイム演出：指摘4, 5）
+	// ポストエフェクト制御
 	// ============================
 	PostEffect* postEffect = PostEffect::GetInstance();
 	postEffect->ClearActiveEffects();
@@ -398,7 +398,7 @@ void GameOverScene::Update() {
 			ca.intensity = 0.06f;
 			postEffect->AddActiveEffect(ca);
 		} else {
-			// CRTモニター質感シェーダー（走査線 + レンズ湾曲 + ビネット + 色収差 + 赤ティント）
+			// CRTモニター質感シェーダー
 			ActivePostEffect scan;
 			scan.type = PostEffectType::kScanLine;
 			scan.intensity = 0.16f;
@@ -425,7 +425,7 @@ void GameOverScene::Update() {
 		selectionManager_.Update();
 	}
 
-	// 中央ウィンドウの追従（ドラッグ移動へのボタン同期）
+	// 中央ウィンドウの追従
 	auto* w0 = pseudoOS_.GetWindow(0);
 	if (w0) {
 		float btnY = w0->pos.y + w0->size.y - 68.0f;
@@ -436,7 +436,7 @@ void GameOverScene::Update() {
 		titleButton_.SetPosition({ b2X, btnY });
 		titleButton_.Update();
 
-		// 完成形の文字列幅を基準に左端を決定（タイピング中も文字位置がずれないよう左上アンカーで固定）
+		// 完成形の文字列幅を基準に左端を決定
 		Vector2 fullHeaderSize = TextRenderer::GetInstance()->CalculateTextSize(
 			gameOverText_.GetFontName(), headerTypewriter_.GetTargetText(), gameOverText_.GetFontSize());
 		gameOverText_.SetAnchorPoint({ 0.0f, 0.0f });
@@ -459,10 +459,10 @@ void GameOverScene::Draw() {
 
 
 void GameOverScene::DrawUI() {
-	// 背景パネル（深紅）
+	// 背景パネル
 	backgroundPanel_.Draw();
 
-	// 疑似OSデスクトップ環境（マルチウィンドウ、タスクバー、カスタムカーソル）
+	// 疑似OSデスクトップ環境
 	pseudoOS_.Draw();
 
 	// ------------------------------------------------------------
@@ -472,7 +472,7 @@ void GameOverScene::DrawUI() {
 		TextRenderer* tr = TextRenderer::GetInstance();
 		float progress = std::clamp(retryGlitchTimer_ / 0.65f, 0.0f, 1.0f);
 
-		// 全画面シアン調クリーンアップベール（赤エラー画面の解除感を強調：指摘4）
+		// 全画面シアン調クリーンアップベール
 		pseudoOS_.DrawPanel({ 0.0f, 0.0f }, { kScreenWidth, kScreenHeight },
 			{ 0.02f, 0.12f, 0.16f, 0.85f }, { 0.20f, 0.90f, 1.0f, 0.95f }, 2.0f);
 
@@ -498,7 +498,7 @@ void GameOverScene::DrawUI() {
 			{ 0.25f, 0.95f, 1.0f, 1.0f }, { 0.05f, 0.20f, 0.30f, 0.85f });
 	}
 
-	// ボタンクリックフィードバック発光（共通エフェクトを使用）
+	// ボタンクリックフィードバック発光
 	if (btnClickFlashTimer_ > 0.0f) {
 		Vector2 flashPos = (clickedButtonIdx_ == 0) ? retryButton_.GetPosition() : titleButton_.GetPosition();
 		Vector2 flashSize = (clickedButtonIdx_ == 0) ? retryButton_.GetSize() : titleButton_.GetSize();
@@ -506,7 +506,7 @@ void GameOverScene::DrawUI() {
 	}
 
 	// ------------------------------------------------------------
-	// リブート演出進行（SYSTEM REBOOTING... → ブラウン管画面収束でタイトルへ復帰）
+	// リブート演出進行
 	// ------------------------------------------------------------
 	if (isRebooting_) {
 		float rebootProgress = rebootTimer_ / 0.65f;

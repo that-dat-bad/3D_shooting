@@ -11,18 +11,16 @@ using namespace MyMath;
 
 class UIText;
 
-// Win32ネイティブ別ウィンドウで動作するUIエディタ。
-// リアルタイムな文字装飾・レイアウト調整、状態（Normal/Hover/Selected/Custom）
-// およびモーション（Tween, Pulse, Float, Shake）の編集・保存を提供する。
+// Win32ネイティブUIエディタ
 class UIEditorWindow {
 public:
 	static UIEditorWindow* GetInstance();
 
-	// エディタウィンドウの初期化・生成（非表示で生成）
+	// エディタウィンドウの初期化・生成
 	bool Initialize(HWND parentHwnd = nullptr);
 	bool Initialize(HINSTANCE hInstance, HWND parentHwnd);
 
-	// 毎フレーム更新（登録テキスト一覧の変更検知など）
+	// 毎フレーム更新
 	void Update();
 
 	// 終了処理

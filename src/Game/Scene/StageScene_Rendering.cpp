@@ -3,7 +3,7 @@
 using namespace MyMath;
 
 // ===========================================================
-// 地面描画（タイル式グリッド ＆ シミュレータ空間Rez構築演出：項目7）
+// 地面描画
 // ===========================================================
 void StageScene::DrawGround() {
 	Camera* camera = CameraManager::GetInstance()->GetActiveCamera();
@@ -15,7 +15,7 @@ void StageScene::DrawGround() {
 	const float tileSize = 160.0f;
 	const int tileRange = 14;
 
-	// 機体位置をタイルサイズでスナップ（タイルの中心座標に丸める）
+	// 機体位置をタイルサイズでスナップ
 	float snapX = std::floor(aircraftPos.x / tileSize) * tileSize;
 	float snapZ = std::floor(aircraftPos.z / tileSize) * tileSize;
 
@@ -45,8 +45,7 @@ void StageScene::DrawGround() {
 		}
 	}
 
-	// --- グリッドライン（160m間隔） ---
-	// 仮想戦闘空間のタクティカルネオングリッド
+	// グリッドライン
 	const float lineExtent = tileRange * tileSize;
 	const Vector4 lineCol = { 0.18f, 0.55f, 0.32f, 0.70f };
 
@@ -68,7 +67,7 @@ void StageScene::DrawGround() {
 		);
 	}
 
-	// 自機の地面投影シャドウ（平坦地面時）
+	// 自機の地面投影シャドウ
 	if (!isGameOver_ && aircraftPos.y > 0.0f && aircraftPos.y < 800.0f) {
 		float altFade = std::clamp(1.0f - aircraftPos.y / 800.0f, 0.0f, 1.0f);
 		float shadowScale = 14.0f + aircraftPos.y * 0.02f;
@@ -322,7 +321,7 @@ void StageScene::DrawMissionMessages() {
 }
 
 // ============================================================
-// ベイパーコーン（プラントル・グロワート・シンギュラリティ）エフェクトの描画
+// ベイパーコーンエフェクトの描画
 // ============================================================
 void StageScene::DrawVaporConeEffect(Camera* cam) {
 	float speed = flightModel_.GetSpeed();
@@ -331,7 +330,7 @@ void StageScene::DrawVaporConeEffect(Camera* cam) {
 		return;
 	}
 
-	// 1000km/hで0.0、1100km/hで最大(1.0)、1200km/hで0.0になるフェードイン・アウト係数
+	// 1000km/hで0.0、1100km/hで最大、1200km/hで0.0になるフェードイン・アウト係数
 	float speedFactor = 0.0f;
 	if (speedKmH < 1100.0f) {
 		speedFactor = (speedKmH - 1000.0f) / 100.0f;
@@ -374,7 +373,7 @@ void StageScene::DrawVaporConeEffect(Camera* cam) {
 	uint32_t coneTex = TextureManager::GetInstance()->GetTextureIndexByFilePath("assets/textures/circle2.png");
 
 	// -------------------------------------------------------------
-	// コーン1 (アウターシェル: 大きくて薄い)
+	// コーン1
 	// -------------------------------------------------------------
 	{
 		float scaleNoise = 1.0f + 0.08f * sinf(t * 1.3f);
@@ -400,7 +399,7 @@ void StageScene::DrawVaporConeEffect(Camera* cam) {
 	}
 
 	// -------------------------------------------------------------
-	// コーン2 (インナーシェル: 小さくて濃い)
+	// コーン2
 	// -------------------------------------------------------------
 	{
 		float scaleNoise = 1.0f + 0.06f * sinf(t * 1.5f + 1.0f);
@@ -427,7 +426,7 @@ void StageScene::DrawVaporConeEffect(Camera* cam) {
 }
 
 // ============================================================
-// 追従マズルフラッシュ（板ポリ・リング）の描画
+// 追従マズルフラッシュの描画
 // ============================================================
 void StageScene::DrawMuzzleFlashEffect(Camera* cam) {
 	if (muzzleFlashTimer_ <= 0.0f) {
@@ -438,16 +437,16 @@ void StageScene::DrawMuzzleFlashEffect(Camera* cam) {
 	Vector3 forward = flightModel_.GetForwardDirection();
 	Vector3 muzzlePos = Add(aircraftPos, Multiply(8.0f, forward));
 	
-	float t = 1.0f - (muzzleFlashTimer_ / 0.08f); // 0.0(開始) -> 1.0(終了)
+	float t = 1.0f - (muzzleFlashTimer_ / 0.08f); // 0.0 -> 1.0
 	if (t < 0.0f) { t = 0.0f; }
 	if (t > 1.0f) { t = 1.0f; }
 	
-	// 機体の回転を取得（オイラー角）
+	// 機体の回転を取得
 	Vector3 aircraftRot = PlayerCamera::QuaternionToEuler(flightModel_.GetOrientation());
 	
 	float randomAlpha = muzzleFlashRandomAlpha_ * (1.0f - t);
 	
-	// 1. Flash (中心の閃光)
+	// 1. Flash
 	uint32_t flashTex = TextureManager::GetInstance()->GetTextureIndexByFilePath("assets/textures/circle2.png");
 	Vector4 flashColor = { 1.0f, 0.7f, 0.2f, randomAlpha }; // 燃えるようなオレンジイエロー
 	
@@ -463,7 +462,7 @@ void StageScene::DrawMuzzleFlashEffect(Camera* cam) {
 		PrimitiveModel::GetInstance()->DrawPlane(flashScale, rot, flashPos, flashColor, flashTex, cam, BlendMode::kAdd);
 	}
 
-	// 2. Petals (星型の広がり)
+	// 2. Petals
 	uint32_t petalTex = TextureManager::GetInstance()->GetTextureIndexByFilePath("assets/textures/circle2.png");
 	Vector4 petalColor = { 1.0f, 0.4f, 0.05f, randomAlpha }; // 濃いオレンジ色
 	

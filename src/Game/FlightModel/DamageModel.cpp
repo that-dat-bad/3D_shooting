@@ -7,9 +7,9 @@
 // 定数
 // ============================================================
 namespace {
-	constexpr float kFireDPS = 2.0f;             // 火災ダメージ (HP/秒)
-	constexpr float kFireSpreadChance = 0.05f;   // 火災拡散確率 (/秒)
-	constexpr float kFireExtinguishSpeed = 166.0f; // 消火可能な最低速度 (m/s ≈ 600km/h)
+	constexpr float kFireDPS = 2.0f;             // 火災ダメージ
+	constexpr float kFireSpreadChance = 0.05f;   // 火災拡散確率
+	constexpr float kFireExtinguishSpeed = 166.0f; // 消火可能な最低速度
 
 	// 素材別のダメージ軽減率
 	float GetMaterialDamageReduction(ArmorMaterial mat) {
@@ -22,7 +22,7 @@ namespace {
 		return 1.0f;
 	}
 
-	// 簡易乱数 (0.0 ～ 1.0)
+	// 簡易乱数
 	float RandomFloat() {
 		return static_cast<float>(std::rand()) / static_cast<float>(RAND_MAX);
 	}
@@ -30,13 +30,13 @@ namespace {
 
 
 // ============================================================
-// 初期化（A5M4ベースのデフォルト構成）
+// 初期化
 // ============================================================
 void DamageModel::Initialize()
 {
 	isInvulnerable_ = false;
 
-	// --- パーツ定義テーブル（War Thunder A5M4データ準拠） ---
+	// --- パーツ定義テーブル ---
 	auto SetDef = [this](DamagePart part, float hp, ArmorMaterial mat, float dmgMult = 1.0f, bool canSep = false) {
 		int idx = static_cast<int>(part);
 		partDefs_[idx] = { hp, mat, dmgMult, canSep };
@@ -73,10 +73,10 @@ void DamageModel::Initialize()
 	SetDef(DamagePart::Aileron_R,   13.8f, ArmorMaterial::Dural,     0.3f,   true);
 
 
-	// --- サブコライダー定義（機体ローカル座標: +Z=前, +Y=上, +X=右） ---
+	// --- サブコライダー定義 ---
 	subColliders_.clear();
 	subColliders_ = {
-		// パーツ                    中心座標                       半径（ハーフサイズ）
+		// パーツ 中心座標 半径
 		{ DamagePart::Engine1,  { 0.0f,  0.0f,   5.0f },  { 0.8f,  0.6f,  1.5f } },
 		{ DamagePart::Propeller1, { 0.0f, 0.0f,  6.5f },  { 2.0f,  2.0f,  0.2f } },
 		{ DamagePart::Fuse,     { 0.0f,  0.0f,   0.0f },  { 0.95f, 0.95f, 7.5f } },
@@ -107,11 +107,7 @@ MyMath::Vector3 DamageModel::WorldToLocal(
 	// ワールド空間での相対位置
 	MyMath::Vector3 relative = MyMath::Subtract(worldPos, origin);
 
-	// 逆クォータニオン（共役）で回転 → ローカル空間
-	// q_inv = (-x, -y, -z, w) （単位クォータニオンの場合）
-	// v' = q_inv * v * q の回転公式を展開:
-	// t = 2 * cross(q_inv.xyz, v)
-	// v' = v + q.w * t + cross(q_inv.xyz, t)
+	// 逆クォータニオンでローカル空間へ回転
 	MyMath::Vector3 qv = { -orientation.x, -orientation.y, -orientation.z };
 	float qw = orientation.w;
 
@@ -138,7 +134,7 @@ MyMath::Vector3 DamageModel::WorldToLocal(
 
 
 // ============================================================
-// 点がOBBボックス内にあるか判定（ローカル空間ではAABB判定になる）
+// 点がOBBボックス内にあるか判定
 // ============================================================
 bool DamageModel::IsPointInBox(const MyMath::Vector3& point, const SubColliderDef& box)
 {
@@ -159,7 +155,7 @@ DamagePart DamageModel::TestHitPart(
 	// ワールド座標をローカル座標に変換
 	MyMath::Vector3 localPos = WorldToLocal(bulletWorldPos, aircraftPos, aircraftOrientation);
 
-	// パイロット（コクピット）を先に判定（他のボックスと重なるため優先）
+	// パイロットを先に判定
 	for (const auto& col : subColliders_) {
 		if (col.part == DamagePart::Pilot && IsPointInBox(localPos, col)) {
 			return DamagePart::Pilot;
@@ -190,7 +186,7 @@ DamagePart DamageModel::TestHitPart(
 
 
 // ============================================================
-// 被弾処理（直接パーツ指定）
+// 被弾処理
 // ============================================================
 HitResult DamageModel::ProcessHit(DamagePart part, float rawDamage)
 {
@@ -220,7 +216,7 @@ HitResult DamageModel::ProcessHit(DamagePart part, float rawDamage)
 		state.SetFlag(PartStatus::Damaged);
 	}
 
-	// --- onHit 効果（ダメージ量に応じた即時効果） ---
+	// --- onHit 効果 ---
 
 	// 燃料タンク被弾 → 漏れ・火災の確率
 	if (part == DamagePart::Tank1 || part == DamagePart::Tank2) {
@@ -233,7 +229,7 @@ HitResult DamageModel::ProcessHit(DamagePart part, float rawDamage)
 				result.leakStarted = true;
 			}
 		}
-		// 火災確率（低HP時に急上昇）
+		// 火災確率
 		if (hpRatio < 0.5f && RandomFloat() < rawDamage * 0.02f) {
 			if (!state.HasFlag(PartStatus::OnFire)) {
 				state.SetFlag(PartStatus::OnFire);
@@ -273,7 +269,7 @@ HitResult DamageModel::ProcessHit(DamagePart part, float rawDamage)
 		state.SetFlag(PartStatus::Destroyed);
 		result.partDestroyed = true;
 
-		// 切断判定（翼・コントロールサーフェス）
+		// 切断判定
 		if (def.canSeparate) {
 			result.partCut = true;
 		}
@@ -290,7 +286,7 @@ HitResult DamageModel::ProcessHit(DamagePart part, float rawDamage)
 
 
 // ============================================================
-// 弾丸ワールド位置からの被弾処理（ヒットテスト + ProcessHit）
+// 弾丸ワールド位置からの被弾処理
 // ============================================================
 HitResult DamageModel::ProcessBulletHit(
 	const MyMath::Vector3& bulletWorldPos,
@@ -312,7 +308,7 @@ HitResult DamageModel::ProcessBulletHit(
 // ============================================================
 void DamageModel::ApplyChainDamage(DamagePart hitPart, float damage, HitResult& result)
 {
-	// 連鎖ダメージは小さめ（元ダメージの10～30%）で確率的に発生
+	// 連鎖ダメージは小さめで確率的に発生
 	float chainDamage = damage * 0.2f;
 
 	switch (hitPart) {
@@ -419,7 +415,7 @@ void DamageModel::ApplyOnKillEffects(DamagePart part, float /*totalDamage*/, Hit
 
 
 // ============================================================
-// 毎フレーム更新（火災DOT・漏れの進行）
+// 毎フレーム更新
 // ============================================================
 void DamageModel::UpdateEffects(float dt)
 {
@@ -439,7 +435,7 @@ void DamageModel::UpdateEffects(float dt)
 				}
 			}
 
-			// 火災の拡散（隣接パーツへの延焼）
+			// 火災の拡散
 			if (RandomFloat() < kFireSpreadChance * dt) {
 				DamagePart current = static_cast<DamagePart>(i);
 				// エンジン火災 → 胴体前部に延焼
@@ -476,7 +472,7 @@ void DamageModel::ProcessGroundCollision(
 
 	float speed = MyMath::Length(velocity);
 
-	// クォータニオンから機体のローカル3軸方向ベクトル（ワールド空間）を計算
+	// クォータニオンから機体のローカル3軸方向ベクトルを計算
 	MyMath::Vector3 right = {
 		1.0f - 2.0f * (orientation.y * orientation.y + orientation.z * orientation.z),
 		2.0f * (orientation.x * orientation.y + orientation.w * orientation.z),
@@ -507,7 +503,7 @@ void DamageModel::ProcessGroundCollision(
 			position.z + right.z * col.center.x + up.z * col.center.y + forward.z * col.center.z
 		};
 
-		// 垂直方向(Y軸)への半サイズ幅
+		// 垂直方向への半サイズ幅
 		float extentY = std::fabs(col.halfSize.x * right.y) +
 		                std::fabs(col.halfSize.y * up.y) +
 		                std::fabs(col.halfSize.z * forward.y);
@@ -517,21 +513,20 @@ void DamageModel::ProcessGroundCollision(
 		if (lowestY < groundY) {
 			float penetration = groundY - lowestY;
 
-			// 破壊されたパーツ（HP=0%の翼端等）は剛性を失って挫屈するため、機体を空中に支えない
+			// 破壊されたパーツは剛性を失って挫屈するため、機体を空中に支えない
 			if (!isDestroyed) {
 				grounded = true;
 				if (penetration > maxPenetration) {
 					maxPenetration = penetration;
 				}
 
-				// 接地点の反発力による転倒モーメント（トルク）
-				// 接触位置がCGより左(col.center.x < 0)の場合、反作用で右ロールトルクを発生させて腹から落ちる
+				// 接地点の反発力による転倒モーメント
 				float normalForce = 9.81f * 3000.0f + penetration * 50000.0f;
-				// Pitch torque (rz = col.center.z)
+				// Pitch torque
 				totalGroundTorque.x += col.center.z * normalForce * 0.00005f;
-				// Roll torque (rx = -col.center.x)
+				// Roll torque
 				totalGroundTorque.z += -col.center.x * normalForce * 0.00005f;
-				// Yaw torque from ground friction (cartwheel)
+				// Yaw torque from ground friction
 				if (speed > 5.0f) {
 					totalGroundTorque.y += col.center.x * speed * 0.001f;
 				}
@@ -548,7 +543,7 @@ void DamageModel::ProcessGroundCollision(
 		}
 	}
 
-	// 物理レスポンス（めり込み押し戻し・跳ね返り・接地摩擦・転倒トルク）
+	// 物理レスポンス
 	if (grounded) {
 		position.y += maxPenetration;
 
@@ -557,7 +552,7 @@ void DamageModel::ProcessGroundCollision(
 			velocity.y = -velocity.y * 0.15f; // 微小バウンド
 		}
 
-		// 地面擦り減速（摩擦）
+		// 地面擦り減速
 		velocity.x *= 0.92f;
 		velocity.z *= 0.92f;
 
@@ -566,7 +561,7 @@ void DamageModel::ProcessGroundCollision(
 		angularVelocity.y += totalGroundTorque.y * dt;
 		angularVelocity.z += totalGroundTorque.z * dt;
 
-		// 地面接地時の回転ダンピング（倒れ込んだ後に安定して静止する）
+		// 地面接地時の回転ダンピング
 		angularVelocity.x *= 0.90f;
 		angularVelocity.y *= 0.90f;
 		angularVelocity.z *= 0.90f;
@@ -579,7 +574,7 @@ void DamageModel::ProcessGroundCollision(
 // ============================================================
 bool DamageModel::IsCriticallyDamaged() const
 {
-	// 胴体破壊 (HP=0で強制死亡)
+	// 胴体破壊
 	if (IsPartDestroyed(DamagePart::Fuse)) return true;
 
 	// パイロット死亡
@@ -664,11 +659,11 @@ float DamageModel::GetYawControlFactor() const
 float DamageModel::GetLeftWingLiftFactor() const
 {
 	// 翼端から順に破壊で揚力が減る
-	const auto& w0 = GetPartState(DamagePart::Wing_L);   // 付け根 (寄与40%)
-	const auto& w1 = GetPartState(DamagePart::Wing1_L);  // 中間 (寄与35%)
-	const auto& w2 = GetPartState(DamagePart::Wing2_L);  // 翼端 (寄与25%)
+	const auto& w0 = GetPartState(DamagePart::Wing_L);   // 付け根
+	const auto& w1 = GetPartState(DamagePart::Wing1_L);  // 中間
+	const auto& w2 = GetPartState(DamagePart::Wing2_L);  // 翼端
 
-	// 外側が切断されたら内側も機能しない（翼端→中間→付け根の順で連鎖）
+	// 外側が切断されたら内側も機能しない
 	float f2 = w2.IsAlive() ? w2.GetHPRatio() : 0.0f;
 	float f1 = w1.IsAlive() ? w1.GetHPRatio() : 0.0f;
 	float f0 = w0.IsAlive() ? w0.GetHPRatio() : 0.0f;
@@ -731,8 +726,7 @@ float DamageModel::GetAsymmetricRollMoment() const
 	float leftLift = GetLeftWingLiftFactor();
 	float rightLift = GetRightWingLiftFactor();
 
-	// 正の値 = 右翼の揚力が強い → 左にロール（左翼が落ちる）
-	// 負の値 = 左翼の揚力が強い → 右にロール（右翼が落ちる）
+	// 揚力差によるロール方向
 	return (rightLift - leftLift);
 }
 
@@ -772,7 +766,7 @@ const char* DamageModel::GetPartName(DamagePart part)
 
 
 // ============================================================
-// 水面（海・川）との衝突・水没・浮力判定（War Thunder準拠）
+// 水面との衝突・水没・浮力判定
 // ============================================================
 bool DamageModel::ProcessWaterCollision(
 	MyMath::Vector3& position,
@@ -836,7 +830,7 @@ bool DamageModel::ProcessWaterCollision(
 
 	float speed = MyMath::Length(velocity);
 	if (!isSeaplane) {
-		// War Thunder 実仕様: 通常陸上機の深水域接触は強大な流体抵抗＋機体破壊（即クラッシュ）
+		// War Thunder 実仕様: 通常陸上機の深水域接触は強大な流体抵抗＋機体破壊
 		float dragFactor = std::max(0.05f, 1.0f - 6.5f * dt);
 		velocity.x *= dragFactor;
 		velocity.y *= std::max(0.05f, 1.0f - 8.0f * dt);

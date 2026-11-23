@@ -143,7 +143,7 @@ bool AircraftConfig::SaveToCfg(const std::string& filepath) const {
 }
 
 void AircraftConfig::CreateDefault(const std::string& filepath) {
-	// デフォルト値 (MiG-21)
+	// デフォルト値
 	general_.name = "MiG-21 Fishbed";
 	general_.modelPath = "Resources/models/m21.gltf";
 	general_.environmentCoefficient = 0.0f;

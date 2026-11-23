@@ -55,7 +55,7 @@ namespace RadioDefaults {
 	inline constexpr float kMinResolutionScale = 0.65f;
 	inline constexpr float kMaxResolutionScale = 1.60f;
 
-	// --- フローティング字幕レイアウト定数（ウィンドウ枠なし・画面上部中央） ---
+	// --- フローティング字幕レイアウト定数 ---
 	inline constexpr float kCenterAnchorRatioX = 0.5f;
 	inline constexpr float kTopAnchorRatioY = 0.145f;
 	inline constexpr float kSpeakerFontSize = 19.5f;      // 話者名フォントサイズ
@@ -96,19 +96,19 @@ namespace RadioDefaults {
 	inline constexpr const char* kEmptyCursor = "";
 	inline constexpr const char* kFontName = "HackGen";
 
-	// --- AC7準拠 カラーパレット定数（話者名と << >> が同色、本文がホワイト） ---
+	// --- AC7準拠 カラーパレット定数 ---
 	inline constexpr MyMath::Vector4 kDialogueBodyColor = { 0.97f, 0.98f, 1.00f, 1.00f };
 
-	// 味方 (Ally): AC7 "Joker 2 Coster" 準拠のペールミントグリーン
+	// 味方: AC7 "Joker 2 Coster" 準拠のペールミントグリーン
 	inline constexpr MyMath::Vector4 kAllySpeakerColor = { 0.62f, 0.90f, 0.65f, 1.00f };
 
-	// 管制 (Awacs): AC7 管制官準拠のペールスカイシアン
+	// 管制: AC7 管制官準拠のペールスカイシアン
 	inline constexpr MyMath::Vector4 kAwacsSpeakerColor = { 0.68f, 0.93f, 1.00f, 1.00f };
 
-	// 敵 (Enemy): AC7 敵エース準拠のソフトコーラルレッド
+	// 敵: AC7 敵エース準拠のソフトコーラルレッド
 	inline constexpr MyMath::Vector4 kEnemySpeakerColor = { 1.00f, 0.56f, 0.52f, 1.00f };
 
-	// システム (System): 戦術通知用のペールアンバー
+	// システム: 戦術通知用のペールアンバー
 	inline constexpr MyMath::Vector4 kSystemSpeakerColor = { 1.00f, 0.90f, 0.58f, 1.00f };
 }
 

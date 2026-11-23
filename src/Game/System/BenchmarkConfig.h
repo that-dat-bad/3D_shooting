@@ -23,7 +23,7 @@ namespace Benchmark {
         // 2. Visual Studio 出力ウィンドウ
         OutputDebugStringA((message + "\n").c_str());
 
-        // 3. テキストファイルへの自動追記 (benchmark_log.txt)
+        // 3. テキストファイルへの自動追記
         static std::mutex fileMutex;
         std::lock_guard<std::mutex> lock(fileMutex);
         static bool isFirstWrite = true;

@@ -8,7 +8,7 @@ using namespace StageSceneInternal;
 // ============================================================
 void StageScene::UpdateFlightControls(float gameDeltaTime) {
 	// ============================
-	// マウスポインター制御（自アプリがフォアグラウンドの時のみ非表示にし、他アプリ操作時は標準カーソルを復元）
+	// マウスポインター制御
 	// ============================
 	HWND hwnd = Input::GetInstance() ? Input::GetInstance()->GetHwnd() : nullptr;
 	bool isForeground = (hwnd && ::GetForegroundWindow() == hwnd);
@@ -24,7 +24,7 @@ void StageScene::UpdateFlightControls(float gameDeltaTime) {
 	}
 
 	// ============================
-	// プレイヤー入力 → FlightModel（ゲームオーバー中・出撃演出中は操作遮断）
+	// プレイヤー入力 → FlightModel
 	// ============================
 	Input* input = Input::GetInstance();
 	float finalPitch = 0.0f;
@@ -37,7 +37,7 @@ void StageScene::UpdateFlightControls(float gameDeltaTime) {
 		return;
 	}
 
-	// ゲームオーバー中・クリア演出中・終了シーケンス中は操作遮断（オートパイロットへ完全委譲）
+	// ゲームオーバー中・クリア演出中・終了シーケンス中は操作遮断
 	if (isGameOver_ || isMissionCleared_ || endSequence_ != StageEndSequence::None) {
 		flightModel_.SetControlInput(0.0f, 0.0f, 0.0f);
 		return;
@@ -63,7 +63,7 @@ void StageScene::UpdateFlightControls(float gameDeltaTime) {
 		}
 		flightModel_.SetThrottleInput(throttle_);
 
-		// --- マウスエイム ON/OFF トグル (M キー) ---
+		// --- マウスエイム ON/OFF トグル ---
 		if (input->TriggerKey(DIK_M)) {
 			mouseAimEnabled_ = !mouseAimEnabled_;
 			mouseAimController_.SetEnabled(mouseAimEnabled_);
@@ -75,18 +75,18 @@ void StageScene::UpdateFlightControls(float gameDeltaTime) {
 			}
 		}
 
-		// --- ポーズメニュー呼び出し (P キー) ---
+		// --- ポーズメニュー呼び出し ---
 		if (input->TriggerKey(DIK_P)) {
 			SetPaused(true);
 			return;
 		}
 
-		// --- ナイトビジョン (NVD) ON/OFF トグル (N キー) ---
+		// --- ナイトビジョン ON/OFF トグル ---
 		if (input->TriggerKey(DIK_N)) {
 			isNvdActive_ = !isNvdActive_;
 		}
 
-		// --- ベイルアウト / 緊急脱出 (J キー: クリアデモ時は即時クリア、通常時はゲームオーバー演出) ---
+		// --- ベイルアウト / 緊急脱出 ---
 		if (input->TriggerKey(DIK_J)) {
 			const bool isClearDemo =
 				MissionManager::GetInstance().GetCurrentMission().name.find("CLEAR DEMO") != std::string::npos;
@@ -115,8 +115,7 @@ void StageScene::UpdateFlightControls(float gameDeltaTime) {
 		                       std::fabs(manualRoll) > 0.01f ||
 		                       std::fabs(manualYaw) > 0.01f);
 
-		// フリーカメラ時、マウスエイムの目標が画面外（カメラの向いている方向から外れている）場合は
-		// マウスエイムによる追従を一時停止し、機体がそちらに向かわないようにする
+		// フリーカメラ時の画面外エイム追従を停止
 		bool pauseMouseAim = false;
 		if (mouseAimEnabled_ && playerCamera_.GetFreeViewActive()) {
 			Camera* cam = CameraManager::GetInstance()->GetActiveCamera();
@@ -125,7 +124,7 @@ void StageScene::UpdateFlightControls(float gameDeltaTime) {
 				Vector3 camForward = { mat.m[2][0], mat.m[2][1], mat.m[2][2] };
 				Vector3 targetDir = mouseAimController_.GetTargetDirection();
 				
-				// 視界（カメラ前方）から一定以上外れているか判定（約36度: cos 0.8）
+				// 視界から一定以上外れているか判定
 				if (MyMath::Dot(camForward, targetDir) < 0.8f) {
 					pauseMouseAim = true;
 				}
@@ -150,8 +149,7 @@ void StageScene::UpdateFlightControls(float gameDeltaTime) {
 				}
 			}
 
-			// 失速して機首が強制的に落ちている間は、エイム目標が空に取り残されないよう
-			// 機首の方向へ徐々に引き戻す（ドラッグする）※フリーカメラ時限定
+			// 失速中はエイム目標を機首方向へ戻す
 			if (mouseAimEnabled_ && playerCamera_.GetFreeViewActive() && flightModel_.IsStalling()) {
 				Vector3 currentTarget = mouseAimController_.GetTargetDirection();
 				Vector3 forward = flightModel_.GetForwardDirection();
@@ -172,12 +170,12 @@ void StageScene::UpdateFlightControls(float gameDeltaTime) {
 					mouseAimController_.ResetToDirection(flightModel_.GetForwardDirection());
 				}
 
-				// インストラクター ON/OFF (I キー)
+				// インストラクター ON/OFF
 				if (input->TriggerKey(DIK_I)) {
 					flightInstructor_.ToggleEnabled();
 				}
 
-				// インストラクターによる補正（無入力時に自動水平復帰）
+				// インストラクターによる補正
 				flightInstructor_.ApplyCorrection(
 					manualPitch, manualRoll, manualYaw,
 					flightModel_.GetOrientation(),
@@ -267,7 +265,7 @@ void StageScene::UpdateCombatFiring(float gameDeltaTime) {
 				ParticleManager::GetInstance()->Emit("Casing", casingPos, casingParams, 1);
 			}
 
-			// マズルフラッシュの間引き（2発に1回エフェクトを発生）
+			// マズルフラッシュの間引き
 			muzzleFlashCount_++;
 			if (muzzleFlashCount_ % 2 == 0) {
 				EffectManager::GetInstance()->EmitMuzzleFlash(firePos, fireDir);
@@ -315,7 +313,7 @@ void StageScene::UpdateFlightAndEffects(float gameDeltaTime) {
 	// 飛行モデルの更新
 	if (terrainChunkManager_ && terrainChunkManager_->IsLoaded()) {
 		const Vector3 curPos = flightModel_.GetPosition();
-		// クリア画面用の実飛行軌跡を記録（0.05秒ごと・位置/姿勢/時刻・最大6000点）
+		// クリア画面用の実飛行軌跡を記録
 		if (!isMissionCleared_ && !isGameOver_) {
 			auto& traj = GameResult::GetInstance().flightTrajectory;
 			if (traj.empty() || (traj.size() < 6000 && (missionElapsedTime_ - traj.back().timeSec) >= 0.05f)) {
@@ -334,7 +332,7 @@ void StageScene::UpdateFlightAndEffects(float gameDeltaTime) {
 			surf.waterY,
 			surf.waterDepth);
 
-		// War Thunder 風: 超低空水面飛行（高度 < 15m）のウォータースプレー & 着水柱エフェクト
+		// War Thunder 風: 超低空水面飛行のウォータースプレー & 着水柱エフェクト
 		if (!isGameOver_ && surf.type == TerrainChunkManager::SurfaceType::Water) {
 			const float altAboveWater = curPos.y - surf.waterY;
 			const float acSpeed = flightModel_.GetSpeed();
@@ -378,7 +376,7 @@ void StageScene::UpdateFlightAndEffects(float gameDeltaTime) {
 	// ビジュアルモデルの更新
 	aircraftVisualModel_.Update(flightModel_.GetWorldMatrix(), gameDeltaTime);
 
-	// 自機アフターバーナーの更新（スロットル40%以上で点火、100%〜WEPで最大発光）
+	// 自機アフターバーナーの更新
 	if (afterburner_) {
 		float abIntensity = 0.0f;
 		if (throttle_ > 0.40f) {
@@ -467,12 +465,12 @@ void StageScene::UpdateFlightAndEffects(float gameDeltaTime) {
 		hasLastWingTips_ = false;
 	}
 
-	// --- 高速飛行時のスピード感演出（通り過ぎる空気粉塵・流線パーティクル） ---
+	// --- 高速飛行時のスピード感演出 ---
 	float curSpeed = flightModel_.GetSpeed();
 	if (curSpeed > 135.0f && !isGameOver_) { // 約480km/h以上
 		float shakeFactor = std::clamp((curSpeed - 135.0f) / 100.0f, 0.0f, 1.0f);
 
-		// 自機前方の空間を高速で後方へ通り過ぎるスピードダスト（流線パーティクル）
+		// 自機前方の空間を高速で後方へ通り過ぎるスピードダスト
 		if ((rand() % 100) < static_cast<int>(40 * shakeFactor)) {
 			Vector3 streamSpawn = Add(aircraftPos, Multiply(16.0f + (rand() % 14), forward));
 			streamSpawn = Add(streamSpawn, Multiply((rand() % 24 - 12) * 1.0f, right));
@@ -820,7 +818,7 @@ void StageScene::UpdateCamera(float gameDeltaTime) {
 		Vector3 mapLookTarget = { pos.x, pos.y, pos.z + 0.1f };
 		playerCamera_.SnapTo(mapCamPos, mapLookTarget);
 	} else if (isGameOver_ && endSequence_ != StageEndSequence::TimeOver_Abort && endSequence_ != StageEndSequence::TimeOver_Withdraw) {
-		// エースコンバット風 撃墜・炎上追尾カメラ (Death Chase Camera)
+		// エースコンバット風 撃墜・炎上追尾カメラ
 		Vector3 velDir = gameOverVelocity_;
 		Vector3 horizDir = { velDir.x, 0.0f, velDir.z };
 		if (Length(horizDir) > 0.1f) {
@@ -830,7 +828,7 @@ void StageScene::UpdateCamera(float gameDeltaTime) {
 		}
 		Vector3 horizRight = { horizDir.z, 0.0f, -horizDir.x };
 
-		// 時間経過とともに燃え落ちる機体が遠ざかる演出（追尾距離が28mから40mへ徐々に拡大）
+		// 時間経過とともに燃え落ちる機体が遠ざかる演出
 		float pullProg = std::clamp(endSeqTimer_ / 2.2f, 0.0f, 1.0f);
 		float camDist = 28.0f + 12.0f * pullProg;
 		float camHeight = 6.5f + 2.5f * (1.0f - pullProg);
@@ -844,7 +842,7 @@ void StageScene::UpdateCamera(float gameDeltaTime) {
 		playerCamera_.Update(gameDeltaTime, &flightModel_, &mouseAimController_, mouseAimEnabled_);
 	}
 
-	// 最新フレームのカメラViewProjection行列を自機3DモデルのWVP定数バッファへ即時反映（HUDレティクルとの1フレーム遅延を解消）
+	// 最新フレームのカメラViewProjection行列を自機3DモデルのWVP定数バッファへ即時反映
 	aircraftVisualModel_.Update(flightModel_.GetWorldMatrix(), 0.0f);
 
 	if (skybox_) {
@@ -1013,14 +1011,15 @@ void StageScene::UpdateDebugAndStatusUI(float gameDeltaTime) {
 	int enemyIndex = 0;
 	for (auto* enemy : enemyManager_.GetAliveEnemies()) {
 		float dist = MyMath::Length(MyMath::Subtract(enemy->GetPosition(), flightModel_.GetPosition()));
+		const char* aiLabel = "Patrol (FollowWaypoint)";
 		if (enemy->GetAIType() == AIType::ChaseAttack) {
-			ImGui::Text("[%d] Type A (Chase/Attack)", enemyIndex);
-		} else {
-			ImVec4 stateColor = (enemy->GetTypeBState() == TypeBState::Evading) ? ImVec4(1.0f, 0.5f, 0.0f, 1.0f) : ImVec4(0.0f, 0.8f, 1.0f, 1.0f);
-			ImGui::Text("[%d] Type B (Cruise/Evade)", enemyIndex);
-			ImGui::TextColored(stateColor, "   State: %s", enemy->GetTypeBStateString());
+			aiLabel = "Type A (ChaseAttack)";
+		} else if (enemy->GetAIType() == AIType::CruiseEvade) {
+			aiLabel = "Type B (CruiseEvade)";
 		}
-		ImGui::Text("   Pos: (%.1f, %.1f, %.1f) | Dist: %.1f m", enemy->GetPosition().x, enemy->GetPosition().y, enemy->GetPosition().z, dist);
+		ImGui::Text("[%d] %s | BT: %s", enemyIndex, aiLabel, enemy->GetActiveBehaviorName());
+		ImGui::Text("   HP: %.1f / %.1f | Dist: %.1f m", enemy->GetHealth(), enemy->GetMaxHealth(), dist);
+		ImGui::Text("   Pos: (%.1f, %.1f, %.1f)", enemy->GetPosition().x, enemy->GetPosition().y, enemy->GetPosition().z);
 		enemyIndex++;
 	}
 
@@ -1129,7 +1128,7 @@ void StageScene::UpdatePostEffects(float deltaTime) {
 	PostEffect* postEffect = PostEffect::GetInstance();
 	postEffect->ClearActiveEffects();
 
-	// 1. ナイトビジョン (NVD) モード
+	// 1. ナイトビジョン モード
 	if (isNvdActive_) {
 		ActivePostEffect amp;
 		amp.type = PostEffectType::kLightAmp;
@@ -1236,7 +1235,7 @@ void StageScene::UpdatePostEffects(float deltaTime) {
 		vig.intensity = bootVignette;
 		postEffect->AddActiveEffect(vig);
 
-		// 作戦ブリーフィング中：奥の3D景観に被写界深度（ガウス・川瀬ブラー）をかけて手前のUIを際立たせる
+		// 作戦ブリーフィング中：奥の3D景観に被写界深度をかけて手前のUIを際立たせる
 		if (combatBootSequence_.IsWaitingForSpace()) {
 			ActivePostEffect bgBlur;
 			bgBlur.type = PostEffectType::kKawaseBlur;
@@ -1253,7 +1252,7 @@ void StageScene::UpdatePostEffects(float deltaTime) {
 		environmentManager_.Update(nullptr, kDeltaTime);
 	}
 
-	// 3. Gフォースによるビネット（ゲームクリア演出中・ゲームオーバー演出中は無効化）
+	// 3. Gフォースによるビネット
 	if (!isMissionCleared_ && endSequence_ == StageEndSequence::None) {
 		float blackout = flightModel_.GetBlackoutFactor();
 		float redout = flightModel_.GetRedoutFactor();
@@ -1372,7 +1371,13 @@ void StageScene::UpdatePostEffects(float deltaTime) {
 				marker.showLeadSight = true;
 				break;
 			default:
-				marker.label = (enemy->GetAIType() == AIType::ChaseAttack) ? "HOSTILE [FIGHTER]" : "TARGET [AIR]";
+				if (enemy->GetAIType() == AIType::ChaseAttack) {
+					marker.label = "HOSTILE [INTERCEPTOR]";
+				} else if (enemy->GetAIType() == AIType::CruiseEvade) {
+					marker.label = "HOSTILE [ACE]";
+				} else {
+					marker.label = "HOSTILE [PATROL]";
+				}
 				marker.color = { 1.00f, 0.28f, 0.26f, 0.98f };
 				marker.showLeadSight = true;
 				break;
@@ -1502,7 +1507,7 @@ void StageScene::UpdatePostEffects(float deltaTime) {
 
 	hud_.Update(deltaTime, hudData);
 
-	// 5. War Thunder風フライト計器UI（InfoUI）の更新
+	// 5. War Thunder風フライト計器UIの更新
 	FlightInfoUIData infoData{};
 	infoData.throttle = throttle_;
 	infoData.speed = flightModel_.GetSpeed();

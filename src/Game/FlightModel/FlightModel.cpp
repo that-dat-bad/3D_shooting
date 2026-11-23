@@ -5,12 +5,12 @@
 // --- 定数 ---
 namespace {
 	constexpr float kGravity = 9.81f;            // 重力加速度 (m/s^2)
-	constexpr float kSeaLevelDensity = 1.225f;   // 海面気圧での空気密度 (kg/m^3)
+	constexpr float kSeaLevelDensity = 1.225f;   // 海面気圧での空気密度
 	constexpr float kScaleHeight = 8500.0f;      // 大気のスケールハイト (m)
 	constexpr float kPi = 3.14159265358979f;
 
-	constexpr float kPitchRate = 1.8f;           // ピッチ角速度 (rad/s) ≈ 103 deg/s (War Thunderジェット機急旋回)
-	constexpr float kRollRate = 3.6f;            // ロール角速度 (rad/s) ≈ 206 deg/s (高速バンク＆プル)
+	constexpr float kPitchRate = 1.8f;           // ピッチ角速度 (rad/s) ≈ 103 deg/s
+	constexpr float kRollRate = 3.6f;            // ロール角速度 (rad/s) ≈ 206 deg/s
 	constexpr float kYawRate = 0.9f;             // ヨー角速度 (rad/s)
 
 	constexpr float kGDamageRate = 0.05f;        // G超過時の翼ダメージレート
@@ -28,7 +28,7 @@ FlightModel::FlightModel()
 	: position_{ 0.0f, 0.0f, 0.0f }
 	, velocity_{ 0.0f, 0.0f, 0.0f }
 	, acceleration_{ 0.0f, 0.0f, 0.0f }
-	, orientation_{ 0.0f, 0.0f, 0.0f, 1.0f } // 単位クォータニオン（無回転）
+	, orientation_{ 0.0f, 0.0f, 0.0f, 1.0f } // 単位クォータニオン
 	, currentAoA_(0.0f)
 	, currentG_(1.0f)
 	, isStalling_(false)
@@ -91,10 +91,10 @@ void FlightModel::Update(float deltaTime)
 	// 0. ダメージモデルの火災・漏れなどの毎フレーム経過更新
 	airframe_.GetDamageModel().UpdateEffects(deltaTime);
 
-	// 1. エンジンの更新（スロットルのスプールアップ/ダウン）
+	// 1. エンジンの更新
 	engine_.Update(deltaTime, targetThrottle_);
 
-	// 2. 燃料消費 + 燃料漏れ（ダメージ連動）
+	// 2. 燃料消費 + 燃料漏れ
 	float fuelConsumption = engine_.GetFuelConsumptionRate() * deltaTime;
 	float fuelLeak = airframe_.GetFuelLeakRate() * deltaTime;
 	airframe_.ConsumeInternalFuel(fuelConsumption + fuelLeak);
@@ -109,7 +109,7 @@ void FlightModel::Update(float deltaTime)
 		payload->Update(deltaTime);
 	}
 
-	// 4.5. オートパイロット（クリア演出・自動操縦）モード時のバイパス
+	// 4.5. オートパイロットモード時のバイパス
 	if (isAutopilot_) {
 		position_ = MyMath::Add(position_, MyMath::Multiply(deltaTime, velocity_));
 		currentG_ = 1.0f;
@@ -122,19 +122,19 @@ void FlightModel::Update(float deltaTime)
 		return;
 	}
 
-	// 5. AoA計算（姿勢更新前に現在のAoAを知っておく）
+	// 5. AoA計算
 	currentAoA_ = CalculateAoA();
 
 	// 失速判定
 	isStalling_ = std::fabs(currentAoA_) > airframe_.GetCriticalAoA();
 
-	// 6. 姿勢の更新（速度依存 + ダメージ連動の操舵）
+	// 6. 姿勢の更新
 	UpdateOrientation(deltaTime);
 
 	// 7. 合力を計算
 	MyMath::Vector3 totalForce = CalculateTotalForce(deltaTime);
 
-	// 8. 加速度 = 力 / 質量 (F = ma → a = F/m)
+	// 8. 加速度 = 力 / 質量
 	float totalMass = GetTotalMass();
 	MyMath::Vector3 prevVelocity = velocity_;
 
@@ -143,10 +143,10 @@ void FlightModel::Update(float deltaTime)
 		acceleration_ = MyMath::Multiply(invMass, totalForce);
 	}
 
-	// 9. 速度の更新 (v += a * dt)
+	// 9. 速度の更新
 	velocity_ = MyMath::Add(velocity_, MyMath::Multiply(deltaTime, acceleration_));
 
-	// 10. 位置の更新 (p += v * dt)
+	// 10. 位置の更新
 	position_ = MyMath::Add(position_, MyMath::Multiply(deltaTime, velocity_));
 
 	// 10.5. 地面・水面との部位別物理衝突判定 & ダメージ計算・転倒トルク
@@ -161,15 +161,15 @@ void FlightModel::Update(float deltaTime)
 	if (deltaTime > 0.0001f) {
 		MyMath::Vector3 deltaV = MyMath::Subtract(velocity_, prevVelocity);
 		MyMath::Vector3 accelNoGravity = MyMath::Multiply(1.0f / deltaTime, deltaV);
-		// 重力を除外（重力は体感Gに含めない: 自由落下 = 0G）
+		// 重力を除外
 		accelNoGravity = MyMath::Add(accelNoGravity, { 0.0f, kGravity, 0.0f });
 
-		// 機体のUp軸方向のG成分（パイロットが感じるG）
+		// 機体のUp軸方向のG成分
 		MyMath::Vector3 up = GetUpDirection();
 		currentG_ = MyMath::Dot(accelNoGravity, up) / kGravity;
 	}
 
-	// 12. G効果の更新（ブラックアウト/レッドアウト + 構造ダメージ）
+	// 12. G効果の更新
 	UpdateGEffects(deltaTime);
 }
 
@@ -195,7 +195,7 @@ void FlightModel::FireWeapons()
 
 
 // ===========================================================
-// 総質量の取得（機体 + エンジン + 全ペイロード）
+// 総質量の取得
 // ===========================================================
 float FlightModel::GetTotalMass() const
 {
@@ -213,15 +213,14 @@ float FlightModel::GetTotalMass() const
 // ===========================================================
 float FlightModel::CalculateAirDensity(float altitude) const
 {
-	// 海面: 1.225 kg/m³, 指数的に減少
-	// 負の高度（海面以下）はクランプ
+	// 高度に応じた空気密度計算
 	float alt = (std::max)(altitude, 0.0f);
 	return kSeaLevelDensity * std::exp(-alt / kScaleHeight);
 }
 
 
 // ===========================================================
-// 迎え角（AoA）の計算
+// 迎え角の計算
 // ===========================================================
 float FlightModel::CalculateAoA() const
 {
@@ -236,7 +235,6 @@ float FlightModel::CalculateAoA() const
 	float localUpVel = MyMath::Dot(velDir, up);
 
 	// ピッチ方向の迎え角を計算
-	// 速度ベクトルが機体の下側(localUpVel < 0)にある場合、正の迎え角となる
 	return std::atan2(-localUpVel, localForwardVel);
 }
 
@@ -249,7 +247,7 @@ float FlightModel::CalculateLiftCoefficient(float aoa) const
 	float criticalAoA = airframe_.GetCriticalAoA();
 	float maxCL = airframe_.GetMaxLiftCoefficient();
 	float stallCL = airframe_.GetStallLiftCoefficient();
-	float baseCL = airframe_.GetLiftCoefficient(); // 迎え角0での揚力係数（キャンバー翼）
+	float baseCL = airframe_.GetLiftCoefficient(); // 迎え角0での揚力係数
 
 	float cl = 0.0f;
 	if (aoa >= 0.0f) {
@@ -261,10 +259,10 @@ float FlightModel::CalculateLiftCoefficient(float aoa) const
 			cl = maxCL - (maxCL - stallCL) * overStallRatio;
 		}
 	} else {
-		// 負の迎え角（背面飛行や機首下げ）
+		// 負の迎え角
 		float absAoA = -aoa;
 		if (absAoA <= criticalAoA) {
-			// baseCLから始まり、負方向の最大値(-maxCL)へ向かう
+			// baseCLから始まり、負方向の最大値へ向かう
 			cl = baseCL - (maxCL + baseCL) * (absAoA / criticalAoA);
 		} else {
 			float overStallRatio = (absAoA - criticalAoA) / criticalAoA;
@@ -301,7 +299,7 @@ MyMath::Vector3 FlightModel::CalculateTotalForce(float deltaTime)
 	float speed = MyMath::Length(velocity_);
 	float altitude = position_.y;
 
-	// 高度依存の空気密度 (ISA簡易モデル)
+	// 高度依存の空気密度
 	float airDensity = CalculateAirDensity(altitude);
 
 	// 動圧 q = 0.5 * ρ * v²
@@ -309,7 +307,7 @@ MyMath::Vector3 FlightModel::CalculateTotalForce(float deltaTime)
 	float wingArea = airframe_.GetWingArea();
 
 
-	// --- 1. 推力（高度 + エンジンダメージ補正） ---
+	// --- 1. 推力 ---
 	float engineDamage = airframe_.GetDamageState(DamageZone::Engine);
 	float thrustMag = engine_.GetThrustAtAltitude(altitude, engineDamage);
 	MyMath::Vector3 forward = GetForwardDirection();
@@ -317,13 +315,13 @@ MyMath::Vector3 FlightModel::CalculateTotalForce(float deltaTime)
 	totalForce = MyMath::Add(totalForce, thrust);
 
 
-	// --- 2. 重力（常に下方向に作用） ---
+	// --- 2. 重力 ---
 	float totalMass = GetTotalMass();
 	MyMath::Vector3 gravity = { 0.0f, -kGravity * totalMass, 0.0f };
 	totalForce = MyMath::Add(totalForce, gravity);
 
 
-	// --- 3. 揚力（AoA依存 + 翼ダメージ + フラップ補正） ---
+	// --- 3. 揚力 ---
 	if (speed > 1.0f) {
 		float cl = CalculateLiftCoefficient(currentAoA_);
 
@@ -342,7 +340,7 @@ MyMath::Vector3 FlightModel::CalculateTotalForce(float deltaTime)
 		totalForce = MyMath::Add(totalForce, lift);
 
 
-		// --- 4. 誘導抵抗（揚力の副産物） ---
+		// --- 4. 誘導抵抗 ---
 		float ar = airframe_.GetAspectRatio();
 		float e = airframe_.GetOswaldEfficiency();
 		if (ar > 0.0f && e > 0.0f) {
@@ -355,7 +353,7 @@ MyMath::Vector3 FlightModel::CalculateTotalForce(float deltaTime)
 	}
 
 
-	// --- 5. 寄生抵抗（基本 + フラップ + エアブレーキ + ペイロード + ダメージ） ---
+	// --- 5. 寄生抵抗 ---
 	if (speed > 0.001f) {
 		float totalCd = airframe_.GetEffectiveBaseDrag();
 
@@ -375,10 +373,10 @@ MyMath::Vector3 FlightModel::CalculateTotalForce(float deltaTime)
 		MyMath::Vector3 parasiteDrag = MyMath::Multiply(-parasiteDragMag, velDir);
 		totalForce = MyMath::Add(totalForce, parasiteDrag);
 
-		// --- 6. 横滑り抵抗（垂直尾翼による抗力 / 風見鶏効果の力の成分） ---
+		// --- 6. 横滑り抵抗 ---
 		MyMath::Vector3 right = GetRightDirection();
 		float sideVel = MyMath::Dot(velocity_, right);
-		// 横滑り速度に対する強力な抵抗をかける（垂直尾翼の面積を翼面積の約0.2倍と仮定し、高い抗力係数を掛ける）
+		// 横滑り速度に対する強力な抵抗をかける
 		float sideDragMag = dynamicPressure * wingArea * 0.2f * (sideVel / speed) * 5.0f;
 		MyMath::Vector3 sideForce = MyMath::Multiply(-sideDragMag, right);
 		totalForce = MyMath::Add(totalForce, sideForce);
@@ -389,7 +387,7 @@ MyMath::Vector3 FlightModel::CalculateTotalForce(float deltaTime)
 
 
 // ===========================================================
-// 姿勢（クォータニオン）の更新（速度依存 + ダメージ連動版）
+// 姿勢の更新
 // ===========================================================
 void FlightModel::UpdateOrientation(float deltaTime)
 {
@@ -405,7 +403,7 @@ void FlightModel::UpdateOrientation(float deltaTime)
 	float gPenalty = 1.0f - (std::max)(blackoutFactor_, redoutFactor_) * 0.8f;
 	controlEff *= gPenalty;
 
-	// --- 重心(CG)と圧力中心(CP)の概念に基づくピッチモーメント計算 ---
+	// --- 重心と圧力中心の概念に基づくピッチモーメント計算 ---
 	float airDensity = CalculateAirDensity(position_.y);
 	float dynamicPressure = 0.5f * airDensity * speed * speed;
 	float cl = CalculateLiftCoefficient(currentAoA_);
@@ -445,15 +443,14 @@ void FlightModel::UpdateOrientation(float deltaTime)
 	}
 
 	// =====================================================
-	// 角加速度の計算（操舵入力を角加速度として扱う）
+	// 角加速度の計算
 	// =====================================================
 	// 操舵入力は「目標角速度」への加速度として作用
 	float targetPitchRate = inputPitch_ * kPitchRate * controlEff;
 	float targetRollRate  = inputRoll_  * kRollRate  * controlEff;
 	float targetYawRate   = inputYaw_   * kYawRate   * controlEff;
 
-	// 空力ダンピング係数（速度が高いほどダンピングが強い）
-	// 高い値 = 素早く目標角速度に収束（振動しにくい）
+	// 空力ダンピング係数
 	float dampingBase = 5.0f;
 	float speedFactor = 1.0f;
 	if (speed > 30.0f) {
@@ -461,7 +458,7 @@ void FlightModel::UpdateOrientation(float deltaTime)
 	}
 	float damping = dampingBase * speedFactor;
 
-	// 角速度を目標値に向けて滑らかに追従（指数的スムージング）
+	// 角速度を目標値に向けて滑らかに追従
 	float smoothT = 1.0f - std::exp(-damping * deltaTime);
 
 	angularVelocity_.x += (targetPitchRate - angularVelocity_.x) * smoothT;
@@ -478,9 +475,9 @@ void FlightModel::UpdateOrientation(float deltaTime)
 		float totalWingLift = dynamicPress * airframe_.GetWingArea() * std::fabs(CalculateLiftCoefficient(currentAoA_));
 		float wingArm = 2.5f; // 翼の中心までのモーメントアーム (m)
 		
-		// 右翼揚力 > 左翼揚力 の時、asymRoll > 0 となり、正の角加速度を加算して左へロール（破損した左翼が落ちる）
+		// 右翼揚力 > 左翼揚力 の時、asymRoll > 0 となり、正の角加速度を加算して左へロール
 		float rollTorque = asymRoll * (totalWingLift * 0.5f) * wingArm;
-		const float kInverseInertiaZ = 0.00005f; // 慣性モーメントの逆数 (1 / Iz)
+		const float kInverseInertiaZ = 0.00005f; // 慣性モーメントの逆数
 		float rollAlpha = rollTorque * kInverseInertiaZ;
 		
 		angularVelocity_.z += rollAlpha * deltaTime;
@@ -559,7 +556,7 @@ void FlightModel::UpdateGEffects(float deltaTime)
 		bool isTriggered = false;
 		float excess = 0.0f;
 		
-		// 閾値判定（OnsetG が正ならブラックアウト、負ならレッドアウト）
+		// 閾値判定
 		if (onsetG > 0.0f && currentG > onsetG) {
 			isTriggered = true;
 			excess = currentG - onsetG;
@@ -584,11 +581,11 @@ void FlightModel::UpdateGEffects(float deltaTime)
 		factor = std::clamp(factor, 0.0f, 1.0f);
 	};
 
-	// ブラックアウト（高正G）とレッドアウト（負G）を共通処理で更新
+	// ブラックアウトとレッドアウトを共通処理で更新
 	UpdateGEffect(currentG_, kBlackoutOnsetG, kGEffectBuildRate, blackoutToleranceTimer_, blackoutFactor_);
 	UpdateGEffect(currentG_, kRedoutOnsetG, kGEffectBuildRate * 1.5f, redoutToleranceTimer_, redoutFactor_);
 
-	// --- 構造G超過ダメージ（翼に蓄積） ---
+	// --- 構造G超過ダメージ ---
 	if (isInvulnerable_) {
 		return;
 	}
@@ -610,7 +607,7 @@ void FlightModel::UpdateGEffects(float deltaTime)
 
 
 // ===========================================================
-// 方向ベクトルの取得（クォータニオンから計算）
+// 方向ベクトルの取得
 // ===========================================================
 MyMath::Vector3 FlightModel::GetForwardDirection() const
 {
@@ -659,7 +656,7 @@ MyMath::Vector3 FlightModel::GetRightDirection() const
 
 MyMath::Matrix4x4 FlightModel::GetWorldMatrix() const
 {
-	// スケール(1,1,1)、回転(orientation_)、平行移動(position_) からアフィン行列を合成
+	// スケール、回転、平行移動からアフィン行列を合成
 	MyMath::Matrix4x4 rotMat = MyMath::MakeRotateMatrix(orientation_);
 	MyMath::Matrix4x4 transMat = MyMath::MakeTranslateMatrix(position_);
 	return MyMath::Multiply(rotMat, transMat);

@@ -136,6 +136,8 @@ private:
     Vector3 trajCenter_ = { 0.0f, 0.0f, 0.0f };
     float trajOrbitDist_ = 2800.0f;
     float trajDurationSec_ = 0.0f;
+    float savedTerrainDrawDistance_ = 10000.0f;
+    bool hasSavedTerrainDrawDistance_ = false;
     void UpdateTacticalCamera();
     void DrawTacticalAircraftMarker(
         class PrimitiveModel* prim,

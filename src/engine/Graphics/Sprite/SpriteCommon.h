@@ -20,7 +20,7 @@ public:
 	static SpriteCommon* GetInstance();
 
 	/// <summary>
-	/// デフォルトコンストラクタ (std::make_unique対応のためpublic)
+	/// デフォルトコンストラクタ
 	/// </summary>
 	SpriteCommon() = default;
 

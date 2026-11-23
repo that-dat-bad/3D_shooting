@@ -16,7 +16,7 @@ public:
 	static CameraManager* GetInstance();
 
 	/// <summary>
-	/// デフォルトコンストラクタ (std::make_unique対応のためpublic)
+	/// デフォルトコンストラクタ
 	/// </summary>
 	CameraManager() = default;
 
@@ -24,22 +24,22 @@ public:
 	void Initialize();
 	void Finalize();
 
-	// カメラの生成 (newしてmapに登録)
+	// カメラの生成
 	void CreateCamera(const std::string& name);
 
 	// アクティブカメラの切り替え
 	void SetActiveCamera(const std::string& name);
 
-	// アクティブカメラの取得 (描画やオブジェクト側で使う)
+	// アクティブカメラの取得
 	Camera* GetActiveCamera() const { return activeCamera_; }
 
-	// 名前指定でカメラを取得 (存在しない場合はnullptr)
+	// 名前指定でカメラを取得
 	Camera* GetCamera(const std::string& name) const;
 
 	// 指定名のカメラが存在するか
 	bool HasCamera(const std::string& name) const;
 
-	// 更新 (アクティブなカメラだけ更新する)
+	// 更新
 	void Update();
 
 	//指定されたカメラの削除
@@ -55,9 +55,9 @@ private:
 	CameraManager(const CameraManager&) = delete;
 	CameraManager& operator=(const CameraManager&) = delete;
 
-	// カメラのマップ (名前, 実体)
+	// カメラのマップ
 	std::map<std::string, std::unique_ptr<Camera>> cameras_;
 
-	// 現在有効なカメラへのポインタ (所有権は持たない)
+	// 現在有効なカメラへのポインタ
 	Camera* activeCamera_ = nullptr;
 };

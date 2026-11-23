@@ -31,9 +31,10 @@ void PrimitiveModel::Initialize(DirectXCommon* dxCommon) {
 	// リングやシリンダーの頂点バッファを生成
 	CreatePrimitiveBuffers();
 
-	// 最大描画回数分の定数バッファアロケーション (Transformation と Material)
-	uint32_t transformBufferSize = kCbAlignment * kMaxDrawCount;
-	uint32_t materialBufferSize = kCbAlignment * kMaxDrawCount;
+	// 最大描画回数分の定数バッファアロケーション（フレームインフライト数分）
+	const size_t totalSlots = static_cast<size_t>(kMaxDrawCount) * DirectXCommon::kSwapChainBufferCount_;
+	const size_t transformBufferSize = static_cast<size_t>(kCbAlignment) * totalSlots;
+	const size_t materialBufferSize = static_cast<size_t>(kCbAlignment) * totalSlots;
 
 	transformBuffer_ = dxCommon_->CreateBufferResource(transformBufferSize);
 	materialBuffer_ = dxCommon_->CreateBufferResource(materialBufferSize);
@@ -103,12 +104,15 @@ void PrimitiveModel::DrawLine3D(const Vector3& p1, const Vector3& p2, const Vect
 	uint32_t index = currentDrawCount_;
 	currentDrawCount_++;
 
-	TransformationMatrix* transformData = reinterpret_cast<TransformationMatrix*>(&transformMappedData_[index * kCbAlignment]);
+	const uint32_t frameIndex = dxCommon_->GetCurrentFrameIndex();
+	const size_t slotOffset = (static_cast<size_t>(frameIndex) * kMaxDrawCount + index) * kCbAlignment;
+
+	TransformationMatrix* transformData = reinterpret_cast<TransformationMatrix*>(&transformMappedData_[slotOffset]);
 	transformData->WVP = wvpMatrix;
 	transformData->World = wMatrix;
 	transformData->WorldInverseTranspose = wMatrix; 
 
-	MaterialData* materialData = reinterpret_cast<MaterialData*>(&materialMappedData_[index * kCbAlignment]);
+	MaterialData* materialData = reinterpret_cast<MaterialData*>(&materialMappedData_[slotOffset]);
 	materialData->color = color;
 	materialData->enableLighting = 0; 
 	materialData->shininess = 50.0f;
@@ -121,8 +125,8 @@ void PrimitiveModel::DrawLine3D(const Vector3& p1, const Vector3& p2, const Vect
 	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_LINELIST);
 	commandList->IASetVertexBuffers(0, 1, &lineVertexBufferView_);
 
-	commandList->SetGraphicsRootConstantBufferView(0, materialBuffer_->GetGPUVirtualAddress() + (index * kCbAlignment));
-	commandList->SetGraphicsRootConstantBufferView(1, transformBuffer_->GetGPUVirtualAddress() + (index * kCbAlignment));
+	commandList->SetGraphicsRootConstantBufferView(0, materialBuffer_->GetGPUVirtualAddress() + slotOffset);
+	commandList->SetGraphicsRootConstantBufferView(1, transformBuffer_->GetGPUVirtualAddress() + slotOffset);
 
 	// 単色描画用白テクスチャをセット
 	uint32_t texIndex = TextureManager::GetInstance()->GetTextureIndexByFilePath("assets/textures/white1x1.png");
@@ -160,14 +164,17 @@ void PrimitiveModel::CallDrawCommand(D3D12_VERTEX_BUFFER_VIEW& vbView, uint32_t 
 	uint32_t index = currentDrawCount_;
 	currentDrawCount_++;
 
-	TransformationMatrix* transformData = reinterpret_cast<TransformationMatrix*>(&transformMappedData_[index * kCbAlignment]);
+	const uint32_t frameIndex = dxCommon_->GetCurrentFrameIndex();
+	const size_t slotOffset = (static_cast<size_t>(frameIndex) * kMaxDrawCount + index) * kCbAlignment;
+
+	TransformationMatrix* transformData = reinterpret_cast<TransformationMatrix*>(&transformMappedData_[slotOffset]);
 	transformData->WVP = wvpMatrix;
 	transformData->World = wMatrix;
-	transformData->WorldInverseTranspose = wMatrix; // PSで法線計算が不要なためWorldをそのまま入れる（簡易実装）
+	transformData->WorldInverseTranspose = wMatrix; // PSで法線計算が不要なためWorldをそのまま入れる
 
-	MaterialData* materialData = reinterpret_cast<MaterialData*>(&materialMappedData_[index * kCbAlignment]);
+	MaterialData* materialData = reinterpret_cast<MaterialData*>(&materialMappedData_[slotOffset]);
 	materialData->color = color;
-	materialData->enableLighting = 0; // 今回は常に0（Unlit）
+	materialData->enableLighting = 0; // 今回は常に0
 	materialData->shininess = 50.0f;
 	materialData->uvTransform = Identity4x4();
 
@@ -182,9 +189,9 @@ void PrimitiveModel::CallDrawCommand(D3D12_VERTEX_BUFFER_VIEW& vbView, uint32_t 
 	// 頂点バッファの設定
 	commandList->IASetVertexBuffers(0, 1, &vbView);
 
-	commandList->SetGraphicsRootConstantBufferView(0, materialBuffer_->GetGPUVirtualAddress() + (index * kCbAlignment));
+	commandList->SetGraphicsRootConstantBufferView(0, materialBuffer_->GetGPUVirtualAddress() + slotOffset);
 	
-	commandList->SetGraphicsRootConstantBufferView(1, transformBuffer_->GetGPUVirtualAddress() + (index * kCbAlignment));
+	commandList->SetGraphicsRootConstantBufferView(1, transformBuffer_->GetGPUVirtualAddress() + slotOffset);
 
 	uint32_t texIndex = textureIndex;
 	if (texIndex == 0) { texIndex = TextureManager::GetInstance()->GetTextureIndexByFilePath("assets/textures/uvChecker.png"); }
@@ -200,7 +207,7 @@ void PrimitiveModel::CallDrawCommand(D3D12_VERTEX_BUFFER_VIEW& vbView, uint32_t 
 	if (currentDrawCount_ >= kMaxDrawCount) { return; }
 	if (vertexCount == 0 || !camera) { return; }
 
-	// 行列計算 (クォータニオンを使用する MakeAffineMatrix)
+	// 行列計算
 	Matrix4x4 wMatrix = MakeAffineMatrix(scale, rotate, translate);
 	Matrix4x4 wvpMatrix = wMatrix * camera->GetViewProjectionMatrix();
 
@@ -208,12 +215,15 @@ void PrimitiveModel::CallDrawCommand(D3D12_VERTEX_BUFFER_VIEW& vbView, uint32_t 
 	uint32_t index = currentDrawCount_;
 	currentDrawCount_++;
 
-	TransformationMatrix* transformData = reinterpret_cast<TransformationMatrix*>(&transformMappedData_[index * kCbAlignment]);
+	const uint32_t frameIndex = dxCommon_->GetCurrentFrameIndex();
+	const size_t slotOffset = (static_cast<size_t>(frameIndex) * kMaxDrawCount + index) * kCbAlignment;
+
+	TransformationMatrix* transformData = reinterpret_cast<TransformationMatrix*>(&transformMappedData_[slotOffset]);
 	transformData->WVP = wvpMatrix;
 	transformData->World = wMatrix;
 	transformData->WorldInverseTranspose = wMatrix; 
 
-	MaterialData* materialData = reinterpret_cast<MaterialData*>(&materialMappedData_[index * kCbAlignment]);
+	MaterialData* materialData = reinterpret_cast<MaterialData*>(&materialMappedData_[slotOffset]);
 	materialData->color = color;
 	materialData->enableLighting = 0; // 常に0
 	materialData->shininess = 50.0f;
@@ -230,9 +240,9 @@ void PrimitiveModel::CallDrawCommand(D3D12_VERTEX_BUFFER_VIEW& vbView, uint32_t 
 	// 頂点バッファの設定
 	commandList->IASetVertexBuffers(0, 1, &vbView);
 
-	commandList->SetGraphicsRootConstantBufferView(0, materialBuffer_->GetGPUVirtualAddress() + (index * kCbAlignment));
+	commandList->SetGraphicsRootConstantBufferView(0, materialBuffer_->GetGPUVirtualAddress() + slotOffset);
 	
-	commandList->SetGraphicsRootConstantBufferView(1, transformBuffer_->GetGPUVirtualAddress() + (index * kCbAlignment));
+	commandList->SetGraphicsRootConstantBufferView(1, transformBuffer_->GetGPUVirtualAddress() + slotOffset);
 
 	uint32_t texIndex = textureIndex;
 	if (texIndex == 0) { texIndex = TextureManager::GetInstance()->GetTextureIndexByFilePath("assets/textures/uvChecker.png"); }
@@ -253,12 +263,15 @@ void PrimitiveModel::CallDrawCommand(D3D12_VERTEX_BUFFER_VIEW& vbView, uint32_t 
 	uint32_t index = currentDrawCount_;
 	currentDrawCount_++;
 
-	TransformationMatrix* transformData = reinterpret_cast<TransformationMatrix*>(&transformMappedData_[index * kCbAlignment]);
+	const uint32_t frameIndex = dxCommon_->GetCurrentFrameIndex();
+	const size_t slotOffset = (static_cast<size_t>(frameIndex) * kMaxDrawCount + index) * kCbAlignment;
+
+	TransformationMatrix* transformData = reinterpret_cast<TransformationMatrix*>(&transformMappedData_[slotOffset]);
 	transformData->WVP = wvpMatrix;
 	transformData->World = wMatrix;
 	transformData->WorldInverseTranspose = wMatrix; 
 
-	MaterialData* materialData = reinterpret_cast<MaterialData*>(&materialMappedData_[index * kCbAlignment]);
+	MaterialData* materialData = reinterpret_cast<MaterialData*>(&materialMappedData_[slotOffset]);
 	materialData->color = color;
 	materialData->enableLighting = 0; // 常に0
 	materialData->shininess = 50.0f;
@@ -275,8 +288,8 @@ void PrimitiveModel::CallDrawCommand(D3D12_VERTEX_BUFFER_VIEW& vbView, uint32_t 
 	// 頂点バッファの設定
 	commandList->IASetVertexBuffers(0, 1, &vbView);
 
-	commandList->SetGraphicsRootConstantBufferView(0, materialBuffer_->GetGPUVirtualAddress() + (index * kCbAlignment));
-	commandList->SetGraphicsRootConstantBufferView(1, transformBuffer_->GetGPUVirtualAddress() + (index * kCbAlignment));
+	commandList->SetGraphicsRootConstantBufferView(0, materialBuffer_->GetGPUVirtualAddress() + slotOffset);
+	commandList->SetGraphicsRootConstantBufferView(1, transformBuffer_->GetGPUVirtualAddress() + slotOffset);
 
 	uint32_t texIndex = textureIndex;
 	if (texIndex == 0) { texIndex = TextureManager::GetInstance()->GetTextureIndexByFilePath("assets/textures/uvChecker.png"); }
@@ -339,7 +352,7 @@ void PrimitiveModel::CreateRootSignature() {
 }
 
 void PrimitiveModel::CreateGraphicsPipeline() {
-	// 軽量版インプットレイアウト（WEIGHTやINDICESがない）
+	// 軽量版インプットレイアウト
 	D3D12_INPUT_ELEMENT_DESC inputElementDescs[3] = {};
 	inputElementDescs[0] = { "POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 };
 	inputElementDescs[1] = { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 };
@@ -389,7 +402,7 @@ void PrimitiveModel::CreateGraphicsPipeline() {
 		assert(SUCCEEDED(hr));
 	}
 
-	// ライン描画用パイプラインの生成 (トポロジータイプをLINEに変更)
+	// ライン描画用パイプラインの生成
 	graphicsPipelineStateDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_LINE;
 	for (size_t i = 0; i < static_cast<size_t>(BlendMode::kCountOf); ++i) {
 		BlendMode mode = static_cast<BlendMode>(i);
@@ -473,7 +486,7 @@ void PrimitiveModel::CreatePrimitiveBuffers() {
 	coneVertexBuffer_->Unmap(0, nullptr);
 
 	// ===================================
-	// ラインの頂点データ生成 (0,0,0) -> (1,0,0)
+	// ラインの頂点データ生成 ->
 	// ===================================
 	lineVertexCount_ = 2;
 	lineVertexBuffer_ = dxCommon_->CreateBufferResource(sizeof(VertexData) * lineVertexCount_);
@@ -488,7 +501,7 @@ void PrimitiveModel::CreatePrimitiveBuffers() {
 	lineVertexBuffer_->Unmap(0, nullptr);
 
 	// ===================================
-	// 三角形の頂点データ生成 (0,0,0), (1,0,0), (0,1,0)
+	// 三角形の頂点データ生成 , ,
 	// ===================================
 	triangleVertexCount_ = 3;
 	triangleVertexBuffer_ = dxCommon_->CreateBufferResource(sizeof(VertexData) * triangleVertexCount_);

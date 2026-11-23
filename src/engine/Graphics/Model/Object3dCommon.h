@@ -60,7 +60,7 @@ public:
 	static Object3dCommon* GetInstance();
 
 	/// <summary>
-	/// デフォルトコンストラクタ (std::make_unique対応のためpublic)
+	/// デフォルトコンストラクタ
 	/// </summary>
 	Object3dCommon() = default;
 
@@ -73,7 +73,7 @@ public:
 	// ブレンドモード設定
 	void SetBlendMode(BlendMode mode);
 
-	// ワイヤーフレーム描画モード切り替え（SFホログラム演出・デバッグ用）
+	// ワイヤーフレーム描画モード切り替え
 	void SetWireframeMode(bool isWireframe) { isWireframeMode_ = isWireframe; }
 	bool IsWireframeMode() const { return isWireframeMode_; }
 

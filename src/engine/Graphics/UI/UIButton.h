@@ -125,7 +125,7 @@ private:
 	TextAlignment textAlignment_ = TextAlignment::Center;
 	float leftPadding_ = 100.0f;
 
-	// プロンプト装飾（>> と _）
+	// プロンプト装飾
 	bool enablePromptDecorators_ = true;
 	float promptBlinkTimer_ = 0.0f;
 };

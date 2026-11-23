@@ -6,7 +6,7 @@
 #include <chrono>
 
 namespace {
-// WinHTTPハンドルのRAIIラッパー（スレッド内完結で二重解放やリークを100%防止）
+// WinHTTPハンドルのRAIIラッパー
 struct ScopedWinHttpHandle {
 	HINTERNET handle = nullptr;
 	ScopedWinHttpHandle(HINTERNET h = nullptr) : handle(h) {}
@@ -134,7 +134,7 @@ bool MCPClient::SendRequest(const std::string& method, const std::string& path,
 		return false;
 	}
 
-	// タイムアウト設定（ローカルホスト専用: 50msで即時復帰）
+	// タイムアウト設定
 	WinHttpSetTimeouts(hSession, 50, 50, 50, 50);
 
 	if (shouldStop_.load()) return false;
@@ -249,7 +249,7 @@ void MCPClient::PollingWorker() {
 
 		if (shouldStop_.load()) break;
 
-		// サーバーオフライン時は指数バックオフ（3秒待機）
+		// サーバーオフライン時は指数バックオフ
 		int waitMs = (failureCount_.load() > 0) ? 3000 : pollingIntervalMs_;
 
 		// 10ms単位で小刻みにスリープし、shouldStop_ が立ったら即時脱出

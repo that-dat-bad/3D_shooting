@@ -21,12 +21,15 @@ void Object3d::Initialize(Object3dCommon* object3dCommon) {
 
 	// 4. 座標変換行列の初期化
 
-	transformationMatrixResource_ = dxCommon->CreateBufferResource(sizeof(TransformationMatrix));
-	transformationMatrixResource_->Map(0, nullptr, reinterpret_cast<void**>(&transformationMatrixData_));
+	transformationMatrixResource_ = dxCommon->CreateBufferResource(kTransformCbAlignment * DirectXCommon::kSwapChainBufferCount_);
+	transformationMatrixResource_->Map(0, nullptr, reinterpret_cast<void**>(&transformationMatrixMapped_));
 
-	transformationMatrixData_->WVP = Identity4x4();
-	transformationMatrixData_->World = Identity4x4();
-	transformationMatrixData_->WorldInverseTranspose = Identity4x4();
+	cachedTransformationMatrix_.WVP = Identity4x4();
+	cachedTransformationMatrix_.World = Identity4x4();
+	cachedTransformationMatrix_.WorldInverseTranspose = Identity4x4();
+	for (uint32_t i = 0; i < DirectXCommon::kSwapChainBufferCount_; ++i) {
+		*reinterpret_cast<TransformationMatrix*>(transformationMatrixMapped_ + static_cast<size_t>(i) * kTransformCbAlignment) = cachedTransformationMatrix_;
+	}
 
 	// 7. Transform初期値設定
 
@@ -48,14 +51,14 @@ void Object3d::Update() {
 		worldViewProjectionMatrix = Multiply(worldMatrix, viewProjectionMatrix);
 	}
 	else {
-		// カメラが無い場合はとりあえずWorld行列だけ（または単位行列など）
+		// カメラが無い場合はとりあえずWorld行列だけ
 		worldViewProjectionMatrix = worldMatrix;
 	}
 
-	// 3. 定数バッファに転送
-	transformationMatrixData_->WVP = worldViewProjectionMatrix;
-	transformationMatrixData_->World = worldMatrix;
-	transformationMatrixData_->WorldInverseTranspose = Transpose(Inverse(worldMatrix));
+	// 3. CPUキャッシュに保持し、Draw時に現フレーム用スロットへ転送
+	cachedTransformationMatrix_.WVP = worldViewProjectionMatrix;
+	cachedTransformationMatrix_.World = worldMatrix;
+	cachedTransformationMatrix_.WorldInverseTranspose = Transpose(Inverse(worldMatrix));
 
 	// 4. LOD情報の更新
 	UpdateLOD();
@@ -73,10 +76,10 @@ void Object3d::UpdateWithWorldMatrix(const Matrix4x4& worldMatrix) {
 		worldViewProjectionMatrix = worldMatrix;
 	}
 
-	// 2. 定数バッファに転送
-	transformationMatrixData_->WVP = worldViewProjectionMatrix;
-	transformationMatrixData_->World = worldMatrix;
-	transformationMatrixData_->WorldInverseTranspose = Transpose(Inverse(worldMatrix));
+	// 2. CPUキャッシュに保持し、Draw時に現フレーム用スロットへ転送
+	cachedTransformationMatrix_.WVP = worldViewProjectionMatrix;
+	cachedTransformationMatrix_.World = worldMatrix;
+	cachedTransformationMatrix_.WorldInverseTranspose = Transpose(Inverse(worldMatrix));
 
 	// 3. LOD情報の更新
 	UpdateLOD();
@@ -100,13 +103,17 @@ void Object3d::Draw() {
 		object3dCommon_->SetBlendMode(blendMode_);
 	}
 
-	// 座標変換行列CBufferの設定 (RootParameter Index: 1)
-	commandList->SetGraphicsRootConstantBufferView(1, transformationMatrixResource_->GetGPUVirtualAddress());
+	const uint32_t frameIndex = object3dCommon_->GetDirectXCommon()->GetCurrentFrameIndex();
+	const size_t cbOffset = static_cast<size_t>(frameIndex) * kTransformCbAlignment;
+	*reinterpret_cast<TransformationMatrix*>(transformationMatrixMapped_ + cbOffset) = cachedTransformationMatrix_;
 
-	// 平行光源CBufferの設定 (RootParameter Index: 3)
+	// 座標変換行列CBufferの設定
+	commandList->SetGraphicsRootConstantBufferView(1, transformationMatrixResource_->GetGPUVirtualAddress() + cbOffset);
+
+	// 平行光源CBufferの設定
 	commandList->SetGraphicsRootConstantBufferView(3, object3dCommon_->GetDirectionalLightResource()->GetGPUVirtualAddress());
 
-	// LightingSettingsまたはカスタム設定定数バッファの設定 (RootParameter Index: 4 / register b3)
+	// LightingSettingsまたはカスタム設定定数バッファの設定
 	ID3D12Resource* lightingRes = customLightingSettingsResource_ ? customLightingSettingsResource_.Get() : object3dCommon_->GetLightingSettingsResource();
 	commandList->SetGraphicsRootConstantBufferView(4, lightingRes->GetGPUVirtualAddress());
 
@@ -114,7 +121,7 @@ void Object3d::Draw() {
 
 	commandList->SetGraphicsRootConstantBufferView(6, object3dCommon_->GetSpotLightResource()->GetGPUVirtualAddress());
 
-	// 環境マップテクスチャの設定 (RootParameter Index: 8)
+	// 環境マップテクスチャの設定
 	uint32_t useEnvTexIndex = (envTextureOverride_ != 0) ? envTextureOverride_ : object3dCommon_->GetDefaultEnvTextureIndex();
 	if (useEnvTexIndex != 0) {
 		commandList->SetGraphicsRootDescriptorTable(8, TextureManager::GetInstance()->GetSrvHandleGPU(useEnvTexIndex));
@@ -154,7 +161,7 @@ void Object3d::DebugDrawSkeleton(const Vector4& color) {
 void Object3d::AddLODLevel(Model* model, float minScreenSize) {
 	if (!model) return;
 	lodLevels_.push_back({ model, minScreenSize });
-	// minScreenSize の降順（スクリーンサイズが大きい順＝高詳細順）でソート
+	// minScreenSize の降順でソート
 	std::sort(lodLevels_.begin(), lodLevels_.end(), [](const LODLevel& a, const LODLevel& b) {
 		return a.minScreenSize > b.minScreenSize;
 		});
@@ -205,7 +212,7 @@ void Object3d::UpdateLOD() {
 		return;
 	}
 
-	// 6. LOD選択 (minScreenSize の高い順から判定)
+	// 6. LOD選択
 	activeLODIndex_ = (int)lodLevels_.size() - 1; // デフォルトは最低詳細
 	for (size_t i = 0; i < lodLevels_.size(); ++i) {
 		if (currentScreenSize_ >= lodLevels_[i].minScreenSize) {

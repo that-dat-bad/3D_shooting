@@ -27,23 +27,23 @@ void ModelCommon::CreateSkinningPipeline() {
 
 	D3D12_ROOT_PARAMETER rootParameters[4] = {};
 
-	// RootParam 0: CBV b0 (SkinningParams)
+	// RootParam 0: CBV b0
 	rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
 	rootParameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 	rootParameters[0].Descriptor.ShaderRegister = 0;
 
-	// RootParam 1: CBV b1 (BoneMatrix)
+	// RootParam 1: CBV b1
 	rootParameters[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
 	rootParameters[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 	rootParameters[1].Descriptor.ShaderRegister = 1;
 
-	// RootParam 2: SRV t0 (Input Vertices)
+	// RootParam 2: SRV t0
 	rootParameters[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
 	rootParameters[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 	rootParameters[2].DescriptorTable.pDescriptorRanges = srvRange;
 	rootParameters[2].DescriptorTable.NumDescriptorRanges = 1;
 
-	// RootParam 3: UAV u0 (Output Vertices)
+	// RootParam 3: UAV u0
 	rootParameters[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
 	rootParameters[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 	rootParameters[3].DescriptorTable.pDescriptorRanges = uavRange;

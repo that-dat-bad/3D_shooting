@@ -5,11 +5,11 @@ SamplerState gSampler : register(s0);
 
 struct PostEffectParams {
     int32_t kernelSize;
-    float intensity;      // 抽出カラーの許容判定範囲 (Tolerance / Range)
-    float dirX;           // トランジションの境界の滑らかさ (Smoothness)
-    float dirY;           // 非対象カラーのモノクロ化率 (Desaturation, 1.0 = 完全モノクロ)
+    float intensity;      // 抽出カラーの許容判定範囲
+    float dirX;           // トランジションの境界の滑らかさ
+    float dirY;           // 非対象カラーのモノクロ化率
     float time;
-    float3 targetColor;   // 抽出したい目標カラー (R, G, B)
+    float3 targetColor;   // 抽出したい目標カラー
 };
 ConstantBuffer<PostEffectParams> gParams : register(b0);
 
@@ -26,16 +26,16 @@ PixelShaderOutput main(VertexShaderOutput input)
     // 目標カラー (R, G, B) と現在のピクセル色との距離を計算
     float32_t dist = length(baseColor.rgb - gParams.targetColor);
     
-    // 輝度（モノクロ）計算
+    // 輝度計算
     float32_t luminance = dot(baseColor.rgb, float32_t3(0.2125f, 0.7154f, 0.0721f));
     float32_t3 grayColor = float32_t3(luminance, luminance, luminance);
     
-    // 許容範囲 (intensity) と滑らかさ (dirX) によるフェード率
+    // 許容範囲と滑らかさによるフェード率
     float32_t tolerance = max(gParams.intensity, 0.01f);
     float32_t smoothness = max(gParams.dirX, 0.001f);
     float32_t factor = smoothstep(tolerance, tolerance - smoothness, dist);
     
-    // モノクロ化率 (dirY) に応じた非対象領域の脱色
+    // モノクロ化率に応じた非対象領域の脱色
     float32_t desatAmount = saturate(gParams.dirY);
     float32_t3 nonTargetColor = lerp(baseColor.rgb, grayColor, desatAmount);
     

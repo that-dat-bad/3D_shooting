@@ -59,7 +59,7 @@ public: // メンバ関数
 	void SetMaterialEnableLighting(uint32_t materialIndex, bool enable);
 	void SetMaterialColor(uint32_t materialIndex, const Vector4& color);
 
-	// LOD (Level of Detail) API
+	// LOD API
 	void SetLODEnabled(bool enabled) { isLODEnabled_ = enabled; }
 	bool IsLODEnabled() const { return isLODEnabled_; }
 	void AddLODLevel(Model* model, float minScreenSize);
@@ -86,11 +86,11 @@ public: // メンバ関数
 	const std::vector<std::string>& GetTargetNodeNames() const { return targetNodeNames_; }
 	const std::string& GetTargetNodeName() const { return targetNodeName_; }
 
-	// カスタムパイプラインステート（特殊シェーダー描画用）
+	// カスタムパイプラインステート
 	void SetCustomPipelineState(ID3D12PipelineState* pso) { customPipelineState_ = pso; }
 	ID3D12PipelineState* GetCustomPipelineState() const { return customPipelineState_.Get(); }
 
-	// カスタム定数バッファ（特殊シェーダーのLightingSettingsスロットb3差し替え用）
+	// カスタム定数バッファ
 	void SetCustomLightingSettingsResource(ID3D12Resource* res) { customLightingSettingsResource_ = res; }
 	ID3D12Resource* GetCustomLightingSettingsResource() const { return customLightingSettingsResource_.Get(); }
 
@@ -115,8 +115,10 @@ private:
 	Transform transform_;
 
 	//--座標変換行列--//
+	static constexpr size_t kTransformCbAlignment = (sizeof(TransformationMatrix) + 0xffu) & ~static_cast<size_t>(0xffu);
 	Microsoft::WRL::ComPtr<ID3D12Resource> transformationMatrixResource_ = nullptr;
-	TransformationMatrix* transformationMatrixData_ = nullptr;
+	uint8_t* transformationMatrixMapped_ = nullptr;
+	TransformationMatrix cachedTransformationMatrix_{};
 
 	BlendMode blendMode_ = BlendMode::kNormal;
 	
@@ -125,7 +127,7 @@ private:
 	//--LOD--//
 	bool isLODEnabled_ = false;
 	std::vector<LODLevel> lodLevels_;
-	float cullScreenSize_ = 0.005f; // 画面の0.5%未満は描画スキップ（カリング）
+	float cullScreenSize_ = 0.005f; // 画面の0.5%未満は描画スキップ
 	float boundingRadius_ = 1.0f;  // オブジェクト境界半径
 	float currentScreenSize_ = 1.0f;
 	int activeLODIndex_ = 0;

@@ -5,9 +5,9 @@
 #include "../../engine/base/Math/Vector3.h"
 
 enum class TitleEntryReason {
-	InitialBoot,          // 通常の初回起動（ドローン視点）
-	RebootFromGameOver,   // ゲームオーバーからの復旧（SYSTEM REBOOTING... → ConsoleBoot）
-	ReturnFromClear       // クリアからの復帰（WindowClose → 再認証セキュリティ演出）
+	InitialBoot,          // 通常の初回起動
+	RebootFromGameOver,   // ゲームオーバーからの復旧
+	ReturnFromClear       // クリアからの復帰
 };
 
 enum class GameOverReason {
@@ -29,12 +29,12 @@ struct GameResult {
 	float playerHPRemaining = 0.0f;	// 残りHP
 	float playerMaxHP = 100.0f;		// 最大HP
 	bool missionCleared = false;	// ミッションクリアしたか
-	bool isRetry = false;           // リトライ出撃か（trueなら起動シーケンスを高速短縮）
+	bool isRetry = false;           // リトライ出撃か
 	bool isHalcyonDaysTutorial = false; // Operation Halcyon Days チュートリアルクリアか
 	bool isClearAutoDemo = false;       // クリア画面自動デモ再生フラグ
 	GameOverReason gameOverReason = GameOverReason::Destroyed; // 失敗要因
 	TitleEntryReason titleEntryReason = TitleEntryReason::InitialBoot; // タイトル画面への突入理由
-	std::vector<TrajectorySample> flightTrajectory; // ステージ中のプレイヤー飛行軌跡（実座標・実姿勢・実時刻）
+	std::vector<TrajectorySample> flightTrajectory; // ステージ中のプレイヤー飛行軌跡
 	std::string terrainPath = "Resources/terrains/demo2/chunks_info.json"; // 使用中の地形パス
 
 	// 結果をリセットする

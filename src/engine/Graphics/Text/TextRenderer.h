@@ -15,21 +15,19 @@ public:
     void Initialize(SpriteCommon* spriteCommon);
     void Finalize();
 
-    // 画面に文字を描画するために積む（毎フレーム呼ぶ想定）
+    // 画面に文字を描画するために積む
     void Print(const std::string& fontName, const std::string& text, float x, float y, float size, const Vector4& color = {1.0f, 1.0f, 1.0f, 1.0f}, const Vector2& anchorPoint = {0.0f, 0.0f});
 
     // 指定したフォントとサイズでの文字列の描画サイズを計算する
     Vector2 CalculateTextSize(const std::string& fontName, const std::string& text, float size);
 
-    // スプライトプールの事前確保（シーン遷移時のCreateCommittedResourceスパイクをゼロにする）
+    // スプライトプールの事前確保
     void PrewarmPool(size_t count);
 
-    // 積まれた文字を実際に描画する（SceneのDraw等で一括で呼ぶ）
+    // 積まれた文字を実際に描画する
     void Draw();
 
-    // フレーム途中で、これまでに積まれた未描画の文字だけを描画する（描画順制御用）
-    // プールはリセットしないため、以降の Print は新しいスプライトを使用する
-    // （GPU実行前に定数バッファが上書きされるのを防ぐ）
+    // 未描画の文字を途中描画する
     void Flush();
 
 private:

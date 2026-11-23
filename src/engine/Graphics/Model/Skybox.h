@@ -18,7 +18,7 @@ public:
 		Vector4 position;
 	};
 
-	// マテリアル (PS b0に対応)
+	// マテリアル
 	struct Material {
 		Vector4 color;
 		int32_t enableLighting;
@@ -27,7 +27,7 @@ public:
 		Matrix4x4 uvTransform;
 	};
 
-	// 変換行列 (VS b1に対応)
+	// 変換行列
 	struct TransformationMatrix {
 		Matrix4x4 WVP;
 		Matrix4x4 World;
@@ -66,7 +66,7 @@ private:
 	Microsoft::WRL::ComPtr<ID3D12Resource> transformationMatrixResource_;
 	TransformationMatrix* transformationMatrixData_ = nullptr;
 
-	// テクスチャインデックス (cubemap)
+	// テクスチャインデックス
 	uint32_t textureIndex_ = 0;
 
 	// トランスフォーム

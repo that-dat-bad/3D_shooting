@@ -26,7 +26,7 @@ public:
 	// camera: カメラ
 	void Draw(const MyMath::Vector3& aircraftPosition, const MyMath::Vector3& aircraftRotation, Camera* camera);
 
-	// 描画（行列指定）
+	// 描画
 	// aircraftWorldMatrix: ワールド行列
 	// camera: カメラ
 	void Draw(const MyMath::Matrix4x4& aircraftWorldMatrix, Camera* camera);
@@ -85,19 +85,19 @@ private:
 	// ノズル個別描画
 	void DrawSingleNozzle(const MyMath::Matrix4x4& nozzleWorldMatrix, Camera* camera);
 
-	// ノズル設定（m21_wg の双発ジェットノズル実寸値）
+	// ノズル設定
 	bool isTwinEngine_ = true;
 	MyMath::Vector3 leftNozzleOffset_  = { -0.407f, 0.011f, 7.55f };
 	MyMath::Vector3 rightNozzleOffset_ = {  0.396f, 0.011f, 7.55f };
 	MyMath::Vector3 singleNozzleOffset_ = { 0.0f, 0.0f, 7.55f };
-	MyMath::Vector3 nozzleRotation_ = { 0.0f, 0.0f, 0.0f }; // ノズル噴射角 (Pitch, Yaw, Roll [rad])
+	MyMath::Vector3 nozzleRotation_ = { 0.0f, 0.0f, 0.0f }; // ノズル噴射角
 
 	// 形状パラメータ
 	float baseFlameLength_ = 5.2f;    // アフターバーナー炎の長さ
 	float baseFlameRadius_ = 0.28f;   // ノズル出口半径
 	int shockDiamondCount_ = 5;       // マッハディスクの節の数
-	MyMath::Vector3 baseFlameColor_ = { 0.20f, 0.65f, 1.0f }; // 外炎（コバルトブルー〜エレクトリックシアン）
-	MyMath::Vector3 coreColor_ = { 0.88f, 0.95f, 1.0f };      // 内炎・マッハディスク（白熱青白）
+	MyMath::Vector3 baseFlameColor_ = { 0.20f, 0.65f, 1.0f }; // 外炎
+	MyMath::Vector3 coreColor_ = { 0.88f, 0.95f, 1.0f };      // 内炎・マッハディスク
 
 	// 状態・アニメーション
 	float animTimer_ = 0.0f;

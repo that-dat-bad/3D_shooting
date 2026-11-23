@@ -11,7 +11,7 @@
 using namespace MyMath;
 
 /// <summary>
-/// プリミティブ形状 (リング、シリンダー、コーン、平面) 描画管理クラス
+/// プリミティブ形状 描画管理クラス
 /// </summary>
 class PrimitiveModel {
 public:
@@ -22,7 +22,7 @@ public:
 	static PrimitiveModel* GetInstance();
 
 	/// <summary>
-	/// デフォルトコンストラクタ (std::make_unique対応のためpublic)
+	/// デフォルトコンストラクタ
 	/// </summary>
 	PrimitiveModel() = default;
 
@@ -32,35 +32,35 @@ public:
 	/// <summary>終了処理</summary>
 	void Finalize();
 	
-	/// <summary>描画カウントをリセットする（毎フレームの最初に呼ぶ、またはUpdateなどで呼ぶ）</summary>
+	/// <summary>描画カウントをリセットする</summary>
 	void Reset();
 
-	/// <summary>エフェクト描画関数 (Ring)</summary>
+	/// <summary>エフェクト描画関数</summary>
 	void DrawRing(const Vector3& scale, const Vector3& rotate, const Vector3& translate, const Vector4& color, uint32_t textureIndex, Camera* camera, BlendMode blendMode = BlendMode::kNormal);
 	void DrawRing(const Matrix4x4& worldMatrix, const Vector4& color, uint32_t textureIndex, Camera* camera, BlendMode blendMode = BlendMode::kNormal);
 
-	/// <summary>エフェクト描画関数 (Cylinder)</summary>
+	/// <summary>エフェクト描画関数</summary>
 	void DrawCylinder(const Vector3& scale, const Vector3& rotate, const Vector3& translate, const Vector4& color, uint32_t textureIndex, Camera* camera, BlendMode blendMode = BlendMode::kNormal);
 	void DrawCylinder(const Matrix4x4& worldMatrix, const Vector4& color, uint32_t textureIndex, Camera* camera, BlendMode blendMode = BlendMode::kNormal);
 
-	/// <summary>エフェクト描画関数 (Plane)</summary>
+	/// <summary>エフェクト描画関数</summary>
 	void DrawPlane(const Vector3& scale, const Vector3& rotate, const Vector3& translate, const Vector4& color, uint32_t textureIndex, Camera* camera, BlendMode blendMode = BlendMode::kNormal);
 	void DrawPlane(const Matrix4x4& worldMatrix, const Vector4& color, uint32_t textureIndex, Camera* camera, BlendMode blendMode = BlendMode::kNormal);
 
-	/// <summary>エフェクト描画関数 (Cone)</summary>
+	/// <summary>エフェクト描画関数</summary>
 	void DrawCone(const Vector3& scale, const Vector3& rotate, const Vector3& translate, const Vector4& color, uint32_t textureIndex, Camera* camera, BlendMode blendMode = BlendMode::kNormal);
 	void DrawCone(const Matrix4x4& worldMatrix, const Vector4& color, uint32_t textureIndex, Camera* camera, BlendMode blendMode = BlendMode::kNormal);
 
-	/// <summary>エフェクト描画関数 (Cone - クォータニオン版)</summary>
+	/// <summary>エフェクト描画関数</summary>
 	void DrawCone(const Vector3& scale, const Quaternion& rotate, const Vector3& translate, const Vector4& color, uint32_t textureIndex, Camera* camera, BlendMode blendMode = BlendMode::kNormal);
 
-	// 3D直線描画関数 (デバッグ用などに使用)
+	// 3D直線描画関数
 	void DrawLine3D(const Vector3& p1, const Vector3& p2, const Vector4& color, Camera* camera);
 
-	// 3D三角形描画関数（ソリッド面描画用）
+	// 3D三角形描画関数
 	void DrawTriangle3D(const Vector3& p0, const Vector3& p1, const Vector3& p2, const Vector4& color, Camera* camera, BlendMode blendMode = BlendMode::kOpaque);
 
-	// 頂点データ構造体（無駄なウェイトやインデックスを省いた軽量版）
+	// 頂点データ構造体
 	struct VertexData {
 		Vector4 position;
 		Vector2 texcoord;
@@ -126,7 +126,7 @@ private:
 		Matrix4x4 uvTransform;
 	};
 
-	// 定数バッファのアライメント制約（256バイトの倍数）に合わせたサイズ
+	// 定数バッファのアライメント制約に合わせたサイズ
 	static const uint32_t kCbAlignment = 256;
 	static const uint32_t kMaxDrawCount = 10000; // 1フレームあたりの最大描画数
 

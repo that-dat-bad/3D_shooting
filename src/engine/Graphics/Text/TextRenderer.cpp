@@ -95,17 +95,14 @@ void TextRenderer::Print(const std::string& fontName, const std::string& text, f
 
     float scale = size / info->size;
     
-    // anchorPoint.x が 0.0f（左揃え）の場合はテキスト幅の事前計算をスキップして高速化
+    // anchorPoint.x が 0.0fの場合はテキスト幅の事前計算をスキップして高速化
     float startX = x;
     if (std::abs(anchorPoint.x) > 0.0001f) {
         Vector2 textSize = CalculateTextSize(fontName, text, size);
         startX = x - textSize.x * anchorPoint.x;
     }
     
-    // フォントのascentとdescentに基づき、アンカーに応じたベースライン位置を正確に決定
-    // anchorPoint.y = 0.0f: 上揃え (行上端が y) -> startY = y + ascent * scale
-    // anchorPoint.y = 0.5f: 上下中央揃え (上下中心が y) -> startY = y + (ascent + descent) * 0.5f * scale
-    // anchorPoint.y = 1.0f: 下揃え (行下端が y) -> startY = y + descent * scale
+    // アンカーに応じたベースライン位置の計算
     float scaledAscent = info->ascent * scale;
     float scaledDescent = info->descent * scale;
     float startY = y + scaledAscent * (1.0f - anchorPoint.y) + scaledDescent * anchorPoint.y;
@@ -137,7 +134,7 @@ void TextRenderer::Print(const std::string& fontName, const std::string& text, f
         if (it != info->glyphs.end()) {
             const stbtt_packedchar* b = &it->second;
             
-            // 四角形の生成（整数ピクセルにスナップしてサブピクセル滲みやジャギーを抑制）
+            // 四角形の生成
             float xpos = std::round(startX + b->xoff * scale);
             float ypos = std::round(startY + b->yoff * scale);
             float width = std::round((b->x1 - b->x0) * scale);

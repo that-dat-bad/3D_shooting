@@ -604,7 +604,7 @@ bool MissionManager::IsScriptedGuideVisible() const {
 	}
 
 	if (!activeGuideObj) {
-		// ガイド付きミッションで次目標への遷移ディレイ待機中、またはフェードアウト中は非表示（操作ロック）
+		// ガイド付きミッションで次目標への遷移ディレイ待機中、またはフェードアウト中は非表示
 		if (HasActiveOrScriptedGuideContext()) {
 			return false;
 		}
@@ -736,6 +736,23 @@ bool MissionManager::BuildActiveGuideHUD(
 		}
 	} else if (activeObj->type == ObjectiveType::DestroyTarget && activeObj->showProgressBar) {
 		outProgressRatio = std::clamp(targetDamageRatio, 0.0f, 1.0f);
+	} else if (activeObj->type == ObjectiveType::DestroyCount && activeObj->requiredKills > 0 && boundEnemyManager_) {
+		const int kills = boundEnemyManager_->GetDestroyedCount();
+		if (activeObj->showProgressBar) {
+			outProgressRatio = std::clamp(
+				static_cast<float>(kills) / static_cast<float>(activeObj->requiredKills),
+				0.0f,
+				1.0f);
+		}
+		char subBuf[256]{};
+		std::snprintf(
+			subBuf,
+			sizeof(subBuf),
+			"%s  [撃墜: %d/%d]",
+			activeObj->guideSub.c_str(),
+			(std::min)(kills, activeObj->requiredKills),
+			activeObj->requiredKills);
+		outSub = subBuf;
 	}
 
 	return true;

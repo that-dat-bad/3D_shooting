@@ -22,7 +22,7 @@ public:
 	static SkyboxCommon* GetInstance();
 
 	/// <summary>
-	/// デフォルトコンストラクタ (std::make_unique対応のためpublic)
+	/// デフォルトコンストラクタ
 	/// </summary>
 	SkyboxCommon() = default;
 

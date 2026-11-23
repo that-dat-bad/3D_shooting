@@ -23,20 +23,20 @@ DebugCamera::DebugCamera() {
 
 void DebugCamera::Update(const BYTE* key, const DIMOUSESTATE2& mouseState) {
 
-    // --- 回転処理 (右ボタンドラッグ) ---
+    // --- 回転処理 ---
     if (mouseState.rgbButtons[1] & 0x80) {
         float dx = static_cast<float>(mouseState.lX) * 0.005f;
         float dy = static_cast<float>(mouseState.lY) * 0.005f;
         rotation_.y += dx; // ヨー回転
         rotation_.x += dy; // ピッチ回転
 
-        // ピッチ角を制限（真上や真下に行きすぎないように）
+        // ピッチ角を制限
         float pitchLimit = 3.141592f * 0.49f; // 約89.9度
         if (rotation_.x > pitchLimit) { rotation_.x = pitchLimit; }
         if (rotation_.x < -pitchLimit) { rotation_.x = -pitchLimit; }
     }
 
-    // --- ズーム処理 (マウスホイール) ---
+    // --- ズーム処理 ---
     float wheel = static_cast<float>(mouseState.lZ) * 0.01f;
     distance_ -= wheel;
     // 距離に下限を設定
@@ -44,12 +44,12 @@ void DebugCamera::Update(const BYTE* key, const DIMOUSESTATE2& mouseState) {
         distance_ = 1.0f;
     }
 
-    // --- パン処理 (中ボタンドラッグ) ---
+    // --- パン処理 ---
     if (mouseState.rgbButtons[2] & 0x80) {
         float dx = static_cast<float>(mouseState.lX) * -0.01f;
         float dy = static_cast<float>(mouseState.lY) * 0.01f;
 
-        // カメラのワールド行列（ビュー行列の逆行列）からカメラのX軸とY軸を取得
+        // カメラのワールド行列からカメラのX軸とY軸を取得
         Matrix4x4 cameraWorldMatrix = Inverse(viewMatrix_);
         Vector3 cameraRight = { cameraWorldMatrix.m[0][0], cameraWorldMatrix.m[0][1], cameraWorldMatrix.m[0][2] };
         Vector3 cameraUp = { cameraWorldMatrix.m[1][0], cameraWorldMatrix.m[1][1], cameraWorldMatrix.m[1][2] };
@@ -60,8 +60,7 @@ void DebugCamera::Update(const BYTE* key, const DIMOUSESTATE2& mouseState) {
     }
 
 
-    // --- ビュー行列の計算 ---
-    // 1. 注視点からのオフセットを計算（球面座標）
+    // 1. 注視点からのオフセットを計算
     Vector3 offset;
     offset.x = distance_ * std::cos(rotation_.x) * std::sin(rotation_.y);
     offset.y = distance_ * std::sin(rotation_.x);

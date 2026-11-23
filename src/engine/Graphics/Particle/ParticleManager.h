@@ -23,7 +23,7 @@ namespace ParticleHeightCapDefaults {
 	inline constexpr uint32_t kZeroCount = 0u;
 }
 
-// パーティクル1粒の情報（CPU側での計算用）
+// パーティクル1粒の情報
 struct Particle {
 	Transform transform;
 	Vector3 velocity;
@@ -36,10 +36,10 @@ struct Particle {
 	// アニメーション用パラメータ
 	float startScale = 1.0f;   // 初期スケール
 	float endScale = 0.0f;     // 終了時スケール
-	float startAlpha = 1.0f;   // 初期アルファ（フェードアウト用）
+	float startAlpha = 1.0f;   // 初期アルファ
 	float scaleEasing = 1.0f;  // スケールイージング指数
 
-	// 上昇上限高さ制御（0.0f以下で無制限）
+	// 上昇上限高さ制御
 	float spawnY = ParticleHeightCapDefaults::kNoHeightLimit;
 	float maxRiseHeight = ParticleHeightCapDefaults::kNoHeightLimit;
 
@@ -58,9 +58,9 @@ struct ParticleParameters {
 	float minLifeTime = 1.0f;
 	float maxLifeTime = 3.0f;
 	Vector3 acceleration = { 0.0f, 0.0f, 0.0f }; // 重力など
-	float randomPositionRange = 1.0f;            // 発生位置のランダムばらつき範囲（0.0で完全に点から発生）
+	float randomPositionRange = 1.0f;            // 発生位置のランダムばらつき範囲
 
-	// 上昇上限高さ（発生Y座標からの最大上昇距離[m]：0.0f以下で無制限）
+	// 上昇上限高さ
 	float maxRiseHeight = ParticleHeightCapDefaults::kNoHeightLimit;
 
 	// 回転
@@ -70,13 +70,13 @@ struct ParticleParameters {
 	float maxRotationSpeed = 0.0f;
 
 	// スケール・フェードアニメーション
-	float minScale = 1.0f;     // 初期スケールの範囲（最小）
-	float maxScale = 1.0f;     // 初期スケールの範囲（最大）
+	float minScale = 1.0f;     // 初期スケールの範囲
+	float maxScale = 1.0f;     // 初期スケールの範囲
 	float endScale = 0.0f;     // 寿命終了時のスケール
 	bool fadeOut = true;       // アルファフェードアウトの有効化
-	float scaleEasing = 1.0f;  // スケール変化のイージング指数（1.0=リニア）
+	float scaleEasing = 1.0f;  // スケール変化のイージング指数
 
-	// ストレッチ（引き伸ばし）ビルボード用
+	// ストレッチビルボード用
 	bool isStretched = false;
 	float stretchFactor = 1.0f;
 	Vector3 stretchDir = { 0.0f, 0.0f, 0.0f };
@@ -130,7 +130,7 @@ public: // シングルトンパターン
 	static ParticleManager* GetInstance();
 
 	/// <summary>
-	/// デフォルトコンストラクタ (std::make_unique対応のためpublic)
+	/// デフォルトコンストラクタ
 	/// </summary>
 	ParticleManager() = default;
 
@@ -174,7 +174,7 @@ private:
 	std::unordered_map<std::string, AccelerationField> accelerationFields_;
 
 	// 共通リソース
-	// 頂点データ（板ポリゴン）
+	// 頂点データ
 	struct VertexData {
 		Vector4 position;
 		Vector2 texcoord;
@@ -200,7 +200,7 @@ private:
 	// ランダムエンジン
 	std::mt19937 randomEngine_;
 
-	// 最大インスタンス数（1グループあたり）
+	// 最大インスタンス数
 	const uint32_t kMaxInstanceCount_ = 1024;
 
 private: // 内部関数

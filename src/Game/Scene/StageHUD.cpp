@@ -201,7 +201,7 @@ void StageHUD::DrawBorderedPanel(const Vector2& pos, const Vector2& size, const 
 	DrawRect({ pos.x, pos.y }, { borderWidth, size.y }, borderColor, { 0.0f, 0.0f });                                // 左
 	DrawRect({ pos.x + size.x - borderWidth, pos.y }, { borderWidth, size.y }, borderColor, { 0.0f, 0.0f });        // 右
 
-	// 4隅のミリタリー風コーナータグ（装飾）
+	// 4隅のミリタリー風コーナータグ
 	float cornerLen = 8.0f;
 	float cornerThick = borderWidth + 1.0f;
 	Vector4 cornerColor = { borderColor.x, borderColor.y, borderColor.z, (std::min)(1.0f, borderColor.w + 0.2f) };
@@ -299,12 +299,11 @@ void StageHUD::ProjectToScreenClamped(
 	const float maxX = (std::max)(16.0f, halfW - marginPx);
 	const float maxY = (std::max)(16.0f, halfH - marginPx);
 
-	// 透視投影行列の構造上 cX = vx * cotHalfFovX, cY = vy * cotHalfFovY, cW = vz であるため、
-	// cW <= 0 (90°〜180°の大フリック時) でも (rx, ry) は目標への正確な2Dスクリーン方位を保持する
+	// 背面方向でもスクリーン方位を維持
 	const float rx = cX * halfW;
 	const float ry = -cY * halfH;
 
-	// 角を滑らかに丸めたスーパー楕円(p=8)で安全枠を評価し、cW = edgeFactor で1ビット単位まで連続接続する
+	// 角を滑らかに丸めたスーパー楕円で安全枠を評価し、cW = edgeFactor で1ビット単位まで連続接続する
 	const float nx = std::fabs(rx) / maxX;
 	const float ny = std::fabs(ry) / maxY;
 	const float nx2 = nx * nx;
@@ -416,7 +415,7 @@ void StageHUD::ComputeOffscreenChevronGeometry(
 	outWingA = { base.x + px * wingHalf, base.y + py * wingHalf };
 	outWingB = { base.x - px * wingHalf, base.y - py * wingHalf };
 
-	// 距離テキストはブラケット内側（画面中央側）に配置し、外側矢印や画面端と重ならないようにする
+	// 距離テキストはブラケット内側に配置し、外側矢印や画面端と重ならないようにする
 	const float inwardOffset = boxHalf + 20.0f * hudScale;
 	outTextPos = { screenPt.x - dx * inwardOffset, screenPt.y - dy * inwardOffset };
 }
@@ -427,10 +426,10 @@ void StageHUD::ComputeOffscreenChevronGeometry(
 // ================================================================
 
 void StageHUD::DrawTimer() {
-	// HUD順次展開（0.25s〜0.65s で上からスライドイン＋フェードイン）
+	// HUD順次展開
 	if (deployTimer_ < 0.25f) return;
 
-	// ステージクリア時のHUD順次シャットダウン（タイマーは0.60s〜1.00sでOFFLINE化＆消去）
+	// ステージクリア時のHUD順次シャットダウン
 	float shutdownAlpha = 1.0f;
 	bool isTimerOffline = false;
 	if (isShuttingDown_) {
@@ -495,7 +494,7 @@ void StageHUD::DrawTimer() {
 		snprintf(timeStr, sizeof(timeStr), "[ TIME %02d:%02d ]", minutes, seconds);
 	}
 
-	// テキスト描画 (TextRenderer)
+	// テキスト描画
 	TextRenderer::GetInstance()->Print(
 		"HackGen",
 		timeStr,
@@ -508,10 +507,10 @@ void StageHUD::DrawTimer() {
 }
 
 void StageHUD::DrawBailoutGuide() {
-	// HUD順次展開（0.50s〜0.90s で左からスライドイン＋フェードイン）
+	// HUD順次展開
 	if (deployTimer_ < 0.50f) return;
 
-	// ステージクリア時のHUD順次シャットダウン（0.30s〜0.70sで消去）
+	// ステージクリア時のHUD順次シャットダウン
 	float shutdownAlpha = 1.0f;
 	if (isShuttingDown_) {
 		if (shutdownTimer_ >= 0.70f) {
@@ -569,7 +568,7 @@ void StageHUD::DrawBailoutGuide() {
 		{ 0.5f, 0.0f }
 	);
 
-	// BAIL OUT / 緊急脱出（クリアデモ時は即時クリア表示）
+	// BAIL OUT / 緊急脱出
 	const char* titleStr = hudData_.isClearDemoMode ? "INSTANT CLEAR" : "BAIL OUT";
 	const char* subStr = hudData_.isClearDemoMode ? "即時クリア (CLEAR)" : "緊急脱出 (EJECT)";
 
@@ -1008,7 +1007,7 @@ void StageHUD::DrawBoresightReticle(const Vector2& noseScreen, float reticleScal
 		crossColor = { 0.45f, 0.82f, 0.48f, 0.85f * alpha }; // War Thunder HUDグリーン
 	}
 
-	// War Thunder準拠: 機首方向（ボアサイト）を示す大サークル (半径約 23px)
+	// War Thunder準拠: 機首方向を示す大サークル
 	DrawRing(noseScreen, 23.0f * pulseScale, crossColor);
 
 	// 中心小ドット
@@ -1019,7 +1018,7 @@ void StageHUD::DrawReticles() {
 	if (!hudData_.showReticles) {
 		return;
 	}
-	// ステージクリア時のHUD順次シャットダウン（照準は真っ先に0.00s〜0.35sで消滅）
+	// ステージクリア時のHUD順次シャットダウン
 	if (isShuttingDown_ && shutdownTimer_ >= 0.35f) {
 		return;
 	}
@@ -1028,18 +1027,18 @@ void StageHUD::DrawReticles() {
 	Vector2 noseGuideScreen{};
 	Vector2 aimScreen{};
 
-	// 1. 自機が向いている方向（機首方向 / ボアシサイト照準）
+	// 1. 自機が向いている方向
 	Vector3 noseTargetWorld = Add(hudData_.aircraftPosition, Multiply(500.0f, hudData_.aircraftForward));
 	bool noseInFront = ProjectToScreen(noseTargetWorld, hudData_.viewProjectionMatrix, hudData_.screenWidth, hudData_.screenHeight, noseScreen);
 	bool noseVisible = noseInFront &&
 		noseScreen.x >= -48.0f && noseScreen.x <= hudData_.screenWidth + 48.0f &&
 		noseScreen.y >= -48.0f && noseScreen.y <= hudData_.screenHeight + 48.0f;
 
-	// リードガイダンス用：機首が大きく画面外（または大旋回で90°超）にある場合も巨大スプライト化を防ぎ画面外縁へクリップ
+	// リードガイダンス用：機首が大きく画面外にある場合も巨大スプライト化を防ぎ画面外縁へクリップ
 	bool noseGuideClamped = false;
 	ProjectToScreenClamped(noseTargetWorld, hudData_.viewProjectionMatrix, hudData_.screenWidth, hudData_.screenHeight, -16.0f, noseGuideScreen, noseGuideClamped);
 
-	// 2. マウスの向き（War Thunder準拠：視野内は厳密透視投影、急フリックで一時的にFOV外に出た間は安全枠38px内縁へ連続クランプ表示）
+	// 2. マウスの向き
 	bool aimVisible = false;
 	bool aimClamped = false;
 	if (hudData_.mouseAimEnabled) {
@@ -1048,7 +1047,7 @@ void StageHUD::DrawReticles() {
 		aimVisible = true;
 	}
 
-	// HUD順次展開（0.00s〜0.40s でレティクルが拡大から収束しながら点灯展開）
+	// HUD順次展開
 	float deployT = std::clamp(deployTimer_ / 0.40f, 0.0f, 1.0f);
 	float shutdownAlpha = isShuttingDown_ ? (1.0f - shutdownTimer_ / 0.35f) : 1.0f;
 	float alpha = deployT * (std::clamp)(shutdownAlpha, 0.0f, 1.0f);
@@ -1063,21 +1062,21 @@ void StageHUD::DrawReticles() {
 		: Vector4{ 0.50f, 0.86f, 0.53f, 0.95f * alpha };
 
 	// -----------------------------------------------------------------
-	// リードガイダンスライン（機首方向とマウス目標照準を結ぶHUDライン）
+	// リードガイダンスライン
 	// -----------------------------------------------------------------
 	if (aimVisible) {
 		DrawLeadGuidanceLine(noseGuideScreen, aimScreen, alpha);
 	}
 
 	// -----------------------------------------------------------------
-	// マウス目標照準（サークル＋十字目盛＋中心ドット）
+	// マウス目標照準
 	// -----------------------------------------------------------------
 	if (aimVisible) {
 		DrawMouseAimReticle(aimScreen, reticleScale, baseAimCol, baseTickCol);
 	}
 
 	// -----------------------------------------------------------------
-	// 自機が向いている方向（戦闘機HUD風ガンクロス / ボアシサイト）
+	// 自機が向いている方向
 	// -----------------------------------------------------------------
 	if (noseVisible) {
 		DrawBoresightReticle(noseScreen, reticleScale, alpha);

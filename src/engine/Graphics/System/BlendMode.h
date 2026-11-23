@@ -3,7 +3,7 @@
 #include <cassert>
 
 enum class BlendMode {
-	kOpaque,	//!< 不透明 (Z書き込みあり)
+	kOpaque,	//!< 不透明
 	kNormal,	//!< 通常
 	kAdd,		//!< 加算
 	kSubtract,	//!< 減算

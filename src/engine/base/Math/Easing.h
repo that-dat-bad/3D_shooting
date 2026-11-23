@@ -12,28 +12,28 @@ inline float Clamp01(float t) {
 	return (std::max)(0.0f, (std::min)(1.0f, t));
 }
 
-// 線形補間 (float)
+// 線形補間
 inline float Lerp(float a, float b, float t) {
 	return a + (b - a) * t;
 }
 
-// 線形補間 (Vector2)
+// 線形補間
 inline Vector2 Lerp(const Vector2& a, const Vector2& b, float t) {
 	return { Lerp(a.x, b.x, t), Lerp(a.y, b.y, t) };
 }
 
-// 線形補間 (Vector3)
+// 線形補間
 inline Vector3 Lerp(const Vector3& a, const Vector3& b, float t) {
 	return { Lerp(a.x, b.x, t), Lerp(a.y, b.y, t), Lerp(a.z, b.z, t) };
 }
 
-// 線形補間 (Vector4)
+// 線形補間
 inline MyMath::Vector4 Lerp(const MyMath::Vector4& a, const MyMath::Vector4& b, float t) {
 	return { Lerp(a.x, b.x, t), Lerp(a.y, b.y, t), Lerp(a.z, b.z, t), Lerp(a.w, b.w, t) };
 }
 
 // ========================================================
-// Quadratic (2次曲線)
+// Quadratic
 // ========================================================
 inline float EaseInQuad(float t) {
 	return t * t;
@@ -48,7 +48,7 @@ inline float EaseInOutQuad(float t) {
 }
 
 // ========================================================
-// Cubic (3次曲線: 自然で滑らかな加減速)
+// Cubic
 // ========================================================
 inline float EaseInCubic(float t) {
 	return t * t * t;
@@ -64,7 +64,7 @@ inline float EaseInOutCubic(float t) {
 }
 
 // ========================================================
-// Exponential (指数: 素早く立ち上がり/定着)
+// Exponential
 // ========================================================
 inline float EaseInExpo(float t) {
 	return (t <= 0.0f) ? 0.0f : std::pow(2.0f, 10.0f * (t - 1.0f));
@@ -75,7 +75,7 @@ inline float EaseOutExpo(float t) {
 }
 
 // ========================================================
-// Sine (正弦波: 穏やかなイージング)
+// Sine
 // ========================================================
 inline float EaseInSine(float t) {
 	return 1.0f - std::cos(t * 1.57079632679f);
@@ -90,7 +90,7 @@ inline float EaseInOutSine(float t) {
 }
 
 // ========================================================
-// Back (オーバーシュート・バウンス感)
+// Back
 // ========================================================
 inline float EaseOutBack(float t, float s = 1.70158f) {
 	float inv = t - 1.0f;

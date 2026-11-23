@@ -24,7 +24,7 @@ void Sun::UpdateBloom(Camera* camera) {
 	const MyMath::Matrix4x4& mat = camera->GetWorldMatrix();
 	MyMath::Vector3 camForward = { mat.m[2][0], mat.m[2][1], mat.m[2][2] };
 
-	// 太陽光線と逆の方向（太陽そのものを指すベクトル）
+	// 太陽光線と逆の方向
 	MyMath::Vector3 sunDirNorm = MyMath::Normalize(MyMath::Vector3{ -direction_.x, -direction_.y, -direction_.z });
 	float sunDot = MyMath::Dot(camForward, sunDirNorm);
 
@@ -54,7 +54,7 @@ void Sun::Draw(Camera* camera) {
 	// 太陽の描画サイズ
 	MyMath::Vector3 scale = { 100.0f, 100.0f, 1.0f };
 	
-	// やや黄色みを帯びた白色光（加算合成）
+	// やや黄色みを帯びた白色光
 	MyMath::Vector4 sunColor = { 1.0f, 1.0f, 0.85f, 1.0f };
 	
 	uint32_t sunTex = TextureManager::GetInstance()->GetTextureIndexByFilePath("assets/textures/circle2.png");

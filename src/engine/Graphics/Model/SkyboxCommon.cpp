@@ -41,9 +41,9 @@ void SkyboxCommon::CreateRootSignature(DirectXCommon* dxCommon) {
 	descriptorRange[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
 	descriptorRange[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
 
-	// [0] Material (PS b0)
-	// [1] TransformationMatrix (VS b1)
-	// [2] Texture (PS t0)
+	// [0] Material
+	// [1] TransformationMatrix
+	// [2] Texture
 	D3D12_ROOT_PARAMETER rootParameters[3] = {};
 	rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
 	rootParameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;

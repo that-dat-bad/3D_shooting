@@ -7,7 +7,7 @@
 #include "../UI/RadioCommunicator.h"
 
 // ============================================================
-// ミッショントリガー (Mission Trigger) の型定義
+// ミッショントリガーの型定義
 // ============================================================
 
 // トリガーの発火条件
@@ -47,7 +47,7 @@ struct TriggerAction {
 
 	// --- SetObjective 用 ---
 	int objectiveIndex = -1;         // 対象の目標インデックス
-	std::string newStatus = "Active"; // 変更先のステータス ("Active" / "Completed" / "Failed")
+	std::string newStatus = "Active"; // 変更先のステータス
 
 	// --- SpawnEnemies 用 ---
 	std::vector<EnemySpawnData> spawnEnemies;
@@ -57,7 +57,7 @@ struct TriggerAction {
 	int activateTriggerIndex = -1;   // 有効化する別トリガーのインデックス
 
 	// --- PlayRadioDialogue 用 ---
-	std::string speakerName = "";                     // 無線の話者名（自動で <○○> 整形）
+	std::string speakerName = "";                     // 無線の話者名
 	RadioFaction speakerFaction = RadioFaction::Awacs; // 話者の所属・色分け属性
 	bool radioInterrupt = false;                      // true の場合は再生中の無線を割り込み更新
 };
@@ -66,8 +66,8 @@ struct TriggerAction {
 struct MissionTrigger {
 	std::string name = "Trigger";
 	TriggerCondition condition = TriggerCondition::OnMissionStart;
-	bool isEnabled = true;          // 有効/無効（無効なら評価をスキップ）
-	bool isFired = false;           // 発火済みフラグ（ランタイム用、JSONには保存しない）
+	bool isEnabled = true;          // 有効/無効
+	bool isFired = false;           // 発火済みフラグ
 	bool isRepeatable = false;      // true: 条件を満たすたびに何度でも発火
 	float delaySeconds = 0.0f;      // 条件成立後の発火ディレイ（秒）
 	bool isPendingDelay = false;    // ランタイム用ディレイ待機フラグ
@@ -82,7 +82,7 @@ struct MissionTrigger {
 	float hpThreshold = 50.0f;             // OnPlayerDamaged用
 	int objectiveIndex = -1;               // OnObjectiveComplete用
 
-	// --- 発火時のアクション（複数設定可能） ---
+	// --- 発火時のアクション ---
 	std::vector<TriggerAction> actions;
 };
 

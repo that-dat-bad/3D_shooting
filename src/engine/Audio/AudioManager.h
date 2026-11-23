@@ -24,7 +24,7 @@ struct FormatChunk {
 	WAVEFORMATEX fmt;
 };
 
-// 音声データ構造体 (std::vector<BYTE>版)
+// 音声データ構造体
 struct SoundData {
 	WAVEFORMATEX wfex;
 	std::vector<BYTE> buffer;
@@ -49,7 +49,7 @@ public:
 	STDMETHOD_(void, OnLoopEnd)(void*) override {}
 	STDMETHOD_(void, OnVoiceError)(void*, HRESULT) override {}
 
-	// コールバックが所属する SourceVoice（再生後に破棄するため保持）
+	// コールバックが所属する SourceVoice
 	IXAudio2SourceVoice* sourceVoice = nullptr;
 };
 
@@ -74,16 +74,16 @@ public:
 	// 毎フレーム呼ぶ: 再生済みVoiceの回収
 	void Update();
 
-	// 音声読み込み (WAV/MP3/AAC対応)
+	// 音声読み込み
 	SoundData SoundLoadFile(const char* filename);
 
 	// 音声データ解放
 	void SoundUnload(SoundData* soundData);
 
-	// 音声再生 (再生完了後に自動で Voice を破棄)
+	// 音声再生
 	void SoundPlayWave(const SoundData& soundData);
 
-	// 音声再生 (ループ再生)
+	// 音声再生
 	void SoundPlayWaveLoop(const SoundData& soundData);
 
 	// すべての再生中サウンドを停止

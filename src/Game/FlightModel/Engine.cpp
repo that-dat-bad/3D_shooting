@@ -2,7 +2,7 @@
 #include <algorithm>
 #include <cmath>
 
-// --- 初期化処理（外部のDTOデータを受け取って自分の変数に入れる） ---
+// --- 初期化処理 ---
 void Engine::Initialize(const EngineData& data) {
 	mass_ = data.mass;
 	baseThrust_ = data.baseThrust;
@@ -15,16 +15,16 @@ void Engine::Initialize(const EngineData& data) {
 	currentThrottle_ = 0.0f; // エンジン停止状態でスタート
 }
 
-// --- 毎フレームの更新処理（スロットルの物理的な遅延） ---
+// --- 毎フレームの更新処理 ---
 void Engine::Update(float dt, float targetThrottle) {
-	// 1. 目標値が限界（WEP上限）を超えないように安全対策（クランプ）
+	// 1. 目標値が限界を超えないように安全対策
 	if (targetThrottle > wepThrottleLimit_) {
 		targetThrottle = wepThrottleLimit_;
 	}
 
 	// 2. 物理的な反応速度に従って、現在のスロットルを目標値に近づける
 	if (currentThrottle_ < targetThrottle) {
-		// スロットルを上げる時（スプールアップ）
+		// スロットルを上げる時
 		currentThrottle_ += enginePhysicalSpoolSpeed_ * dt;
 
 		// 上がりすぎたら目標値で止める
@@ -32,7 +32,7 @@ void Engine::Update(float dt, float targetThrottle) {
 			currentThrottle_ = targetThrottle;
 		}
 	} else if (currentThrottle_ > targetThrottle) {
-		// スロットルを下げる時（スプールダウン）
+		// スロットルを下げる時
 		currentThrottle_ -= enginePhysicalSpoolSpeed_ * dt;
 
 		// 下がりすぎたら目標値でピタッと止める
@@ -44,11 +44,11 @@ void Engine::Update(float dt, float targetThrottle) {
 
 // --- 高度とエンジンダメージを考慮した推力 ---
 float Engine::GetThrustAtAltitude(float altitude, float engineDamageFactor) const {
-	// 高度補正: 高度が上がるほど推力低下（指数関数的）
+	// 高度補正: 高度が上がるほど推力低下
 	float altFactor = 1.0f - altitudeThrottleFactor_ * altitude;
 	altFactor = (std::max)(altFactor, 0.1f); // 最低10%は維持
 
-	// エンジンダメージで推力低下（完全破壊で90%推力喪失）
+	// エンジンダメージで推力低下
 	float damageFactor = 1.0f - engineDamageFactor * 0.9f;
 	damageFactor = (std::max)(damageFactor, 0.1f);
 

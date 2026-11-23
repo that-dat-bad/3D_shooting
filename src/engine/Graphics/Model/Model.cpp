@@ -86,8 +86,7 @@ void Model::InitializeFromModelData(ModelCommon* modelCommon, ModelData modelDat
 	DirectXCommon* dxCommon = modelCommon_->GetDirectXCommon();
 	modelData_ = std::move(modelData);
 
-	// 2. 頂点データの初期化 (GPUリソース作成)
-	// 頂点がない場合のガード
+	// 2. 頂点データの初期化
 	if (modelData_.vertices.empty() || modelData_.indices.empty()) {
 		return;
 	}
@@ -105,8 +104,7 @@ void Model::InitializeFromModelData(ModelCommon* modelCommon, ModelData modelDat
 	std::memcpy(vertexData_, modelData_.vertices.data(), sizeof(VertexData) * modelData_.vertices.size());
 	vertexBuffer_->Unmap(0, nullptr);
 
-	// ボーンを持たない静的メッシュ（地形チャンク等）では CS スキニング用リソースは不要なので生成しない
-	// （UAVバッファ・パラメータCB・SRV/UAVディスクリプタの生成コストとVRAMを節約）
+	// 静的メッシュはスキニング用リソースを生成しない
 	if (!modelData_.bones.empty()) {
 		if (srvManager && srvManager->CanAllocate()) {
 			rawVertexSrvIndex_ = srvManager->Allocate();
@@ -197,12 +195,12 @@ namespace {
 		uint32_t matIdx = mesh.materialIndex;
 		if (matIdx >= materialResources.size()) { matIdx = 0; }
 
-		// 1. マテリアル定数バッファの設定 (RootParameter Index: 0)
+		// 1. マテリアル定数バッファの設定
 		if (!materialResources.empty() && materialResources[matIdx]) {
 			commandList->SetGraphicsRootConstantBufferView(0, materialResources[matIdx]->GetGPUVirtualAddress());
 		}
 
-		// 2. テクスチャ (DescriptorTable) の設定 (RootParameter Index: 2)
+		// 2. テクスチャの設定
 		uint32_t useTextureIndex = 0;
 		if (matIdx < materials.size()) {
 			useTextureIndex = materials[matIdx].textureIndex;
@@ -435,7 +433,7 @@ Model::ModelData Model::LoadModelFile(const std::string& directoryPath, const st
 			}
 		}
 
-		// 行列の掛け合わせの順序は (ローカル * 親)
+		// 行列の掛け合わせの順序は
 		aiMatrix4x4 globalTransform = node->mTransformation * parentTransform;
 
 		for (uint32_t i = 0; i < node->mNumMeshes; ++i) {
@@ -508,7 +506,7 @@ Model::ModelData Model::LoadModelFile(const std::string& directoryPath, const st
 				vertex.position.x *= -1.0f;
 				vertex.normal.x *= -1.0f;
 
-				// アニメーション関連初期化 (ゼロクリア)
+				// アニメーション関連初期化
 				vertex.weight = { 1.0f, 0.0f, 0.0f, 0.0f };
 				vertex.indices[0] = 0;
 				vertex.indices[1] = 0;
@@ -528,7 +526,7 @@ Model::ModelData Model::LoadModelFile(const std::string& directoryPath, const st
 
 			uint32_t meshIndexStart = static_cast<uint32_t>(modelData.indices.size());
 
-			// 面（三角形）の展開 (インデックス抽出)
+			// 面の展開
 			for (uint32_t faceIndex = 0; faceIndex < mesh->mNumFaces; ++faceIndex) {
 				aiFace& face = mesh->mFaces[faceIndex];
 				if (face.mNumIndices != 3) { continue; } // 三角形以外はスキップ
@@ -578,7 +576,7 @@ Model::ModelData Model::LoadModelFile(const std::string& directoryPath, const st
 		OutputDebugStringA(buf);
 	}
 
-	// ディレクトリパスの取得 (テクスチャ読み込み用)
+	// ディレクトリパスの取得
 	size_t pos = filePath.find_last_of('/');
 	if (pos != std::string::npos) {
 		baseDirectory = filePath.substr(0, pos);
@@ -672,23 +670,19 @@ Model::ModelData Model::LoadModelFile(const std::string& directoryPath, const st
 	return modelData;
 }
 
-// ============================================================================
-// 軽量OBJローダー（Assimp非経由）
-// - 地形チャンクのような「テクスチャ少・ボーン無し・大量ファイル」の静的メッシュ向け
-// - Assimp 経路 (FlipWindingOrder | FlipUVs | Triangulate | JoinIdenticalVertices + X反転) と同じ頂点規約で出力
-// ============================================================================
+// Assimp非経由の軽量OBJローダー
 namespace {
 	// 空白スキップ
 	inline const char* SkipSpaces(const char* p, const char* end) {
 		while (p < end && (*p == ' ' || *p == '\t')) { ++p; }
 		return p;
 	}
-	// 行末までスキップ（改行文字の次へ）
+	// 行末までスキップ
 	inline const char* SkipLine(const char* p, const char* end) {
 		while (p < end && *p != '\n') { ++p; }
 		return (p < end) ? p + 1 : end;
 	}
-	// 高速 float パース（Debugビルドでも strtof より大幅に速い）
+	// 高速 float パース
 	inline const char* ParseFloat(const char* p, const char* end, float& out) {
 		p = SkipSpaces(p, end);
 		bool neg = false;
@@ -719,7 +713,7 @@ namespace {
 		out = neg ? -v : v;
 		return p;
 	}
-	// 行の残り（トークン）を取得（前後空白・CR除去）
+	// 行の残りを取得
 	inline std::string ReadRestOfLine(const char* p, const char* end) {
 		p = SkipSpaces(p, end);
 		const char* s = p;
@@ -752,7 +746,7 @@ namespace {
 		}
 	};
 
-	// .mtl の読み込み（Kd / d / Ns / Ke / map_Kd のみ対応）
+	// .mtl の読み込み
 	void ParseMtlFile(const std::string& mtlPath, const std::string& baseDir,
 		std::unordered_map<std::string, Model::MaterialData>& outMaterials) {
 		std::string buf;
@@ -809,11 +803,11 @@ Model::ModelData Model::LoadObjFileFast(const std::string& filePath) {
 	std::string baseDirectory = std::filesystem::path(filePath).parent_path().string();
 	std::replace(baseDirectory.begin(), baseDirectory.end(), '\\', '/');
 
-	// 生データ（OBJは1始まりインデックス）
+	// 生データ
 	std::vector<Vector3> positions;
 	std::vector<Vector2> texcoords;
 	std::vector<Vector3> normals;
-	// 概算で予約（1行 ~30byte 程度）
+	// 概算で予約
 	positions.reserve(buf.size() / 64);
 	normals.reserve(buf.size() / 64);
 
@@ -832,7 +826,7 @@ Model::ModelData Model::LoadObjFileFast(const std::string& filePath) {
 	};
 	bool hasAnyMaterial = false;
 
-	// オブジェクト（o）ごと → マテリアルごとの三角形インデックス
+	// オブジェクトごと → マテリアルごとの三角形インデックス
 	struct ObjGroup {
 		std::string name;
 		std::map<uint32_t, std::vector<uint32_t>> trisByMaterial;
@@ -937,7 +931,7 @@ Model::ModelData Model::LoadObjFileFast(const std::string& filePath) {
 			}
 			if (count >= 3) {
 				auto& tris = groups.back().trisByMaterial[currentMaterial];
-				// 扇形三角形分割 (0,i,i+1) + FlipWindingOrder 相当で逆順に格納
+				// 扇形三角形分割 + FlipWindingOrder 相当で逆順に格納
 				for (uint32_t i = 1; i + 1 < count; ++i) {
 					tris.push_back(faceVerts[i + 1]);
 					tris.push_back(faceVerts[i]);
@@ -961,7 +955,7 @@ Model::ModelData Model::LoadObjFileFast(const std::string& filePath) {
 		return modelData;
 	}
 
-	// マテリアル配列の構築（usemtl 出現順）
+	// マテリアル配列の構築
 	if (!hasAnyMaterial) {
 		modelData.materials.push_back(MaterialData());
 	} else {
@@ -1101,8 +1095,7 @@ void Model::Update(float deltaTime) {
 	// ループ再生：再生時間がアニメーションの長さを超えたら最初に戻る
 	animationTime_ = std::fmod(animationTime_, playingAnimation_->duration);
 
-	// 2. 全てのボーンの行列を計算する
-	// ここで階層構造(Node)をたどって、今のポーズの行列を作成
+	// 全ボーンの行列計算
 	UpdateNodeAnimation(modelData_.rootNode, Identity4x4());
 }
 
@@ -1164,7 +1157,7 @@ void Model::DebugDrawNodeSkeleton(const Node& node, const Matrix4x4& parentMatri
 	Matrix4x4 myFinal = globalMatrix * objectWorldMatrix;
 	Vector3 myPos = { myFinal.m[3][0], myFinal.m[3][1], myFinal.m[3][2] };
 
-	// 線を描画（親と自分の位置が同じなら描画しない。ルートの初回など）
+	// 線を描画
 	float distSq = (myPos.x - parentPos.x) * (myPos.x - parentPos.x) +
 				   (myPos.y - parentPos.y) * (myPos.y - parentPos.y) +
 				   (myPos.z - parentPos.z) * (myPos.z - parentPos.z);

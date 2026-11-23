@@ -24,7 +24,7 @@ public:
 			double deltaMs = std::chrono::duration<double, std::milli>(now - lastFrameTime_).count();
 			lastDeltaMs_ = deltaMs;
 
-			// 初回または直後の異常値（起動時の初期化スパイク）を記録
+			// 初回または直後の異常値を記録
 			if (frameCount_ > 10) { // 最初の10フレームはエンジン初期化・ウィンドウ生成なので除外
 				avgFrameTimeMs_ = (avgFrameTimeMs_ <= 0.0) ? deltaMs : (avgFrameTimeMs_ * 0.95 + deltaMs * 0.05);
 
@@ -32,7 +32,7 @@ public:
 					maxFrameTimeMs_ = deltaMs;
 				}
 
-				// ヒッチ判定（25.0ms以上 = 60FPSの16.6msより半フレーム以上遅延）
+				// ヒッチ判定
 				if (deltaMs >= hitchThresholdMs_) {
 					hitchCount_++;
 					double spikeMs = deltaMs - 16.666;
@@ -44,7 +44,7 @@ public:
 					Benchmark::Log(logBuf);
 				}
 
-				// 重度ヒッチ判定（50.0ms以上 = 3フレーム以上画面停止）
+				// 重度ヒッチ判定
 				if (deltaMs >= severeThresholdMs_) {
 					severeHitchCount_++;
 				}

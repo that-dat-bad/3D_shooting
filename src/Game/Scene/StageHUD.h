@@ -124,7 +124,7 @@ public:
 		Vector2& outScreen,
 		bool& outIsClamped);
 
-	// 偏差射撃予測位置（リードインターセプトポイント）計算
+	// 偏差射撃予測位置計算
 	static Vector3 ComputeLeadInterceptPoint(
 		const Vector3& shooterPos,
 		const Vector3& shooterVel,

@@ -3,29 +3,29 @@
 #include <algorithm>
 
 void EnvironmentManager::Initialize() {
-	timeOfDay_ = 14.8f; // 午後の斜光（14:48頃）: 太陽仰角約42度で山岳の陰影と機体の美しさを両立
+	timeOfDay_ = 14.8f; // 午後の斜光: 太陽仰角約42度で山岳の陰影と機体の美しさを両立
 	sun_.Initialize();
 }
 
 void EnvironmentManager::Update(Camera* camera, float deltaTime) {
-	// 時間の進行（ミッション中は安定した日照を保ちつつ緩やかに進行）
+	// 時間の進行
 	timeOfDay_ += deltaTime * 0.0005f;
 	if (timeOfDay_ > 24.0f) {
 		timeOfDay_ = 0.0f;
 	}
 
-	// 太陽の回転計算 (6:00日の出 〜 12:00南中 〜 18:00日の入り)
+	// 太陽の回転計算
 	float angle = ((timeOfDay_ - 6.0f) / 12.0f) * 3.14159265f;
 	
 	// 太陽光の進行方向ベクトルを計算
 	MyMath::Vector3 dir;
 	dir.x = std::cos(angle);
-	dir.y = -std::sin(angle); // 昼間は下向き (太陽が空にある)
+	dir.y = -std::sin(angle); // 昼間は下向き
 	dir.z = -0.4f;
 	
 	sun_.SetDirection(MyMath::Normalize(dir));
 
-	// 太陽の高さ（地平線より上か下か）に応じて明るさと色を調整
+	// 太陽の高さに応じて明るさと色を調整
 	float sunHeight = -dir.y;
 	if (sunHeight > 0.05f) {
 		sun_.SetIntensity(std::clamp(sunHeight * 1.2f, 0.45f, 1.0f)); // 昼間はしっかり照らす
@@ -45,7 +45,7 @@ void EnvironmentManager::Update(Camera* camera, float deltaTime) {
 	// 太陽光設定の適用
 	sun_.UpdateLight();
 
-	// 太陽ブルーム（グレア）の動的適用
+	// 太陽ブルームの動的適用
 	sun_.UpdateBloom(camera);
 }
 

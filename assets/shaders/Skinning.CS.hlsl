@@ -36,7 +36,7 @@ void main(uint3 DTid : SV_DispatchThreadID)
     VertexData input = gInputVertices[vertexIndex];
     VertexData output = input;
 
-    // 4つのボーン行列をウェイト（影響度）でブレンド
+    // 4つのボーン行列をウェイトでブレンド
     matrix skinnedMatrix =
         gBones.matrices[input.indices[0]] * input.weight.x +
         gBones.matrices[input.indices[1]] * input.weight.y +

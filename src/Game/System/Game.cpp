@@ -38,7 +38,7 @@ void Game::Initialize() {
 
 	FontManager::GetInstance()->Initialize();
 	TextRenderer::GetInstance()->Initialize(SpriteCommon::GetInstance());
-	// ゲーム全体（全シーン）で文字描画によるD3D12バッファ生成ヒッチを防ぐため3000個を一括プリウォーム
+	// ゲーム全体で文字描画によるD3D12バッファ生成ヒッチを防ぐため3000個を一括プリウォーム
 	TextRenderer::GetInstance()->PrewarmPool(3000);
 
 	// 非同期処理による軽量化：全コアを使ったマルチスレッド並列フォントラスタライズ
@@ -56,6 +56,7 @@ void Game::Initialize() {
 	std::vector<std::string> modelRequests = {
 		"Resources/models/m21_wg.gltf",
 		"Resources/models/m21.gltf",
+		"Resources/models/m15.gltf",
 		"Resources/models/m21_crashed.gltf",
 		"Resources/models/title/Tunnel.obj",
 		"Resources/models/title/Tunnel_road.obj",
@@ -76,11 +77,10 @@ void Game::Initialize() {
 	DirectXCommon::GetInstance()->SetupDepthTextureSRV(srvManager.get());
 	PostEffect::GetInstance()->Initialize(DirectXCommon::GetInstance(), srvManager.get());
 
-	// 5. シーンマネージャの生成 (全ての準備が整ってから)
-	sceneManager = std::make_unique<SceneManager>(std::make_unique<SceneFactory>()); // 内部で初期シーン(TITLE)の Initialize が走る
+	// 5. シーンマネージャの生成
+	sceneManager = std::make_unique<SceneManager>(std::make_unique<SceneFactory>()); // 内部で初期シーンの Initialize が走る
 
-	// 全シーン事前ウォームアップ：全シーン（STAGE, GAMEOVER, CLEAR）を先行初期化してプールに保管
-	// これにより、プレイ中の全シーン移行（Title⇄Stage⇄GameOver⇄Clear）が完全に0msシームレスになる
+	// 全シーン事前ウォームアップ
 	sceneManager->PrewarmAllScenes();
 
 	// 6. Win32 ネイティブ UIエディタ別ウィンドウの初期化
@@ -114,7 +114,7 @@ void Game::Update() {
 		Vector3 rotate = camera->GetRotate();
 		Vector3 translate = camera->GetTranslate();
 
-		// 第3引数は感度（ドラッグ時の変化量）です
+		// 第3引数は感度です
 		ImGui::DragFloat3("Rotate", &rotate.x, 0.01f);
 		ImGui::DragFloat3("Translate", &translate.x, 0.1f);
 
@@ -136,7 +136,7 @@ void Game::Update() {
 		UIEditorWindow::GetInstance()->Toggle();
 	}
 
-	// Escキーによる強制終了は無効化（ゲーム内UI操作や誤操作でウィンドウが閉じないようにする）
+	// Escキーによる強制終了は無効化
 	// if (Input::GetInstance()->TriggerKey(DIK_ESCAPE)) {
 	// 	endRequest_ = true;
 	// }
@@ -147,23 +147,22 @@ void Game::Draw() {
 	DirectXCommon::GetInstance()->PreDraw();
 	srvManager->PreDraw();
 	PrimitiveModel::GetInstance()->Reset(); // プリミティブの描画カウントをリセット
-	// 3Dオブジェクト・パーティクル描画（中間レンダーターゲットへ描画）
+	// 3Dオブジェクト・パーティクル描画
 	Object3dCommon::GetInstance()->SetupCommonState();
 	sceneManager->Draw();
 	ParticleManager::GetInstance()->Draw();
 
-	// 描画後処理（3Dシーンにポストエフェクト適用し、バックバッファへ転送）
+	// 描画後処理
 	DirectXCommon::GetInstance()->PostDraw();
 
-	// 2D UI・テキスト描画（ポストエフェクト適用後のバックバッファに描画）
-	// これによりUIが走査線・色収差・レンズ歪み・ブルームでぼやけたり見づらくならない
+	// 2D UI・テキスト描画
 	SpriteCommon::GetInstance()->SetupCommonState();
 	sceneManager->DrawUI();
 	TextRenderer::GetInstance()->Draw();
 
 	imguiManager->End();
 
-	// フレーム終了処理（PRESENTに遷移、submit、present）
+	// フレーム終了処理
 	DirectXCommon::GetInstance()->EndFrame();
 
 
@@ -176,7 +175,7 @@ void Game::Run() {
 			break;
 		}
 
-		// ヒッチ監視（フレーム開始時刻・DeltaTimeの計測とログ出力）
+		// ヒッチ監視
 		HitchDetector::GetInstance()->OnBeginFrame();
 
 		// ゲーム更新

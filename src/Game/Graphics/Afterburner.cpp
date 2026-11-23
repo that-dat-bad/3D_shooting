@@ -68,10 +68,10 @@ void Afterburner::DrawSingleNozzle(const MyMath::Matrix4x4& nozzleWorldMatrix, C
 	const uint32_t diamondTex = (shockDiamondTexIndex_ != 0) ? shockDiamondTexIndex_ : whiteTexIndex_;
 
 	// ========================================================
-	// 1. ノズルアイリス白熱リング (Nozzle Iris Glow)
+	// 1. ノズルアイリス白熱リング
 	// ========================================================
 	{
-		// XZ平面リングをX軸90度回転させてXY面（ノズル出口断面）に一致させる
+		// XZ平面リングをX軸90度回転させてXY面に一致させる
 		Matrix4x4 ringLocal = MakeAffineMatrix(
 			Vector3{ flameRadius * 1.05f, 1.0f, flameRadius * 1.05f },
 			Vector3{ kPi * 0.5f, 0.0f, 0.0f },
@@ -82,15 +82,14 @@ void Afterburner::DrawSingleNozzle(const MyMath::Matrix4x4& nozzleWorldMatrix, C
 	}
 
 	// ========================================================
-	// 2. インナー白熱コア (White-Hot Core Jet)
+	// 2. インナー白熱コア
 	// ========================================================
 	{
 		float coreLen = flameLength * 0.38f;
 		float halfCoreLen = coreLen * 0.5f;
 		float coreRadius = flameRadius * 0.58f;
 
-		// 底面（太い）がノズル出口、先端（細い）が後方(+Z)
-		// Y軸先端を+Zに向けるため X軸 -90度回転
+		// ノズル向きに合わせてX軸-90度回転
 		Matrix4x4 coreConeLocal = MakeAffineMatrix(
 			Vector3{ coreRadius, halfCoreLen, coreRadius },
 			Vector3{ -kPi * 0.5f, 0.0f, 0.0f },
@@ -101,7 +100,7 @@ void Afterburner::DrawSingleNozzle(const MyMath::Matrix4x4& nozzleWorldMatrix, C
 	}
 
 	// ========================================================
-	// 3. ショックダイヤモンド（マッハディスク / Shock Diamonds）列
+	// 3. ショックダイヤモンド列
 	// ========================================================
 	{
 		const int count = shockDiamondCount_;
@@ -115,7 +114,7 @@ void Afterburner::DrawSingleNozzle(const MyMath::Matrix4x4& nozzleWorldMatrix, C
 			float rDisc = flameRadius * (0.42f + static_cast<float>(i) * 0.030f) * flicker_;
 			float halfDiamondLen = (spacing * 0.44f) * 0.5f;
 
-			// 色のグラデーション（前方は coreColor_、後方は baseFlameColor_ へブレンド）
+			// 色のグラデーション
 			float t = (count > 1) ? (static_cast<float>(i) / static_cast<float>(count - 1)) : 0.0f;
 			Vector3 mixedColor = {
 				coreColor_.x * (1.0f - t) + baseFlameColor_.x * t,
@@ -124,7 +123,7 @@ void Afterburner::DrawSingleNozzle(const MyMath::Matrix4x4& nozzleWorldMatrix, C
 			};
 			Vector4 diamondColor = { mixedColor.x, mixedColor.y, mixedColor.z, (0.96f - 0.35f * t) * fade };
 
-			// (A) 前半コーン（収束ショック: 先端が前方-Z、底面が中心zCenter）
+			// (A) 前半コーン
 			Matrix4x4 coneForeLocal = MakeAffineMatrix(
 				Vector3{ rDisc, halfDiamondLen, rDisc },
 				Vector3{ kPi * 0.5f, 0.0f, 0.0f },
@@ -132,7 +131,7 @@ void Afterburner::DrawSingleNozzle(const MyMath::Matrix4x4& nozzleWorldMatrix, C
 			);
 			pm->DrawCone(coneForeLocal * nozzleWorldMatrix, diamondColor, flameTex, camera, BlendMode::kAdd);
 
-			// (B) 後半コーン（発散ショック: 先端が後方+Z、底面が中心zCenter）
+			// (B) 後半コーン
 			Matrix4x4 coneAftLocal = MakeAffineMatrix(
 				Vector3{ rDisc, halfDiamondLen, rDisc },
 				Vector3{ -kPi * 0.5f, 0.0f, 0.0f },
@@ -140,9 +139,9 @@ void Afterburner::DrawSingleNozzle(const MyMath::Matrix4x4& nozzleWorldMatrix, C
 			);
 			pm->DrawCone(coneAftLocal * nozzleWorldMatrix, diamondColor, flameTex, camera, BlendMode::kAdd);
 
-			// (C) 節の中心に位置する十字交差ショックダイヤモンド・ディスク（光芒クワッド）
+			// (C) 節の中心に位置する十字交差ショックダイヤモンド・ディスク
 			float quadSize = rDisc * 2.4f;
-			// クワッド1 (XY平面)
+			// クワッド1
 			Matrix4x4 quad1Local = MakeAffineMatrix(
 				Vector3{ quadSize, 1.0f, quadSize },
 				Vector3{ kPi * 0.5f, 0.0f, 0.0f },
@@ -150,7 +149,7 @@ void Afterburner::DrawSingleNozzle(const MyMath::Matrix4x4& nozzleWorldMatrix, C
 			);
 			pm->DrawPlane(quad1Local * nozzleWorldMatrix, diamondColor, diamondTex, camera, BlendMode::kAdd);
 
-			// クワッド2 (YZ平面: Y軸90度回転)
+			// クワッド2
 			Matrix4x4 quad2Local = MakeAffineMatrix(
 				Vector3{ quadSize, 1.0f, quadSize },
 				Vector3{ 0.0f, 0.0f, kPi * 0.5f },
@@ -161,7 +160,7 @@ void Afterburner::DrawSingleNozzle(const MyMath::Matrix4x4& nozzleWorldMatrix, C
 	}
 
 	// ========================================================
-	// 4. アウタープルーム (メインシリンダー・排気被膜)
+	// 4. アウタープルーム
 	// ========================================================
 	{
 		float halfLen = flameLength * 0.5f;
@@ -177,7 +176,7 @@ void Afterburner::DrawSingleNozzle(const MyMath::Matrix4x4& nozzleWorldMatrix, C
 	}
 
 	// ========================================================
-	// 5. アウターグローシース (拡散オーラシリンダー)
+	// 5. アウターグローシース
 	// ========================================================
 	{
 		float sheathLen = flameLength * 1.15f;
@@ -194,7 +193,7 @@ void Afterburner::DrawSingleNozzle(const MyMath::Matrix4x4& nozzleWorldMatrix, C
 	}
 
 	// ========================================================
-	// 6. 後方排気熱気トレイル (排気プルーム)
+	// 6. 後方排気熱気トレイル
 	// ========================================================
 	{
 		float trailLen = flameLength * 1.55f;

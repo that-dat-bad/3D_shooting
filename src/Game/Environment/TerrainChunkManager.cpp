@@ -257,20 +257,17 @@ void TerrainChunkManager::LoadSingleMesh(const std::string& objPath) {
 	isLoaded_ = (singleMeshObject_ != nullptr);
 }
 
-// ============================================================================
-// 統合地形パッケージ（.terrain）フォーマット定義（LOD拡張性対応）
-// 全100チャンク＋各チャンクの複数LODメッシュを1ファイルに集約
-// ============================================================================
+// 統合地形パッケージフォーマット定義
 #pragma pack(push, 1)
 struct TerrainPackageHeader {
-	char magic[4] = { 'T', 'R', 'N', 'P' }; // "TRNP" (Terrain Package)
+	char magic[4] = { 'T', 'R', 'N', 'P' }; // "TRNP"
 	uint32_t version = 1;                   // フォーマットバージョン
-	uint32_t chunkCount = 0;                // チャンク総数 (例: 100)
-	uint32_t maxLODCount = 1;               // サポート最大LOD段階数 (現在は1: LOD0のみ、将来複数)
+	uint32_t chunkCount = 0;                // チャンク総数
+	uint32_t maxLODCount = 1;               // サポート最大LOD段階数
 	float worldSizeX = 40000.0f;            // 全体ワールドXサイズ
 	float worldSizeZ = 40000.0f;            // 全体ワールドZサイズ
 	float chunkSize = 4000.0f;              // 1チャンクの一辺のサイズ
-	uint8_t reserved[32] = { 0 };           // 将来拡張用パディング（バイオーム・衝突・ハイトマップなど）
+	uint8_t reserved[32] = { 0 };           // 将来拡張用パディング
 };
 
 struct ChunkMetaHeader {
@@ -286,12 +283,12 @@ struct ChunkMetaHeader {
 	float centerY = 0.0f;
 	float centerZ = 0.0f;
 	uint32_t lodCount = 1;                  // 格納されているLODメッシュ数
-	uint8_t reserved[32] = { 0 };           // 将来拡張用パディング（標高Min/Max、バイオームIDなど）
+	uint8_t reserved[32] = { 0 };           // 将来拡張用パディング
 };
 
 struct LodMetaHeader {
-	uint32_t lodLevel = 0;                  // 0 = LOD0(最高精細), 1 = LOD1, ...
-	float switchDistance = 0.0f;            // LOD切り替え推奨距離（将来用、0なら自動）
+	uint32_t lodLevel = 0;                  // 0 = LOD0, 1 = LOD1, ...
+	float switchDistance = 0.0f;            // LOD切り替え推奨距離
 	uint32_t vertexCount = 0;
 	uint32_t indexCount = 0;
 	uint32_t materialCount = 0;
@@ -518,7 +515,7 @@ bool TerrainChunkManager::LoadPackage(const std::string& packagePath) {
 			chunk.lodMeshes.push_back(std::move(lodMesh));
 		}
 
-		// LOD0 のオブジェクトを直接 object3d にも初期化（既存描画互換用）
+		// LOD0 のオブジェクトを直接 object3d にも初期化
 		if (!chunk.lodMeshes.empty()) {
 			chunk.object3d = std::make_unique<Object3d>();
 			chunk.object3d->Initialize(object3dCommon_);
@@ -629,8 +626,7 @@ void TerrainChunkManager::LoadChunked(const std::string& jsonPath) {
 	singleMeshObject_.reset();
 	isLoaded_ = false;
 
-	// 1. 統合パッケージ（chunks.terrain）の確認
-	//    chunks_info.json と同じディレクトリの chunks.terrain を探索
+	// 1. 統合パッケージの確認
 	std::filesystem::path jPath(jsonPath);
 	std::filesystem::path packagePath = jPath.parent_path() / "chunks.terrain";
 
@@ -692,7 +688,7 @@ void TerrainChunkManager::LoadChunked(const std::string& jsonPath) {
 	std::string baseDir = std::filesystem::path(jsonPath).parent_path().string();
 	std::vector<std::string> modelPathsToLoad;
 
-	// 水系メタデータ（water_level / rivers / ocean_mesh / river_mesh）の読み込み
+	// 水系メタデータの読み込み
 	hasWaterLevel_ = j.contains("water_level") && !j["water_level"].is_null();
 	waterLevel_ = hasWaterLevel_ ? j["water_level"].get<float>() : 0.0f;
 	rivers_.clear();
@@ -704,7 +700,7 @@ void TerrainChunkManager::LoadChunked(const std::string& jsonPath) {
 				for (const auto& pt : rItem["points"]) {
 					if (pt.is_array() && pt.size() >= 3) {
 						RiverPoint rp;
-						// Blender (x, y, z) -> DirectX (-x, z, -y)
+						// Blender -> DirectX
 						rp.x = -pt[0].get<float>();
 						rp.z = -pt[1].get<float>();
 						rp.y = pt[2].get<float>();
@@ -753,7 +749,7 @@ void TerrainChunkManager::LoadChunked(const std::string& jsonPath) {
 		float origMinY = item.value("min_y", 0.0f);
 		float origMaxY = item.value("max_y", 0.0f);
 
-		// DirectX座標系変換（X反転・Z=-Y）
+		// DirectX座標系変換
 		chunk.minX = -origMaxX;
 		chunk.maxX = -origMinX;
 		chunk.minZ = -origMaxY;
@@ -787,7 +783,7 @@ void TerrainChunkManager::LoadChunked(const std::string& jsonPath) {
 		chunks_.size(), jsonPath.c_str());
 	Benchmark::Log(logBuf);
 
-	// 3. ModelManager による全チャンクモデルの並列ロード（マルチスレッドAssimp/FastOBJパース）
+	// 3. ModelManager による全チャンクモデルの並列ロード
 	if (!modelPathsToLoad.empty()) {
 		ModelManager::GetInstance()->LoadModelsParallel(modelPathsToLoad, /*useFastObjLoader=*/true);
 
@@ -835,7 +831,7 @@ void TerrainChunkManager::LoadChunked(const std::string& jsonPath) {
 		}
 	}
 
-	// 4.5 水面メッシュ（海・川）の初期化
+	// 4.5 水面メッシュの初期化
 	oceanObject_.reset();
 	if (!oceanObjPath.empty() && ModelManager::GetInstance()->FindModel(oceanObjPath)) {
 		oceanObject_ = std::make_unique<Object3d>();
@@ -864,7 +860,7 @@ void TerrainChunkManager::LoadChunked(const std::string& jsonPath) {
 		riverObject_->Update();
 	}
 
-	// 5. 次回起動のために 1 つの統合パッケージ（chunks.terrain）へ保存
+	// 5. 次回起動のために 1 つの統合パッケージへ保存
 	SavePackage(packagePath.string());
 
 	auto endTime = std::chrono::high_resolution_clock::now();
@@ -888,7 +884,7 @@ int TerrainChunkManager::GetLoadedChunkCount() const {
 	return count;
 }
 
-void TerrainChunkManager::Update(const Vector3& viewerPos) {
+void TerrainChunkManager::Update(const Vector3& viewerPos, Camera* overrideCamera) {
 	if (!isLoaded_ || !isVisible_) return;
 
 	auto nowTick = std::chrono::steady_clock::now();
@@ -899,9 +895,9 @@ void TerrainChunkManager::Update(const Vector3& viewerPos) {
 	lastWaterTick_ = nowTick;
 	hasWaterTick_ = true;
 
-	Camera* activeCam = CameraManager::GetInstance()->GetActiveCamera();
-	if (activeCam) {
-		camera_ = activeCam;
+	Camera* targetCam = overrideCamera ? overrideCamera : CameraManager::GetInstance()->GetActiveCamera();
+	if (targetCam) {
+		camera_ = targetCam;
 	}
 
 	if (oceanObject_) {
@@ -931,7 +927,7 @@ void TerrainChunkManager::Update(const Vector3& viewerPos) {
 			continue;
 		}
 
-		// チャンクAABB（4000m四方の矩形境界）への最近接最短距離を計算
+		// チャンクAABBへの最近接最短距離を計算
 		float clampedX = std::clamp(viewerPos.x, chunk.minX, chunk.maxX);
 		float clampedZ = std::clamp(viewerPos.z, chunk.minZ, chunk.maxZ);
 		float dx = clampedX - viewerPos.x;
@@ -987,6 +983,7 @@ void TerrainChunkManager::DrawContourMap(Camera* cam) {
 	if (!contourPipelineState_) return;
 
 	Object3dCommon::GetInstance()->SetupCommonState();
+	Object3dCommon::GetInstance()->SetCameraPosition(cam->GetTranslate());
 
 	if (mode_ == TerrainMode::SingleMesh) {
 		if (singleMeshObject_) {
@@ -1143,7 +1140,7 @@ bool TerrainChunkManager::GetWaterSurfaceHeightAt(float worldX, float worldZ, fl
 	bool isRiverHit = false;
 
 	if (hasWaterLevel_) {
-		// CPU側ではパイプラインストールを避けるため低周波解析波で海面高を近似（Dagor方式）
+		// CPU側ではパイプラインストールを避けるため低周波解析波で海面高を近似
 		float waveOffset =
 			0.85f * std::sin(worldX * 0.018f * 0.866f + worldZ * 0.018f * 0.500f + waterTimeSec_ * 1.15f) +
 			0.42f * std::sin(worldX * 0.037f * 0.422f - worldZ * 0.037f * 0.906f + waterTimeSec_ * 1.65f);

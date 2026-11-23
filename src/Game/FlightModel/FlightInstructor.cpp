@@ -15,24 +15,20 @@ void FlightInstructor::ApplyCorrection(
 
 	if (!enabled_) { return; }
 
-	// --- ロール補正（翼を水平に戻す） ---
-	// プレイヤーがロール入力をしていないときだけ補正
+	// ロール補正
 	if (std::fabs(rawRoll) < 0.01f) {
 		// 機体のUp方向とワールドUpの関係からロール角を推定
 		MyMath::Vector3 up = GetUpFromOrientation(orientation);
 
-		// ワールドUp (0,1,0) との差分からロール角を求める
-		// 機体のRight方向に対するワールドUpのドット = sin(rollAngle) の近似
-		// 簡易的に: up.x が正ならば右に傾いている（左ロールで戻す）
+		// ワールド上方向との差分からロール角を計算
 		float rollError = up.x; // -1 ～ +1 の範囲
 
-		// 補正入力を生成（エラーに比例、強さで調整）
+		// 補正入力を生成
 		outRoll = rollError * correctionStrength_;
 		outRoll = std::clamp(outRoll, -1.0f, 1.0f);
 	}
 
-	// --- ピッチ補正（機首を水平に戻す） ---
-	// プレイヤーがピッチ入力をしていないときだけ補正
+	// ピッチ補正
 	if (std::fabs(rawPitch) < 0.01f) {
 		MyMath::Vector3 forward = GetForwardFromOrientation(orientation);
 
@@ -43,7 +39,7 @@ void FlightInstructor::ApplyCorrection(
 		outPitch = std::clamp(outPitch, -1.0f, 1.0f);
 	}
 
-	// ヨーは補正しない（水平維持には不要、コンパスヘディングは変えない）
+	// ヨーは補正しない
 }
 
 

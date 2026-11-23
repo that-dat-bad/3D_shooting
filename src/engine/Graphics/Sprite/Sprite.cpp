@@ -6,7 +6,7 @@
 #include "../System/TextureManager.h"
 #include "../../../external/DirectXTex/DirectXTex.h"
 
-// 引数の dxCommon を削除 (spriteCommonから取得できるため)
+// 引数の dxCommon を削除
 void Sprite::Initialize(SpriteCommon* spriteCommon, std::string textureFilePath)
 {
 	spriteCommon_ = spriteCommon;
@@ -62,7 +62,7 @@ void Sprite::Update()
 	// テクスチャ情報の取得
 	const DirectX::TexMetadata& metaData = TextureManager::GetInstance()->GetMetaData(textureIndex_);
 
-	// テクスチャサイズが0除算にならないようガード（念のため）
+	// テクスチャサイズが0除算にならないようガード
 	float texWidth = static_cast<float>(metaData.width);
 	float texHeight = static_cast<float>(metaData.height);
 	if (texWidth == 0) { texWidth = 1.0f; }
@@ -93,7 +93,7 @@ void Sprite::Update()
 		1.0f
 	};
 
-	// 正射影行列の静的キャッシュ（毎フレーム・毎スプライトの再計算を完全撤廃）
+	// 正射影行列の静的キャッシュ
 	static const Matrix4x4 s_proj = makeOrthographicmMatrix(
 		0.0f, 0.0f,
 		static_cast<float>(WinApp::kClientWidth),
@@ -101,7 +101,7 @@ void Sprite::Update()
 		-10.0f, 100.0f
 	);
 
-	// 回転0のスプライト（文字やUIパネル等99%以上）は4x4行列積算を行わず直接代入する高速パス
+	// 回転0のスプライトは4x4行列積算を行わず直接代入する高速パス
 	if (transform_.rotate.z == 0.0f && transform_.rotate.x == 0.0f && transform_.rotate.y == 0.0f) {
 		Matrix4x4 wvp = s_proj;
 		wvp.m[0][0] = finalScale.x * s_proj.m[0][0];
@@ -127,9 +127,9 @@ void Sprite::Draw()
 	commandList->IASetVertexBuffers(0, 1, &vertexBufferView);
 	// 2. インデックスバッファの設定
 	commandList->IASetIndexBuffer(&indexBufferView);
-	// 3. マテリアル(定数バッファ)の設定
+	// 3. マテリアルの設定
 	commandList->SetGraphicsRootConstantBufferView(0, materialResource_->GetGPUVirtualAddress());
-	// 4. テクスチャの設定 (内部の textureIndex_ を使用)
+	// 4. テクスチャの設定
 	commandList->SetGraphicsRootDescriptorTable(1, TextureManager::GetInstance()->GetSrvHandleGPU(textureIndex_));
 
 	// 5. 描画コマンド

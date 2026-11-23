@@ -9,7 +9,7 @@
 #include "../base/Math/Vector2.h"
 
 /// <summary>
-/// 入力管理クラス (キーボード、マウス)
+/// 入力管理クラス
 /// </summary>
 class Input
 {
@@ -23,7 +23,7 @@ public:
 	static Input* GetInstance();
 
 	/// <summary>
-	/// デフォルトコンストラクタ (std::make_unique対応のためpublic)
+	/// デフォルトコンストラクタ
 	/// </summary>
 	Input() = default;
 
@@ -58,14 +58,14 @@ public:
 	/// <summary>
 	/// キーの押下状態取得
 	/// </summary>
-	/// <param name="keyNumber">キーコード (DIK_*)</param>
+	/// <param name="keyNumber">キーコード</param>
 	/// <returns>押されていればtrue</returns>
 	bool PushKey(BYTE keyNumber);
 
 	/// <summary>
-	/// キーのトリガー状態取得（押した瞬間）
+	/// キーのトリガー状態取得
 	/// </summary>
-	/// <param name="keyNumber">キーコード (DIK_*)</param>
+	/// <param name="keyNumber">キーコード</param>
 	/// <returns>押した瞬間であればtrue</returns>
 	bool TriggerKey(BYTE keyNumber);
 
@@ -84,18 +84,18 @@ public:
 	/// <summary>
 	/// マウスボタンの押下状態取得
 	/// </summary>
-	/// <param name="buttonNumber">ボタン番号 (0:左, 1:右, 2:中)</param>
+	/// <param name="buttonNumber">ボタン番号</param>
 	/// <returns>押されていればtrue</returns>
 	bool PushMouse(int buttonNumber);
 
 	/// <summary>
 	/// マウスボタンのトリガー状態取得
 	/// </summary>
-	/// <param name="buttonNumber">ボタン番号 (0:左, 1:右, 2:中)</param>
+	/// <param name="buttonNumber">ボタン番号</param>
 	/// <returns>押した瞬間であればtrue</returns>
 	bool TriggerMouse(int buttonNumber);
 
-	// スクリーン座標でのマウス位置取得（クライアント領域基準）
+	// スクリーン座標でのマウス位置取得
 	struct MousePosition {
 		long x;
 		long y;
@@ -104,16 +104,16 @@ public:
 	/// <summary>
 	/// クライアント領域基準でのマウス位置取得
 	/// </summary>
-	/// <param name="hwnd">ウィンドウハンドル（省略時は初期化時のHWNDを使用）</param>
+	/// <param name="hwnd">ウィンドウハンドル</param>
 	/// <returns>座標構造体</returns>
 	MousePosition GetMouseScreenPosition(HWND hwnd = nullptr);
 
 	/// <summary>
-	/// 仮想画面解像度にスケーリングしたマウス座標取得（全シーン共通）
+	/// 仮想画面解像度にスケーリングしたマウス座標取得
 	/// </summary>
-	/// <param name="virtualWidth">仮想画面幅（例: 1280.0f）</param>
-	/// <param name="virtualHeight">仮想画面高（例: 720.0f）</param>
-	/// <param name="hwnd">ウィンドウハンドル（省略時は初期化時のHWNDを使用）</param>
+	/// <param name="virtualWidth">仮想画面幅</param>
+	/// <param name="virtualHeight">仮想画面高</param>
+	/// <param name="hwnd">ウィンドウハンドル</param>
 	/// <returns>スケーリング済みマウス座標</returns>
 	Vector2 GetVirtualMousePosition(float virtualWidth, float virtualHeight, HWND hwnd = nullptr);
 
@@ -137,7 +137,7 @@ private:
 	DIMOUSESTATE2 mouseState_ = {};
 	DIMOUSESTATE2 preMouseState_ = {};
 
-	HWND hwnd_ = nullptr;           // ウィンドウハンドル（カーソル制御用）
+	HWND hwnd_ = nullptr;           // ウィンドウハンドル
 	bool cursorLocked_ = false;     // カーソルロック状態
 };
 

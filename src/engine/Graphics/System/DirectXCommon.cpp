@@ -87,8 +87,7 @@ void DirectXCommon::PreDraw()
 
 	HRESULT hr;
 
-	// 現在のフレームのアロケーターがGPUで使い終わるのを待つ
-	// （ダブルバッファなので、2フレーム前のGPU完了を待つことになる）
+	// フレームのアロケーター完了待ち
 	if (fence_->GetCompletedValue() < frameFenceValues_[currentFrameIndex_]) {
 		fence_->SetEventOnCompletion(frameFenceValues_[currentFrameIndex_], fenceEvent_);
 		WaitForSingleObject(fenceEvent_, INFINITE);
@@ -240,7 +239,7 @@ void DirectXCommon::CreateCommand()
 		assert(SUCCEEDED(hr));
 	}
 
-	// コマンドリストの生成（最初のアロケーターで作成）
+	// コマンドリストの生成
 	hr = device_->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, commandAllocators_[0].Get(), nullptr, IID_PPV_ARGS(&commandList_));
 	assert(SUCCEEDED(hr));
 
@@ -411,7 +410,7 @@ void DirectXCommon::UpdateFixFPS()
 	//前回記録からの経過時間を取得する
 	std::chrono::microseconds elapsed = std::chrono::duration_cast<std::chrono::microseconds>(now - reference_);
 
-	//1//60(よりわずかに短い時間)経っていない場合
+	//1//60経っていない場合
 	if (elapsed<kMinCheckTime)
 	{
 		//1/60経過するまで微小なスリープを繰り返す
@@ -440,7 +439,7 @@ Microsoft::WRL::ComPtr<ID3D12Resource> DirectXCommon::CreateUAVBufferResource(si
 	Microsoft::WRL::ComPtr<ID3D12Resource> resource = nullptr;
 	// リソース用のヒープの設定
 	D3D12_HEAP_PROPERTIES uploadHeapProperties{};
-	uploadHeapProperties.Type = D3D12_HEAP_TYPE_DEFAULT; // Defaultヒープ（GPU上）
+	uploadHeapProperties.Type = D3D12_HEAP_TYPE_DEFAULT; // Defaultヒープ
 
 	// リソースの設定
 	D3D12_RESOURCE_DESC resourceDesc{};
@@ -629,7 +628,7 @@ Microsoft::WRL::ComPtr<ID3D12Resource> DirectXCommon::UploadTextureData(ID3D12Re
 	// 必要なサイズを計算
 	UINT64 intermediateSize = GetRequiredIntermediateSize(texture, 0, UINT(subresources.size()));
 
-	// 中間リソースの作成 (アップロード用バッファ)
+	// 中間リソースの作成
 	Microsoft::WRL::ComPtr<ID3D12Resource> intermediateResource = CreateBufferResource(intermediateSize);
 
 	// アップロード用コマンドリストがまだ開かれていなければ開く
@@ -642,10 +641,10 @@ Microsoft::WRL::ComPtr<ID3D12Resource> DirectXCommon::UploadTextureData(ID3D12Re
 		uploadRecording_ = true;
 	}
 
-	// データ転送命令を積む（実行はまだしない）
+	// データ転送命令を積む
 	UpdateSubresources(uploadCommandList_.Get(), texture, intermediateResource.Get(), 0, 0, UINT(subresources.size()), subresources.data());
 
-	// バリアの設定（コピー先 -> 読み取り専用）
+	// バリアの設定
 	D3D12_RESOURCE_BARRIER barrier = {};
 	barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
 	barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
@@ -655,10 +654,10 @@ Microsoft::WRL::ComPtr<ID3D12Resource> DirectXCommon::UploadTextureData(ID3D12Re
 	barrier.Transition.StateAfter =  D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
 	uploadCommandList_->ResourceBarrier(1, &barrier);
 
-	// 中間リソースを転送完了まで保持（リストに追加）
+	// 中間リソースを転送完了まで保持
 	pendingIntermediateResources_.push_back(intermediateResource);
 
-	// 中間リソースを返す（呼び出し元でも保持）
+	// 中間リソースを返す
 	return intermediateResource;
 }
 
@@ -675,7 +674,7 @@ Microsoft::WRL::ComPtr<ID3D12Resource> DirectXCommon::CreateRenderTextureResourc
 	resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
 	resourceDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;  // RTV として使用可能
 
-	// ヒープ設定（GPU専用メモリ）
+	// ヒープ設定
 	D3D12_HEAP_PROPERTIES heapProperties{};
 	heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
 
@@ -736,7 +735,7 @@ void DirectXCommon::CreateRenderTargetTextures()
     uint32_t descriptorSize = device_->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 
     for (uint32_t i = 0; i < kRenderTextureCount_; ++i) {
-        // リソース作成（初期状態は SRV 相当）
+        // リソース作成
         renderTextures_[i] = CreateRenderTextureResource(device_.Get(), winApp_->kClientWidth, winApp_->kClientHeight, rtvFormat_, defaultClear);
 
         uint32_t descriptorIndex = kSwapChainBufferCount_ + i;

@@ -32,7 +32,7 @@ private:
     MyMath::Vector3 cameraCurrentPos_{};
     MyMath::Vector3 cameraLookTarget_{};
 
-    // War Thunder準拠：単一カメラ基底 (camForward_ = Zc, camUp_ = Yc) と角速度状態
+    // War Thunder準拠：単一カメラ基底と角速度状態
     MyMath::Vector3 camForward_ = { 0.0f, 0.0f, 1.0f };
     MyMath::Vector3 camUp_ = { 0.0f, 1.0f, 0.0f };
     MyMath::Vector3 camAngVel_ = { 0.0f, 0.0f, 0.0f };

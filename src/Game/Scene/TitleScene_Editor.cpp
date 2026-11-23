@@ -20,7 +20,7 @@ void TitleScene::DrawAfterburnerEditor() {
 	ImGui::Separator();
 
 	// ------------------------------------------------------------
-	// 1. エンジン構成 (Engine Mode)
+	// 1. エンジン構成
 	// ------------------------------------------------------------
 	if (ImGui::CollapsingHeader("1. Engine Configuration (Single / Twin)", ImGuiTreeNodeFlags_DefaultOpen)) {
 		bool isTwin = afterburner_->IsTwinEngine();
@@ -45,7 +45,7 @@ void TitleScene::DrawAfterburnerEditor() {
 			ImGui::TextColored(ImVec4(0.4f, 0.8f, 1.0f, 0.9f), "Mig-21 standard single nozzle: (0.000, 0.011, 7.600)");
 		}
 
-		// ノズル噴射角（向き・オイラー角）
+		// ノズル噴射角
 		MyMath::Vector3 nRot = afterburner_->GetNozzleRotation();
 		MyMath::Vector3 nRotDeg = {
 			nRot.x * 180.0f / 3.14159265f,
@@ -73,7 +73,7 @@ void TitleScene::DrawAfterburnerEditor() {
 	}
 
 	// ------------------------------------------------------------
-	// 2. 炎のジオメトリ (Flame Geometry)
+	// 2. 炎のジオメトリ
 	// ------------------------------------------------------------
 	if (ImGui::CollapsingHeader("2. Flame Geometry & Shock Diamonds", ImGuiTreeNodeFlags_DefaultOpen)) {
 		float radius = afterburner_->GetFlameRadius();
@@ -93,7 +93,7 @@ void TitleScene::DrawAfterburnerEditor() {
 	}
 
 	// ------------------------------------------------------------
-	// 3. カラー & 発光強度 (Color & Intensity)
+	// 3. カラー & 発光強度
 	// ------------------------------------------------------------
 	if (ImGui::CollapsingHeader("3. Color & Glow Intensity", ImGuiTreeNodeFlags_DefaultOpen)) {
 		MyMath::Vector3 flameColor = afterburner_->GetFlameColor();
@@ -113,7 +113,7 @@ void TitleScene::DrawAfterburnerEditor() {
 	}
 
 	// ------------------------------------------------------------
-	// 4. 機体の向き・アライメント調整 (Aircraft Orientation)
+	// 4. 機体の向き・アライメント調整
 	// ------------------------------------------------------------
 	if (ImGui::CollapsingHeader("4. Aircraft Orientation & Presets", ImGuiTreeNodeFlags_DefaultOpen)) {
 		ImGui::Checkbox("Flight Motion / Sway Animation", &enableTunnelMotion_);
@@ -147,7 +147,7 @@ void TitleScene::DrawAfterburnerEditor() {
 	}
 
 	// ------------------------------------------------------------
-	// 5. JSON 保存 & 読み込み (Asset Pipeline)
+	// 5. JSON 保存 & 読み込み
 	// ------------------------------------------------------------
 	if (ImGui::CollapsingHeader("5. Asset Pipeline (JSON Save/Load)", ImGuiTreeNodeFlags_DefaultOpen)) {
 		char pathBuf[256];

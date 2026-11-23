@@ -20,7 +20,7 @@ void Object3dCommon::Finalize() {
 void Object3dCommon::Initialize(DirectXCommon* dxCommon)
 {
 	dxCommon_ = dxCommon;
-	// ライト設定 (b1, b2レジスタ用)
+	// ライト設定
 	directionalLightResource_ = DirectXCommon::GetInstance()->CreateBufferResource(sizeof(DirectionalLight));
 	directionalLightResource_->Map(0, nullptr, reinterpret_cast<void**>(&directionalLightData));
 	directionalLightData->color = { 1.0f, 1.0f, 1.0f, 1.0f };
@@ -49,9 +49,9 @@ void Object3dCommon::Initialize(DirectXCommon* dxCommon)
 
 	lightingSettingsResource_ = DirectXCommon::GetInstance()->CreateBufferResource(sizeof(LightingSettings));
 	lightingSettingsResource_->Map(0, nullptr, reinterpret_cast<void**>(&lightingSettingsData));
-	lightingSettingsData->shadingModel = 1; // 1: Half-Lambert (暗部も明るく照らす)
+	lightingSettingsData->shadingModel = 1; // 1: Half-Lambert
 	lightingSettingsData->specularModel = 0; // 鏡面反射OFF
-	lightingSettingsData->lightType = 1;     // 1: 平行光源 (Directional Light) 有効化
+	lightingSettingsData->lightType = 1;     // 1: 平行光源 有効化
 	lightingSettingsData->emissiveIntensityScale = 1.0f; // メッシュ自発光スケール初期値
 	CreateRootSignature(dxCommon_);
 	CreateGraphicsPipeline(dxCommon_);
@@ -163,7 +163,7 @@ void Object3dCommon::CreateGraphicsPipeline(DirectXCommon* dxCommon)
 
 	Microsoft::WRL::ComPtr<IDxcBlob> vertexShaderBlob = dxCommon->CompileShader(L"./assets/shaders/Object3D.VS.hlsl", L"vs_6_0");
 	Microsoft::WRL::ComPtr<IDxcBlob> pixelShaderBlob = dxCommon->CompileShader(L"./assets/shaders/Object3D.PS.hlsl", L"ps_6_0");
-	// パススルーGSを除去し、純粋なVS->PS直結パイプラインにしてGPU頂点負荷を大幅軽量化（20〜30%スループット向上）
+	// パススルーGSを除去し、純粋なVS->PS直結パイプラインにしてGPU頂点負荷を大幅軽量化
 	graphicsPipelineStateDesc.VS = { vertexShaderBlob->GetBufferPointer(), vertexShaderBlob->GetBufferSize() };
 	graphicsPipelineStateDesc.PS = { pixelShaderBlob->GetBufferPointer(), pixelShaderBlob->GetBufferSize() };
 	graphicsPipelineStateDesc.GS = {};
@@ -195,7 +195,7 @@ void Object3dCommon::CreateGraphicsPipeline(DirectXCommon* dxCommon)
 		assert(SUCCEEDED(hr));
 	}
 
-	// 全ブレンドモードのワイヤーフレームPSOを生成（SFホログラム演出・デバッグ用）
+	// 全ブレンドモードのワイヤーフレームPSOを生成
 	D3D12_RASTERIZER_DESC wireRasterDesc = rasterizerDesc;
 	wireRasterDesc.FillMode = D3D12_FILL_MODE_WIREFRAME;
 	wireRasterDesc.CullMode = D3D12_CULL_MODE_NONE; // 裏面メッシュも骨格として透けて光るホログラム仕様

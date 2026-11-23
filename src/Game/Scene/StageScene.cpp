@@ -75,7 +75,7 @@ void StageScene::PrewarmAssets() {
 
 void StageScene::InitializeAssets() {
 	// ============================
-	// 機体設定（CFG）のロード
+	// 機体設定のロード
 	// ============================
 	std::string aircraftCfgPath = aircraftConfig_.GetCurrentFilePath();
 	if (aircraftCfgPath.empty()) {
@@ -93,7 +93,7 @@ void StageScene::InitializeAssets() {
 	const auto& generalConfig = aircraftConfig_.GetGeneral();
 
 	// ============================
-	// 描画オブジェクト・モデル・テクスチャの初期化（初回のみ）
+	// 描画オブジェクト・モデル・テクスチャの初期化
 	// ============================
 	TextureManager::GetInstance()->LoadTexture("assets/textures/uvChecker.png");
 	TextureManager::GetInstance()->LoadTexture("assets/textures/circle2.png");
@@ -174,7 +174,7 @@ void StageScene::InitializeAssets() {
 	seqNoiseSprite_ = std::make_unique<Sprite>();
 	seqNoiseSprite_->Initialize(spriteCommon, "assets/textures/white1x1.png");
 
-	// ポーズメニュー用スプライトプールの初期化（512枚：DAWN_OS デスクトップ完全同期）
+	// ポーズメニュー用スプライトプールの初期化
 	pauseSpritePool_.clear();
 	for (int i = 0; i < 512; ++i) {
 		auto sp = std::make_unique<Sprite>();
@@ -183,7 +183,7 @@ void StageScene::InitializeAssets() {
 	}
 	pauseSpritePoolIndex_ = 0;
 
-	// パーティクルグループの登録（初回のみ）
+	// パーティクルグループの登録
 	ParticleManager::GetInstance()->CreateParticleGroup("HitSpark", "assets/textures/white1x1.png");
 	ParticleManager::GetInstance()->CreateParticleGroup("Vortex", "assets/textures/circle2.png");
 	ParticleManager::GetInstance()->CreateParticleGroup("Casing", "assets/textures/white1x1.png");
@@ -196,7 +196,7 @@ void StageScene::InitializeAssets() {
 
 	GPUParticleManager::GetInstance()->SetTexture(TextureManager::GetInstance()->GetTextureIndexByFilePath("assets/textures/circle.png"));
 
-	// 地形チャンクマネージャー初期化（4000mチャンク分割 40km x 40km）
+	// 地形チャンクマネージャー初期化
 	terrainChunkManager_ = TerrainChunkManager::GetInstance();
 	terrainChunkManager_->Initialize(Object3dCommon::GetInstance(), CameraManager::GetInstance()->GetActiveCamera(), "Resources/terrains/demo2/chunks_info.json");
 
@@ -205,14 +205,14 @@ void StageScene::InitializeAssets() {
 }
 
 void StageScene::ResetGameplayState() {
-	// マウスポインターを非表示（自ウィンドウがアクティブな場合のみ）
+	// マウスポインターを非表示
 	HWND hwnd = Input::GetInstance() ? Input::GetInstance()->GetHwnd() : nullptr;
 	if (hwnd && ::GetForegroundWindow() == hwnd) {
 		while (::ShowCursor(FALSE) >= 0) {}
 		::SetCursor(nullptr);
 	}
 
-	// 機体設定（CFG）の最新反映
+	// 機体設定の最新反映
 	std::string aircraftCfgPath = aircraftConfig_.GetCurrentFilePath();
 	if (aircraftCfgPath.empty()) {
 		aircraftCfgPath = "Resources/aircraft/mig21.cfg";
@@ -427,7 +427,7 @@ void StageScene::ResetGameplayState() {
 void StageScene::Update() {
 	ApplyMissionLiveSyncUpdate();
 	// ----------------------------------------------------
-	// ポーズメニュー制御（ゲームプレイ中のみ作動）
+	// ポーズメニュー制御
 	// ----------------------------------------------------
 	Input* input = Input::GetInstance();
 	if (isPaused_) {
@@ -435,7 +435,7 @@ void StageScene::Update() {
 		return;
 	}
 
-	// ブリーフィング中（SPACE/クリック入力待機中）のマウス座標・波紋・アンロック更新
+	// ブリーフィング中のマウス座標・波紋・アンロック更新
 	if (combatBootSequence_.IsWaitingForSpace()) {
 		if (input) {
 			input->UnlockCursor();
@@ -453,13 +453,13 @@ void StageScene::Update() {
 		}
 	}
 
-	// ゲームプレイ中のみポーズ可能（出撃イントロ中・ゲームオーバー演出中・クリア演出中は作動させない）
+	// ゲームプレイ中のみポーズ可能
 	if (IsGameplayActive()) {
 		if (input && (input->TriggerKey(DIK_ESCAPE) || input->TriggerKey(DIK_P))) {
 			SetPaused(true);
 			return;
 		}
-		// ベイルアウト（脱出）入力（クリアデモ時は即時クリア、通常時はゲームオーバー演出）
+		// ベイルアウト入力
 		if (input && input->TriggerKey(DIK_J)) {
 			const bool isClearDemo =
 				MissionManager::GetInstance().GetCurrentMission().name.find("CLEAR DEMO") != std::string::npos;
@@ -473,7 +473,7 @@ void StageScene::Update() {
 		}
 	}
 
-	// ミッション制限時間の更新 (出撃演出・ブリーフィング完了後の実プレイ中のみ減算)
+	// ミッション制限時間の更新
 	if (IsGameplayActive()) {
 		missionElapsedTime_ += kDeltaTime;
 		const bool hasMissionTimeLimit =
@@ -497,7 +497,7 @@ void StageScene::Update() {
 	}
 	timeText_.Update();
 
-	// デバッグ用キー（VキーでGameOver演出、BキーでGameClear演出を即時テスト可能）
+	// デバッグ用キー
 	Input* inputDebug = Input::GetInstance();
 	if (inputDebug) {
 		if (inputDebug->TriggerKey(DIK_V)) {
@@ -524,7 +524,7 @@ void StageScene::Update() {
 	UpdateDebugAndStatusUI(gameDeltaTime);
 	UpdatePostEffects(gameDeltaTime);
 
-	// 地形チャンクの更新（距離カリング）
+	// 地形チャンクの更新
 	if (terrainChunkManager_) {
 		terrainChunkManager_->Update(flightModel_.GetPosition());
 	}
@@ -558,20 +558,18 @@ void StageScene::Draw() {
 	// 太陽の見た目を無限遠に描画
 	environmentManager_.Draw(CameraManager::GetInstance()->GetActiveCamera());
 
-	// 3Dオブジェクト描画（Object3dパイプライン）
+	// 3Dオブジェクト描画
 	Object3dCommon::GetInstance()->SetupCommonState();
-	Object3dCommon::GetInstance()->SetLightType(1); // 自機・通常3Dモデル描画時は平行光源(Directional Light)を保証
+	Object3dCommon::GetInstance()->SetLightType(1); // 自機・通常3Dモデル描画時は平行光源を保証
 
 	// 部位破壊対応ビジュアルモデルの描画
-	// 【戦闘モード起動演出（自機専用スキャン波形マテリアライズ・パイプライン）】
 	if (!combatBootSequence_.IsFinished() && !combatBootSequence_.IsQuickMode()) {
 		float timer = combatBootSequence_.GetTimer();
 
 		if (timer < 2.00f) {
-			// 1. 【作戦ブリーフィングフェーズ】起動開始前は待機（完全不可視）
+			// 1. 【作戦ブリーフィングフェーズ】起動開始前は待機
 		} else if (timer < 4.50f) {
-			// 2. 【スキャン波形マテリアライズフェーズ（機体中心から広がる波紋に沿ってピクセル単位で構築）】
-			// 機体中心からスキャン波形が外側へ伝播：[無(不可視) -> ネオンワイヤー＆波形パルス -> 3D実写装甲]
+			// 2. スキャン波形マテリアライズフェーズ
 			float scanProg = std::clamp((timer - 2.00f) / 2.50f, 0.0f, 1.0f);
 
 			combatBootSequence_.BeginAircraftScanDraw(aircraftVisualModel_, scanProg);
@@ -586,8 +584,7 @@ void StageScene::Draw() {
 		aircraftVisualModel_.Draw();
 	}
 
-	// 自機アフターバーナー（ジェットプルーム・推力炎）の描画
-	// ※MiG-21モデル本来の前後方向(Y軸180度回転)に一致させ、機体後部ノズルから後方へ噴射させる
+	// 自機アフターバーナーの描画
 	if (afterburner_ && !isGameOver_ && (combatBootSequence_.IsFinished() || sortieIntroTimer_ >= 4.50f)) {
 		Matrix4x4 baseRotate = MakeAffineMatrix(Vector3{ 1.0f, 1.0f, 1.0f }, Vector3{ 0.0f, 3.14159265f, 0.0f }, Vector3{ 0.0f, 0.0f, 0.0f });
 		Matrix4x4 visualWorld = Multiply(baseRotate, flightModel_.GetWorldMatrix());
@@ -596,13 +593,13 @@ void StageScene::Draw() {
 
 	DebrisManager::GetInstance()->Draw();
 
-	// 敵描画（空中敵＋地上敵）
+	// 敵描画
 	Camera* cam = CameraManager::GetInstance()->GetActiveCamera();
 	enemyManager_.Draw(cam);
 
-	// 地面描画（40km x 40km チャンク地形パイプライン）
+	// 地面描画
 	if (terrainChunkManager_ && terrainChunkManager_->IsLoaded()) {
-		// 自機の地面投影シャドウ情報を SpotLight (b5) 経由で地形シェーダーへ渡す
+		// 自機の地面投影シャドウ情報を SpotLight 経由で地形シェーダーへ渡す
 		SpotLight* shadowLight = Object3dCommon::GetInstance()->GetSpotLightData();
 		if (shadowLight) {
 			if (!isGameOver_) {
@@ -657,10 +654,10 @@ void StageScene::Draw() {
 }
 
 void StageScene::DrawUI() {
-	// 1. 出撃イントロ用黒フェード背景描画（3Dシーンの上、最前面UIの下）
+	// 1. 出撃イントロ用黒フェード背景描画
 	combatBootSequence_.DrawBackgroundFade();
 
-	// 2. 戦闘HUD（残弾数・照準・タイマー）描画
+	// 2. 戦闘HUD描画
 	float hudThreshold = combatBootSequence_.IsQuickMode() ? sortieIntroDuration_ : 4.00f;
 	if (sortieIntroTimer_ >= hudThreshold) {
 		if (endSequence_ == StageEndSequence::None && !isMissionCleared_ && !isMissionFailed_ && !isGameOver_) {
@@ -675,21 +672,21 @@ void StageScene::DrawUI() {
 		hud_.DrawFadeOverlay();
 	}
 
-	// 3. AC6スタイル「メインシステム、戦闘モード起動...」ブートUI描画（最前面）
+	// 3. AC6スタイル「メインシステム、戦闘モード起動...」ブートUI描画
 	if (sortieIntroTimer_ < sortieIntroDuration_) {
 		combatBootSequence_.DrawBootUI();
 	}
 
-	// 3.5. ブリーフィング中のカスタムサイバーカーソル描画（最前面）
+	// 3.5. ブリーフィング中のカスタムサイバーカーソル描画
 	if (combatBootSequence_.IsWaitingForSpace() && !isPaused_) {
 		ResetPauseSpritePool();
 		DrawPauseCustomCursor();
 	}
 
-	// 4. ゲームオーバー / ステージクリア演出UI描画（最前面）
+	// 4. ゲームオーバー / ステージクリア演出UI描画
 	DrawEndSequenceUI();
 
-	// 5. ポーズメニューUI描画（最前面）
+	// 5. ポーズメニューUI描画
 	if (isPaused_) {
 		TextRenderer::GetInstance()->Flush();
 		DrawPauseMenuUI();
@@ -718,7 +715,7 @@ void StageScene::Restart() {
 }
 
 // ============================================================
-// ポーズメニュー実装（プレイ中のみ作動）
+// ポーズメニュー実装
 // ============================================================
 
 bool StageScene::IsGameplayActive() const {
@@ -741,7 +738,7 @@ void StageScene::SetPaused(bool paused) {
 		pauseWinPos_ = { (screenW - 500.0f) * 0.5f, (screenH - 430.0f) * 0.5f };
 		pauseIsDragging_ = false;
 		Input::GetInstance()->UnlockCursor();
-		// OSカーソルは非表示にし、自前のカスタムサイバーカーソル（TitleSceneと同一）を使用
+		// OSカーソルは非表示にし、自前のカスタムサイバーカーソルを使用
 		if (hwnd && ::GetForegroundWindow() == hwnd) {
 			while (::ShowCursor(FALSE) >= 0) {}
 			::SetCursor(nullptr);
@@ -768,7 +765,7 @@ void StageScene::UpdatePauseMenu() {
 		::SetCursor(nullptr);
 	}
 
-	// ポーズからタイトル復帰時のCRTシャットダウン演出（プツッ暗転）
+	// ポーズからタイトル復帰時のCRTシャットダウン演出
 	if (isPauseAborting_) {
 		pauseAbortTimer_ += kDeltaTime;
 
@@ -789,7 +786,7 @@ void StageScene::UpdatePauseMenu() {
 		scan.dirY = 6.0f;
 		postEffect->AddActiveEffect(scan);
 
-		// アナログCRT特有の微細ランダム粒子ノイズ（画像のような質感）
+		// アナログCRT特有の微細ランダム粒子ノイズ
 		ActivePostEffect noise;
 		noise.type = PostEffectType::kRandom;
 		noise.intensity = 0.12f;
@@ -850,7 +847,7 @@ void StageScene::UpdatePauseMenu() {
 	if (input->TriggerKey(DIK_3)) { ExecutePauseAction(2); return; }
 	if (input->TriggerKey(DIK_4)) { ExecutePauseAction(3); return; }
 
-	// 決定キー（ENTER / SPACE / NUMPADENTER）
+	// 決定キー
 	if (input->TriggerKey(DIK_RETURN) || input->TriggerKey(DIK_SPACE) || input->TriggerKey(DIK_NUMPADENTER)) {
 		ExecutePauseAction(pauseMenuIndex_);
 		return;
@@ -864,7 +861,7 @@ void StageScene::UpdatePauseMenu() {
 	const float closeX = pauseWinPos_.x + winW - 32.0f;
 	const float closeY = pauseWinPos_.y + 6.0f;
 
-	// 右上 [X] ボタンクリックで再開 (RESUME)
+	// 右上 [X] ボタンクリックで再開
 	if (isLTrig &&
 	    customCursorPos_.x >= closeX && customCursorPos_.x <= closeX + closeW &&
 	    customCursorPos_.y >= closeY && customCursorPos_.y <= closeY + closeH) {
@@ -874,7 +871,7 @@ void StageScene::UpdatePauseMenu() {
 		return;
 	}
 
-	// ウィンドウドラッグ処理 (タイトルバーのドラッグ。[X]ボタン領域は除外)
+	// ウィンドウドラッグ処理
 	if (isLDown) {
 		if (!pauseIsDragging_ && isLTrig) {
 			if (customCursorPos_.x >= pauseWinPos_.x && customCursorPos_.x <= pauseWinPos_.x + winW &&
@@ -921,7 +918,7 @@ void StageScene::ExecutePauseAction(int actionIndex) {
 		GameResult::GetInstance().isRetry = true;
 		Restart();
 		break;
-	case 2: // TITLE（ブラウン管テレビのプツッ暗転演出を開始）
+	case 2: // TITLE
 		isPauseAborting_ = true;
 		pauseAbortTimer_ = 0.0f;
 		pauseIsDragging_ = false;
@@ -1040,10 +1037,7 @@ void StageScene::DrawPauseCustomCursor() {
 		DrawPauseSolidRect({ cursorRipplePos_.x + rRad - 1.5f, cursorRipplePos_.y - rRad }, { 1.5f, rRad * 2.0f }, ringCol);
 	}
 
-	// 2. 三角形カスタムカーソル (ユーザー指示: マウスカーソルを三角形へ)
-	// P0: (mx, my) 先端
-	// P1: (mx + 7.0f, my + 22.0f) 下端頂点
-	// P2: (mx + 22.0f, my + 7.0f) 右端頂点
+	// 三角形カスタムカーソル
 	const Vector4 kBlackEdge = { 0.0f, 0.0f, 0.0f, 0.95f };
 	const Vector4 kGreenBody = { 0.0f, 0.65f, 0.08f, 0.98f };
 	const Vector4 kGreenEdge = { 0.0f, 1.0f, 0.12f, 1.00f };
@@ -1054,7 +1048,7 @@ void StageScene::DrawPauseCustomCursor() {
 	DrawPauseLine({ mx - 0.5f, my - 0.5f }, { mx + 6.5f, my + 22.5f }, 3.5f, kBlackEdge);
 	DrawPauseLine({ mx + 6.5f, my + 22.5f }, { mx + 22.5f, my + 6.5f }, 3.5f, kBlackEdge);
 
-	// 2.2 ソリッド塗りつぶし（スキャンラインスライシング）
+	// 2.2 ソリッド塗りつぶし
 	for (int y = 0; y <= 22; ++y) {
 		float fy = static_cast<float>(y);
 		float x1 = fy * (7.0f / 22.0f);
@@ -1079,11 +1073,11 @@ void StageScene::DrawPauseMenuUI() {
 	const float screenW = static_cast<float>(WinApp::kClientWidth);
 	const float screenH = static_cast<float>(WinApp::kClientHeight);
 
-	// 0. 全画面半透明ダークバックドロップ（薄暗くして背後の戦闘シーンを適度に見せる）
+	// 0. 全画面半透明ダークバックドロップ
 	DrawPauseSolidRect({ 0.0f, 0.0f }, { screenW, screenH }, { 0.0f, 0.0f, 0.0f, 0.65f });
 
 	// =========================================================================
-	// ポーズウィンドウ本体（タイトル画面と同一の【完全な漆黒・純黒ブラック背景】）
+	// ポーズウィンドウ本体
 	// =========================================================================
 	const float winW = 500.0f;
 	const float winH = 430.0f;
@@ -1094,24 +1088,24 @@ void StageScene::DrawPauseMenuUI() {
 	const Vector4 titleBarBg  = { 0.0f, 0.0f, 0.0f, 1.0f };  // 純黒ブラック背景色
 	const Vector4 cornerColor = { 1.0f, 1.0f, 1.0f, 1.00f }; // コーナーブラケット白
 
-	// 1. ドロップシャドウ（外側に4〜8pxの黒い半透明影を落とす）
+	// 1. ドロップシャドウ
 	DrawPauseSolidRect({ curPos.x + 8.0f, curPos.y + 10.0f }, curSize, { 0.0f, 0.0f, 0.0f, 0.70f });
 	DrawPauseSolidRect({ curPos.x - 6.0f, curPos.y - 4.0f }, { curSize.x + 12.0f, curSize.y + 10.0f }, { 0.0f, 0.0f, 0.0f, 0.35f });
 
-	// 2. ウィンドウ本体背景（純黒ブラック 100%）
+	// 2. ウィンドウ本体背景
 	DrawPauseSolidRect(curPos, curSize, { 0.0f, 0.0f, 0.0f, 1.0f });
 
 	// 3. タイトルバー背景
 	DrawPauseSolidRect(curPos, { curSize.x, 34.0f }, titleBarBg);
 
-	// 4. ウィンドウ外周境界線 (太さ 2px)
+	// 4. ウィンドウ外周境界線
 	DrawPauseBorder(curPos, curSize, borderCol, 2.0f);
 
-	// タイトルバー境界線（上端アクセントライン & 下部水平区切り線）
+	// タイトルバー境界線
 	DrawPauseSolidRect(curPos, { curSize.x, 2.0f }, { 1.0f, 1.0f, 1.0f, 0.95f }); // 上端白アクセントライン
-	DrawPauseSolidRect({ curPos.x, curPos.y + 32.0f }, { curSize.x, 2.0f }, { 1.0f, 1.0f, 1.0f, 0.65f }); // 下部区切り線（白）
+	DrawPauseSolidRect({ curPos.x, curPos.y + 32.0f }, { curSize.x, 2.0f }, { 1.0f, 1.0f, 1.0f, 0.65f }); // 下部区切り線
 
-	// タイトルバー左側要素（高輝度LED & SOVI_OS タイトル）
+	// タイトルバー左側要素
 	DrawPauseSolidRect({ curPos.x + 14.0f, curPos.y + 13.0f }, { 8.0f, 8.0f }, { 0.0f, 1.0f, 0.12f, 1.0f }); // 高輝度LED
 	tr->Print("HackGen", "[PAUSE] TERMINAL : SOVI_OS [v4.12]", curPos.x + 28.0f, curPos.y + 9.0f, 13.0f, { 0.0f, 1.0f, 0.12f, 1.0f });
 
@@ -1137,19 +1131,19 @@ void StageScene::DrawPauseMenuUI() {
 	}
 	tr->Print("HackGen", "X", closeX + closeW * 0.5f, closeY + 4.0f, 12.0f, isCloseHover ? Vector4{ 1.0f, 1.0f, 1.0f, 1.0f } : Vector4{ 0.0f, 1.0f, 0.12f, 0.95f }, { 0.5f, 0.0f });
 
-	// 5. 四隅のコーナーブラケット（太さ 2.5px、白）
+	// 5. 四隅のコーナーブラケット
 	DrawPauseCornerBrackets(curPos, curSize, 22.0f, 2.5f, cornerColor);
 
 	// 5. サブヘッダー
 	tr->Print("HackGenRegular", "/// MISSION PAUSED : PILOT DIRECTIVE ///", curPos.x + curSize.x * 0.5f, curPos.y + 44.0f, 11.5f, { 0.0f, 1.0f, 0.12f, 0.90f }, { 0.5f, 0.0f });
 
-	// 認証ステータス行（水平区切り線 ＆ 黒ベタマスク）
+	// 認証ステータス行
 	const float authY = curPos.y + 68.0f;
 	DrawPauseSolidRect({ curPos.x + 24.0f, authY }, { curSize.x - 48.0f, 1.0f }, { 1.0f, 1.0f, 1.0f, 0.40f });
 	DrawPauseSolidRect({ curPos.x + curSize.x * 0.5f - 160.0f, authY - 8.0f }, { 320.0f, 16.0f }, { 0.0f, 0.0f, 0.0f, 1.0f });
 	tr->Print("HackGenRegular", "AUTH LEVEL 5 GRANTED // READY FOR COMMAND", curPos.x + curSize.x * 0.5f, authY - 6.0f, 11.0f, { 0.0f, 1.0f, 0.12f, 0.90f }, { 0.5f, 0.0f });
 
-	// 6. メニューボタン (4つ)
+	// 6. メニューボタン
 	const float buttonWidth = 380.0f;
 	const float buttonHeight = 44.0f;
 	const float buttonX = curPos.x + (curSize.x - buttonWidth) * 0.5f;
@@ -1168,7 +1162,7 @@ void StageScene::DrawPauseMenuUI() {
 		bool isSelected = (pauseMenuIndex_ == i);
 
 		if (isSelected) {
-			// 選択中ハイライト（白枠 ＆ (0, 255, 30) ネオングリーン文字）
+			// 選択中ハイライト
 			DrawPauseSolidRect({ buttonX, btnY }, { buttonWidth, buttonHeight }, { 0.0f, 0.15f, 0.02f, 0.85f });
 			DrawPauseSolidRect({ buttonX, btnY }, { 4.0f, buttonHeight }, { 0.0f, 1.0f, 0.12f, 1.0f });
 			DrawPauseBorder({ buttonX, btnY }, { buttonWidth, buttonHeight }, { 1.0f, 1.0f, 1.0f, 0.95f }, 1.5f);
@@ -1177,7 +1171,7 @@ void StageScene::DrawPauseMenuUI() {
 			std::string selText = ">> " + std::string(kLabels[i]);
 			tr->Print("HackGen", selText, buttonX + 24.0f, btnY + 11.0f, 20.0f, { 0.0f, 1.0f, 0.12f, 1.00f });
 		} else {
-			// 非選択（完全純黒背景 ＆ 白枠）
+			// 非選択
 			DrawPauseSolidRect({ buttonX, btnY }, { buttonWidth, buttonHeight }, { 0.0f, 0.0f, 0.0f, 1.0f });
 			DrawPauseBorder({ buttonX, btnY }, { buttonWidth, buttonHeight }, { 1.0f, 1.0f, 1.0f, 0.35f }, 1.0f);
 			DrawPauseCornerBrackets({ buttonX, btnY }, { buttonWidth, buttonHeight }, 8.0f, 1.5f, { 1.0f, 1.0f, 1.0f, 0.50f });
@@ -1185,14 +1179,14 @@ void StageScene::DrawPauseMenuUI() {
 		}
 	}
 
-	// 7. 操作ガイド枠（完全純黒背景）
+	// 7. 操作ガイド枠
 	const float guideY = curPos.y + 322.0f;
 	const float guideH = 34.0f;
 	DrawPausePanel({ curPos.x + 24.0f, guideY }, { curSize.x - 48.0f, guideH }, { 0.0f, 0.0f, 0.0f, 1.0f }, { 1.0f, 1.0f, 1.0f, 0.40f }, 1.0f);
 	DrawPauseCornerBrackets({ curPos.x + 24.0f, guideY }, { curSize.x - 48.0f, guideH }, 10.0f, 1.5f, { 1.0f, 1.0f, 1.0f, 0.50f });
 	tr->Print("HackGen", "[ UP / DOWN ] SELECT     [ ENTER / CLICK ] EXECUTE     [ ESC ] RESUME", curPos.x + curSize.x * 0.5f, guideY + 9.0f, 11.5f, { 0.0f, 1.0f, 0.12f, 0.90f }, { 0.5f, 0.0f });
 
-	// 8. ウィンドウ最下部ステータスバー（独立フッター領域）
+	// 8. ウィンドウ最下部ステータスバー
 	const float sbH = 22.0f;
 	const float sbFootY = curPos.y + curSize.y - sbH;
 	DrawPauseSolidRect({ curPos.x, sbFootY }, { curSize.x, 1.0f }, { 1.0f, 1.0f, 1.0f, 0.45f }); // 白仕切り線
@@ -1204,12 +1198,12 @@ void StageScene::DrawPauseMenuUI() {
 	// ウィンドウテキストを描画フラッシュ
 	tr->Flush();
 
-	// 9. カスタムサイバーマウスカーソル（最前面）
+	// 9. カスタムサイバーマウスカーソル
 	if (!isPauseAborting_) {
 		DrawPauseCustomCursor();
 	}
 
-	// 10. ポーズからタイトル復帰時のCRTシャットダウン演出（最前面）
+	// 10. ポーズからタイトル復帰時のCRTシャットダウン演出
 	if (isPauseAborting_) {
 		DrawPauseCRTShutdown(pauseAbortTimer_ / kPauseAbortDuration);
 	}
@@ -1224,7 +1218,7 @@ void StageScene::DrawPauseCRTShutdown(float progress) {
 
 	if (crtT < 0.55f) {
 		// ==========================================================
-		// Phase 1 (0.00〜0.55): 画面垂直収束 ＆ 中央丸型楕円ブルーム発光
+		// Phase 1: 画面垂直収束 ＆ 中央丸型楕円ブルーム発光
 		// ==========================================================
 		float p = crtT / 0.55f;
 		float collapse = 1.0f - std::pow(1.0f - p, 3.0f);
@@ -1237,18 +1231,18 @@ void StageScene::DrawPauseCRTShutdown(float progress) {
 
 		float bloomIntensity = (std::min)(1.0f, p / 0.12f);
 
-		// 1. 中央の大きく膨らむ楕円形蛍光体グロー（ユーザー提示画像のような丸みを帯びた発光）
+		// 1. 中央の大きく膨らむ楕円形蛍光体グロー
 		DrawPauseGlowOval({ centerX, centerY }, { 600.0f, 230.0f }, { 0.85f, 0.82f, 0.65f, 0.40f * bloomIntensity }, BlendMode::kAdd);
 		DrawPauseGlowOval({ centerX, centerY }, { 460.0f, 160.0f }, { 0.95f, 0.95f, 0.85f, 0.60f * bloomIntensity }, BlendMode::kAdd);
 		DrawPauseGlowOval({ centerX, centerY }, { 320.0f, 100.0f }, { 1.00f, 1.00f, 0.95f, 0.85f * bloomIntensity }, BlendMode::kAdd);
 		DrawPauseGlowOval({ centerX, centerY }, { 200.0f, 50.0f },  { 1.00f, 1.00f, 1.00f, 1.00f * bloomIntensity }, BlendMode::kAdd);
 
-		// 2. 画面端まで走る水平ビーム（多層発光ライン）
+		// 2. 画面端まで走る水平ビーム
 		DrawPauseSolidRect({ 0.0f, centerY - 6.0f }, { screenW, 12.0f }, { 0.70f, 0.85f, 0.95f, 0.35f * bloomIntensity }, BlendMode::kAdd);
 		DrawPauseSolidRect({ 0.0f, centerY - 2.5f }, { screenW, 5.0f },  { 0.90f, 0.95f, 1.00f, 0.70f * bloomIntensity }, BlendMode::kAdd);
 		DrawPauseSolidRect({ 0.0f, centerY - 1.0f }, { screenW, 2.0f },  { 1.00f, 1.00f, 1.00f, 1.00f * bloomIntensity }, BlendMode::kAdd);
 
-		// 3. 発光部を横切るCRT特有の黒い走査線スリット（ユーザー提示画像のような横縞スリット）
+		// 3. 発光部を横切るCRT特有の黒い走査線スリット
 		for (float y = centerY - 110.0f; y <= centerY + 110.0f; y += 14.0f) {
 			if (std::abs(y - centerY) > 2.0f) {
 				DrawPauseSolidRect({ 0.0f, y - 2.0f }, { screenW, 4.0f }, { 0.0f, 0.0f, 0.0f, 0.75f * bloomIntensity });
@@ -1256,7 +1250,7 @@ void StageScene::DrawPauseCRTShutdown(float progress) {
 		}
 	} else if (crtT < 0.85f) {
 		// ==========================================================
-		// Phase 2 (0.55〜0.85): 水平ビームと楕円が左右から中央へ収束
+		// Phase 2: 水平ビームと楕円が左右から中央へ収束
 		// ==========================================================
 		float p = (crtT - 0.55f) / 0.30f;
 		float shrink = 1.0f - p;
@@ -1285,7 +1279,7 @@ void StageScene::DrawPauseCRTShutdown(float progress) {
 		}
 	} else {
 		// ==========================================================
-		// Phase 3 (0.85〜1.00): 中央の極小蛍光体光点が「プツッ」と閃光して消滅
+		// Phase 3: 中央の極小蛍光体光点が「プツッ」と閃光して消滅
 		// ==========================================================
 		float p = (crtT - 0.85f) / 0.15f;
 		DrawPauseSolidRect({ 0.0f, 0.0f }, { screenW, screenH }, { 0.0f, 0.0f, 0.0f, 1.0f });

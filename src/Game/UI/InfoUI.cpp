@@ -6,7 +6,7 @@ void InfoUI::SetupTextElement(UIText& textElem, const std::string& initialText) 
 	textElem.Initialize(InfoUIDefaults::kFontName, initialText, InfoUIDefaults::kFontSize);
 	textElem.SetAnchorPoint({ 0.0f, 0.0f });
 	textElem.SetColor(InfoUIDefaults::kTextColor);
-	// 会話UI（RadioCommunicator）と完全同一の2層ソフトドロップシャドウを適用
+	// 会話UIと完全同一の2層ソフトドロップシャドウを適用
 	textElem.SetDualDropShadow(
 		true,
 		InfoUIDefaults::kInnerShadowOffset,
@@ -77,7 +77,7 @@ void InfoUI::Update(float dt, const FlightInfoUIData& data) {
 	baseTextColor.w *= currentAlpha;
 
 	// -------------------------------------------------------------
-	// 1. エンジン出力 (THR / 出力)
+	// 1. エンジン出力
 	// -------------------------------------------------------------
 	{
 		const int throttlePct = static_cast<int>(std::round(data_.throttle * InfoUIDefaults::kThrottlePercentScale));
@@ -106,7 +106,7 @@ void InfoUI::Update(float dt, const FlightInfoUIData& data) {
 	}
 
 	// -------------------------------------------------------------
-	// 2. 速度 (SPD / 速度, km/h)
+	// 2. 速度
 	// -------------------------------------------------------------
 	{
 		const int speedKmh = static_cast<int>(std::round(data_.speed * InfoUIDefaults::kMpsToKmh));
@@ -126,7 +126,7 @@ void InfoUI::Update(float dt, const FlightInfoUIData& data) {
 	}
 
 	// -------------------------------------------------------------
-	// 3. 絶対高度 (ALT / 高度, 海抜高度 MSL)
+	// 3. 絶対高度
 	// -------------------------------------------------------------
 	{
 		const int altM = static_cast<int>(std::round(data_.absoluteAltitude));
@@ -146,7 +146,7 @@ void InfoUI::Update(float dt, const FlightInfoUIData& data) {
 	}
 
 	// -------------------------------------------------------------
-	// 4. 相対高度 (RALT / 対地高度 AGL)
+	// 4. 相対高度
 	// -------------------------------------------------------------
 	{
 		const int raltM = static_cast<int>(std::round((std::max)(0.0f, data_.relativeAltitude)));
@@ -166,7 +166,7 @@ void InfoUI::Update(float dt, const FlightInfoUIData& data) {
 	}
 
 	// -------------------------------------------------------------
-	// 5. 弾数 (AMMO / 機関砲) - WT画像準拠で空行セクションギャップを挿入
+	// 5. 弾数 - WT画像準拠で空行セクションギャップを挿入
 	// -------------------------------------------------------------
 	currentY += InfoUIDefaults::kSectionGap * scale;
 	{
@@ -208,7 +208,7 @@ void InfoUI::Draw() {
 		return;
 	}
 
-	// 既存の文字UIクラス（UIText）の描画処理を一括呼び出し
+	// 既存の文字UIクラスの描画処理を一括呼び出し
 	labelThrottle_.Draw();
 	valThrottle_.Draw();
 

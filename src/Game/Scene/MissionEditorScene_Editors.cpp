@@ -303,7 +303,7 @@ void MissionEditorScene::DrawMissionEditor() {
 	// 2D Map Editor
 	missionMapView_.Draw(currentMission_, currentMission_.playerPosition);
 
-	// 同期（Map -> Editor）
+	// 同期
 	if (missionMapView_.GetSelectedEnemyIndex() != -1) selectedEnemyIndex_ = missionMapView_.GetSelectedEnemyIndex();
 	if (missionMapView_.GetSelectedGroundEnemyIndex() != -1) selectedGroundEnemyIndex_ = missionMapView_.GetSelectedGroundEnemyIndex();
 	if (missionMapView_.GetSelectedTriggerIndex() != -1) selectedTriggerIndex_ = missionMapView_.GetSelectedTriggerIndex();

@@ -11,7 +11,7 @@ class SpriteCommon;
 class DirectXCommon;
 
 /// <summary>
-/// 2Dスプライト(画像)の描画を行うクラス
+/// 2Dスプライトの描画を行うクラス
 /// </summary>
 class Sprite
 {

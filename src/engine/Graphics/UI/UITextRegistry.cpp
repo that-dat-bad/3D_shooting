@@ -14,7 +14,7 @@ static inline std::string Trim(const std::string& str) {
 	return str.substr(first, (last - first + 1));
 }
 
-// INIデータのマップ型: Section -> (Key -> Value)
+// INIデータのマップ型: Section ->
 using IniData = std::map<std::string, std::map<std::string, std::string>>;
 
 // INIファイル読み込み関数
@@ -159,7 +159,7 @@ void UITextRegistry::ApplyConfig(const std::string& name, UIText* text) {
 		text->SetVisible(itVis->second == "1" || itVis->second == "true" || itVis->second == "TRUE");
 	}
 
-	// 状態別スタイル（Normal, Hovered, Selected, Pressed, LowHP, Warning, Complete等）の読み込み
+	// 状態別スタイルの読み込み
 	auto& styles = text->GetStyles();
 	for (const auto& [key, val] : props) {
 		size_t underPos = key.find('_');
@@ -206,7 +206,7 @@ void UITextRegistry::LoadConfig(const std::string& filePath) {
 }
 
 void UITextRegistry::SaveConfig(const std::string& filePath) {
-	// 既存のINIファイルを読み込んでマージ（他シーンの登録テキストも保持）
+	// 既存のINIファイルを読み込んでマージ
 	IniData ini = ParseIniFile(filePath);
 
 	for (const auto& [name, text] : registry_) {

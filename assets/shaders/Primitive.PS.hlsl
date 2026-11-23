@@ -1,6 +1,3 @@
-// Primitive.PS.hlsl
-// ライティング計算を省いた軽量なエフェクト専用ピクセルシェーダー
-
 struct PixelShaderOutput
 {
     float32_t4 color : SV_TARGET;
@@ -10,7 +7,7 @@ struct PixelShaderOutput
 struct Material
 {
     float32_t4 color;
-    int enableLighting; // Primitiveでは無視します（常にUnlit）
+    int enableLighting; // Primitiveでは無視します
     float shininess;
     float32_t2 padding;
     matrix uvTransform;
@@ -41,12 +38,12 @@ PixelShaderOutput main(PixelInput input)
     // テクスチャサンプリング
     float32_t4 texColor = gTexture.Sample(gSampler, uv.xy);
     
-    // アルファテスト (半透明の滑らかなグラデーションがパキッと途切れるのを防ぐため、閾値を下げる)
+    // アルファテスト
     if (texColor.a < 0.001f) {
         discard;
     }
 
-    // テクスチャの色 × マテリアルの色（エフェクトなのでシンプルに乗算するだけ）
+    // テクスチャの色 × マテリアルの色
     output.color = texColor * gMaterial.color;
 
     return output;

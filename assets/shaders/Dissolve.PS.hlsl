@@ -24,7 +24,7 @@ PixelShaderOutput main(VertexShaderOutput input)
     float32_t4 sceneColor = gTexture.Sample(gSampler, input.texcoord);
     float32_t mask = gMaskTexture.Sample(gSampler, input.texcoord);
 
-    // pixels below threshold → output black (no discard to avoid flicker)
+    // pixels below threshold → output black
     if (mask <= threshold)
     {
         output.color = float32_t4(0.0f, 0.0f, 0.0f, 1.0f);
@@ -33,7 +33,7 @@ PixelShaderOutput main(VertexShaderOutput input)
 
     // edge glow: highlight pixels near the dissolve boundary
     float32_t edge = smoothstep(threshold, threshold + edgeWidth, mask);
-    // bright edge color (orange-white glow)
+    // bright edge color
     float32_t3 edgeColor = float32_t3(1.0f, 0.5f, 0.1f);
     output.color.rgb = lerp(edgeColor, sceneColor.rgb, edge);
     output.color.a = 1.0f;

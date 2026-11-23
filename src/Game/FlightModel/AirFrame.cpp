@@ -74,7 +74,7 @@ bool Airframe::IsDestroyed() const {
 // フラップの更新
 // ===========================================================
 void Airframe::UpdateFlap(float deltaTime, float speed) {
-	// 速度超過時は強制収納（フラップ保護）
+	// 速度超過時は強制収納
 	bool canDeploy = flapDesired_ && !IsFlapOverspeed(speed);
 
 	if (canDeploy) {

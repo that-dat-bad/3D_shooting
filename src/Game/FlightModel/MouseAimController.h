@@ -3,7 +3,7 @@
 
 class FlightModel;
 
-// <summary>汎用PIDコントローラー（1軸分）</summary>
+// <summary>汎用PIDコントローラー</summary>
 struct PIDController {
 	float kP = 0.0f;    // 比例ゲイン
 	float kI = 0.0f;    // 積分ゲイン
@@ -23,13 +23,13 @@ struct PIDController {
 		// 比例項
 		float pTerm = kP * error;
 
-		// 積分項（台形法 + アンチワインドアップ）
+		// 積分項
 		integral += error * dt;
 		if (integral > maxIntegral) { integral = maxIntegral; }
 		if (integral < -maxIntegral) { integral = -maxIntegral; }
 		float iTerm = kI * integral;
 
-		// 微分項（誤差の変化率）
+		// 微分項
 		float derivative = 0.0f;
 		if (dt > 0.0001f) {
 			derivative = (error - prevError) / dt;
@@ -51,7 +51,7 @@ struct PIDController {
 
 // <summary>
 // War Thunder準拠 マウスエイム・コントローラー
-// ワールド水平基準の球面座標(方位角・仰角±89°)で目標方向を更新し、PID制御で操舵入力を生成。
+// ワールド水平基準の球面座標で目標方向を更新し、PID制御で操舵入力を生成。
 // </summary>
 class MouseAimController {
 public:
@@ -64,18 +64,18 @@ public:
 	// マウスの相対移動量でワールド空間の目標方向を回転
 	void UpdateTargetDirection(long deltaX, long deltaY, const MyMath::Vector3& camRight, const MyMath::Vector3& camUp);
 
-	// 目標方向を指定の前方ベクトルにリセット（PID状態も初期化）
+	// 目標方向を指定の前方ベクトルにリセット
 	void ResetToDirection(const MyMath::Vector3& forward);
 
-	// PID状態を保持したまま目標方向のみを更新（AI追従用）
+	// PID状態を保持したまま目標方向のみを更新
 	void SetTargetDirection(const MyMath::Vector3& dir);
 
 	// PID制御で操舵入力を生成
-	// orientation: 機体の現在姿勢（クォータニオン）
+	// orientation: 機体の現在姿勢
 	// deltaTime: フレーム間の経過時間（秒）
-	// outPitch: 生成されたピッチ入力 (-1 ～ 1)
-	// outRoll: 生成されたロール入力 (-1 ～ 1)
-	// outYaw: 生成されたヨー入力 (-1 ～ 1)
+	// outPitch: 生成されたピッチ入力
+	// outRoll: 生成されたロール入力
+	// outYaw: 生成されたヨー入力
 	void CalculateSteeringInput(
 		const MyMath::Quaternion& orientation,
 		float deltaTime,
@@ -91,10 +91,10 @@ public:
 	void SetSensitivity(float sensitivity) { sensitivity_ = sensitivity; }
 	float GetSensitivity() const { return sensitivity_; }
 
-	// ワールド空間の目標方向ベクトル（レティクル投影用）
+	// ワールド空間の目標方向ベクトル
 	MyMath::Vector3 GetTargetDirection() const { return targetDirection_; }
 
-	// PIDコントローラーへのアクセス（ImGuiチューニング用）
+	// PIDコントローラーへのアクセス
 	PIDController& GetPitchPID() { return pitchPID_; }
 	PIDController& GetRollPID() { return rollPID_; }
 	PIDController& GetYawPID() { return yawPID_; }
@@ -106,20 +106,20 @@ private:
 	// マウス感度
 	float sensitivity_ = 0.05f; // reduced mouse sensitivity
 
-	// ワールド水平基準の方位角・仰角（War Thunder準拠：360°方位角＋±89°仰角）
+	// ワールド水平基準の方位角・仰角
 	float targetYaw_ = 0.0f;
 	float targetPitch_ = 0.0f;
 
-	// ワールド空間の目標方向（単位ベクトル）
+	// ワールド空間の目標方向
 	MyMath::Vector3 targetDirection_ = { 0.0f, 0.0f, 1.0f };
 
 	// コーディネートターンの閾値（ラジアン）
 	float coordinatedTurnThreshold_ = 0.03f;  // ≈ 1.7度
 
-	// === PIDコントローラー（各軸） ===
+	// === PIDコントローラー ===
 	PIDController pitchPID_;   // ピッチ誤差 → ピッチ入力
-	PIDController rollPID_;    // バンク誤差 → ロール入力（コーディネートターン時）
-	PIDController yawPID_;     // ヨー誤差 → ヨー入力（小角度時）
+	PIDController rollPID_;    // バンク誤差 → ロール入力
+	PIDController yawPID_;     // ヨー誤差 → ヨー入力
 	PIDController bankPID_;    // 水平復帰用ロール
 
 	// ヘルパー関数

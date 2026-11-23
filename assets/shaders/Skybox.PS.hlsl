@@ -15,7 +15,7 @@ struct Material {
 
 ConstantBuffer<Material> gMaterial : register(b0);
 
-// Cubemapテクスチャではなく2Dテクスチャとして equirectangular (正距円筒図法) サンプリングする
+// Cubemapテクスチャではなく2Dテクスチャとして equirectangular サンプリングする
 Texture2D<float32_t4> gTexture : register(t0);
 SamplerState gSampler : register(s0);
 
@@ -25,7 +25,7 @@ PixelShaderOutput main(VertexShaderOutput input) {
     // 3次元方向ベクトルを正規化
     float3 dir = normalize(input.texcoord);
     
-    // 方向ベクトルから球面座標(経度・緯度)を計算し、UV座標に変換
+    // 方向ベクトルから球面座標を計算し、UV座標に変換
     float u = atan2(dir.x, dir.z) / (2.0f * 3.14159265f) + 0.5f;
     float v = 0.5f - asin(dir.y) / 3.14159265f;
     

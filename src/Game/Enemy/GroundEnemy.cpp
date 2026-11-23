@@ -118,7 +118,7 @@ void GroundEnemy::SetWaypointPath(const WaypointPath& path) {
 void GroundEnemy::UpdateAI(float deltaTime) {
 	if (!playerFlightModel_) return;
 
-	// 1. 車両のパトロール移動 (PatrolVehicle)
+	// 1. 車両のパトロール移動
 	if (aiType_ == GroundAIType::PatrolVehicle && waypointPoints_.size() >= GroundWaypointDefaults::kMinPathPoints) {
 		using namespace GroundWaypointDefaults;
 		if (currentWaypointIndex_ >= waypointPoints_.size()) {
@@ -163,13 +163,13 @@ void GroundEnemy::UpdateAI(float deltaTime) {
 		position_.x = initialPosition_.x + currentPatrolOffset_;
 	}
 
-	// 構造物（Structure）は攻撃しない
+	// 構造物は攻撃しない
 	if (aiType_ == GroundAIType::Structure) {
 		isTargetInSight_ = false;
 		return;
 	}
 
-	// 2. プレイヤー機との距離・偏差射撃（リード予測）の計算
+	// 2. プレイヤー機との距離・偏差射撃の計算
 	MyMath::Vector3 playerPos = playerFlightModel_->GetPosition();
 	MyMath::Vector3 playerVel = playerFlightModel_->GetVelocity();
 	MyMath::Vector3 gunBasePos = { position_.x, position_.y + 2.5f, position_.z };
@@ -191,7 +191,7 @@ void GroundEnemy::UpdateAI(float deltaTime) {
 		float t1 = distance / bulletSpeed;
 		MyMath::Vector3 futurePos = MyMath::Add(playerPos, MyMath::Multiply(t1, playerVel));
 
-		// 2次予測（より高精度な予測未来位置）
+		// 2次予測
 		float dist2 = MyMath::Length(MyMath::Subtract(futurePos, gunBasePos));
 		float t2 = dist2 / bulletSpeed;
 		futurePos = MyMath::Add(playerPos, MyMath::Multiply(t2, playerVel));
@@ -215,7 +215,7 @@ void GroundEnemy::UpdateAI(float deltaTime) {
 	float turnSpeedRad = param_.turnSpeedDeg * kDeg2Rad;
 	float maxTurnStep = turnSpeedRad * deltaTime;
 
-	// ヨーの回転（最短回り）
+	// ヨーの回転
 	float yawDiff = NormalizeAngle(targetYaw_ - turretYaw_);
 	turretYaw_ += Clamp(yawDiff, -maxTurnStep, maxTurnStep);
 	turretYaw_ = NormalizeAngle(turretYaw_);
@@ -224,11 +224,11 @@ void GroundEnemy::UpdateAI(float deltaTime) {
 	float pitchDiff = targetPitch_ - turretPitch_;
 	turretPitch_ += Clamp(pitchDiff, -maxTurnStep, maxTurnStep);
 
-	// 4. 対空射撃制御 (バースト連射 & クールダウン)
+	// 4. 対空射撃制御
 	if (cooldownTimer_ > 0.0f) {
 		cooldownTimer_ -= deltaTime;
 	} else if (isTargetInSight_) {
-		// 砲塔が目標方向（未来位置）と概ね一致しているかチェック（約10度以内）
+		// 砲塔が目標方向と概ね一致しているかチェック
 		bool isAimed = (std::abs(yawDiff) < 0.18f) && (std::abs(pitchDiff) < 0.18f);
 
 		if (isAimed) {
@@ -512,7 +512,7 @@ void GroundEnemy::OnCollision(ICollisionBody3D* other) {
 		EffectManager::GetInstance()->EmitHitEffect(bulletPos);
 		TakeDamage(dmg);
 	}
-	// プレイヤー機との衝突（突入）
+	// プレイヤー機との衝突
 	else if (other->GetCollisionAttribute() & CollisionAttribute::kPlayer) {
 		TakeDamage(maxHealth_);
 	}
@@ -619,7 +619,7 @@ void GroundEnemy::DrawTurret(Camera* camera) {
 
 	uint32_t whiteTex = TextureManager::GetInstance()->GetTextureIndexByFilePath("assets/textures/white1x1.png");
 
-	// 1. 固定台座 (Base) - 六角形/八角形風の強固なスチールベース
+	// 1. 固定台座 - 六角形/八角形風の強固なスチールベース
 	{
 		MyMath::Vector3 scale = { 6.0f, 1.2f, 6.0f };
 		MyMath::Vector3 rot = { 0.0f, 0.0f, 0.0f };
@@ -634,7 +634,7 @@ void GroundEnemy::DrawTurret(Camera* camera) {
 		prim->DrawCylinder(rimScale, rot, rimPos, rimColor, whiteTex, camera, BlendMode::kNormal);
 	}
 
-	// 2. 旋回砲台リング & マウント (Turret Ring)
+	// 2. 旋回砲台リング & マウント
 	{
 		MyMath::Vector3 mountScale = { 4.0f, 0.8f, 4.0f };
 		MyMath::Vector3 mountRot = { 0.0f, turretYaw_, 0.0f };
@@ -643,7 +643,7 @@ void GroundEnemy::DrawTurret(Camera* camera) {
 		prim->DrawCylinder(mountScale, mountRot, mountPos, mountColor, whiteTex, camera, BlendMode::kNormal);
 	}
 
-	// 3. 砲塔メインキャビン (Turret Body)
+	// 3. 砲塔メインキャビン
 	{
 		MyMath::Vector3 bodyScale = { 3.0f, 1.8f, 3.4f };
 		MyMath::Vector3 bodyRot = { 0.0f, turretYaw_, 0.0f };
@@ -658,11 +658,11 @@ void GroundEnemy::DrawTurret(Camera* camera) {
 			position_.y + 3.8f,
 			position_.z - std::cos(turretYaw_) * 0.8f
 		};
-		MyMath::Vector4 domeColor = { 0.15f, 0.45f, 0.35f, 1.0f }; // レーダードーム（ダークグリーン）
+		MyMath::Vector4 domeColor = { 0.15f, 0.45f, 0.35f, 1.0f }; // レーダードーム
 		prim->DrawCylinder(domeScale, bodyRot, domePos, domeColor, whiteTex, camera, BlendMode::kNormal);
 	}
 
-	// 4. 連装砲身 (Twin Barrels) - ヨーとピッチに連動
+	// 4. 連装砲身 - ヨーとピッチに連動
 	{
 		float cosP = std::cos(turretPitch_);
 		float sinP = std::sin(turretPitch_);
@@ -680,9 +680,9 @@ void GroundEnemy::DrawTurret(Camera* camera) {
 			MyMath::Vector3 barrelBase = MyMath::Add(pivot, MyMath::Multiply(offsets[i], right));
 			MyMath::Vector3 barrelCenter = MyMath::Add(barrelBase, MyMath::Multiply(2.0f, forward));
 
-			// 砲身（細長いシリンダー: Y軸長さをZ方向へ回転）
+			// 砲身
 			MyMath::Vector3 bScale = { 0.28f, 4.0f, 0.28f };
-			// ピッチ（X回転）とヨー（Y回転）の合成回転
+			// ピッチとヨーの合成回転
 			MyMath::Vector3 bRot = {
 				-(kPI * 0.5f - turretPitch_),
 				turretYaw_,
@@ -691,7 +691,7 @@ void GroundEnemy::DrawTurret(Camera* camera) {
 			MyMath::Vector4 barrelColor = { 0.12f, 0.12f, 0.14f, 1.0f }; // ガンメタルブラック
 			prim->DrawCylinder(bScale, bRot, barrelCenter, barrelColor, whiteTex, camera, BlendMode::kNormal);
 
-			// マズルブレーキ（砲口）
+			// マズルブレーキ
 			MyMath::Vector3 muzzlePos = MyMath::Add(barrelBase, MyMath::Multiply(4.0f, forward));
 			MyMath::Vector3 mScale = { 0.45f, 0.8f, 0.45f };
 			MyMath::Vector4 muzzleColor = { 0.25f, 0.25f, 0.28f, 1.0f };
@@ -706,7 +706,7 @@ void GroundEnemy::DrawStructure(Camera* camera) {
 
 	uint32_t whiteTex = TextureManager::GetInstance()->GetTextureIndexByFilePath("assets/textures/white1x1.png");
 
-	// 1. 大型建築物ベース（司令所・通信センター）
+	// 1. 大型建築物ベース
 	{
 		MyMath::Vector3 baseScale = { 16.0f, 5.0f, 16.0f };
 		MyMath::Vector3 baseRot = { 0.0f, 0.0f, 0.0f };
@@ -738,7 +738,7 @@ void GroundEnemy::DrawStructure(Camera* camera) {
 		prim->DrawCylinder(mastScale, mastRot, mastPos, mastColor, whiteTex, camera, BlendMode::kNormal);
 	}
 
-	// 3. 隣接燃料サイロ（2基）
+	// 3. 隣接燃料サイロ
 	{
 		MyMath::Vector3 silo1Scale = { 5.0f, 9.0f, 5.0f };
 		MyMath::Vector3 silo1Pos = { position_.x + 12.0f, position_.y + 4.5f, position_.z - 4.0f };
@@ -761,7 +761,7 @@ void GroundEnemy::DrawVehicle(Camera* camera) {
 		? customBodyYaw_
 		: ((moveDirection_ > GroundWaypointDefaults::kZero) ? (kPI * GroundWaypointDefaults::kHalf) : (-kPI * GroundWaypointDefaults::kHalf));
 
-	// 1. 車体（装甲車シャーシ）
+	// 1. 車体
 	{
 		MyMath::Vector3 hullScale = { 4.5f, 1.6f, 8.0f };
 		MyMath::Vector3 hullRot = { 0.0f, bodyYaw, 0.0f };
@@ -781,7 +781,7 @@ void GroundEnemy::DrawVehicle(Camera* camera) {
 		prim->DrawCylinder(trackScale, trackRot, { position_.x, position_.y + 0.6f, position_.z - 2.0f }, trackColor, whiteTex, camera, BlendMode::kNormal);
 	}
 
-	// 3. 車載対空砲塔（Turret）
+	// 3. 車載対空砲塔
 	{
 		MyMath::Vector3 mountScale = { 2.6f, 1.2f, 2.6f };
 		MyMath::Vector3 mountRot = { 0.0f, turretYaw_, 0.0f };

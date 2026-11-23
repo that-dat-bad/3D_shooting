@@ -47,7 +47,7 @@ void TitleScene::InitializeEntryState() {
 void TitleScene::UpdateDroneViewState(float dt) {
 	SetCursorVisible(false); // ドローン画面中はマウスカーソル非表示
 
-	// スペースキー、Enterキー、またはマウスクリック（左クリック）でOSウィンドウ最小化演出を経てコンソールへ
+	// スペースキー、Enterキー、またはマウスクリックでOSウィンドウ最小化演出を経てコンソールへ
 	Input* input = Input::GetInstance();
 	bool clickTriggered = input->TriggerMouse(0) || ((::GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0 && !wasLButtonDown_);
 	bool enterTriggered = input->TriggerKey(DIK_SPACE) || input->TriggerKey(DIK_RETURN)
@@ -58,38 +58,38 @@ void TitleScene::UpdateDroneViewState(float dt) {
 		state_ = TitleState::WindowClose;
 		windowCloseTimer_ = 0.0f;
 		if (CurrentLocation().id == TitleLocation::CrashedForest) {
-			ChangeLocation(0); // 通信途絶現場からメニュー移行時は基地メイン回線（格納庫）に接続復帰
+			ChangeLocation(0); // 通信途絶現場からメニュー移行時は基地メイン回線に接続復帰
 		}
 		// ローディング中にバックグラウンドで並行準備できるようプリロードを開始
 		AsyncPreloadManager::GetInstance()->StartStagePreloadAsync();
 	}
 
-	// ポストエフェクト (ドローン風 + ブルーム発光)
+	// ポストエフェクト
 	PostEffect* postEffect = PostEffect::GetInstance();
 	postEffect->ClearActiveEffects();
 
 	LocationData& loc = CurrentLocation();
 
-	// ブルーム（過剰発光・白飛びを抑制し、機体ディテールを鮮明に保つ：項目1）
+	// ブルーム
 	ActivePostEffect bloom;
 	bloom.type = PostEffectType::kBloom;
 	bloom.intensity = (loc.id == TitleLocation::Tunnel) ? 2.6f : 2.8f; // ブラー半径
-	bloom.dirX = (loc.id == TitleLocation::Tunnel) ? 1.05f : 1.15f;    // ブルーム強度 (過剰な2.4fから適正な1.05fへ抑制)
-	bloom.dirY = (loc.id == TitleLocation::Tunnel) ? 0.78f : 0.74f;    // 輝度閾値 (0.60fから0.78fに引き上げ、高輝度部のみ自然に光らせる)
+	bloom.dirX = (loc.id == TitleLocation::Tunnel) ? 1.05f : 1.15f;    // ブルーム強度
+	bloom.dirY = (loc.id == TitleLocation::Tunnel) ? 0.78f : 0.74f;    // 輝度閾値
 	postEffect->AddActiveEffect(bloom);
 
-	// 墜落現場専用：適度で落ち着いた砂嵐モニター演出（過剰な激しさを抑制）
+	// 墜落現場専用：適度で落ち着いた砂嵐モニター演出
 	if (loc.id == TitleLocation::CrashedForest) {
 		// 控えめなグリッチスパイク
 		float glitchSpike = (rand() % 100 < 8) ? (0.08f + static_cast<float>(rand() % 100) / 100.0f * 0.12f) : 0.0f;
 
-		// 1. 落ち着いた砂嵐ノイズ（0.65fから0.22fへ大幅抑制）
+		// 1. 落ち着いた砂嵐ノイズ
 		ActivePostEffect noise;
 		noise.type = PostEffectType::kRandom;
 		noise.intensity = 0.22f + glitchSpike;
 		postEffect->AddActiveEffect(noise);
 
-		// 2. 繊細なCRT走査線（0.28fから0.12fへ抑制、ゆっくりスクロール）
+		// 2. 繊細なCRT走査線
 		ActivePostEffect scanline;
 		scanline.type = PostEffectType::kScanLine;
 		scanline.intensity = 0.12f + glitchSpike * 0.2f;
@@ -97,20 +97,19 @@ void TitleScene::UpdateDroneViewState(float dt) {
 		scanline.dirY = 6.0f;   // 穏やかなスクロール
 		postEffect->AddActiveEffect(scanline);
 
-		// 3. 控えめで上品な色収差（0.032fから0.012fへ抑制し、文字の可読性を確保）
+		// 3. 控えめで上品な色収差
 		ActivePostEffect chromatic;
 		chromatic.type = PostEffectType::kChromaticAberration;
 		chromatic.intensity = 0.012f + glitchSpike * 0.015f;
 		postEffect->AddActiveEffect(chromatic);
 
-		// 4. 控えめなレンズ歪み（0.036fから0.010fへ抑制し、過剰な歪曲を解消）
+		// 4. 控えめなレンズ歪み
 		ActivePostEffect lens;
 		lens.type = PostEffectType::kLensDistortion;
 		lens.intensity = 0.010f;
 		postEffect->AddActiveEffect(lens);
 	} else {
-		// 通常ロケーション（Tunnel など）
-		// カメラ切替時の砂嵐ノイズトランジション演出
+		// 通常ロケーションのカメラ切替演出
 		if (transitionTimer_ > 0.0f) {
 			float t = transitionTimer_ / kTransitionDuration;
 			ActivePostEffect noise;
@@ -143,7 +142,7 @@ void TitleScene::UpdateDroneViewState(float dt) {
 		postEffect->AddActiveEffect(lens);
 	}
 
-	// ロケーション固有の色味（ビネット + カラーオーバーレイ）
+	// ロケーション固有の色味
 	if (loc.grade.vignette > 0.0f || loc.grade.tintIntensity > 0.0f) {
 		ActivePostEffect vignette;
 		vignette.type = PostEffectType::kVignette;
@@ -206,7 +205,6 @@ void TitleScene::UpdateConsoleBootState(float dt) {
 	if (loadTime < 0.0f) {
 		loadingProgress_ = 0.0f;
 	} else {
-		// タイトルの全カメラ・全3Dロケーションモデルを段階的に先行読み込み・ウォームアップ！
 		if (!isTitleCamerasPrewarmed_) {
 			PrewarmAllTitleCamerasAndLocations(dt);
 		}
@@ -214,12 +212,12 @@ void TitleScene::UpdateConsoleBootState(float dt) {
 		// バックグラウンドでのプリロード完了判定
 		bool isStageReady = AsyncPreloadManager::GetInstance()->IsStagePreloadReady();
 
-		// フェーズ進行度に基づく最低進捗率 (0.0f, 0.25f, 0.50f, 0.75f, 1.0f)
+		// フェーズ進行度に基づく最低進捗率
 		float phaseProgress = 0.25f * static_cast<float>(prewarmPhase_);
 		float timeProgress = loadTime / 0.85f;
 		float targetProgress = (std::min)(0.95f, (std::max)(phaseProgress * 0.95f, timeProgress));
 
-		// 全カメラ・ロケーションのウォームアップ完了 & ステージプリロード完了 & 最低バー演出時間（0.70秒）経過で 100% (1.0f) へ
+		// 全カメラ・ロケーションのウォームアップ完了 & ステージプリロード完了 & 最低バー演出時間経過で 100% へ
 		if (isTitleCamerasPrewarmed_ && isStageReady && loadTime >= 0.70f) {
 			targetProgress = 1.0f;
 		}
@@ -260,7 +258,7 @@ void TitleScene::UpdateConsoleBootState(float dt) {
 					state_ = TitleState::Menu;
 					stateTimer_ = 0.0f;
 					consoleExitTimer_ = 0.0f;
-					menuEnterTimer_ = kMenuEnterDuration; // メニュー起動トランジション開始！
+					menuEnterTimer_ = kMenuEnterDuration;
 					SetCursorVisible(true);
 					if (CurrentLocation().id == TitleLocation::CrashedForest) {
 						ChangeLocation(0);
@@ -277,7 +275,7 @@ void TitleScene::UpdateConsoleBootState(float dt) {
 		consoleBgSprite_->Update();
 	}
 
-	// 背景を完全な黒（アルファ1.0）にして格納庫の透けを完全排除
+	// 背景を完全な黒にして格納庫の透けを完全排除
 	backgroundPanel_.SetBackgroundColor({ 0.0f, 0.0f, 0.0f, 1.0f });
 	backgroundPanel_.Update();
 
@@ -338,7 +336,7 @@ void TitleScene::UpdateMenuState(float dt) {
 	float my = mouseScaled.y;
 	customCursorPos_ = { mx, my };
 
-	// マウスボタン押下判定（DirectInput ＋ Windows API の多重フォールバック）
+	// マウスボタン押下判定
 	bool isLButtonDown = input->PushMouse(0) || ((::GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0);
 	bool isLButtonTrigger = input->TriggerMouse(0) || (isLButtonDown && !wasLButtonDown_);
 	wasLButtonDown_ = isLButtonDown;
@@ -351,15 +349,15 @@ void TitleScene::UpdateMenuState(float dt) {
 		// メインターミナル内ミッション選択の更新
 		UpdateMissionSelectModal(dt, { mx, my }, isLButtonDown, isLButtonTrigger);
 	} else {
-		// フルOSデスクトップ環境の更新（タスクバー、マルチウィンドウドラッグ・最小化・フォーカス、デスクトップアイコン、カスタムカーソル）
+		// フルOSデスクトップ環境の更新
 		UpdateOSDesktop(dt, { mx, my }, isLButtonDown, isLButtonTrigger);
 
-		// メインターミナル（Window 0）がフォーカスされており、非最小化・表示中かつ非ドラッグ時のみメニュー操作を更新
+		// メインターミナルがフォーカスされており、非最小化・表示中かつ非ドラッグ時のみメニュー操作を更新
 		bool isTermActive = (activeWindowId_ == 0 && osWindows_.size() > 0 && osWindows_[0].isOpen && !osWindows_[0].isMinimized);
 		if (isTermActive && !osWindows_[0].isDragging && osWindows_[0].animScale >= 0.85f) {
 			selectionManager_.Update();
 
-			// マウスクリックでのダイレクトボタン判定（万が一の判定漏れ防止用フォールバック）
+			// マウスクリックでのダイレクトボタン判定
 			if (isLButtonTrigger) {
 				const float btnX = osWindows_[0].pos.x + 65.0f;
 				const float btnW = 390.0f;
@@ -407,23 +405,23 @@ void TitleScene::UpdateMenuState(float dt) {
 	// 現在のロケーションをゆっくりOrbitする
 	UpdateLocationCamera(CurrentLocation(), dt, true);
 
-	// 背景オーバーレイ（背景の3D映像が美しく透ける半透明ダークガラス：約10%暗く抑えてUIを鮮明化）
+	// 背景オーバーレイ
 	float bgAlpha = (std::min)(stateTimer_ * 2.5f, 0.85f);
 	backgroundPanel_.SetBackgroundColor({ 0.0f, 0.0f, 0.0f, bgAlpha });
 	backgroundPanel_.Update();
 
-	// メニュー用ポストエフェクト（背景被写界深度ブラー ＋ ブルーム ＋ 走査線 ＋ スタートメニュートランジション）
+	// メニュー用ポストエフェクト
 	PostEffect* postEffect = PostEffect::GetInstance();
 	postEffect->ClearActiveEffects();
 
-	// 背景（格納庫）の被写界深度（デフォーカス・ガウスブラー）- 手前UI視認性向上のため滑らかな被写界深度ブラーを適用
+	// 背景の被写界深度- 手前UI視認性向上のため滑らかな被写界深度ブラーを適用
 	ActivePostEffect bgBlur;
 	bgBlur.type = PostEffectType::kKawaseBlur;
 	bgBlur.intensity = 2.8f;
 	bgBlur.kernelSize = 2;
 	postEffect->AddActiveEffect(bgBlur);
 
-	// 高輝度部を光らせるブルーム（1パスで軽量＆鮮やか）
+	// 高輝度部を光らせるブルーム
 	ActivePostEffect bloom;
 	bloom.type = PostEffectType::kBloom;
 	bloom.intensity = 2.0f;
@@ -549,7 +547,6 @@ void TitleScene::StartSortieSequence() {
 	isEngineTesting_ = true;
 	engineTestTimer_ = kSortieDuration;
 	SetCursorVisible(false); // 出撃開始と同時にOSカーソルを消去
-	// 非同期処理による軽量化：出撃演出ムービーの裏でバックグラウンドスレッドでステージリソースを非同期プリロード！
 	std::string currentPath = MissionManager::GetInstance().GetCurrentFilePath();
 	if (currentPath.empty()) {
 		currentPath = "Resources/missions/mission00.json";

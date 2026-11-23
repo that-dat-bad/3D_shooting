@@ -5,7 +5,7 @@ SamplerState gSampler : register(s0);
 
 struct PostEffectParams {
     int32_t kernelSize;
-    float intensity;      // 光量増幅 (Light Amplification / Gain)
+    float intensity;      // 光量増幅
     float dirX;
     float dirY;
     float time;
@@ -26,10 +26,10 @@ PixelShaderOutput main(VertexShaderOutput input)
     // 輝度計算
     float32_t value = dot(output.color.rgb, float32_t3(0.2125f, 0.7154f, 0.0721f));
     
-    // intensity を用いて光量を増幅 (露出/ゲイン調整)
+    // intensity を用いて光量を増幅
     value *= gParams.intensity;
     
-    // 目標とする色 (colorTint) を乗算して着色する
+    // 目標とする色を乗算して着色する
     output.color.rgb = value * gParams.colorTint;
     
     return output;

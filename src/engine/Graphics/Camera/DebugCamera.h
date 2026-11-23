@@ -13,7 +13,7 @@ public:
 	DebugCamera();
 
 	/// <summary>
-	/// 更新処理 (毎フレーム呼び出す)
+	/// 更新処理
 	/// </summary>
 	/// <param name="key">キーボードの状態</param>
 	/// <param name="mouseState">マウスの状態</param>
@@ -29,7 +29,7 @@ private:
 	// ビュー行列
 	Matrix4x4 viewMatrix_ = Identity4x4();
 
-	// 注視点（カメラが回る中心）
+	// 注視点
 	Vector3 pivot_ = { 0.0f, 0.0f, 0.0f };
 
 	// 注視点からの距離

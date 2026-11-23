@@ -43,7 +43,7 @@ public:
 	float GetFarClip() const { return farClip_; }
 
 	/// <summary>
-	/// カメラを揺らす（カメラシェイク）
+	/// カメラを揺らす
 	/// </summary>
 	/// <param name="duration">揺れる時間（秒）</param>
 	/// <param name="magnitude">揺れの大きさ</param>

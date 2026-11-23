@@ -31,12 +31,12 @@ public:
 	static DirectXCommon* GetInstance();
 
 	/// <summary>
-	/// デフォルトコンストラクタ (std::make_unique対応のためpublic)
+	/// デフォルトコンストラクタ
 	/// </summary>
 	DirectXCommon() = default;
 
-	static const uint32_t kRtvHeapDescriptorNum_ = 5; // ダブルバッファ(2) + レンダーテクスチャ用(3)
-	static const uint32_t kDsvHeapDescriptorNum_ = 2; // 深度バッファ用(R/W と ReadOnly)
+	static const uint32_t kRtvHeapDescriptorNum_ = 5; // ダブルバッファ + レンダーテクスチャ用
+	static const uint32_t kDsvHeapDescriptorNum_ = 2; // 深度バッファ用
 	static const uint32_t kSwapChainBufferCount_ = 2;
 
 
@@ -55,10 +55,10 @@ public:
 	/// <summary>描画前処理</summary>
 	void PreDraw();
 
-	/// <summary>描画後処理（ポストエフェクト適用、バックバッファをRTのまま残す）</summary>
+	/// <summary>描画後処理</summary>
 	void PostDraw();
 
-	/// <summary>フレーム終了処理（バックバッファをPRESENTに戻してsubmit）</summary>
+	/// <summary>フレーム終了処理</summary>
 	void EndFrame();
 
 	Microsoft::WRL::ComPtr<IDxcBlob> CompileShader(const std::wstring& filePath, const wchar_t* profile);
@@ -71,6 +71,7 @@ public:
 	ID3D12GraphicsCommandList* GetCommandList() { return commandList_.Get(); }
 	ID3D12CommandQueue* GetCommandQueue() { return commandQueue_.Get(); }
 	ID3D12CommandAllocator* GetCommandAllocator() { return commandAllocators_[currentFrameIndex_].Get(); }
+	uint32_t GetCurrentFrameIndex() const { return currentFrameIndex_; }
 	IDXGISwapChain4* GetSwapChain() { return swapChain_.Get(); }
 	ID3D12Resource* GetCurrentBackBuffer() {
 		return swapChainResources_[swapChain_->GetCurrentBackBufferIndex()].Get();
@@ -180,7 +181,7 @@ private:
 	D3D12_VIEWPORT viewport_{};
 
 
-	//記録時間(FPS固定用	)
+	//記録時間
 	std::chrono::steady_clock::time_point reference_;
 
 	WinApp* winApp_ = nullptr;

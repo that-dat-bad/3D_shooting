@@ -56,23 +56,23 @@ private:
 	float stateTimer_ = 0.0f;
 	float cutTimer_ = 0.0f;
 	float transitionTimer_ = 0.0f;      // カメラ切替時のノイズトランジションタイマー
-	static constexpr float kTransitionDuration = 0.15f; // 0.15秒の一瞬の切り替え（テンポ向上）
+	static constexpr float kTransitionDuration = 0.15f; // 0.15秒の一瞬の切り替え
 	float windowCloseTimer_ = 0.0f;     // カメラ映像ウィンドウ最小化・閉じる演出タイマー
 	static constexpr float kWindowCloseDuration = 0.35f; // スタイリッシュなウィンドウ最小化
 	std::vector<std::unique_ptr<Sprite>> windowCloseMaskSprites_;   // 最小化時の外側4黒マスク
 	std::vector<std::unique_ptr<Sprite>> windowCloseBorderSprites_; // 最小化ウィンドウのOSタイトルバー＆サイバー枠線
 	float consoleBootTimer_ = 0.0f;     // クリック後のローディング演出タイマー
-	float currentConsoleDuration_ = 1.40f; // ログ表示時間（緊急リブート時は高速化）
+	float currentConsoleDuration_ = 1.40f; // ログ表示時間
 	bool isRebootLog_ = false;          // ゲームオーバーからの復旧ログ表示フラグ
-	std::string previousSortieLog_;     // 直前の戦闘ログ引継ぎ（連続性演出）
+	std::string previousSortieLog_;     // 直前の戦闘ログ引継ぎ
 	Vector4 previousSortieColor_ = { 0.35f, 0.85f, 0.50f, 0.80f };
 
-	// ローディング演出用ステート（コマンドのやつ -> loading...[||||||||||]を表示）
+	// ローディング演出用ステート
 	static constexpr float kCommandTypingDuration = 0.38f; // コマンドタイピング演出時間
 	float loadingProgress_ = 0.0f;       // 0.0f〜1.0f の読み込み進捗率
 	bool isLoadingComplete_ = false;     // 全アセット読み込み完了フラグ
 	float completeHoldTimer_ = 0.0f;     // complete 表示キープタイマー
-	static constexpr float kCompleteHoldDuration = 0.52f; // 高速ブートログ表示時間（コンピュータ演出）
+	static constexpr float kCompleteHoldDuration = 0.52f; // 高速ブートログ表示時間
 	int prewarmPhase_ = 0;               // ローディング中のカメラ・ロケーション段階的ウォームアップフェーズ
 	bool isTitleCamerasPrewarmed_ = false; // タイトルの全カメラ・全3D背景モデルの読み込み・ウォームアップ完了
 	const char* loadingPhaseText_ = "INITIALIZING OPTICAL CAMERAS...";
@@ -84,8 +84,8 @@ private:
 	float menuEnterTimer_ = 0.0f;       // メニュー展開トランジションタイマー
 	static constexpr float kMenuEnterDuration = 0.35f;   // OSデスクトップ立ち上がり走査時間
 	float sortieTimer_ = 0.0f;          // 出撃シーケンスタイマー
-	static constexpr float kSortieDuration = 2.40f;      // 出撃シーケンスの総時間（負荷タメ・認証停滞の緩急付き）
-	std::unique_ptr<Sprite> sortieFlashSprite_;          // 出撃トランジション用ブラックアウト（黒フェード）
+	static constexpr float kSortieDuration = 2.40f;      // 出撃シーケンスの総時間
+	std::unique_ptr<Sprite> sortieFlashSprite_;          // 出撃トランジション用ブラックアウト
 	bool isCursorShown_ = false;
 	void SetCursorVisible(bool visible);
 	void DrawReAuthentication();
@@ -96,14 +96,14 @@ private:
 
 	// --- UI追加要素 ---
 	UIText pressSpaceText_;
-	std::unique_ptr<Sprite> pressSpaceBannerBg_;               // 操作案内の半透明ダーク帯（機体との被り防止）
+	std::unique_ptr<Sprite> pressSpaceBannerBg_;               // 操作案内の半透明ダーク帯
 	std::vector<std::unique_ptr<Sprite>> pressSpaceBorders_;   // 操作案内帯のサイバー枠線
 	std::unique_ptr<Sprite> consoleBgSprite_;                  // コンソールブート時の完全漆黒背景スプライト
 	UIPanel scanlineOverlay_;
 	UIPanel menuCardPanel_;                         // メニュー中央のコンソール端末ウィンドウ
 	UIPanel menuHeaderPanel_;                       // コンソール端末上部ヘッダーバー
 	std::unique_ptr<Sprite> headerLampSprite_;      // ヘッダーの点滅LEDランプ
-	std::unique_ptr<Sprite> titleLogoSprite_;       // DAWN ロゴスプライト（白文字 + MiG-21通過）
+	std::unique_ptr<Sprite> titleLogoSprite_;       // DAWN ロゴスプライト
 	std::vector<std::unique_ptr<Sprite>> menuBorderSprites_;   // メニューカード枠線・アクセント・走査線
 
 	struct ButtonBorderGroup {
@@ -133,7 +133,7 @@ private:
 	void UpdateMenuState(float dt);
 	void UpdateSortieState(float dt);
 
-	// --- 疑似ウィンドウ（SOVI_OS ターミナル）のマウスドラッグ移動管理 ---
+	// --- 疑似ウィンドウのマウスドラッグ移動管理 ---
 	Vector2 menuWindowPos_ = { 392.0f, 44.0f }; // ウィンドウ左上座標
 	bool isWindowDragging_ = false;             // ドラッグ中フラグ
 	bool wasLButtonDown_ = false;               // 前フレームの左マウスボタン押下状態
@@ -164,7 +164,7 @@ private:
 		bool isMaximized = false;
 		bool isDragging = false;
 		Vector2 dragOffset = { 0.0f, 0.0f };
-		float animScale = 1.0f;               // 最小化・復元アニメーションスケール (0.0:タスクバー格納, 1.0:通常展開)
+		float animScale = 1.0f;               // 最小化・復元アニメーションスケール
 	};
 
 	struct DesktopIcon {
@@ -178,7 +178,7 @@ private:
 	std::vector<OSWindow> osWindows_;
 	std::vector<DesktopIcon> desktopIcons_;
 	int activeWindowId_ = 0;
-	std::vector<int> windowZOrder_ = { 1, 2, 0 }; // ウィンドウ重なり順スタック（奥から手前の順、末尾が最前面・アクティブ）
+	std::vector<int> windowZOrder_ = { 1, 2, 0 }; // ウィンドウ重なり順スタック
 	void BringWindowToFront(int windowId);
 	bool isStartMenuOpen_ = false;
 
@@ -192,7 +192,7 @@ private:
 	Vector2 customCursorPos_ = { 640.0f, 360.0f };
 	float cursorRippleTimer_ = 0.0f;
 	Vector2 cursorRipplePos_ = { 0.0f, 0.0f };
-	std::vector<std::unique_ptr<Sprite>> cursorSprites_; // 独立した専用カーソルスプライト（枯渇防止）
+	std::vector<std::unique_ptr<Sprite>> cursorSprites_; // 独立した専用カーソルスプライト
 
 	// OS UI描画用スプライトプール
 	std::vector<std::unique_ptr<Sprite>> osSpritePool_;
@@ -222,16 +222,16 @@ private:
 	void DrawDesktopIcons();
 	void DrawCustomCursor();
 
-	// 全画面ミッション選択モーダル（完全フルスクリーンHUD / 他UI操作を完全ブロック）
+	// 全画面ミッション選択モーダル
 	bool isMissionSelectModalOpen_ = false;
 	float missionSelectModalAnim_ = 0.0f;
 	void UpdateMissionSelectModal(float dt, const Vector2& mousePos, bool isLDown, bool isLTrig);
 	void DrawMissionSelectModal();
 	void ReloadMissionCardData();
 
-	// ミッション選択データ（JSONデータ構造連動）
+	// ミッション選択データ
 	struct MissionCardData {
-		MissionEntry entry;   // マニフェストエントリ（id, filePath, title, aliasName, subTitle, isLocked）
+		MissionEntry entry;   // マニフェストエントリ
 		std::string id;       // "[01]", "[02]" 等の表示番号
 		std::string filePath; // JSONファイルパス
 		MissionData data;     // ロードされたミッション生データ
@@ -245,14 +245,14 @@ private:
 	static constexpr float kSubWindowSwitchDuration = 0.22f; // 連動トランジション演出時間
 
 	// サブウィンドウ インタラクティブ操作ステート
-	int activeSatLayer_ = 1;              // 衛星マップレイヤー (0: TERRAIN, 1: RADAR, 2: THREAT)
-	int activeSysDetailTab_ = 0;          // システム診断詳細タブ (0: D3D12, 1: HEAP, 2: SHADER)
-	int activeIntelTarget_ = 0;           // 敵戦力ターゲット選択 (0: Su-27, 1: MiG-29, 2: Tor-M1)
+	int activeSatLayer_ = 1;              // 衛星マップレイヤー
+	int activeSysDetailTab_ = 0;          // システム診断詳細タブ
+	int activeIntelTarget_ = 0;           // 敵戦力ターゲット選択
 	bool isEngineTesting_ = false;        // エンジン推力テスト中フラグ
 	float engineTestTimer_ = 0.0f;        // 推力テストタイマー
-	int defconLevel_ = 2;                 // 警戒レベル (1 or 2)
+	int defconLevel_ = 2;                 // 警戒レベル
 
-	// --- OSD (ドローンカメラビュー枠) ---
+	// --- OSD ---
 	std::vector<std::unique_ptr<Sprite>> osdSprites_;
 	std::unique_ptr<Sprite> recDotSprite_;
 	void InitializeOSD(SpriteCommon* spriteCommon);
@@ -262,7 +262,7 @@ private:
 	// 3D背景ロケーション
 	// ============================
 	enum class TitleLocation : int {
-		Hangar,         // 格納庫（大梁トラス鉄骨構造）
+		Hangar,         // 格納庫
 		Tunnel,         // 地下トンネル基地
 		CrashedForest,  // 墜落済みの森
 		Count
@@ -281,7 +281,7 @@ private:
 		float pointIntensity = 0.0f;
 		float pointRadius = 15.0f;
 		float pointDecay = 1.0f;
-		float pointFlicker = 0.0f; // 0で無効。炎のゆらぎ量(0〜1)
+		float pointFlicker = 0.0f; // 0で無効。炎のゆらぎ量
 
 		MyMath::Vector4 spotColor = { 1.0f, 1.0f, 1.0f, 1.0f };
 		MyMath::Vector3 spotOffset = { 0.0f, 12.0f, 0.0f }; // ロケーション原点からの相対位置
@@ -301,8 +301,8 @@ private:
 		float heightSway = 0.5f;
 		float lookAtHeight = 0.5f;  // 注視点の機体からの高さ
 		float orbitSpeed = 0.1f;    // rad/sec
-		float bankTilt = 0.40f;     // ドローンの移動傾き係数（ロール角）
-		bool isTunnelCamera = false; // トンネル内カメラ（壁突き抜け防止・正面構図）
+		float bankTilt = 0.40f;     // ドローンの移動傾き係数
+		bool isTunnelCamera = false; // トンネル内カメラ
 	};
 
 	// ロケーションごとのポストエフェクト色味
@@ -312,7 +312,7 @@ private:
 		float vignette = 0.0f;
 	};
 
-	// 追加の背景セットパーツ（道路、誘導灯、回転灯など）
+	// 追加の背景セットパーツ
 	struct ExtraEnvPart {
 		std::string modelPath;
 		std::unique_ptr<Object3d> object;
@@ -327,9 +327,9 @@ private:
 	struct LocationData {
 		TitleLocation id = TitleLocation::Hangar;
 		const char* name = "";
-		MyMath::Vector3 origin = { 0.0f, 0.0f, 0.0f }; // セットの原点（床面 Y=0 がここに来る）
+		MyMath::Vector3 origin = { 0.0f, 0.0f, 0.0f }; // セットの原点
 
-		// 背景セットモデル（未制作ならnullptrのまま、描画スキップ）
+		// 背景セットモデル
 		std::string envModelPath;
 		std::unique_ptr<Object3d> envObject;
 		MyMath::Vector3 envScale = { 1.0f, 1.0f, 1.0f };
@@ -344,7 +344,7 @@ private:
 		std::vector<DamagePart> hiddenParts;   // 部位破壊で非表示にするパーツ
 		std::unique_ptr<AircraftVisualModel> visualModel;
 
-		// 千切れたパーツ（墜落森用）：hiddenParts の逆だけを表示した別インスタンス
+		// 千切れたパーツ：hiddenParts の逆だけを表示した別インスタンス
 		std::unique_ptr<AircraftVisualModel> debrisModel;
 		MyMath::Vector3 debrisOffset = { 0.0f, 0.0f, 0.0f };
 		MyMath::Vector3 debrisRotation = { 0.0f, 0.0f, 0.0f };
@@ -385,7 +385,7 @@ private:
 
 	// 高品位アフターバーナーエフェクト
 	std::unique_ptr<Afterburner> afterburner_ = nullptr;
-	MyMath::Matrix4x4 currentAircraftMatrix_ = MyMath::Identity4x4(); // 機体の最新動的ワールド行列（A/Bと完全同期）
+	MyMath::Matrix4x4 currentAircraftMatrix_ = MyMath::Identity4x4(); // 機体の最新動的ワールド行列
 	bool enableTunnelMotion_ = true;                                  // トンネル内浮遊・バンク動揺アニメ有効フラグ
 
 #ifdef USE_IMGUI
@@ -396,11 +396,7 @@ private:
 	void DrawAfterburnerEditor();
 #endif
 
-	// ============================================================
 	// タイトルシーン静的リソースキャッシュ
-	// タイトル再訪問時のD3D12リソース生成（2,000バッファ以上）と
-	// 3D背景109個のObject3d再初期化を完全スキップして0ms遷移を達成する
-	// ============================================================
 	struct TitleResourceCache {
 		bool isCached = false;
 

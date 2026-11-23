@@ -27,7 +27,7 @@ public:
 	static TextureManager* GetInstance();
 
 	/// <summary>
-	/// デフォルトコンストラクタ (std::make_unique対応のためpublic)
+	/// デフォルトコンストラクタ
 	/// </summary>
 	TextureManager() = default;
 
@@ -60,13 +60,13 @@ public:
 
 	const DirectX::TexMetadata& GetMetaData(uint32_t textureIndex);
 
-	// レンダーテクスチャを作成（RTV + SRV を両方登録）
+	// レンダーテクスチャを作成
 	void CreateRenderTexture(const std::string& name, uint32_t width, uint32_t height, DXGI_FORMAT format, const Vector4& clearColor);
 
 	// レンダーテクスチャの RTV ハンドルを取得
 	D3D12_CPU_DESCRIPTOR_HANDLE GetRtvHandle(const std::string& name);
 
-	// リソースを取得（レンダーテクスチャのバリア遷移などに使用）
+	// リソースを取得
 	ID3D12Resource* GetResource(const std::string& name);
 
 	~TextureManager() = default;
@@ -95,9 +95,9 @@ private:
 	DirectXCommon* dxCommon_ = nullptr;
 	SrvManager* srvManager_ = nullptr;
 
-	// レンダーテクスチャ用 RTV インデックス（スワップチェーン2枚の次から）
+	// レンダーテクスチャ用 RTV インデックス
 	uint32_t rtvNextIndex_ = 2;
 
-	// O(1) 高速アクセスメタデータキャッシュ（512枚対応、線形探索を完全根絶）
+	// O(1) 高速アクセスメタデータキャッシュ
 	std::array<const DirectX::TexMetadata*, 512> metadataByIndex_{};
 };

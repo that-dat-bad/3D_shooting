@@ -1,7 +1,3 @@
-// Dagor / War Thunder 準拠 水面ピクセルシェーダー
-// 海: Shore Distance Field (浅瀬減衰/白波) + 多層波法線 + Schlickフレネル + Skybox反射
-// 川: 2相フェーズシフト Flowmap 流水スクロール + 岸辺フェード
-
 struct PixelShaderOutput
 {
     float32_t4 color : SV_TARGET;
@@ -40,7 +36,7 @@ ConstantBuffer<Material> gMaterial : register(b0);
 ConstantBuffer<DirectionalLight> gDirectionalLight : register(b2);
 ConstantBuffer<LightingSettings> gLightingSettings : register(b3);
 
-Texture2D<float32_t4> gTexture : register(t0);     // shore_sdf.png (海) または汎用テクスチャ
+Texture2D<float32_t4> gTexture : register(t0);     // shore_sdf.png または汎用テクスチャ
 TextureCube<float32_t4> gEnvTexture : register(t1);
 SamplerState gSampler : register(s0);
 
@@ -106,7 +102,7 @@ PixelShaderOutput main(PixelInput input)
 
     if (isRiver)
     {
-        // Dagor 式 2相フェーズシフト Flowmap スクロール (UV.y が上流 -> 下流)
+        // Dagor 式 2相フェーズシフト Flowmap スクロール
         float flowSpeed = 0.42f;
         float phase0 = frac(timeSec * flowSpeed);
         float phase1 = frac(timeSec * flowSpeed + 0.5f);
@@ -119,7 +115,7 @@ PixelShaderOutput main(PixelInput input)
         float3 n1 = ComputeMicroWaveNormal(uv1 * 14.0f, timeSec * 0.3f, 0.38f);
         N = normalize(lerp(n0, n1, blendW));
 
-        // 岸辺 (uv.x が 0 または 1 に近い) の白泡とフェード
+        // 岸辺の白泡とフェード
         float edgeDist = min(input.texcoord.x, 1.0f - input.texcoord.x);
         float bankMask = saturate(edgeDist / 0.14f);
         float foamNoise = lerp(ValueNoise2D(uv0 * 6.0f), ValueNoise2D(uv1 * 6.0f), blendW);
@@ -132,24 +128,24 @@ PixelShaderOutput main(PixelInput input)
     {
         // 海モード: Shore Distance Field による浅瀬・白波 + 多層波法線
         float shoreDist = gTexture.Sample(gSampler, saturate(input.texcoord)).r;
-        // 岸に近いほど細波を減衰 (Shoaling)
+        // 岸に近いほど細波を減衰
         float waveDamp = lerp(0.35f, 1.0f, saturate(shoreDist * 2.5f));
         float3 microN = ComputeMicroWaveNormal(input.worldPosition.xz * 0.22f, timeSec, 0.32f * waveDamp);
         N = normalize(lerp(normalize(input.normal), microN, 0.65f));
 
-        // 水深グラデーション（浅瀬エメラルド -> 外洋ディープネイビー）
+        // 水深グラデーション
         float3 shallowCol = float3(0.06f, 0.32f, 0.36f);
         float3 deepCol    = float3(0.015f, 0.065f, 0.14f);
         waterBodyColor = lerp(shallowCol, deepCol, saturate(shoreDist * 2.2f));
 
-        // 岸辺の波打ち際白波 (Shore Foam)
+        // 岸辺の波打ち際白波
         float shoreWave = sin(shoreDist * 38.0f - timeSec * 2.4f) * 0.5f + 0.5f;
         float foamNoise = ValueNoise2D(input.worldPosition.xz * 0.04f + float2(timeSec * 0.2f, 0.0f));
         foam = saturate((1.0f - saturate(shoreDist / 0.16f)) * shoreWave * foamNoise * 1.6f);
         alpha = saturate(0.75f + 0.23f * saturate(shoreDist * 4.0f));
     }
 
-    // Schlick フレネル (F0 = 0.02 for water)
+    // Schlick フレネル
     float NdotV = saturate(dot(N, V));
     float fresnel = 0.02f + 0.98f * pow(1.0f - NdotV, 5.0f);
 
@@ -162,7 +158,7 @@ PixelShaderOutput main(PixelInput input)
         skyReflect = float3(0.45f, 0.62f, 0.85f);
     }
 
-    // 太陽スペキュラ (Blinn-Phong)
+    // 太陽スペキュラ
     float3 H = normalize(L + V);
     float spec = pow(saturate(dot(N, H)), 180.0f) * 1.4f;
     float NdotL = saturate(dot(N, L));

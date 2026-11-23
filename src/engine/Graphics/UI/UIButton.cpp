@@ -93,7 +93,7 @@ void UIButton::Update() {
 	backgroundPanel_.SetAnchorPoint(anchorPoint_);
 	backgroundPanel_.Update();
 
-	// ラベルテキストの更新（アライメントに応じた配置 + オフセット微調整）
+	// ラベルテキストの更新
 	float btnLeft = position_.x - size_.x * anchorPoint_.x;
 	float textX = 0.0f;
 	float textY = position_.y + size_.y * (0.5f - anchorPoint_.y) + textOffset_.y;
@@ -117,10 +117,10 @@ void UIButton::Draw() {
 	// 背景描画
 	backgroundPanel_.Draw();
 
-	// テキスト描画（本体テキストは固定ライン配置・ガタつきなし）
+	// テキスト描画
 	labelText_.Draw();
 
-	// 選択時のプロンプト装飾（左側余白の >> と末尾の点滅カーソル _）
+	// 選択時のプロンプト装飾
 	if (isSelected_ && enablePromptDecorators_) {
 		TextRenderer* tr = TextRenderer::GetInstance();
 		if (tr) {
@@ -130,7 +130,7 @@ void UIButton::Draw() {
 			float btnLeft = position_.x - size_.x * anchorPoint_.x;
 			float textCenterY = position_.y + size_.y * (0.5f - anchorPoint_.y) + textOffset_.y;
 
-			// 1. 左側余白の ">>"（テキストの左手前に端正に配置し、重なりを完全防止）
+			// 1. 左側余白の ">>"
 			float promptX = 0.0f;
 			if (textAlignment_ == TextAlignment::Left) {
 				promptX = btnLeft + (std::max)(8.0f, leftPadding_ - 24.0f);
@@ -140,7 +140,7 @@ void UIButton::Draw() {
 			}
 			tr->Print(fontName, ">>", promptX, textCenterY, fontSize_, selectedTextColor_, { 0.0f, 0.5f });
 
-			// 2. テキスト末尾の点滅カーソル "_"（0.36秒周期で点滅）
+			// 2. テキスト末尾の点滅カーソル "_"
 			bool blink = (std::fmod(promptBlinkTimer_, 0.36f) < 0.18f);
 			if (blink) {
 				float cursorX = 0.0f;

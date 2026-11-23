@@ -73,7 +73,7 @@ bool Collision3DManager::CheckBodyCollision(ICollisionBody3D* a, ICollisionBody3
 	if (typeA == ColliderType3D::AABB && typeB == ColliderType3D::AABB) {
 		return CheckAABBAABB(a->GetAABBCollider(), b->GetAABBCollider());
 	}
-	// Sphere vs AABB（順序を正規化）
+	// Sphere vs AABB
 	if (typeA == ColliderType3D::Sphere && typeB == ColliderType3D::AABB) {
 		return CheckSphereAABB(a->GetSphereCollider(), b->GetAABBCollider());
 	}
@@ -179,7 +179,7 @@ bool Collision3DManager::RayTriangleIntersect(
 	MyMath::Vector3 h = MyMath::Cross(ray.direction, edge2);
 	float a = MyMath::Dot(edge1, h);
 
-	// 平行（レイとポリゴン平面が交差しない）の場合は即座にスキップ
+	// 平行の場合は即座にスキップ
 	if (a > -kEpsilon && a < kEpsilon) {
 		return false;
 	}
@@ -188,7 +188,7 @@ bool Collision3DManager::RayTriangleIntersect(
 	MyMath::Vector3 s = MyMath::Subtract(ray.origin, v0);
 	float u = f * MyMath::Dot(s, h);
 
-	// 重心座標 u が外側の場合、即座に早期脱出（アーリーアウト）
+	// 重心座標 u が外側の場合、即座に早期脱出
 	if (u < 0.0f || u > 1.0f) {
 		return false;
 	}
@@ -196,7 +196,7 @@ bool Collision3DManager::RayTriangleIntersect(
 	MyMath::Vector3 q = MyMath::Cross(s, edge1);
 	float v = f * MyMath::Dot(ray.direction, q);
 
-	// 重心座標 v および (u + v) が外側の場合、即座に早期脱出（アーリーアウト）
+	// 重心座標 v および u + v が外側の場合、即座に早期脱出
 	if (v < 0.0f || u + v > 1.0f) {
 		return false;
 	}
@@ -210,7 +210,7 @@ bool Collision3DManager::RayTriangleIntersect(
 			outHit->distance = t;
 			outHit->point = MyMath::Add(ray.origin, MyMath::Multiply(t, ray.direction));
 
-			// 法線ベクトルの計算 (edge1 x edge2)
+			// 法線ベクトルの計算
 			MyMath::Vector3 n = MyMath::Cross(edge1, edge2);
 			outHit->normal = MyMath::Normalize(n);
 		}

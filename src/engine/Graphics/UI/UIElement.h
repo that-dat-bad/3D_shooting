@@ -49,7 +49,7 @@ public:
 	Vector4 GetColor() const { return color_; }
 
 	// ========================================================
-	// 状態（State）& 条件判定（Custom Lambda）
+	// 状態& 条件判定
 	// ========================================================
 
 	// 条件式の登録
@@ -82,7 +82,7 @@ public:
 	const std::string& GetCurrentState() const { return currentState_; }
 
 	// ========================================================
-	// スタイル設定（各状態ごとの色・スケール・オフセット・モーション）
+	// スタイル設定
 	// ========================================================
 
 	void SetStyle(const std::string& stateName, const UIStateStyle& style) {
@@ -106,7 +106,7 @@ public:
 	const std::unordered_map<std::string, UIStateStyle>& GetStyles() const { return styles_; }
 
 	// ========================================================
-	// 描画用計算結果（アニメーション・モーション適用後）
+	// 描画用計算結果
 	// ========================================================
 
 	Vector2 GetRenderPosition() const {
@@ -139,7 +139,7 @@ protected:
 	void UpdateAnimation(float dt = 1.0f / 60.0f) {
 		animTimer_ += dt;
 
-		// 1. 状態の自動判定（Custom条件ラムダ式を優先順に評価）
+		// 1. 状態の自動判定
 		if (!previewStateOverride_.empty()) {
 			currentState_ = previewStateOverride_;
 		} else {
@@ -152,7 +152,7 @@ protected:
 				}
 			}
 			if (!matchedCustom) {
-				// 汎用状態の維持（UIButton等で Hovered / Selected がセットされていない場合は Normal）
+				// 汎用状態の維持
 				if (currentState_ != "Hovered" && currentState_ != "Selected" && currentState_ != "Pressed") {
 					currentState_ = "Normal";
 				}
@@ -162,7 +162,7 @@ protected:
 		// 2. 現在の目標スタイルを取得
 		UIStateStyle targetStyle = GetStyle(currentState_);
 
-		// 3. スムーズな遷移補間（Tween / Exponential Lerp）
+		// 3. スムーズな遷移補間
 		float t = 1.0f - std::exp(-transitionSpeed_ * dt);
 		currentScale_ += (targetStyle.scale - currentScale_) * t;
 		currentOffset_.x += (targetStyle.offset.x - currentOffset_.x) * t;
@@ -191,7 +191,7 @@ protected:
 			break;
 		}
 		case UILoopMotion::Shake: {
-			// 擬似乱数シェイク（時間ベース）
+			// 擬似乱数シェイク
 			float freq = targetStyle.motionSpeed * 20.0f;
 			float r1 = std::sin(animTimer_ * freq) * std::cos(animTimer_ * freq * 1.3f);
 			float r2 = std::cos(animTimer_ * freq * 1.7f) * std::sin(animTimer_ * freq * 0.9f);
@@ -223,7 +223,7 @@ protected:
 		{ "Pressed",  UIStateStyle{ { 0.8f, 0.8f, 0.8f, 1.0f }, 0.95f, { 0.0f,  2.0f }, UILoopMotion::None, 1.0f, 1.0f } },
 	};
 
-	// Custom条件判定ラムダリスト (順次評価)
+	// Custom条件判定ラムダリスト
 	std::vector<std::pair<std::string, std::function<bool()>>> customConditions_;
 
 	// 実行時アニメーション状態

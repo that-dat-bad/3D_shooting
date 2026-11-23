@@ -1,8 +1,3 @@
-// =========================================================================
-// Object3D.GS.hlsl - 戦闘モード起動スキャン・マテリアライズ Geometry Shader
-// 【無（不可視・ステルス） → ネオンワイヤーフレーム構築 → 3D装甲実体化】
-// =========================================================================
-
 // 頂点シェーダーからの入力
 struct GSInput
 {
@@ -27,7 +22,7 @@ struct GSOutput
     float scanFactor : SCANFACTOR0;
 };
 
-// ライティング・スキャン設定定数バッファ (b5)
+// ライティング・スキャン設定定数バッファ
 struct LightingSettings
 {
     int shadingModel;
@@ -38,9 +33,9 @@ struct LightingSettings
     float emissiveIntensityScale;
     float scanProgress;           // 0.0: 未起動 -> 1.0: スキャン完了
     float scanBandWidth;          // ネオンワイヤーフレーム帯の幅
-    float scanMinZ;               // 機首ノーズZ (-8.5f)
-    float scanMaxZ;               // 尾翼ノズルZ (+8.5f)
-    float32_t4 scanColor;         // ネオン発光色 (エメラルドグリーン)
+    float scanMinZ;               // 機首ノーズZ
+    float scanMaxZ;               // 尾翼ノズルZ
+    float32_t4 scanColor;         // ネオン発光色
 };
 
 ConstantBuffer<LightingSettings> gLightingSettings : register(b3);
@@ -68,8 +63,7 @@ void main(triangle GSInput input[3], inout TriangleStream<GSOutput> triStream)
         return;
     }
 
-    // --- 戦闘モード起動スキャン・マテリアライズ演出 ---
-    // 機首 (scanMinZ: -8.5f) から尾翼 (scanMaxZ: +8.5f) へ走査スキャンレーザーが走る
+    // 戦闘モード起動スキャン演出
     float currentScanZ = gLightingSettings.scanMinZ + (gLightingSettings.scanMaxZ - gLightingSettings.scanMinZ) * saturate(gLightingSettings.scanProgress);
     float bandWidth = max(0.5f, gLightingSettings.scanBandWidth);
 
@@ -77,14 +71,13 @@ void main(triangle GSInput input[3], inout TriangleStream<GSOutput> triStream)
     float minZ = min(input[0].localPosition.z, min(input[1].localPosition.z, input[2].localPosition.z));
     float maxZ = max(input[0].localPosition.z, max(input[1].localPosition.z, input[2].localPosition.z));
 
-    // 1. 【無（不可視・ステルス）フェーズ】
-    // スキャンレーザーがまだ到達していない後方領域は、三角形を一切出力せず完全破棄！
+    // 未到達の三角形を破棄
     if (minZ > currentScanZ)
     {
-        return; // GPUパイプラインから完全破棄＝無！
+        return;
     }
 
-    // 重心座標（Barycentric Coordinates）: ピクセルシェーダーで完全なワイヤーフレームを抽出
+    // 重心座標: ピクセルシェーダーで完全なワイヤーフレームを抽出
     const float32_t3 barycentrics[3] = {
         float32_t3(1.0f, 0.0f, 0.0f),
         float32_t3(0.0f, 1.0f, 0.0f),
@@ -102,19 +95,16 @@ void main(triangle GSInput input[3], inout TriangleStream<GSOutput> triStream)
         output.localPosition = input[j].localPosition;
         output.barycentric = barycentrics[j];
 
-        // スキャンレーザー境界帯に入っているかを計算
-        // distToScan: スキャン面からの距離（0.0: まさにスキャン面中心, bandWidth: 境界帯の端）
+        // スキャン境界帯の距離計算
         float distToScan = currentScanZ - input[j].localPosition.z;
         if (distToScan <= bandWidth)
         {
-            // 2. 【ネオンワイヤーフレーム構築フェーズ】
-            // スキャンレーザー境界帯では、scanFactor が 1.0 〜 0.0 で減衰
+            // ワイヤーフレーム構築フェーズ
             output.scanFactor = saturate(1.0f - (distToScan / bandWidth));
         }
         else
         {
-            // 3. 【3D装甲実体化フェーズ】
-            // レーザー通過後は完全な3D装甲テクスチャ＋ライティング
+            // 3D装甲実体化フェーズ
             output.scanFactor = 0.0f;
         }
 

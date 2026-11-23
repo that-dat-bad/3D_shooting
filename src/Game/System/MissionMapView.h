@@ -8,7 +8,7 @@
 // ImGui forward declaration
 struct ImDrawList;
 
-// ミッションエディタのビジュアルマップ表示（War Thunder風）
+// ミッションエディタのビジュアルマップ表示
 class MissionMapView {
 public:
 	MissionMapView() = default;
@@ -16,7 +16,7 @@ public:
 
 	void Initialize();
 
-	// 2Dマップを描画し、インタラクション（ドラッグ等）を処理する
+	// 2Dマップを描画し、インタラクションを処理する
 	// missionData: 現在編集中のミッションデータ
 	// playerPos: 現在のプレイヤー座標
 	void Draw(MissionData& missionData, const MyMath::Vector3& playerPos);
@@ -37,9 +37,9 @@ public:
 	}
 
 private:
-	// カメラ（マップ表示のオフセットとズーム）
-	Vector2 cameraPos_{ 0.0f, 0.0f }; // マップの中心座標 (ワールドX, ワールドZ)
-	float zoom_ = 1.0f;                       // 1ピクセルあたりのワールド距離の逆数 (1.0 = 1m/px)
+	// カメラ
+	Vector2 cameraPos_{ 0.0f, 0.0f }; // マップの中心座標
+	float zoom_ = 1.0f;                       // 1ピクセルあたりのワールド距離の逆数
 
 	// ドラッグ・パン操作の状態
 	bool isDraggingMap_ = false;
@@ -55,8 +55,8 @@ private:
 		TriggerArea
 	};
 	DragTarget currentDragTarget_ = DragTarget::None;
-	int dragIndex1_ = -1; // メインインデックス (enemy, path, trigger 等)
-	int dragIndex2_ = -1; // サブインデックス (waypoint 等)
+	int dragIndex1_ = -1; // メインインデックス
+	int dragIndex2_ = -1; // サブインデックス
 
 	// 選択状態
 	int selectedEnemyIndex_ = -1;

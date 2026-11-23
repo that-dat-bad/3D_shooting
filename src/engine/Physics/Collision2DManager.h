@@ -10,7 +10,7 @@
 class Collision2DManager {
 public:
 	/// <summary>
-	/// コライダーを登録する（毎フレーム呼ぶ）
+	/// コライダーを登録する
 	/// </summary>
 	/// <param name="body">判定に参加するオブジェクト</param>
 	void Register(ICollisionBody2D* body);
@@ -18,26 +18,26 @@ public:
 	/// <summary>登録済みの全コライダーの総当たり判定を実行</summary>
 	void CheckAllCollisions();
 
-	/// <summary>登録リストをクリア（フレーム開始時に呼ぶ）</summary>
+	/// <summary>登録リストをクリア</summary>
 	void Clear();
 
 	/// <summary>現在の登録数を取得</summary>
 	size_t GetBodyCount() const { return bodies_.size(); }
 
 	// ============================================================
-	// ジオメトリユーティリティ (static)
+	// ジオメトリユーティリティ
 	// ============================================================
 
 	/// <summary>円と円の衝突判定</summary>
 	static bool CheckCircleCircle(const CircleCollider& a, const CircleCollider& b);
 
-	/// <summary>矩形と矩形の衝突判定（AABB 2D）</summary>
+	/// <summary>矩形と矩形の衝突判定</summary>
 	static bool CheckRectRect(const RectCollider& a, const RectCollider& b);
 
 	/// <summary>円と矩形の衝突判定</summary>
 	static bool CheckCircleRect(const CircleCollider& circle, const RectCollider& rect);
 
-	/// <summary>点が矩形内にあるか（UI クリック判定用）</summary>
+	/// <summary>点が矩形内にあるか</summary>
 	static bool CheckPointRect(const Vector2& point, const RectCollider& rect);
 
 	/// <summary>点が円内にあるか</summary>

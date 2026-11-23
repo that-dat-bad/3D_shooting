@@ -5,7 +5,7 @@ SamplerState gSampler : register(s0);
 
 struct PostEffectParams {
     int32_t kernelSize;
-    float intensity;      // ノイズの強さ (Noise Strength / Scale)
+    float intensity;      // ノイズの強さ
     float dirX;
     float dirY;
     float time;
@@ -31,18 +31,15 @@ PixelShaderOutput main(VertexShaderOutput input)
     PixelShaderOutput output;
     float32_t4 baseColor = gTexture.Sample(gSampler, input.texcoord);
     
-    // 時間による時間的シード変化を加えてノイズを動かす (gParams.time)
-    // ノイズのテクスチャ解像度を上げるため、座標に大きい値をかける
-    // sin/cosの組み合わせにより、毎フレームごとにランダムに座標オフセットをずらす
+    // 時間ベースのノイズ座標オフセット
     float2 offset = float2(sin(gParams.time * 29.35f) * 100.0f, cos(gParams.time * 37.17f) * 100.0f);
     float2 noiseCoord = input.texcoord * float2(960.0f, 540.0f) + offset;
     float noise = rand2dTo1d(noiseCoord);
     
-    // ノイズを -0.5 ~ +0.5 に正規化し、強度(intensity)を乗算して加算する
+    // ノイズを -0.5 ~ +0.5 に正規化し、強度を乗算して加算する
     float32_t3 noiseFactor = (noise - 0.5f) * gParams.intensity;
     
-    // intensity <= 0.15 の時は従来の微小粒子ノイズ
-    // intensity > 0.15 からは信号減衰が進み、ベース画像が徐々にアナログ砂嵐（スノーノイズ）へ埋没していく
+    // 強度に応じたノイズ遷移
     float snowBlend = saturate((gParams.intensity - 0.15f) / 0.60f); // 0.15〜0.75で 0.0 -> 1.0
     float3 snowColor = float3(noise, noise, noise);
     float3 fadedBase = lerp(baseColor.rgb, snowColor, snowBlend * 0.90f);

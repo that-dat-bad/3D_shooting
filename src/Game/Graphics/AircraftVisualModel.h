@@ -47,7 +47,7 @@ public:
 	// プロペラ回転速度の設定 (rad/sec)
 	void SetPropellerRpm(float rpm) { propellerRpm_ = rpm; }
 
-	// モデル全体の向き補正（ベース回転）の設定 (rad)
+	// モデル全体の向き補正の設定 (rad)
 	void SetBaseRotation(const Vector3& rotate) { baseRotation_ = rotate; }
 	Vector3 GetBaseRotation() const { return baseRotation_; }
 
@@ -81,7 +81,7 @@ public:
 	// 全パーツにカスタム定数バッファを設定
 	void SetCustomLightingSettingsResource(ID3D12Resource* res);
 
-	// コクピットキャノピー（ガラス部）のマテリアル設定
+	// コクピットキャノピーのマテリアル設定
 	void SetupCanopyMaterial();
 
 private:
@@ -96,7 +96,7 @@ private:
 	Camera* camera_ = nullptr;
 	std::unordered_map<DamagePart, PartNode> partNodes_;
 
-	Vector3 baseRotation_ = { 0.0f, static_cast<float>(M_PI), 0.0f }; // デフォルトは前後逆補正(180度回転)
+	Vector3 baseRotation_ = { 0.0f, static_cast<float>(M_PI), 0.0f }; // デフォルトは前後逆補正
 	float propellerAngle_ = 0.0f;
 	float propellerRpm_ = 2000.0f; // デフォルトRPM
 };

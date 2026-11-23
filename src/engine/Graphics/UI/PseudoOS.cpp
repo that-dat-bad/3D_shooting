@@ -23,7 +23,7 @@ void PseudoOS::Initialize(SpriteCommon* spriteCommon, Theme theme) {
 	currentTheme_ = theme;
 	ApplyThemePalette();
 
-	// スプライトプールの初期化（512枚：プール枯渇防止）
+	// スプライトプールの初期化
 	if (spritePool_.empty()) {
 		spritePool_.clear();
 		for (int i = 0; i < 512; ++i) {
@@ -39,7 +39,7 @@ void PseudoOS::Initialize(SpriteCommon* spriteCommon, Theme theme) {
 	}
 	spritePoolIdx_ = 0;
 
-	// 専用カーソルスプライトの初期化（64個：プール枯渇と完全分離）
+	// 専用カーソルスプライトの初期化
 	while (cursorSprites_.size() < 64) {
 		auto sp = std::make_unique<Sprite>();
 		sp->Initialize(spriteCommon, "assets/textures/white1x1.png");
@@ -217,7 +217,7 @@ void PseudoOS::Update(float dt, const Vector2& mousePos, bool isLDown, bool isLT
 	float my = mousePos.y;
 	const float tbY = 688.0f;
 
-	// 1. ウィンドウ開閉アニメーション / 最小化・復元アニメーション (Tween)
+	// 1. ウィンドウ開閉アニメーション / 最小化・復元アニメーション
 	if (windowAnimState_ == WindowAnimState::Opening) {
 		windowAnimTimer_ += dt;
 		float t = Easing::Clamp01(windowAnimTimer_ / (std::max)(0.001f, windowAnimDuration_));
@@ -265,17 +265,17 @@ void PseudoOS::Update(float dt, const Vector2& mousePos, bool isLDown, bool isLT
 		}
 	}
 
-	// 3. クリック判定（タスクバー・スタートメニュー・ウィンドウ操作）
+	// 3. クリック判定
 	if (isLTrig) {
 		// A. タスクバー上の操作判定
 		if (isTaskbarVisible_ && my >= tbY) {
-			// スタートボタン [⯈ DAWN_OS] (8px 〜 112px)
+			// スタートボタン [⯈ DAWN_OS]
 			if (mx >= 8.0f && mx <= 114.0f && my >= tbY + 2.0f && my <= tbY + 30.0f) {
 				isStartMenuOpen_ = !isStartMenuOpen_;
 				return;
 			}
 
-			// タスクバータブ（ウィンドウ復元/最小化トグル）
+			// タスクバータブ
 			float tabX = 120.0f;
 			for (auto& win : windows_) {
 				float tabW = 142.0f;
@@ -326,14 +326,14 @@ void PseudoOS::Update(float dt, const Vector2& mousePos, bool isLDown, bool isLT
 			}
 		}
 
-		// C. ウィンドウのクリック判定（手前優先：逆順探索）
+		// C. ウィンドウのクリック判定
 		for (auto it = windowZOrder_.rbegin(); it != windowZOrder_.rend(); ++it) {
 			int winId = *it;
 			Window* winPtr = GetWindow(winId);
 			if (!winPtr || !winPtr->isOpen || winPtr->isMinimized) continue;
 			Window& win = *winPtr;
 
-			// タイトルバー右上のボタン判定 [X] (タスクバーへ最小化)
+			// タイトルバー右上のボタン判定 [X]
 			float closeW = 24.0f;
 			float closeH = 22.0f;
 			float closeX = win.pos.x + win.size.x - 32.0f;
@@ -369,12 +369,12 @@ void PseudoOS::Draw() {
 	TextRenderer* tr = TextRenderer::GetInstance();
 	spritePoolIdx_ = 0;
 
-	// 1. デスクトップ上部ヘッダー（OSウォーターマーク & クリアランス）
+	// 1. デスクトップ上部ヘッダー
 	tr->Print("HackGen", osName_, 24.0f, 18.0f, 12.0f, colSecondary_);
 	tr->Print("HackGen", securityClearance_, kScreenWidth - 380.0f, 18.0f, 11.5f, colSecondary_);
 	tr->Flush();
 
-	// 2. 全ウィンドウ描画（ZOrder順：奥から手前へ）
+	// 2. 全ウィンドウ描画
 	for (int winId : windowZOrder_) {
 		Window* win = GetWindow(winId);
 		if (!win || !win->isOpen || win->animScale < 0.01f) continue;
@@ -388,7 +388,7 @@ void PseudoOS::Draw() {
 		tr->Flush();
 	}
 
-	// 4. カスタムサイバーマウスカーソル（最前面）
+	// 4. カスタムサイバーマウスカーソル
 	if (isCursorVisible_) {
 		DrawCustomCursor();
 		tr->Flush();
@@ -422,7 +422,7 @@ void PseudoOS::DrawWindowFrame(Window& win) {
 	DrawRect({ curPos.x + shadowOffset1, curPos.y + shadowOffset1 }, curSize, { 0.0f, 0.0f, 0.0f, 0.40f * smoothS });
 	DrawRect({ curPos.x + shadowOffset2, curPos.y + shadowOffset2 }, curSize, { 0.0f, 0.0f, 0.0f, 0.18f * smoothS });
 
-	// 1. ウィンドウ本体パネル（背後を完全遮蔽するソリッドバックプレート）
+	// 1. ウィンドウ本体パネル
 	DrawPanel(curPos, curSize, colPanelBg_, borderCol, isActive ? 2.0f : 1.0f);
 
 	if (smoothS < 0.35f) { return; } // アニメーション極小時は枠のみ
@@ -441,7 +441,7 @@ void PseudoOS::DrawWindowFrame(Window& win) {
 		tr->Print("HackGen", "[IDLE]  " + win.title, curPos.x + 28.0f, curPos.y + 9.0f, 11.5f * smoothS, colSecondary_);
 	}
 
-	// 3. タイトルバー右側のステータスバッジ ＆ [X] ボタン (ミッション選択ウィンドウと同一仕様)
+	// 3. タイトルバー右側のステータスバッジ ＆ [X] ボタン
 	const float closeX = curPos.x + curSize.x - 32.0f;
 	const float closeY = curPos.y + 6.0f;
 	const float closeW = 24.0f;
@@ -468,7 +468,7 @@ void PseudoOS::DrawWindowFrame(Window& win) {
 		win.onDrawContent(win, this);
 	}
 
-	// 5. 四隅コーナーブラケット（アクティブ時強調）
+	// 5. 四隅コーナーブラケット
 	if (isActive) {
 		const float cLen = 14.0f;
 		const float cThick = 2.0f;
@@ -527,7 +527,7 @@ void PseudoOS::DrawTaskbar() {
 			DrawRect({ tabX, tabY }, { tabW, 2.0f }, colHighlight_); // アクティブタブ上端ネオンライン
 		}
 
-		// ステータスLED（最小化中はアンバー点滅）
+		// ステータスLED
 		bool amberBlink = (std::fmod(animTimer_, 0.6f) < 0.35f);
 		Vector4 dotCol = isAct ? colLedActive_
 		               : (isMin ? (amberBlink ? Vector4{ 1.0f, 0.80f, 0.20f, 1.0f } : Vector4{ 0.45f, 0.35f, 0.08f, 0.6f })
@@ -647,10 +647,7 @@ void PseudoOS::DrawCustomCursor() {
 		drawCursorRect({ cursorRipplePos_.x + rRad - 1.5f, cursorRipplePos_.y - rRad }, { 1.5f, rRad * 2.0f }, ringCol);
 	}
 
-	// 2. 三角形カスタムサイバーカーソル（テーマカラー適応）
-	// P0: (mx, my) 先端
-	// P1: (mx + 7.0f, my + 22.0f) 下端頂点
-	// P2: (mx + 22.0f, my + 7.0f) 右端頂点
+	// 三角形カスタムカーソル
 	const Vector4 kBlackEdge = { 0.0f, 0.0f, 0.0f, 0.95f };
 	const Vector4 kBody = colPrimary_;
 	const Vector4 kEdge = colHighlight_;
@@ -661,7 +658,7 @@ void PseudoOS::DrawCustomCursor() {
 	drawCursorLine({ mx - 0.5f, my - 0.5f }, { mx + 6.5f, my + 22.5f }, 3.5f, kBlackEdge);
 	drawCursorLine({ mx + 6.5f, my + 22.5f }, { mx + 22.5f, my + 6.5f }, 3.5f, kBlackEdge);
 
-	// 2.2 ソリッド塗りつぶし（スキャンラインスライシング）
+	// 2.2 ソリッド塗りつぶし
 	for (int y = 0; y <= 22; ++y) {
 		float fy = static_cast<float>(y);
 		float x1 = fy * (7.0f / 22.0f);
@@ -710,7 +707,7 @@ void PseudoOS::DrawCRTShutdown(float progress, float screenWidth, float screenHe
 	float p = Easing::Clamp01(progress);
 	if (p <= 0.0f) return;
 
-	// フェーズ1: 上下から黒帯が迫り、中央のスリットに画面が収束 (0.0〜0.35)
+	// フェーズ1: 上下から黒帯が迫り、中央のスリットに画面が収束
 	if (p < 0.35f) {
 		float phaseT = p / 0.35f;
 		float curH = screenHeight * (1.0f - phaseT);
@@ -721,7 +718,7 @@ void PseudoOS::DrawCRTShutdown(float progress, float screenWidth, float screenHe
 		// 下黒帯
 		DrawRect({ 0.0f, curY + curH }, { screenWidth, screenHeight - (curY + curH) }, { 0.0f, 0.0f, 0.0f, 1.0f });
 	} else {
-		// フェーズ2: 画面全体が暗転し、中央の白い水平線が左右から縮小して点となって消える (0.35〜1.0)
+		// フェーズ2: 画面全体が暗転し、中央の白い水平線が左右から縮小して点となって消える
 		float phaseT = (p - 0.35f) / 0.65f;
 		phaseT = (std::min)(1.0f, phaseT);
 

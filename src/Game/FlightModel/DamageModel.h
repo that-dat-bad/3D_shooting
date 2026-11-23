@@ -11,18 +11,18 @@
 enum class DamagePart : uint8_t {
 	Engine1,        // エンジン
 	Propeller1,     // プロペラ
-	Wing_L,         // 左翼（付け根）
-	Wing_R,         // 右翼（付け根）
-	Wing1_L,        // 左翼（中間）
-	Wing1_R,        // 右翼（中間）
-	Wing2_L,        // 左翼（翼端）
-	Wing2_R,        // 右翼（翼端）
+	Wing_L,         // 左翼
+	Wing_R,         // 右翼
+	Wing1_L,        // 左翼
+	Wing1_R,        // 右翼
+	Wing2_L,        // 左翼
+	Wing2_R,        // 右翼
 	Tail,           // 尾部
 	Fuse,           // 胴体前部
 	Fuse1,          // 胴体後部
 	Pilot,          // パイロット
-	Tank1,          // 燃料タンク1（左翼）
-	Tank2,          // 燃料タンク2（右翼）
+	Tank1,          // 燃料タンク1
+	Tank2,          // 燃料タンク2
 	Oil1,           // オイルライン
 	TailControl,    // 尾翼操縦系統
 	WingControl,    // 主翼操縦系統
@@ -37,10 +37,10 @@ enum class DamagePart : uint8_t {
 
 // パーツの素材タイプ
 enum class ArmorMaterial : uint8_t {
-	Dural,          // ジュラルミン（軽量・低耐久）
-	Steel,          // 鉄鋼（中耐久）
-	Armor,          // 装甲（高耐久・ダメージ軽減）
-	Protected,      // 保護系統（操縦索など）
+	Dural,          // ジュラルミン
+	Steel,          // 鉄鋼
+	Armor,          // 装甲
+	Protected,      // 保護系統
 };
 
 // パーツの状態フラグ
@@ -48,7 +48,7 @@ namespace PartStatus {
 	constexpr uint8_t Normal    = 0;
 	constexpr uint8_t Damaged   = 1 << 0;  // 損傷あり
 	constexpr uint8_t OnFire    = 1 << 1;  // 火災中
-	constexpr uint8_t Leaking   = 1 << 2;  // 漏れ（燃料/オイル）
+	constexpr uint8_t Leaking   = 1 << 2;  // 漏れ
 	constexpr uint8_t Destroyed = 1 << 3;  // 完全破壊/切断
 }
 
@@ -61,7 +61,7 @@ struct DamagePartDef {
 	float maxHP = 10.0f;
 	ArmorMaterial material = ArmorMaterial::Dural;
 	float genericDamageMult = 1.0f;  // 汎用ダメージ倍率
-	bool canSeparate = false;        // 切断可能か（翼系パーツ）
+	bool canSeparate = false;        // 切断可能か
 };
 
 // パーツの現在状態
@@ -79,16 +79,16 @@ struct DamagePartState {
 	bool IsAlive() const { return !HasFlag(PartStatus::Destroyed); }
 };
 
-// サブコライダー定義（機体ローカル空間のOBBボックス）
+// サブコライダー定義
 struct SubColliderDef {
 	DamagePart part;                // 対応するパーツ
 	MyMath::Vector3 center;         // ローカル空間での中心位置
-	MyMath::Vector3 halfSize;       // 半径（各軸方向のハーフサイズ）
+	MyMath::Vector3 halfSize;       // 半径
 };
 
 // 被弾結果
 struct HitResult {
-	DamagePart hitPart = DamagePart::Count;   // 被弾パーツ（Count = ミス）
+	DamagePart hitPart = DamagePart::Count;   // 被弾パーツ
 	float damageDealt = 0.0f;                 // 実際に与えたダメージ
 	bool partDestroyed = false;               // このヒットでパーツが破壊されたか
 	bool fireStarted = false;                 // 火災が発生したか
@@ -165,8 +165,7 @@ public:
 		float groundY = 0.0f
 	);
 
-	// 水面（海・川）との衝突・水没・浮力判定（War Thunder準拠）
-	// 戻り値: 深水域で水面に接触した場合 true（極浅瀬では false を返し海底の地上判定へ委ねる）
+	// 水面との衝突・水没・浮力判定
 	bool ProcessWaterCollision(
 		MyMath::Vector3& position,
 		const MyMath::Quaternion& orientation,
@@ -233,7 +232,7 @@ private:
 	// OBB判定
 	static bool IsPointInBox(const MyMath::Vector3& point, const SubColliderDef& box);
 
-	// パーツ定義（不変）と状態（可変）
+	// パーツ定義と状態
 	DamagePartDef  partDefs_[kPartCount]{};
 	DamagePartState partStates_[kPartCount]{};
 

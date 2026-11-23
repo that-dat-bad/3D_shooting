@@ -17,7 +17,7 @@ PixelShaderOutput main(PixelShaderInput input) {
     float32_t4 textureColor = gTexture.Sample(gSampler, input.texcoord);
     output.color = textureColor * input.color;
     
-    // alphaが0なら破棄（不要な場合もありますが、アルファテスト用）
+    // alphaが0なら破棄
     if (output.color.a == 0.0f) {
         discard;
     }

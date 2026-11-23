@@ -23,7 +23,7 @@ cbuffer CameraData : register(b0)
 //テクスチャ
 Texture2D<float32_t4> gTexture : register(t0);
 
-//インスタンシングデータ (StructuredBuffer)
+//インスタンシングデータ
 StructuredBuffer<ParticleForGPU> gParticleData : register(t1);
 
 //深度テクスチャ

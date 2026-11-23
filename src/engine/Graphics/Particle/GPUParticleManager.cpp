@@ -63,29 +63,29 @@ void GPUParticleManager::CreateBuffers() {
 	particleSrvIndex_ = srvManager_->Allocate();
 	aliveListSrvIndex_ = srvManager_->Allocate();
 
-	// 1. Particle Buffer (UAV/SRV)
+	// 1. Particle Buffer
 	particleBuffer_ = dxCommon_->CreateUAVBufferResource(sizeof(ParticleCS) * kMaxParticles);
 	srvManager_->CreateUAVforStructuredBuffer(particleUavIndex_, particleBuffer_.Get(), kMaxParticles, sizeof(ParticleCS));
 	srvManager_->CreateSRVforStructuredBuffer(particleSrvIndex_, particleBuffer_.Get(), kMaxParticles, sizeof(ParticleCS));
 
-	// 2. FreeListIndex Buffer (UAV)
+	// 2. FreeListIndex Buffer
 	freeListIndexBuffer_ = dxCommon_->CreateUAVBufferResource(sizeof(int32_t));
 	srvManager_->CreateUAVforStructuredBuffer(freeListIndexUavIndex_, freeListIndexBuffer_.Get(), 1, sizeof(int32_t));
 
-	// 3. FreeList Buffer (UAV)
+	// 3. FreeList Buffer
 	freeListBuffer_ = dxCommon_->CreateUAVBufferResource(sizeof(uint32_t) * kMaxParticles);
 	srvManager_->CreateUAVforStructuredBuffer(freeListUavIndex_, freeListBuffer_.Get(), kMaxParticles, sizeof(uint32_t));
 
-	// 4. AliveList Buffer (UAV/SRV)
+	// 4. AliveList Buffer
 	aliveListBuffer_ = dxCommon_->CreateUAVBufferResource(sizeof(uint32_t) * kMaxParticles);
 	srvManager_->CreateUAVforStructuredBuffer(aliveListUavIndex_, aliveListBuffer_.Get(), kMaxParticles, sizeof(uint32_t));
 	srvManager_->CreateSRVforStructuredBuffer(aliveListSrvIndex_, aliveListBuffer_.Get(), kMaxParticles, sizeof(uint32_t));
 
-	// 5. IndirectArgs Buffer (UAV)
+	// 5. IndirectArgs Buffer
 	indirectArgsBuffer_ = dxCommon_->CreateUAVBufferResource(sizeof(D3D12_DRAW_ARGUMENTS));
 	srvManager_->CreateUAVforStructuredBuffer(indirectArgsUavIndex_, indirectArgsBuffer_.Get(), 4, sizeof(uint32_t));
 
-	// 4. EmitterSphere (Constant Buffer) -> b0
+	// 4. EmitterSphere -> b0
 	for (int i = 0; i < 2; ++i) {
 		emitterSphereBuffer_[i] = dxCommon_->CreateBufferResource(sizeof(EmitterSphere));
 		emitterSphereBuffer_[i]->Map(0, nullptr, reinterpret_cast<void**>(&emitterSphereData_[i]));
@@ -97,13 +97,13 @@ void GPUParticleManager::CreateBuffers() {
 		emitterSphereData_[i]->emit = 0;
 	}
 
-	// 5. PerFrame (Constant Buffer)
+	// 5. PerFrame
 	perFrameBuffer_ = dxCommon_->CreateBufferResource(sizeof(PerFrame));
 	perFrameBuffer_->Map(0, nullptr, reinterpret_cast<void**>(&perFrameData_));
 	perFrameData_->time = 0.0f;
 	perFrameData_->deltaTime = 1.0f / 60.0f;
 
-	// 6. PerView (Constant Buffer)
+	// 6. PerView
 	perViewBuffer_ = dxCommon_->CreateBufferResource(sizeof(PerView));
 	perViewBuffer_->Map(0, nullptr, reinterpret_cast<void**>(&perViewData_));
 

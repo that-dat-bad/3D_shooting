@@ -20,7 +20,7 @@ public:
 	EnemyManager() = default;
 	~EnemyManager() = default;
 
-	// 地形マネージャー設定（監視塔接地・低空飛行の高度参照用）
+	// 地形マネージャー設定
 	void SetTerrainChunkManager(TerrainChunkManager* terrain) { terrain_ = terrain; }
 
 	// 初期化

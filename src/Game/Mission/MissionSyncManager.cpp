@@ -33,7 +33,7 @@ void MissionSyncManager::SetActiveMissionFilePath(const std::string& filePath) {
 std::string MissionSyncManager::BuildLiveEndpoint() const {
 	namespace fs = std::filesystem;
 
-	// プロジェクトルート（ゲームプロセスのカレントパス）
+	// プロジェクトルート
 	fs::path rootPath = fs::current_path();
 	std::string rootStr = rootPath.generic_string();
 

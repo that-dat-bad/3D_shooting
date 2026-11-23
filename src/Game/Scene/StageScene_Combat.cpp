@@ -4,7 +4,7 @@
 using namespace MyMath;
 
 namespace {
-	// 直交正規基底 (Right, Up, Forward) からクォータニオンを計算
+	// 直交正規基底からクォータニオンを計算
 	MyMath::Quaternion BasisToQuaternion(const MyMath::Vector3& r, const MyMath::Vector3& u, const MyMath::Vector3& f) {
 		float tr = r.x + u.y + f.z;
 		MyMath::Quaternion q{};
@@ -71,13 +71,12 @@ void StageScene::TriggerGameOver() {
 	auto& res = GameResult::GetInstance();
 	res.gameOverReason = GameOverReason::Destroyed;
 
-	// 非同期処理による軽量化：ゲームオーバー演出中にバックグラウンドで次ステージデータを非同期プリロード！
 	AsyncPreloadManager::GetInstance()->StartStagePreloadAsync();
 
 	// テーマカラー赤反転
 	hud_.SetWarningColorMode(true);
 
-	// 初撃爆破エフェクト（火球・閃光・破片飛散）
+	// 初撃爆破エフェクト
 	EffectManager::GetInstance()->EmitDestroyEffect(flightModel_.GetPosition());
 
 	// ベイルアウト時：キャノピー吹き飛ばし＆射出座席の火花演出
@@ -110,7 +109,7 @@ void StageScene::TriggerGameOver() {
 	flightModel_.SetGEffectsEnabled(false);
 	flightModel_.ResetGEffects();
 
-	// 墜落弾道速度の初期化（前進モーメンタムを維持）
+	// 墜落弾道速度の初期化
 	Vector3 curVel = flightModel_.GetVelocity();
 	float curSpeed = Length(curVel);
 	Vector3 forward = flightModel_.GetForwardDirection();
@@ -120,12 +119,12 @@ void StageScene::TriggerGameOver() {
 		gameOverVelocity_ = curVel;
 	}
 
-	// エースコンバット風の制御不能きりもみ回転（タンブル角速度）
+	// エースコンバット風の制御不能きりもみ回転
 	float rollDir = ((rand() % 2) == 0) ? 1.0f : -1.0f;
 	float yawDir = ((rand() % 2) == 0) ? 1.0f : -1.0f;
-	gameOverTumbleRate_.x = -1.1f - (rand() % 60) * 0.01f; // 機首下げピッチ (-1.1〜-1.7 rad/s)
-	gameOverTumbleRate_.y = yawDir * (0.8f + (rand() % 50) * 0.01f); // ヨー旋回 (±0.8〜±1.3 rad/s)
-	gameOverTumbleRate_.z = rollDir * (4.2f + (rand() % 120) * 0.01f); // 激しい高速ロール (±4.2〜±5.4 rad/s)
+	gameOverTumbleRate_.x = -1.1f - (rand() % 60) * 0.01f; // 機首下げピッチ
+	gameOverTumbleRate_.y = yawDir * (0.8f + (rand() % 50) * 0.01f); // ヨー旋回
+	gameOverTumbleRate_.z = rollDir * (4.2f + (rand() % 120) * 0.01f); // 激しい高速ロール
 }
 
 void StageScene::TriggerTimeOver() {
@@ -173,14 +172,14 @@ void StageScene::TriggerGameClear() {
 	endSequence_ = StageEndSequence::Clear_HudShutdown;
 	endSeqTimer_ = 0.0f;
 
-	// 自機を完全無敵化（受けるダメージ0）
+	// 自機を完全無敵化
 	flightModel_.SetInvulnerable(true);
 
-	// G効果（ブラックアウト・レッドアウト）を即座に無効化＆リセット
+	// G効果を即座に無効化＆リセット
 	flightModel_.SetGEffectsEnabled(false);
 	flightModel_.ResetGEffects();
 
-	// オートパイロット移行（物理シミュレーションを直接制御）
+	// オートパイロット移行
 	flightModel_.SetAutopilot(true);
 
 	// 離脱機動の初期状態を保持
@@ -214,7 +213,7 @@ void StageScene::PlayerCollisionBody::OnCollision(ICollisionBody3D* other) {
 		HitResult res = scene_->flightModel_.ProcessBulletHit(bulletPos, damage);
 		EffectManager::GetInstance()->EmitHitEffect(bulletPos);
 
-		// カメラシェイク（被弾）
+		// カメラシェイク
 		if (CameraManager::GetInstance()->GetActiveCamera()) {
 			CameraManager::GetInstance()->GetActiveCamera()->Shake(0.5f, 2.0f);
 		}
@@ -233,7 +232,7 @@ void StageScene::PlayerCollisionBody::OnCollision(ICollisionBody3D* other) {
 		scene_->flightModel_.GetDamageModel().ProcessHit(DamagePart::Fuse, 50.0f);
 		EffectManager::GetInstance()->EmitHitEffect(scene_->flightModel_.GetPosition());
 
-		// カメラシェイク（激突）
+		// カメラシェイク
 		if (CameraManager::GetInstance()->GetActiveCamera()) {
 			CameraManager::GetInstance()->GetActiveCamera()->Shake(0.8f, 5.0f);
 		}
@@ -255,7 +254,7 @@ void StageScene::CheckPartDestructionEvents() {
 				// 1. ビジュアル側を非表示化
 				aircraftVisualModel_.SetPartVisible(part, false);
 
-				// 2. 切断破片（Debris）を生成しワールドへ放出して物理運動
+				// 2. 切断破片を生成しワールドへ放出して物理運動
 				Matrix4x4 partWorldMatrix = aircraftVisualModel_.GetPartWorldMatrix(part);
 				Vector3 baseVelocity = flightModel_.GetVelocity();
 				Vector3 ejectForce = Multiply(6.0f, flightModel_.GetRightDirection());
@@ -316,14 +315,14 @@ void StageScene::UpdateEndSequence(float dt) {
 	PostEffect* postEffect = PostEffect::GetInstance();
 	postEffect->ClearActiveEffects();
 
-	// --- ゲームオーバー系（エースコンバット風：機体炎上きりもみ落下 & 連続火炎・黒煙・火花放出 & 通信シグナル段階的途絶）---
+	// --- ゲームオーバー系---
 	if (endSequence_ == StageEndSequence::GameOver_Critical ||
 		endSequence_ == StageEndSequence::GameOver_SignalLost ||
 		endSequence_ == StageEndSequence::GameOver_CrtShutdown) {
 
 		timeScale_ = 1.0f; // 物理更新と炎・煙の動きを止めずに実時間でシミュレーション
 
-		// 1. 落下重力と空気抵抗による弾道計算（緩やかに機首を下げながらきりもみ落下）
+		// 1. 落下重力と空気抵抗による弾道計算
 		gameOverVelocity_.y -= 9.81f * 1.5f * dt;
 		gameOverVelocity_.x *= (1.0f - 0.15f * dt);
 		gameOverVelocity_.z *= (1.0f - 0.15f * dt);
@@ -338,7 +337,7 @@ void StageScene::UpdateEndSequence(float dt) {
 		flightModel_.SetPosition(newPos);
 		flightModel_.SetVelocity(gameOverVelocity_);
 
-		// 2. きりもみ回転（タンブル）クォータニオン更新
+		// 2. きりもみ回転クォータニオン更新
 		Vector3 right = flightModel_.GetRightDirection();
 		Vector3 up = flightModel_.GetUpDirection();
 		Vector3 forward = flightModel_.GetForwardDirection();
@@ -368,7 +367,7 @@ void StageScene::UpdateEndSequence(float dt) {
 		Quaternion comb = qMul(qR, qMul(qY, qP));
 		flightModel_.SetOrientation(qMul(comb, flightModel_.GetOrientation()));
 
-		// 3. 機体からの激しい火炎・濃密黒煙・火花トレイルの連続放出（煙出しながら激しく燃える）
+		// 3. 機体からの激しい火炎・濃密黒煙・火花トレイルの連続放出
 		gameOverBurnTimer_ += dt;
 		if (gameOverBurnTimer_ >= 0.020f) {
 			gameOverBurnTimer_ = 0.0f;
@@ -471,7 +470,7 @@ void StageScene::UpdateEndSequence(float dt) {
 			pm->Emit("ExplosionSpark", firePos1, sparkParams, 5);
 			pm->Emit("ExplosionSpark", firePos2, sparkParams, 3);
 
-			// 炎の動的ライト（明滅）
+			// 炎の動的ライト
 			PointLight* pLight = Object3dCommon::GetInstance()->GetPointLightData();
 			if (pLight) {
 				pLight->position = firePos1;
@@ -482,7 +481,7 @@ void StageScene::UpdateEndSequence(float dt) {
 			}
 		}
 
-		// 4. シグナル途絶段階（フェーズ制御）
+		// 4. シグナル途絶段階
 		if (endSequence_ == StageEndSequence::GameOver_Critical) {
 			if (endSeqTimer_ >= 0.35f) {
 				float p = (endSeqTimer_ - 0.35f) / 1.05f; // 0.0 -> 1.0
@@ -510,7 +509,7 @@ void StageScene::UpdateEndSequence(float dt) {
 				endSequence_ = StageEndSequence::GameOver_SignalLost;
 			}
 		} else if (endSequence_ == StageEndSequence::GameOver_SignalLost) {
-			// Phase 2 (1.4s - 2.2s): ノイズが本格的に激化し、通信完全途絶（SIGNAL LOST）へ
+			// Phase 2: ノイズが本格的に激化し、通信完全途絶へ
 			float degradeT = std::clamp((endSeqTimer_ - 1.4f) / 0.80f, 0.0f, 1.0f);
 			// smoothstepでノイズを劇的かつ滑らかに増幅
 			float easeT = degradeT * degradeT * (3.0f - 2.0f * degradeT);
@@ -581,7 +580,7 @@ void StageScene::UpdateEndSequence(float dt) {
 			}
 		}
 	}
-	// --- 時間切れ離脱系（爆発なし・作戦離脱） ---
+	// --- 時間切れ離脱系 ---
 	else if (endSequence_ == StageEndSequence::TimeOver_Abort) {
 		// 0.0s - 1.4s
 		timeScale_ = 1.0f;
@@ -716,7 +715,7 @@ void StageScene::UpdateEndSequence(float dt) {
 		blur.intensity = smoothClimb * 0.08f;
 		postEffect->AddActiveEffect(blur);
 
-		// 色収差（光速突入の色ズレ）
+		// 色収差
 		ActivePostEffect ca;
 		ca.type = PostEffectType::kChromaticAberration;
 		ca.intensity = smoothClimb * 0.04f;
@@ -873,7 +872,7 @@ void StageScene::DrawEndSequenceUI() {
 	}
 
 	// ------------------------------------------------------------
-	// 通信途絶（シグナル急減衰&砂嵐激化&SIGNAL LOST&ノイズ中のブラウン管暗転
+	// 通信途絶
 	// ------------------------------------------------------------
 	else if (endSequence_ == StageEndSequence::GameOver_SignalLost || endSequence_ == StageEndSequence::GameOver_CrtShutdown) {
 		float degradeT = (endSequence_ == StageEndSequence::GameOver_CrtShutdown)
@@ -893,7 +892,7 @@ void StageScene::DrawEndSequenceUI() {
 		// 赤黒ノイズベール
 		DrawSolidRect({ 0.0f, 0.0f }, { screenW, screenH }, { 0.12f, 0.01f, 0.01f, (0.05f + 0.40f * degradeT) * cardAlpha });
 
-		// 走査線インターレースグリッチ（数本が上下を高速に走る）
+		// 走査線インターレースグリッチ
 		float glitchOffset1 = std::fmod(endSeqTimer_ * 950.0f, screenH);
 		DrawSolidRect({ 0.0f, glitchOffset1 }, { screenW, 22.0f }, { 0.95f, 0.95f, 1.0f, (0.08f + 0.32f * degradeT) }, BlendMode::kAdd);
 		float glitchOffset2 = std::fmod(endSeqTimer_ * 1400.0f + 240.0f, screenH);
@@ -956,11 +955,11 @@ void StageScene::DrawEndSequenceUI() {
 				{ 0.5f, 0.0f }
 			);
 		} else {
-			// 完全途絶 (SIGNAL LOST)
+			// 完全途絶
 			float signalPulse = (0.7f + 0.3f * std::sin(endSeqTimer_ * 30.0f)) * cardAlpha;
 			const char* signalLostTitle = (std::fmod(endSeqTimer_, 0.12f) < 0.03f) ? "S!GN#L L0ST // ERR" : "// SIGNAL LOST // (通信途絶)";
 
-			// RGBスプリット（シアン影＋赤影）
+			// RGBスプリット
 			TextRenderer::GetInstance()->Print(
 				"HackGen",
 				signalLostTitle,
@@ -1019,7 +1018,7 @@ void StageScene::DrawEndSequenceUI() {
 			float centerX = screenW * 0.5f;
 
 			if (crtT < 0.55f) {
-				// Phase 1 (0.00〜0.55)
+				// Phase 1
 				float p = crtT / 0.55f;
 				float collapse = 1.0f - std::pow(1.0f - p, 3.0f);
 				float halfH = (screenH * 0.5f) * (1.0f - collapse);
@@ -1032,7 +1031,7 @@ void StageScene::DrawEndSequenceUI() {
 				float lineAlpha = 0.95f + 0.05f * std::sin(endSeqTimer_ * 90.0f);
 				DrawSolidRect({ 0.0f, centerY - 3.0f }, { screenW, 6.0f }, { 0.95f, 0.98f, 1.0f, lineAlpha }, BlendMode::kAdd);
 			} else if (crtT < 0.85f) {
-				// Phase 2 (0.55〜0.85)
+				// Phase 2
 				float p = (crtT - 0.55f) / 0.30f;
 				float shrink = 1.0f - p;
 				float halfW = (screenW * 0.5f) * shrink;
@@ -1040,7 +1039,7 @@ void StageScene::DrawEndSequenceUI() {
 				DrawSolidRect({ 0.0f, 0.0f }, { screenW, screenH }, { 0.0f, 0.0f, 0.0f, 1.0f });
 				DrawSolidRect({ centerX - halfW, centerY - 3.0f }, { halfW * 2.0f, 6.0f }, { 1.0f, 1.0f, 1.0f, 1.0f }, BlendMode::kAdd);
 			} else {
-				// Phase 3 (0.85〜1.00)
+				// Phase 3
 				float p = (crtT - 0.85f) / 0.15f;
 				DrawSolidRect({ 0.0f, 0.0f }, { screenW, screenH }, { 0.0f, 0.0f, 0.0f, 1.0f });
 
@@ -1057,7 +1056,7 @@ void StageScene::DrawEndSequenceUI() {
 	else if (endSequence_ == StageEndSequence::TimeOver_Abort || endSequence_ == StageEndSequence::TimeOver_Withdraw) {
 		float fadeAlpha = std::clamp(endSeqTimer_ / 0.30f, 0.0f, 1.0f);
 
-		// 点滅ドット計算 (1〜5個)
+		// 点滅ドット計算
 		int dotCount = 1 + static_cast<int>(endSeqTimer_ * 3.5f) % 5;
 		std::string dots = std::string(dotCount, '.');
 
@@ -1260,7 +1259,7 @@ void StageScene::DrawEndSequenceUI() {
 			{ 0.50f, 0.86f, 0.53f, 0.90f }
 		);
 
-		// 移行直後（0.0s〜0.26s）の鋭利な垂直急ズーム＋走査デジタルワイプ
+		// 移行直後の鋭利な垂直急ズーム＋走査デジタルワイプ
 		if (mapTimer < 0.26f) {
 			float wipeProg = mapTimer / 0.26f;
 			float bandH = screenH * 0.25f;
@@ -1269,7 +1268,6 @@ void StageScene::DrawEndSequenceUI() {
 			DrawSolidRect({ 0.0f, bandY + bandH * 0.5f }, { screenW, 4.0f }, { 0.78f, 0.95f, 0.80f, (1.0f - wipeProg) * 0.95f }, BlendMode::kAdd);
 		}
 
-		// 3.5s に達した瞬間、SECTOR CLEARED のスタンプがドンッと押される！
 		if (endSeqTimer_ >= 3.5f) {
 			float stampT = std::clamp((endSeqTimer_ - 3.5f) / 0.14f, 0.0f, 1.0f);
 			float stampScale = 1.0f + 1.2f * (1.0f - stampT) * (1.0f - stampT);
@@ -1304,7 +1302,7 @@ void StageScene::DrawEndSequenceUI() {
 			);
 		}
 
-		// 戦術マップとリザルト画面（デスクトップ）の視覚的繋がり（転送ブリッジ）
+		// 戦術マップとリザルト画面の視覚的繋がり
 		if (mapTimer >= 0.60f) {
 			float transBannerW = 740.0f;
 			float transBannerH = 52.0f;

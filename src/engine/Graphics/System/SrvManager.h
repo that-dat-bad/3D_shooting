@@ -5,11 +5,11 @@
 class DirectXCommon;
 
 /// <summary>
-/// SRV(シェーダーリソースビュー)やUAVのデスクリプタヒープを管理するクラス
+/// SRVやUAVのデスクリプタヒープを管理するクラス
 /// </summary>
 class SrvManager {
 public:
-	/// <summary>最大SRV数(最大テクスチャ枚数)</summary>
+	/// <summary>最大SRV数</summary>
 	static const uint32_t kMaxSRVCount_ = 2048;
 
 	/// <summary>初期化処理</summary>

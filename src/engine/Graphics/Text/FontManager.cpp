@@ -72,7 +72,7 @@ FontRasterResult FontManager::RasterizeFontInternal(const std::string& fontName,
         return result;
     }
 
-    // このゲームで実際に使用されている全漢字（901文字）の事前登録リスト
+    // このゲームで実際に使用されている全漢字の事前登録リスト
     static const std::u32string kUsedGameKanji =
         U"一七万三上下不与両並中丸主久乗九乱了予事二互五井亡交人今仕他付代令以仮仰件任伏会伴伸似位低体何余作使例供依価便係保信修俯"
         U"個倍倒候値偏停側偶備傷傾働像僚億優元充先光克入全八公六共具典内円再冒写冷処出分切列初判別利到制刷刺刻則削前剛剣副剰割力功"
@@ -100,22 +100,22 @@ FontRasterResult FontManager::RasterizeFontInternal(const std::string& fontName,
     std::vector<int> codepoints;
     codepoints.reserve(2048);
 
-    // 1. ASCII (32-126)
+    // 1. ASCII
     for (int c = 32; c <= 126; ++c) codepoints.push_back(c);
 
-    // 2. ひらがな (0x3040-0x309F)
+    // 2. ひらがな
     for (int c = 0x3040; c <= 0x309F; ++c) codepoints.push_back(c);
 
-    // 3. カタカナ (0x30A0-0x30FF)
+    // 3. カタカナ
     for (int c = 0x30A0; c <= 0x30FF; ++c) codepoints.push_back(c);
 
-    // 4. CJK記号・句読点 (0x3000-0x303F)
+    // 4. CJK記号・句読点
     for (int c = 0x3000; c <= 0x303F; ++c) codepoints.push_back(c);
 
-    // 5. 全角記号・英数 (0xFF01-0xFF5E)
+    // 5. 全角記号・英数
     for (int c = 0xFF01; c <= 0xFF5E; ++c) codepoints.push_back(c);
 
-    // 6. 一般的な追加特殊記号 (度数、矢印、幾何学記号、三点リーダー、ダッシュ、キリル文字等)
+    // 6. 一般的な追加特殊記号
     static constexpr int kCyrillicStartCodepoint = 0x0410;
     static constexpr int kCyrillicEndCodepoint = 0x044F;
     for (int c = kCyrillicStartCodepoint; c <= kCyrillicEndCodepoint; ++c) {
@@ -132,7 +132,7 @@ FontRasterResult FontManager::RasterizeFontInternal(const std::string& fontName,
         codepoints.push_back(static_cast<int>(c));
     }
 
-    // 7. このゲームで使われている全漢字 (901文字)
+    // 7. このゲームで使われている全漢字
     for (char32_t c : kUsedGameKanji) {
         if (c > 0 && c <= 0x10FFFF) {
             codepoints.push_back(static_cast<int>(c));
@@ -142,7 +142,7 @@ FontRasterResult FontManager::RasterizeFontInternal(const std::string& fontName,
     std::sort(codepoints.begin(), codepoints.end());
     codepoints.erase(std::unique(codepoints.begin(), codepoints.end()), codepoints.end());
 
-    // 高解像度パッキング（基本は 4096 x 4096 テクスチャ、必要時に自動拡張）
+    // 高解像度パッキング
     int texDim = 4096;
     stbtt_pack_context spc;
     std::vector<unsigned char> tempBitmap;
@@ -297,7 +297,7 @@ const CharacterInfo* FontManager::GetCharacterInfo(const std::string& fontName) 
     if (it != fonts_.end()) {
         return &it->second;
     }
-    // ロード未完了時の安全なフォールバック（クラッシュ防止）
+    // ロード未完了時の安全なフォールバック
     if (!fonts_.empty()) {
         return &fonts_.begin()->second;
     }

@@ -1,6 +1,3 @@
-// タクティカル等高線マップ ピクセルシェーダー (ClearScene 背景用)
-// 地形の標高 (worldPosition.y) に基づくアンチエイリアス等高線のみを描画
-
 struct PixelShaderOutput
 {
     float32_t4 color : SV_TARGET;
@@ -51,11 +48,11 @@ PixelShaderOutput main(PixelInput input)
     PixelShaderOutput output;
     float3 wp = input.worldPosition;
 
-    // 1. 等高線 (40m 間隔の細線 + 200m 間隔の主線)
+    // 1. 等高線
     float minorLine = ContourLine(wp.y, 40.0f, 1.35f);
     float majorLine = ContourLine(wp.y, 200.0f, 1.85f);
 
-    // 2. 海岸線 (標高 0m 付近) の強調
+    // 2. 海岸線の強調
     float shoreBand = 1.0f - smoothstep(0.0f, 12.0f, abs(wp.y));
 
     // 3. 2000m 間隔の控えめなタクティカルグリッド
@@ -63,7 +60,7 @@ PixelShaderOutput main(PixelInput input)
     float gz = ContourLine(wp.z, 2000.0f, 1.0f);
     float grid = max(gx, gz) * 0.22f;
 
-    // 4. ベース背景色（深いタクティカルネイビー）
+    // 4. ベース背景色
     float3 baseCol = float3(0.008f, 0.022f, 0.045f);
     float3 minorCol = float3(0.10f, 0.48f, 0.72f);
     float3 majorCol = float3(0.28f, 0.85f, 1.00f);
@@ -75,7 +72,7 @@ PixelShaderOutput main(PixelInput input)
     col += shoreCol * (shoreBand * 0.45f);
     col += float3(0.10f, 0.35f, 0.55f) * grid;
 
-    // カメラからの距離フェード（遠景を滑らかに暗く溶かす）
+    // カメラからの距離フェード
     float camDist = length(gLightingSettings.cameraPosition - wp);
     float fade = saturate(1.0f - smoothstep(14000.0f, 34000.0f, camDist));
     col = lerp(float3(0.004f, 0.010f, 0.022f), col, fade);

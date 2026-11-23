@@ -10,7 +10,7 @@
 class Collision3DManager {
 public:
 	/// <summary>
-	/// コライダーを登録する（毎フレーム呼ぶ）
+	/// コライダーを登録する
 	/// </summary>
 	/// <param name="body">判定に参加するオブジェクト</param>
 	void Register(ICollisionBody3D* body);
@@ -21,14 +21,14 @@ public:
 	/// </summary>
 	void CheckAllCollisions();
 
-	/// <summary>登録リストをクリア（フレーム開始時に呼ぶ）</summary>
+	/// <summary>登録リストをクリア</summary>
 	void Clear();
 
 	/// <summary>現在の登録数を取得</summary>
 	size_t GetBodyCount() const { return bodies_.size(); }
 
 	// ============================================================
-	// ジオメトリユーティリティ (static)
+	// ジオメトリユーティリティ
 	// ============================================================
 
 	/// <summary>球と球の衝突判定</summary>
@@ -40,7 +40,7 @@ public:
 	/// <summary>球とAABBの衝突判定</summary>
 	static bool CheckSphereAABB(const SphereCollider& sphere, const AABBCollider& aabb);
 
-	/// <summary>レイとAABBの衝突判定（高速アーリーアウト用）</summary>
+	/// <summary>レイとAABBの衝突判定</summary>
 	static bool CheckRayAABB(const Ray& ray, const AABBCollider& aabb, float* outTMin = nullptr);
 
 	/// <summary>レイと三角形ポリゴンの Möller–Trumbore 交差判定</summary>
@@ -55,7 +55,7 @@ public:
 	/// 座標が地面より下かどうか
 	/// </summary>
 	/// <param name="position">判定座標</param>
-	/// <param name="groundY">地面の高さ（デフォルト 0）</param>
+	/// <param name="groundY">地面の高さ</param>
 	static bool CheckGroundCollision(const MyMath::Vector3& position, float groundY = 0.0f);
 
 private:

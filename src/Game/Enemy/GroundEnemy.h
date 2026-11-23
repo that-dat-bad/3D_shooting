@@ -29,7 +29,7 @@ enum class GroundAIType {
 	Turret,          // 対空砲台
 	Structure,       // 固定施設
 	PatrolVehicle,   // 地上車両
-	Watchtower       // 峡谷監視塔（非敵対・炎上演出対応）
+	Watchtower       // 峡谷監視塔
 };
 
 // 地上目標のパラメータ
@@ -158,8 +158,8 @@ private:
 	BulletManager* bulletManager_ = nullptr;
 
 	// 砲塔の向き（ラジアン）
-	float turretYaw_ = 0.0f;         // ヨー角（水平回転 Y軸回り）
-	float turretPitch_ = 0.3f;       // ピッチ角（仰角 X軸回り、上向きが正）
+	float turretYaw_ = 0.0f;         // ヨー角
+	float turretPitch_ = 0.3f;       // ピッチ角
 	float targetYaw_ = 0.0f;
 	float targetPitch_ = 0.3f;
 	bool isTargetInSight_ = false;   // プレイヤーを射程・射角内に捉えているか
@@ -175,7 +175,7 @@ private:
 	MyMath::Vector3 muzzleFlashPos_{ 0.0f, 0.0f, 0.0f };
 	MyMath::Vector3 muzzleFlashDir_{ 0.0f, 1.0f, 0.0f };
 
-	// 移動制御 (Patrol用)
+	// 移動制御
 	float moveDirection_ = 1.0f;     // +1.0 または -1.0
 	float currentPatrolOffset_ = 0.0f;
 	bool hasCustomBodyYaw_ = false;
@@ -189,7 +189,7 @@ private:
 	float animTime_ = 0.0f;
 	float smokeEmitTimer_ = 0.0f;    // 撃破後の発煙タイマー
 
-	// 監視塔（Watchtower）演出用状態
+	// 監視塔演出用状態
 	std::unique_ptr<Object3d> towerObject_ = nullptr;
 	uint32_t ringTexIndex_ = 0;
 	float watchtowerYaw_ = 0.0f;

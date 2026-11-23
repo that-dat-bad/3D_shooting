@@ -20,7 +20,7 @@ namespace MyMath {
 }
 #endif
 
-// 敵の配置データ（空中目標）
+// 敵の配置データ
 struct EnemySpawnData {
 	MyMath::Vector3 position{};
 	std::string modelPath = "";

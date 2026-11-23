@@ -9,10 +9,10 @@ public:
 	// 太陽光パラメータを DirectX 側の Constant Buffer に適用
 	void UpdateLight();
 
-	// カメラ方向に応じた太陽ブルーム（グレア）の動的適用
+	// カメラ方向に応じた太陽ブルームの動的適用
 	void UpdateBloom(Camera* camera);
 
-	// 太陽のビジュアル（ビルボード）の描画
+	// 太陽のビジュアルの描画
 	void Draw(Camera* camera);
 
 	// ゲッター/セッター

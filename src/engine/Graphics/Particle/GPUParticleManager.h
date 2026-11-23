@@ -10,7 +10,7 @@
 #include "../System/BlendMode.h"
 
 /// <summary>
-/// GPU駆動型パーティクルシステム管理クラス (Compute Shader利用)
+/// GPU駆動型パーティクルシステム管理クラス
 /// </summary>
 class GPUParticleManager {
 public:
@@ -31,7 +31,7 @@ public:
 	static GPUParticleManager* GetInstance();
 
 	/// <summary>
-	/// デフォルトコンストラクタ (std::make_unique対応のためpublic)
+	/// デフォルトコンストラクタ
 	/// </summary>
 	GPUParticleManager() = default;
 
@@ -45,7 +45,7 @@ public:
 	
 	void SetEmitParams(const Vector3& position, uint32_t count, float radius, float frequency);
 	
-	// 強制的に発生させるフラグ（毎フレーム呼び出すと発生し続ける）
+	// 強制的に発生させるフラグ
 	void Emit();
 
 	void DrawImGui();

@@ -10,7 +10,7 @@
 #include "Payload/IPayload.h"
 
 
-// 飛行機の物理挙動（フライトモデル）を計算・管理するクラス
+// 飛行機の物理挙動を計算・管理するクラス
 class FlightModel {
 public:
 	FlightModel();
@@ -26,13 +26,13 @@ public:
 	void Update(float deltaTime);
 
 
-	// -- ペイロード（外部武装・タンク等）の管理 --
+	// -- ペイロードの管理 --
 	void AddPayload(std::unique_ptr<IPayload> payload);
 	void FireWeapons(); // トリガーを引いた時用
 
 
 	// ---setter --
-	void SetThrottleInput(float throttle) { targetThrottle_ = throttle; }                      // 0.0f(停止) ~ 1.0f(全開)
+	void SetThrottleInput(float throttle) { targetThrottle_ = throttle; }                      // 0.0f ~ 1.0f
 	void SetThrottle(float throttle) { engine_.SetThrottle(throttle); targetThrottle_ = throttle; }
 	void SetControlInput(float pitch, float roll, float yaw) { inputPitch_ = pitch; inputRoll_ = roll; inputYaw_ = yaw; }   // 各軸 -1.0f ~ 1.0f
 	void SetFlapInput(bool deploy) { airframe_.SetFlapDesired(deploy); }
@@ -53,8 +53,8 @@ public:
 	bool  IsStalling() const { return isStalling_; }
 	float GetFlapPosition() const { return airframe_.GetFlapPosition(); }
 	float GetAirBrakePosition() const { return airframe_.GetAirBrakePosition(); }
-	float GetBlackoutFactor() const { return blackoutFactor_; }   // 0.0(正常)～1.0(ブラックアウト)
-	float GetRedoutFactor() const { return redoutFactor_; }       // 0.0(正常)～1.0(レッドアウト)
+	float GetBlackoutFactor() const { return blackoutFactor_; }   // 0.0～1.0
+	float GetRedoutFactor() const { return redoutFactor_; }       // 0.0～1.0
 
 	// ダメージ連動
 	Airframe& GetAirframe() { return airframe_; }
@@ -62,16 +62,16 @@ public:
 	DamageModel& GetDamageModel() { return airframe_.GetDamageModel(); }
 	const DamageModel& GetDamageModel() const { return airframe_.GetDamageModel(); }
 
-	// 無敵モード制御（被弾・地面衝突・構造Gダメージを0にする）
+	// 無敵モード制御
 	void SetInvulnerable(bool inv) { isInvulnerable_ = inv; airframe_.GetDamageModel().SetInvulnerable(inv); }
 	bool IsInvulnerable() const { return isInvulnerable_; }
 
-	// G効果（ブラックアウト・レッドアウト）の制御
+	// G効果の制御
 	void SetGEffectsEnabled(bool enabled) { gEffectsEnabled_ = enabled; if (!enabled) { ResetGEffects(); } }
 	bool IsGEffectsEnabled() const { return gEffectsEnabled_; }
 	void ResetGEffects() { blackoutFactor_ = 0.0f; redoutFactor_ = 0.0f; blackoutToleranceTimer_ = 0.0f; redoutToleranceTimer_ = 0.0f; }
 
-	// オートパイロット（クリア演出・自動操縦）モード
+	// オートパイロットモード
 	void SetAutopilot(bool autopilot) { isAutopilot_ = autopilot; }
 	bool IsAutopilot() const { return isAutopilot_; }
 
@@ -80,7 +80,7 @@ public:
 		return airframe_.GetDamageModel().ProcessBulletHit(bulletWorldPos, position_, orientation_, rawDamage);
 	}
 
-	// 外部から位置・姿勢・速度をセットする（スポーン時など）
+	// 外部から位置・姿勢・速度をセットする
 	void SetPosition(const MyMath::Vector3& pos) { position_ = pos; }
 	void SetOrientation(const MyMath::Quaternion& ori) { orientation_ = ori; }
 	static constexpr float kDefaultGroundElevation = 0.0f;
@@ -94,7 +94,7 @@ public:
 	}
 	bool IsInWaterContact() const { return inWaterContact_; }
 
-	// 方向ベクトルの取得（クォータニオンから計算）
+	// 方向ベクトルの取得
 	MyMath::Vector3 GetForwardDirection() const;
 	MyMath::Vector3 GetUpDirection() const;
 	MyMath::Vector3 GetRightDirection() const;
@@ -108,7 +108,7 @@ private:
 	Airframe airframe_;
 	Engine   engine_;
 
-	// 動的に着脱されるペイロード群（ミサイル、ガンポッドなど）
+	// 動的に着脱されるペイロード群
 	std::vector<std::unique_ptr<IPayload>> payloads_;
 
 
@@ -116,17 +116,17 @@ private:
 	MyMath::Vector3 position_;      // 座標
 	MyMath::Vector3 velocity_;      // 速度
 	MyMath::Vector3 acceleration_;  // 加速度
-	MyMath::Quaternion orientation_; // 姿勢（回転）
+	MyMath::Quaternion orientation_; // 姿勢
 
-	// 角速度（ローカル軸: x=pitch, y=yaw, z=roll）(rad/s)
+	// 角速度(rad/s)
 	MyMath::Vector3 angularVelocity_ = { 0.0f, 0.0f, 0.0f };
 
 	// フライトモデル拡張状態
 	float currentAoA_;        // 現在の迎え角 (rad)
 	float currentG_;          // 現在のG
 	bool  isStalling_;        // 失速中フラグ
-	float blackoutFactor_;    // ブラックアウト度合い (+G)
-	float redoutFactor_;      // レッドアウト度合い (-G)
+	float blackoutFactor_;    // ブラックアウト度合い
+	float redoutFactor_;      // レッドアウト度合い
 	float blackoutToleranceTimer_ = 0.0f; // ブラックアウトまでの猶予タイマー
 	float redoutToleranceTimer_ = 0.0f;   // レッドアウトまでの猶予タイマー
 	bool  isInvulnerable_ = false;       // 無敵フラグ

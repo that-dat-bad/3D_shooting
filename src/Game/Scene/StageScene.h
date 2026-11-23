@@ -76,19 +76,19 @@ private:
 	void InitializeAssets();           // 初回アセット生成
 	void ResetGameplayState();         // ゲームプレイ状態リセット
 
-	// フライトモデル（物理）
+	// フライトモデル
 	FlightModel flightModel_;
 
-	// フライトインストラクター（自動水平復帰）
+	// フライトインストラクター
 	FlightInstructor flightInstructor_;
 
-	// 描画用 3Dオブジェクト（機体の見た目 - レガシー）
+	// 描画用 3Dオブジェクト
 	std::unique_ptr<Object3d> aircraftObject_ = nullptr;
 
 	// 部位破壊対応マルチパーツビジュアルモデル
 	AircraftVisualModel aircraftVisualModel_;
 
-	// 自機アフターバーナーエフェクト（ジェットプルーム・ショックダイヤモンド）
+	// 自機アフターバーナーエフェクト
 	std::unique_ptr<Afterburner> afterburner_ = nullptr;
 
 	// パーツ破壊イベントチェック
@@ -100,7 +100,7 @@ private:
 	// 地面グリッド描画
 	void DrawGround();
 
-	// --- 出撃イントロ（AC6メインシステム戦闘モード起動シーケンス & カメラワーク）---
+	// --- 出撃イントロ---
 	float sortieIntroTimer_ = 0.0f;
 	float sortieIntroDuration_ = CombatBootSequence::GetDuration();
 	CombatBootSequence combatBootSequence_;
@@ -146,7 +146,7 @@ private:
 	// 追従マズルフラッシュ描画用タイマー
 	float muzzleFlashTimer_ = 0.0f;
 	
-	// マズルフラッシュの間引き（スキップ）制御用カウンター
+	// マズルフラッシュの間引き制御用カウンター
 	int muzzleFlashCount_ = 0;
 	
 	// マズルフラッシュのランダム化パラメータ
@@ -159,7 +159,7 @@ private:
 	// ============================
 	enum class StageEndSequence {
 		None,
-		// ゲームオーバー演出（被弾撃墜）
+		// ゲームオーバー演出
 		GameOver_Critical,      // HUD赤反転、警告点滅
 		GameOver_SignalLost,    // シグナルロスト演出
 		GameOver_CrtShutdown,   // CRT電源切断演出
@@ -174,7 +174,7 @@ private:
 	StageEndSequence endSequence_ = StageEndSequence::None;
 	float endSeqTimer_ = 0.0f;
 
-	// クリア・離脱演出用パラメータ（飛行機離脱機動用）
+	// クリア・離脱演出用パラメータ
 	MyMath::Quaternion clearStartOrientation_{ 0.0f, 0.0f, 0.0f, 1.0f };
 	MyMath::Vector3 clearStartForward_{ 0.0f, 0.0f, 1.0f };
 	MyMath::Vector3 clearHorizontalDir_{ 0.0f, 0.0f, 1.0f };
@@ -200,16 +200,16 @@ private:
 	float gameOverBurnTimer_ = 0.0f;
 	bool isBailout_ = false;
 
-	// ミッション制限時間（MissionData.timeLimitから設定）
+	// ミッション制限時間
 	float remainingTime_ = 300.0f;
-	float missionElapsedTime_ = 0.0f;  // ミッション経過時間（トリガー評価用）
+	float missionElapsedTime_ = 0.0f;  // ミッション経過時間
 	UIText timeText_;
 
 	// 演出用スプライト
 	std::unique_ptr<Sprite> seqOverlaySprite_;
 	std::unique_ptr<Sprite> seqNoiseSprite_;
 
-	// 戦闘HUD（残弾数・照準・タイマー）
+	// 戦闘HUD
 	StageHUD hud_;
 	RadioCommunicator radioCommunicator_;
 	InfoUI infoUI_;
@@ -229,7 +229,7 @@ private:
 	float playerHP_ = 100.0f;
 	float playerCollisionRadius_ = 2.0f; // プレイヤーの当たり判定の半径
 
-	// スロットル入力状態（メンバー変数化して初期化時にリセットできるようにする）
+	// スロットル入力状態
 	float throttle_ = 0.0f;
 
 	// 翼端エフェクト用の前フレーム位置保存
@@ -237,16 +237,16 @@ private:
 	MyMath::Vector3 lastRightWingTip_{};
 	bool hasLastWingTips_ = false;
 
-	// 経過時間（エフェクトアニメーション用）
+	// 経過時間
 	float totalTime_ = 0.0f;
 
 	// ナイトビジョン状態
 	bool isNvdActive_ = false;
 
-	// 環境管理（太陽・昼夜サイクルなど）
+	// 環境管理
 	EnvironmentManager environmentManager_;
 
-	// 地形チャンク管理（4000mチャンク分割 40km x 40km）
+	// 地形チャンク管理
 	TerrainChunkManager* terrainChunkManager_ = nullptr;
 
 	// ============================
@@ -259,7 +259,7 @@ private:
 	int manualSelectedEffect_ = 0;          // 手動・ImGuiテスト用エフェクトインデックス
 	ActivePostEffect manualEffectParams_{}; // 手動・ImGuiテスト用パラメータ
 
-	// 機体設定（CFG）
+	// 機体設定
 	AircraftConfig aircraftConfig_;
 	bool isAircraftTuningOpen_ = true;
 	int selectedAircraftConfigIndex_ = 0;
@@ -271,7 +271,7 @@ private:
 	void DrawMissionReachAreaRings(Camera* cam);
 
 	// ============================
-	// 分割ヘルパー関数群 (Gameplay / Rendering / Combat)
+	// 分割ヘルパー関数群
 	// ============================
 	void UpdateFlightControls(float gameDeltaTime);
 	void UpdateCombatFiring(float gameDeltaTime);
@@ -283,7 +283,7 @@ private:
 	void DrawMuzzleFlashEffect(Camera* cam);
 
 	// ============================
-	// ポーズメニュー（タイトル画面完全同期・黒背景仕様）
+	// ポーズメニュー
 	// ============================
 	bool isPaused_ = false;
 	int pauseMenuIndex_ = 0;
@@ -322,7 +322,7 @@ private:
 	void DrawPauseMenuUI();
 	void ExecutePauseAction(int actionIndex);
 
-	// ポーズからタイトル復帰時のCRTシャットダウン演出（プツッ暗転）
+	// ポーズからタイトル復帰時のCRTシャットダウン演出
 	bool isPauseAborting_ = false;
 	float pauseAbortTimer_ = 0.0f;
 	static constexpr float kPauseAbortDuration = 0.38f;

@@ -201,15 +201,15 @@ void RadioCommunicator::Draw(float screenWidth, float screenHeight) {
 	const float speakerGapY = layoutConfig_.speakerToDialogueGap * scale;
 	const float lineGapY = layoutConfig_.dialogueLineGap * scale;
 
-	// 話者名および << >> 括弧のカラー（AC7準拠の陣営カラー）
+	// 話者名および << >> 括弧のカラー
 	Vector4 speakerColor = ResolveSpeakerColor(currentMessage_.faction);
 	speakerColor.w *= alpha;
 
-	// セリフ本文のカラー（ホワイト）
+	// セリフ本文のカラー
 	Vector4 bodyColor = RadioDefaults::kDialogueBodyColor;
 	bodyColor.w *= alpha;
 
-	// 1. 1行目: 話者名（例: Joker 2 Coster）を中央揃えで直接フローティング描画
+	// 1. 1行目: 話者名を中央揃えで直接フローティング描画
 	PrintFloatingText(
 		RadioDefaults::kFontName,
 		cleanSpeakerName_,
@@ -220,7 +220,7 @@ void RadioCommunicator::Draw(float screenWidth, float screenHeight) {
 		speakerColor,
 		{ RadioDefaults::kHalf, RadioDefaults::kZero });
 
-	// 2. 2行目以降: << 会話内容 >>（<< と >> は話者と同色、会話内容はホワイト）
+	// 2. 2行目以降: << 会話内容 >>
 	const float dialogueStartY = speakerTopY + speakerFontPx + speakerGapY;
 	const float openDelimWidth = textRenderer->CalculateTextSize(
 		RadioDefaults::kFontName, RadioDefaults::kDialogueOpenDelimiter, dialogueFontPx).x;
@@ -248,7 +248,7 @@ void RadioCommunicator::Draw(float screenWidth, float screenHeight) {
 		float cursorX = centerX - totalLineWidth * RadioDefaults::kHalf;
 		const float lineY = dialogueStartY + static_cast<float>(i) * (dialogueFontPx + lineGapY);
 
-		// 左側 "<< "（話者名と同色）
+		// 左側 "<< "
 		if (isFirstLine) {
 			PrintFloatingText(
 				RadioDefaults::kFontName,
@@ -262,7 +262,7 @@ void RadioCommunicator::Draw(float screenWidth, float screenHeight) {
 			cursorX += openDelimWidth;
 		}
 
-		// 中央 セリフ本文（ホワイト）
+		// 中央 セリフ本文
 		if (i < visibleBodyLines.size() && !visibleBodyLines[i].empty()) {
 			PrintFloatingText(
 				RadioDefaults::kFontName,
@@ -276,7 +276,7 @@ void RadioCommunicator::Draw(float screenWidth, float screenHeight) {
 		}
 		cursorX += fullBodyWidth;
 
-		// 右側 " >>"（話者名と同色）
+		// 右側 " >>"
 		if (isLastLine && showFullText) {
 			PrintFloatingText(
 				RadioDefaults::kFontName,

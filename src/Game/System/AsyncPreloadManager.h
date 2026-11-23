@@ -6,12 +6,12 @@
 #include "../FlightModel/AircraftConfig.h"
 #include "MissionManager.h"
 
-// バックグラウンドスレッドで重いステージデータ（ミッションJSON、機体CFG等）を非同期プリロードするマネージャー
+// バックグラウンドスレッドで重いステージデータを非同期プリロードするマネージャー
 class AsyncPreloadManager {
 public:
     static AsyncPreloadManager* GetInstance();
 
-    // バックグラウンドスレッドでステージリソースの事前非同期ロードを開始（ゲームオーバー演出中やリトライ待機中に発火）
+    // バックグラウンドスレッドでステージリソースの事前非同期ロードを開始
     void StartStagePreloadAsync(const std::string& missionPath = "Resources/missions/mission00.json",
                                 const std::string& aircraftCfgPath = "Resources/aircraft/mig21.cfg");
 

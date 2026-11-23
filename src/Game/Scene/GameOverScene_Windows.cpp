@@ -20,7 +20,7 @@ void GameOverScene::DrawCrashRecoveryWindow(const PseudoOS::Window& win) {
 	}
 	cy += 24.0f;
 
-	// 2. メモリダンプ表示枠（深紅のターミナル枠）
+	// 2. メモリダンプ表示枠
 	float dumpFrameW = win.size.x - 36.0f;
 	float dumpFrameH = 216.0f;
 	pseudoOS_.DrawPanel({ win.pos.x + 18.0f, cy }, { dumpFrameW, dumpFrameH },
@@ -118,13 +118,13 @@ void GameOverScene::DrawHardwareFailureWindow(const PseudoOS::Window& win) {
 	}
 	cy += 8.0f;
 
-	// CPU温度異常ゲージ (99℃)
+	// CPU温度異常ゲージ
 	tr->Print("HackGen", "MAIN ENGINE CPU CORE TEMP: 99.4 ℃ [OVERHEAT!]", startX, cy, 10.5f, { 1.0f, 0.30f, 0.25f, 0.98f });
 	cy += 14.0f;
 	pseudoOS_.DrawGauge({ startX, cy }, { frameW, 8.0f }, 0.99f, { 1.0f, 0.25f, 0.20f, 0.95f }, { 0.65f, 0.15f, 0.15f, 0.75f });
 	cy += 18.0f;
 
-	// 緊急電力残量ゲージ (8%)
+	// 緊急電力残量ゲージ
 	tr->Print("HackGen", "EMERGENCY BATTERY RESERVE: 8 % [CRITICAL]", startX, cy, 10.5f, { 1.0f, 0.80f, 0.25f, 0.95f });
 	cy += 14.0f;
 	pseudoOS_.DrawGauge({ startX, cy }, { frameW, 8.0f }, 0.08f, { 1.0f, 0.65f, 0.15f, 0.95f }, { 0.55f, 0.30f, 0.15f, 0.75f });

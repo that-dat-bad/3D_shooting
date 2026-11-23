@@ -3,7 +3,7 @@
 using namespace ClearSceneInternal;
 
 // ============================================================
-// VHSテープのリワインド（巻き戻し）演出
+// VHSテープのリワインド演出
 // ============================================================
 void ClearScene::DrawRewindEffectUI() {
 	if (!isRewinding_ || !uploadSprite_) return;

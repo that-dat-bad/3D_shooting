@@ -35,7 +35,7 @@ void ParticleManager::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager
 	CreateRootSignature();
 	CreateGraphicsPipeline();
 
-	// 板ポリゴン（モデル）生成
+	// 板ポリゴン生成
 	CreateModel();
 
 	// カメラ用定数バッファの生成
@@ -95,7 +95,7 @@ void ParticleManager::Update() {
 				}
 			}
 
-			// 移動処理 (速度を加算: パーティクルの個別加速度 + フィールド加速度)
+			// 移動処理
 			Vector3 effectiveAccel = Add(it->acceleration, fieldAcceleration);
 			if (it->maxRiseHeight > ParticleHeightCapDefaults::kNoHeightLimit) {
 				const float currentRise = it->transform.translate.y - it->spawnY;
@@ -151,7 +151,7 @@ void ParticleManager::Update() {
 			float t = it->currentTime / it->lifeTime; // 0.0 ~ 1.0
 			if (t > 1.0f) { t = 1.0f; }
 
-			// スケール補間（イージング付き）
+			// スケール補間
 			float easedT = std::pow(t, it->scaleEasing);
 			float currentScale = it->startScale + (it->endScale - it->startScale) * easedT;
 			it->transform.scale = { currentScale, currentScale, currentScale };
@@ -159,7 +159,7 @@ void ParticleManager::Update() {
 			// アルファフェードアウト
 			it->color.w = it->startAlpha * (1.0f - t);
 
-			// インスタンス数が最大を超えたらそれ以上処理しない（描画しない）
+			// インスタンス数が最大を超えたらそれ以上処理しない
 			if (group.instanceCount < kMaxInstanceCount_) {
 
 				// ワールド行列の計算
@@ -186,14 +186,14 @@ void ParticleManager::Update() {
 
 						if (stretchAmount > 0.001f) {
 							Vector3 velDir = Normalize(stretchVec);
-							// 速度（または指定方向）ベクトルをスクリーン平面（法線camToParticle）に投影
+							// 速度ベクトルをスクリーン平面に投影
 							float dot = Dot(velDir, camToParticle);
 							Vector3 projVel = Subtract(velDir, Multiply(dot, camToParticle));
 							if (Length(projVel) > 0.0001f) {
 								projVel = Normalize(projVel);
 								Vector3 right = Normalize(Cross(camToParticle, projVel));
 								
-								// 進行方向（Y軸）と右方向（X軸）でカスタムビルボード行列を構築
+								// 進行方向と右方向でカスタムビルボード行列を構築
 								finalBillboard.m[0][0] = right.x;
 								finalBillboard.m[0][1] = right.y;
 								finalBillboard.m[0][2] = right.z;
@@ -239,7 +239,7 @@ void ParticleManager::Draw() {
 
 	commandList->IASetVertexBuffers(0, 1, &vertexBufferView_);
 
-	// 深度バッファを SRV 用 (PIXEL_SHADER_RESOURCE | DEPTH_READ) に遷移させる
+	// 深度バッファを SRV 用に遷移させる
 	D3D12_RESOURCE_BARRIER barrier = {};
 	barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
 	barrier.Transition.pResource = dxCommon_->GetDepthStencilBuffer();
@@ -272,11 +272,11 @@ void ParticleManager::Draw() {
 		D3D12_GPU_DESCRIPTOR_HANDLE instancingHandle = srvManager_->GetGPUDescriptorHandle(group.instancingSrvIndex);
 		commandList->SetGraphicsRootDescriptorTable(1, instancingHandle);
 
-		// 深度テクスチャのSRVを設定 (t2)
+		// 深度テクスチャのSRVを設定
 		D3D12_GPU_DESCRIPTOR_HANDLE depthHandle = srvManager_->GetGPUDescriptorHandle(dxCommon_->GetDepthSrvIndex());
 		commandList->SetGraphicsRootDescriptorTable(2, depthHandle);
 
-		// カメラ用定数バッファを設定 (b0)
+		// カメラ用定数バッファを設定
 		commandList->SetGraphicsRootConstantBufferView(3, cameraBuffer_->GetGPUVirtualAddress());
 
 		// インスタンシング描画
@@ -354,12 +354,11 @@ void ParticleManager::CreateParticleGroup(const std::string& name, const std::st
 	TextureManager::GetInstance()->LoadTexture(textureFilePath);
 	group.textureSrvIndex = TextureManager::GetInstance()->GetTextureIndexByFilePath(textureFilePath);
 
-	// インスタンシング用リソースの生成 (StructuredBuffer)
-	// サイズ = データ1個分サイズ * 最大数
+	// インスタンシング用リソースの生成
 	uint32_t sizeInBytes = sizeof(ParticleInstancingData) * kMaxInstanceCount_;
 	group.instancingResource = dxCommon_->CreateBufferResource(sizeInBytes);
 
-	// データを書き込むためのポインタを取得 (Mapしたままにする)
+	// データを書き込むためのポインタを取得
 	group.instancingResource->Map(0, nullptr, reinterpret_cast<void**>(&group.instancingDataPtr));
 
 	// インスタンシング用にSRVを確保
@@ -400,7 +399,7 @@ void ParticleManager::Emit(const std::string& name, const Vector3& position, con
 	// スケールのランダム分布
 	std::uniform_real_distribution<float> distScale((std::min)(params.minScale, params.maxScale), (std::max)(params.minScale, params.maxScale));
 
-	// 位置のランダム分布（0.0に設定された場合はズレを無くす）
+	// 位置のランダム分布
 	std::uniform_real_distribution<float> distPos(-params.randomPositionRange, params.randomPositionRange);
 
 	for (uint32_t i = 0; i < count; ++i) {
@@ -507,25 +506,25 @@ void ParticleManager::CreateRootSignature() {
 
 	D3D12_ROOT_PARAMETER rootParameters[4] = {};
 
-	// テクスチャ用 (t0)
+	// テクスチャ用
 	rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
 	rootParameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 	rootParameters[0].DescriptorTable.pDescriptorRanges = descriptorRange;
 	rootParameters[0].DescriptorTable.NumDescriptorRanges = _countof(descriptorRange);
 
-	// インスタンシングデータ用 (StructuredBuffer, t1)
+	// インスタンシングデータ用
 	rootParameters[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
 	rootParameters[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
 	rootParameters[1].DescriptorTable.pDescriptorRanges = descriptorRangeInstancing;
 	rootParameters[1].DescriptorTable.NumDescriptorRanges = _countof(descriptorRangeInstancing);
 
-	// 深度バッファ用 (t2)
+	// 深度バッファ用
 	rootParameters[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
 	rootParameters[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 	rootParameters[2].DescriptorTable.pDescriptorRanges = descriptorRangeDepth;
 	rootParameters[2].DescriptorTable.NumDescriptorRanges = _countof(descriptorRangeDepth);
 
-	// 定数バッファ (b0) - カメラパラメータ用
+	// 定数バッファ - カメラパラメータ用
 	rootParameters[3].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
 	rootParameters[3].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
 	rootParameters[3].Descriptor.ShaderRegister = 0;

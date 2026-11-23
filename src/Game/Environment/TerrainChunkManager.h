@@ -57,7 +57,7 @@ struct TerrainChunk {
 	std::string fileName;
 	std::string fullPath;
 
-	// ハイトマップサンプル (51x51)
+	// ハイトマップサンプル
 	std::vector<float> heightSamples;
 
 	// LODメッシュ配列
@@ -88,7 +88,8 @@ public:
 
 	// 更新
 	// viewerPos: 視点座標
-	void Update(const Vector3& viewerPos);
+	// overrideCamera: 指定時はアクティブカメラの代わりにこのカメラを使用
+	void Update(const Vector3& viewerPos, Camera* overrideCamera = nullptr);
 
 	// 描画
 	void Draw();
@@ -124,7 +125,7 @@ public:
 		float worldZ,
 		float fallbackY = TerrainHeightDefaults::kDefaultFallbackHeight) const;
 
-	// 地表種別（陸地 / 水面）
+	// 地表種別
 	enum class SurfaceType {
 		Land,
 		Water
@@ -150,7 +151,7 @@ public:
 		std::vector<RiverPoint> points;
 	};
 
-	// 水面標高取得（海・川）
+	// 水面標高取得
 	bool GetWaterSurfaceHeightAt(float worldX, float worldZ, float& outWaterY, bool* outIsRiver = nullptr) const;
 
 	// 陸地・水面を統合したサーフェス判定
@@ -201,7 +202,7 @@ private:
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> waterPipelineState_;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> contourPipelineState_;
 
-	// 水系データ（海・川）
+	// 水系データ
 	bool hasWaterLevel_ = false;
 	float waterLevel_ = 0.0f;
 	float waterTimeSec_ = 0.0f;

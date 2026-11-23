@@ -29,7 +29,7 @@ LRESULT CALLBACK WinApp::WindowProc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM l
 		}
 		break;
 	case WM_SETCURSOR:
-		// クライアント領域外（タイトルバーやウィンドウ枠）または非アクティブ時は標準カーソルを表示
+		// クライアント領域外または非アクティブ時は標準カーソルを表示
 		if (LOWORD(lparam) != HTCLIENT || ::GetForegroundWindow() != hwnd) {
 			::SetCursor(::LoadCursor(nullptr, IDC_ARROW));
 			return DefWindowProc(hwnd, msg, wparam, lparam);

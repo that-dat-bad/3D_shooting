@@ -31,16 +31,16 @@ public:
 	virtual void Draw() = 0;
 	/// <summary>2D UI描画処理</summary>
 	virtual void DrawUI() {}
-	/// <summary>重いリソースの事前非同期/バックグラウンド生成（ゲーム状態はアクティブ化しない）</summary>
+	/// <summary>重いリソースの事前非同期/バックグラウンド生成</summary>
 	virtual void PrewarmAssets() {}
 	/// <summary>終了処理</summary>
 	virtual void Finalize() = 0;
 	
 	virtual ~IScene();
 
-	/// <summary>キー入力のトリガー判定（便利関数）</summary>
+	/// <summary>キー入力のトリガー判定</summary>
 	static bool IsKeyTriggered(BYTE keyNumber);
-	/// <summary>キー入力のプレス判定（便利関数）</summary>
+	/// <summary>キー入力のプレス判定</summary>
 	static bool IsKeyPressed(BYTE keyNumber);
 
 	/// <summary>

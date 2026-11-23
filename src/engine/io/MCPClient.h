@@ -18,7 +18,7 @@ public:
 	void Configure(const std::string& host, int port);
 
 	// 定期ポーリング開始
-	// intervalMs: ポーリング間隔（ミリ秒）
+	// intervalMs: ポーリング間隔
 	// callback: 受信時コールバック
 	void StartPolling(
 		int intervalMs,

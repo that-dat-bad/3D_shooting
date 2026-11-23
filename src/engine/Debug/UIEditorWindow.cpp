@@ -521,7 +521,7 @@ void UIEditorWindow::CreateControls() {
 
 	curY += 72;
 
-	// --- 5. ステート＆モーション設定（Tween, Pulse, Floating, Shake）---
+	// --- 5. ステート＆モーション設定---
 	hGroupMotion_ = CreateWindowW(L"BUTTON", L" 5. State & Motion (Hover, Condition, Anim) ", WS_CHILD | WS_VISIBLE | BS_GROUPBOX, padX, curY, width, 140, hwnd_, nullptr, hInst, nullptr);
 	SendMessageW(hGroupMotion_, WM_SETFONT, (WPARAM)hFont, TRUE);
 

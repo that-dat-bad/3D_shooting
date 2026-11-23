@@ -136,11 +136,11 @@ void DebugScene::Update() {
 		// スフィアの位置で全エフェクトを発生させる
 		EffectManager::GetInstance()->EmitHitEffect(sphereObject->GetTranslate());
 	}
-	// デバッグ用: VキーでPlane（板ポリ）のみのエフェクト発生
+	// デバッグ用: VキーでPlaneのみのエフェクト発生
 	if (Input::GetInstance()->TriggerKey(DIK_V)) {
 		EffectManager::GetInstance()->EmitHitPlaneEffect(sphereObject->GetTranslate());
 	}
-	// デバッグ用: BキーでGPUParticleManagerから最大数(1024個)のエフェクトを発生
+	// デバッグ用: BキーでGPUParticleManagerから最大数のエフェクトを発生
 	if (Input::GetInstance()->TriggerKey(DIK_B)) {
 		GPUParticleManager::GetInstance()->SetEmitParams(sphereObject->GetTranslate(), 1024, 5.0f, 0.0f);
 		GPUParticleManager::GetInstance()->Emit();
@@ -300,7 +300,7 @@ void DebugScene::Update() {
 					effects[i].colorB = 0.1f;
 					effects[i].intensity = 0.45f; // Tolerance
 					effects[i].dirX = 0.15f;      // Smoothness
-					effects[i].dirY = 1.0f;       // Desaturation (Full monochrome)
+					effects[i].dirY = 1.0f;       // Desaturation
 				} else if (effects[i].type == PostEffectType::kLuminanceOutline || effects[i].type == PostEffectType::kDepthOutline) {
 					effects[i].intensity = 6.0f;  // Outline Multiplier / Sensitivity
 					effects[i].colorR = 0.0f;     // Black Outline default
@@ -536,7 +536,7 @@ void DebugScene::Update() {
 }
 
 void DebugScene::Draw() {
-	// 0. Skybox描画 (最初に描画。深度書き込みなしで最遠方に配置)
+	// 0. Skybox描画
 	if (isSkyboxVisible_ && skybox_) {
 		SkyboxCommon::GetInstance()->SetupCommonState();
 		skybox_->Draw();
@@ -550,7 +550,7 @@ void DebugScene::Draw() {
 	// スケルトンのデバッグ描画テスト
 	sphereObject->DebugDrawSkeleton({ 1.0f, 1.0f, 1.0f, 1.0f });
 
-	// Ray-Mesh デバッグ描画（レイ線 & ヒット時の法線ベクトル）
+	// Ray-Mesh デバッグ描画
 	Camera* mainCamera = CameraManager::GetInstance()->GetActiveCamera();
 	Vector3 rayEnd = Add(debugRay_.origin, Multiply(debugRay_.maxDistance, debugRay_.direction));
 	Vector4 rayColor = debugHit_.hit ? Vector4{ 1.0f, 0.0f, 0.0f, 1.0f } : Vector4{ 0.0f, 1.0f, 1.0f, 1.0f };
@@ -561,7 +561,7 @@ void DebugScene::Draw() {
 		PrimitiveModel::GetInstance()->DrawLine3D(debugHit_.point, normalEnd, { 1.0f, 1.0f, 0.0f, 1.0f }, mainCamera);
 	}
 
-	// エフェクト（プリミティブ）描画 (加算合成で光る柱のように描画)
+	// エフェクト描画
 	uint32_t particleTex = TextureManager::GetInstance()->GetTextureIndexByFilePath("assets/textures/circle2.png");
 	uint32_t whiteTex = TextureManager::GetInstance()->GetTextureIndexByFilePath("assets/textures/white1x1.png");
 	Vector3 cylScale = { 2.0f, 8.0f, 2.0f }; // 太さ2, 高さ8

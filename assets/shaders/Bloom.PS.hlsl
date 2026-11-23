@@ -5,9 +5,9 @@ SamplerState gSampler : register(s0);
 
 struct PostEffectParams {
     int32_t kernelSize;
-    float intensity;      // ブルームの広がり半径 (Bloom Blur Radius)
-    float dirX;           // ブルームの強さ (Bloom Strength)
-    float dirY;           // 輝度しきい値 (Bloom Brightness Threshold)
+    float intensity;      // ブルームの広がり半径
+    float dirX;           // ブルームの強さ
+    float dirY;           // 輝度しきい値
     float time;
     float3 colorTint;
 };
@@ -23,11 +23,11 @@ PixelShaderOutput main(VertexShaderOutput input)
     PixelShaderOutput output;
     float32_t4 baseColor = gTexture.Sample(gSampler, input.texcoord);
     
-    // ブルーム抽出のしきい値 (dirY) と強度 (dirX)
+    // ブルーム抽出のしきい値と強度
     float threshold = gParams.dirY;
     float strength = gParams.dirX;
     
-    // サンプリングステップの決定 (解像度に合わせる)
+    // サンプリングステップの決定
     float2 step = float2(1.0f / 1280.0f, 1.0f / 720.0f) * gParams.intensity * 2.0f;
     
     // 9タップガウシアンブラーの重み
@@ -44,7 +44,7 @@ PixelShaderOutput main(VertexShaderOutput input)
     }
     totalWeight += weights[0];
     
-    // 2. 十字（水平・垂直）方向に隣接する周辺ピクセルをサンプリング
+    // 2. 十字方向に隣接する周辺ピクセルをサンプリング
     for (int i = 1; i < 5; ++i) {
         float2 offsetH = float2(i, 0.0f) * step;
         float2 offsetV = float2(0.0f, i) * step;
@@ -67,7 +67,7 @@ PixelShaderOutput main(VertexShaderOutput input)
         totalWeight += weights[i] * 4.0f;
     }
     
-    // 平均化されたブルームの眩しさを強度(strength)を乗算して元の色に加算
+    // 平均化されたブルームの眩しさを強度を乗算して元の色に加算
     float32_t3 bloomColor = (blurColor / totalWeight) * strength;
     output.color = float32_t4(baseColor.rgb + bloomColor, baseColor.a);
     

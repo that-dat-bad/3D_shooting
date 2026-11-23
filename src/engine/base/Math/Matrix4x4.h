@@ -29,7 +29,7 @@ namespace MyMath {
 	Matrix4x4 Subtract(const Matrix4x4& m1, const Matrix4x4& m2);
 
 	/// <summary>
-	/// 行列の積 (乗算)
+	/// 行列の積
 	/// </summary>
 	/// <param name="m1">左側の行列</param>
 	/// <param name="m2">右側の行列</param>
@@ -92,7 +92,7 @@ namespace MyMath {
 	Matrix4x4 MakeRotateZMatrix(float angle);
 
 	/// <summary>
-	/// アフィン変換行列(スケール、回転、平行移動の合成行列)の生成
+	/// アフィン変換行列の生成
 	/// </summary>
 	/// <param name="scale">スケール値</param>
 	/// <param name="rotate">オイラー角回転(ラジアン)</param>
@@ -101,7 +101,7 @@ namespace MyMath {
 	Matrix4x4 MakeAffineMatrix(const Vector3& scale, const Vector3& rotate, const Vector3& translate);
 
 	/// <summary>
-	/// ベクトルの座標変換 (w=1として行列と乗算)
+	/// ベクトルの座標変換
 	/// </summary>
 	/// <param name="vector">対象のベクトル</param>
 	/// <param name="matrix">変換行列</param>
@@ -112,14 +112,14 @@ namespace MyMath {
 	/// 透視投影行列の生成
 	/// </summary>
 	/// <param name="fovY">縦の視野角(ラジアン)</param>
-	/// <param name="aspectRatio">アスペクト比(幅/高さ)</param>
+	/// <param name="aspectRatio">アスペクト比</param>
 	/// <param name="nearClip">ニアクリップ距離</param>
 	/// <param name="farClip">ファークリップ距離</param>
 	/// <returns>透視投影行列</returns>
 	Matrix4x4 MakePerspectiveMatrix(float fovY, float aspectRatio, float nearClip, float farClip);
 
 	/// <summary>
-	/// 正射影(平行投影)行列の生成
+	/// 正射影行列の生成
 	/// </summary>
 	/// <param name="left">左端</param>
 	/// <param name="top">上端</param>
@@ -143,7 +143,7 @@ namespace MyMath {
 	Matrix4x4 MakeViewportMatrix(float left, float top, float width, float height, float minDepth, float maxDepth);
 
 	/// <summary>
-	/// 法線ベクトルの変換 (w=0として行列と乗算し、正規化はしない)
+	/// 法線ベクトルの変換
 	/// </summary>
 	/// <param name="v">法線ベクトル</param>
 	/// <param name="m">変換行列</param>

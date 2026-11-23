@@ -5,10 +5,7 @@
 
 namespace AI {
 
-// ============================================================================
 // 待機アクション
-// ミッションエディタで設定した WaypointPath に沿って飛行
-// ============================================================================
 NodeStatus WaitPatrolAction::Tick(float deltaTime, Enemy& enemy) {
 	enemy.SetActiveBehaviorName("WaitPatrol");
 
@@ -39,7 +36,7 @@ NodeStatus WaitPatrolAction::Tick(float deltaTime, Enemy& enemy) {
 	const MyMath::Vector3 toWp = MyMath::Subtract(activeWp.position, myPos);
 	const float distToWp = MyMath::Length(toWp);
 
-	// ウェイポイント到達判定（85m以内）
+	// ウェイポイント到達判定
 	if (distToWp <= EnemyWaypointDefaults::kWaypointCaptureRadiusMeters) {
 		enemy.AdvanceWaypoint();
 		currentIdx = enemy.GetCurrentWaypointIndex();
@@ -68,7 +65,7 @@ NodeStatus WaitPatrolAction::Tick(float deltaTime, Enemy& enemy) {
 		EnemyWaypointDefaults::kMaxThrottle);
 	enemy.SetThrottleInput(desiredThrottle);
 
-	// 機会射撃（正面約5度以内、850m以内に自機がいれば牽制発射）
+	// 機会射撃
 	if (allowOpportunisticFire_ && enemy.IsPlayerValid()) {
 		const float distToPlayer = enemy.GetDistanceToPlayer();
 		if (distToPlayer > EnemyWaypointDefaults::kMinTargetDirectionLength &&
@@ -85,10 +82,7 @@ NodeStatus WaitPatrolAction::Tick(float deltaTime, Enemy& enemy) {
 	return NodeStatus::Running;
 }
 
-// ============================================================================
-// アグレッションアクション (AggressionAction)
-// プレイヤーへ向けた接近・追従・偏差射撃（ドッグファイト）
-// ============================================================================
+// アグレッションアクション
 NodeStatus AggressionAction::Tick(float deltaTime, Enemy& enemy) {
 	if (!enemy.IsPlayerValid()) {
 		return NodeStatus::Failure;
@@ -102,7 +96,7 @@ NodeStatus AggressionAction::Tick(float deltaTime, Enemy& enemy) {
 	const MyMath::Vector3 toPlayer = MyMath::Subtract(playerPos, myPos);
 	const float distance = MyMath::Length(toPlayer);
 
-	// 偏差射撃（リード予測）の計算：弾速と相手速度から未来位置を2次予測
+	// 偏差射撃の計算：弾速と相手速度から未来位置を2次予測
 	const float bulletSpeed = enemy.GetSpeed() + 500.0f;
 	float timeToHit = (bulletSpeed > 0.1f) ? (distance / bulletSpeed) : 0.0f;
 	MyMath::Vector3 futurePos = MyMath::Add(playerPos, MyMath::Multiply(timeToHit, playerVel));
@@ -113,7 +107,7 @@ NodeStatus AggressionAction::Tick(float deltaTime, Enemy& enemy) {
 
 	const MyMath::Vector3 toFuture = MyMath::Subtract(futurePos, myPos);
 
-	// ワールド水平面上で直交する一定ブレイク方向（ロールによる左右反転を防止）
+	// ワールド水平面上で直交する一定ブレイク方向
 	MyMath::Vector3 breakHoriz = { -toPlayer.z, 0.0f, toPlayer.x };
 	const float breakHorizLen = MyMath::Length(breakHoriz);
 	if (breakHorizLen > EnemyWaypointDefaults::kMinTargetDirectionLength) {
@@ -143,7 +137,7 @@ NodeStatus AggressionAction::Tick(float deltaTime, Enemy& enemy) {
 	}
 	enemy.SetAimTargetDirection(aimDir, deltaTime);
 
-	// 距離に応じたスロットル調整（交戦距離に応じて食らいつく積極制御）
+	// 距離に応じたスロットル調整
 	if (leadWeight < 0.5f || distance > engagementRange_ * 0.6f) {
 		enemy.SetThrottleInput(1.0f);
 	} else if (distance < 320.0f) {
@@ -161,10 +155,7 @@ NodeStatus AggressionAction::Tick(float deltaTime, Enemy& enemy) {
 	return NodeStatus::Running;
 }
 
-// ============================================================================
-// 撤退アクション (RetreatAction)
-// 戦術的ブレイクターン（旋回離脱→即再突入）
-// ============================================================================
+// 撤退アクション
 NodeStatus RetreatAction::Tick(float deltaTime, Enemy& enemy) {
 	if (!enemy.IsPlayerValid()) {
 		return NodeStatus::Failure;
@@ -178,7 +169,7 @@ NodeStatus RetreatAction::Tick(float deltaTime, Enemy& enemy) {
 	const MyMath::Vector3 awayVector = MyMath::Subtract(myPos, playerPos);
 	const float distance = MyMath::Length(awayVector);
 
-	// 一定距離を確保したら即座に成功（再交戦サイクルへ移行）
+	// 一定距離を確保したら即座に成功
 	if (distance >= safeDistanceMeters_ || distance >= 600.0f) {
 		Reset();
 		return NodeStatus::Success;
@@ -210,7 +201,7 @@ NodeStatus RetreatAction::Tick(float deltaTime, Enemy& enemy) {
 
 	enemy.SetAimTargetDirection(dynamicEvadeDir, deltaTime);
 
-	// 離脱ターン時は全力加速（スロットル100%）
+	// 離脱ターン時は全力加速
 	enemy.SetThrottleInput(1.0f);
 
 	return NodeStatus::Running;
@@ -227,10 +218,7 @@ std::unique_ptr<BehaviorTree> EnemyBehaviorTreeBuilder::CreateEnemyTree(AIType a
 	auto tree = std::make_unique<BehaviorTree>();
 	auto rootSelector = std::make_unique<SelectorNode>("EnemyRootSelector");
 
-	// ------------------------------------------------------------------------
-	// 1. 撤退シーケンス (優先度：高)
-	// HPが20%未満かつ350m以内の危機的状況、またはCruiseEvadeで300m以内に接近された場合にブレイクターン
-	// ------------------------------------------------------------------------
+	// 1. 撤退シーケンス
 	auto retreatSeq = std::make_unique<SequenceNode>("RetreatSequence");
 	retreatSeq->AddChild(std::make_unique<ConditionNode>("ShouldRetreat", [aiType](Enemy& e) {
 		if (!e.IsPlayerValid()) {
@@ -241,7 +229,7 @@ std::unique_ptr<BehaviorTree> EnemyBehaviorTreeBuilder::CreateEnemyTree(AIType a
 		if (e.GetHealthRatio() < 0.20f && dist < 350.0f) {
 			return true;
 		}
-		// 回避AIタイプの場合、プレイヤーが至近距離（300m以内）に迫ったらブレイクターン
+		// 回避AIタイプの場合、プレイヤーが至近距離に迫ったらブレイクターン
 		if (aiType == AIType::CruiseEvade && dist < 300.0f) {
 			return true;
 		}
@@ -250,10 +238,7 @@ std::unique_ptr<BehaviorTree> EnemyBehaviorTreeBuilder::CreateEnemyTree(AIType a
 	retreatSeq->AddChild(std::make_unique<RetreatAction>());
 	rootSelector->AddChild(std::move(retreatSeq));
 
-	// ------------------------------------------------------------------------
-	// 2. アグレッションシーケンス (優先度：中)
-	// ChaseAttack設定、または2500m以内に自機がいる場合に積極交戦
-	// ------------------------------------------------------------------------
+	// 2. アグレッションシーケンス
 	auto aggressionSeq = std::make_unique<SequenceNode>("AggressionSequence");
 	aggressionSeq->AddChild(std::make_unique<ConditionNode>("ShouldEngage", [aiType](Enemy& e) {
 		if (!e.IsPlayerValid()) {
@@ -273,10 +258,7 @@ std::unique_ptr<BehaviorTree> EnemyBehaviorTreeBuilder::CreateEnemyTree(AIType a
 	aggressionSeq->AddChild(std::make_unique<AggressionAction>());
 	rootSelector->AddChild(std::move(aggressionSeq));
 
-	// ------------------------------------------------------------------------
-	// 3. 待機・ミッションエディタ経路追従アクション (優先度：低 / デフォルト)
-	// 上記条件に該当しない場合は、エディタで設定したWaypointPathに沿って巡航
-	// ------------------------------------------------------------------------
+	// 3. 待機・経路追従アクション
 	rootSelector->AddChild(std::make_unique<WaitPatrolAction>());
 
 	tree->SetRoot(std::move(rootSelector));
@@ -374,7 +356,7 @@ std::unique_ptr<BehaviorTree> EnemyBehaviorTreeBuilder::BuildFromJson(
 			return CreateEnemyTree(fallbackType);
 		}
 
-		// 1. ノードエディタグラフ（rootノード）が存在し、useCustomParamsOnly でない場合はグラフから構築
+		// 1. ノードエディタグラフが存在し、useCustomParamsOnly でない場合はグラフから構築
 		const bool useCustomParamsOnly = rootJson.value("useCustomParamsOnly", false);
 		if (!useCustomParamsOnly && rootJson.contains("root") && rootJson["root"].is_object()) {
 			auto rootNode = ParseNodeRecursive(rootJson["root"]);
@@ -385,7 +367,7 @@ std::unique_ptr<BehaviorTree> EnemyBehaviorTreeBuilder::BuildFromJson(
 			}
 		}
 
-		// 2. Nパネルパラメータ個別上書き（overrideParams）からの動的構築
+		// 2. Nパネルパラメータ個別上書きからの動的構築
 		nlohmann::json params = nlohmann::json::object();
 		if (rootJson.contains("overrideParams") && rootJson["overrideParams"].is_object()) {
 			params = rootJson["overrideParams"];
@@ -400,7 +382,7 @@ std::unique_ptr<BehaviorTree> EnemyBehaviorTreeBuilder::BuildFromJson(
 		auto tree = std::make_unique<BehaviorTree>();
 		auto rootSelector = std::make_unique<SelectorNode>("DynamicRootSelector");
 
-		// (A) 撤退シーケンス（近距離ブレイクターン）
+		// (A) 撤退シーケンス
 		auto retreatSeq = std::make_unique<SequenceNode>("RetreatSequence");
 		const float retreatRatio = retreatHpPct * 0.01f;
 		retreatSeq->AddChild(std::make_unique<ConditionNode>("LowHealthCheck", [retreatRatio, fallbackType](Enemy& e) {

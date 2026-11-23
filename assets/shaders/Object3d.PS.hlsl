@@ -99,11 +99,10 @@ PixelShaderOutput main(PixelInput input)
         float32_t3 N = normalize(input.normal);
         float32_t3 toEye = normalize(gLightingSettings.cameraPosition - input.worldPosition);
 
-        // 金属的な反射色を計算（ベースカラーを80%染める）
+        // 金属的な反射色を計算
         float32_t3 specColor = lerp(float32_t3(1.0f, 1.0f, 1.0f), texColor.rgb, 0.8f) * gMaterial.specularIntensity;
 
-        // アンビエントライト（天空光と地面反射光による半球ライティング）
-        // 暗部が真っ黒にならず、かつ機体全体が白飛び・まぶしくならないよう適正な照度(0.16)に抑制
+        // アンビエントライト
         float hemi = N.y * 0.5f + 0.5f;
         float32_t3 skyAmbient = float32_t3(0.30f, 0.35f, 0.42f);
         float32_t3 groundAmbient = float32_t3(0.18f, 0.16f, 0.14f);
@@ -126,7 +125,7 @@ PixelShaderOutput main(PixelInput input)
                 dirCos = dirCos * dirCos;
             }
 
-            // 直接光とアンビエント光の合計が自然な照度(最大1.0程度)に収まる適正バランス
+            // 直接光とアンビエント光の合計が自然な照度に収まる適正バランス
             float32_t3 dirDiffuse = gMaterial.color.rgb * texColor.rgb * gDirectionalLight.color.rgb * (dirCos * 0.84f) * gDirectionalLight.intensity;
             float32_t3 dirSpecular = float32_t3(0.0f, 0.0f, 0.0f);
 
@@ -263,7 +262,7 @@ PixelShaderOutput main(PixelInput input)
              }
         }
 
-        // 環境マップ (Environment Mapping) の計算
+        // 環境マップの計算
         float32_t3 envColor = float32_t3(0.0f, 0.0f, 0.0f);
         if (gMaterial.environmentCoefficient > 0.0f)
         {
@@ -273,13 +272,12 @@ PixelShaderOutput main(PixelInput input)
             // 高輝度空テクスチャの白飛び・まぶしさを抑制
             baseEnv = min(baseEnv, 1.2f);
             
-            // 環境反射光もベースカラーで染める (70% tint)
+            // 環境反射光もベースカラーで染める
             float32_t3 envTint = lerp(float32_t3(1.0f, 1.0f, 1.0f), texColor.rgb, 0.7f);
             // specularIntensityの重複掛けを排除し、サテン金属の落ち着いた適正反射に調整
             envColor = baseEnv * envTint * gMaterial.environmentCoefficient * 0.35f;
 
-            // 暗い場所（影）で光って見える現象をごまかすハック
-            // 主光源（平行光源）の当たり具合を利用して、光が当たりにくい面の反射を暗くする
+            // 影部分の環境反射を抑制
             if (gLightingSettings.lightType & 1)
             {
                 float32_t3 dirLightL = normalize(-gDirectionalLight.direction);
@@ -293,7 +291,7 @@ PixelShaderOutput main(PixelInput input)
             }
         }
 
-        // 自発光（メッシュ自体の発光）
+        // 自発光
         float32_t3 emissive = gMaterial.emissiveColor * gMaterial.emissiveIntensity * gLightingSettings.emissiveIntensityScale;
 
         // Combine & NaN Guard

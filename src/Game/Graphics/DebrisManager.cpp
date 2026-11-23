@@ -23,7 +23,7 @@ void DebrisObject::Update(float deltaTime) {
 	position = Add(position, Multiply(deltaTime, velocity));
 	rotation = Add(rotation, Multiply(deltaTime, angularVelocity));
 
-	// 自転行列 * 初期回転変換（切断時の位置・姿勢をベースにタンブリング回転）
+	// 自転行列 * 初期回転変換
 	Matrix4x4 rotMat = MakeAffineMatrix(scale, rotation, { 0.0f, 0.0f, 0.0f });
 	Matrix4x4 world = Multiply(rotMat, initialWorldMatrix);
 	world.m[3][0] = position.x;

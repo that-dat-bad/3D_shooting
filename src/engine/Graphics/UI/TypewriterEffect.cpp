@@ -43,7 +43,7 @@ std::string TypewriterEffect::GetRawVisibleText() const {
 std::string TypewriterEffect::GetCurrentText() const {
 	std::string result = GetRawVisibleText();
 	if (!isComplete_ && showCursor_) {
-		// 指定周波数でカーソルを点滅（偶数フレームで表示）
+		// 指定周波数でカーソルを点滅
 		if (static_cast<int>(timer_ * cursorBlinkRate_) % 2 == 0) {
 			result += cursorChar_;
 		}

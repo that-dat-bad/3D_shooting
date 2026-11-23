@@ -6,7 +6,7 @@ struct GunPodData {
 	float drag;         // 空気抵抗係数
 	float ammoWeight;   // 弾丸1発の重さ
 	int maxAmmo;        // 最大弾数
-	float fireRate;     // 1秒間に何発撃てるか (例: 10.0f なら秒間10発)
+	float fireRate;     // 1秒間に何発撃てるか
 };
 
 // ガンポッド

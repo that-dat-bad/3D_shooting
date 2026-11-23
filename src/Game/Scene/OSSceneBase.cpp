@@ -38,7 +38,7 @@ void OSSceneBase::UpdateOS(float dt, float fadeInSpeed) {
 		if (btnClickFlashTimer_ < 0.0f) btnClickFlashTimer_ = 0.0f;
 	}
 
-	// 疑似OSデスクトップ環境更新（入力自動取得＆アニメーション更新）
+	// 疑似OSデスクトップ環境更新
 	pseudoOS_.Update(dt);
 
 	// キーボード/ゲームパッドの選択操作時のフォーカス維持

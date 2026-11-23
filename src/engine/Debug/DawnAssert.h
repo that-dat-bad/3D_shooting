@@ -6,8 +6,7 @@
 
 #ifdef ASSERT_ENABLED
 
-// アサート失敗時に呼び出される内部ヘルパー関数
-// trueを返した場合、__debugbreak()を呼び出す
+// アサート失敗時の内部ヘルパー関数
 bool ReportAssertionFailure(const char* expression, const char* message, const char* file, int line);
 
 // デバッグブレークを引き起こすマクロ

@@ -55,7 +55,7 @@ private:
 
 	MCPClient mcpClient_;
 
-	// 地形パラメータ（スレッドセーフに更新）
+	// 地形パラメータ
 	mutable std::mutex paramMutex_;
 	float gridSizeX_ = 200.0f;
 	float gridSizeY_ = 200.0f;

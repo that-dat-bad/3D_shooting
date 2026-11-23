@@ -45,39 +45,39 @@ void Skybox::CreateBox() {
 	SkyboxVertex* vertexData = nullptr;
 	vertexResource_->Map(0, nullptr, reinterpret_cast<void**>(&vertexData));
 
-	// 原点を中心として、幅2m、高さ2mの箱を作る (x,y,zそれぞれ -1~1)
+	// 原点を中心として、幅2m、高さ2mの箱を作る
 
-	// 右面 (x = +1) : 描画インデックスは[0,1,2][2,1,3]で内側に向く
+	// 右面: 描画インデックスは[0,1,2][2,1,3]で内側に向く
 	vertexData[0].position = { 1.0f,  1.0f,  1.0f, 1.0f };
 	vertexData[1].position = { 1.0f,  1.0f, -1.0f, 1.0f };
 	vertexData[2].position = { 1.0f, -1.0f,  1.0f, 1.0f };
 	vertexData[3].position = { 1.0f, -1.0f, -1.0f, 1.0f };
 
-	// 左面 (x = -1) : 描画インデックスは[4,5,6][6,5,7]
+	// 左面: 描画インデックスは[4,5,6][6,5,7]
 	vertexData[4].position = { -1.0f,  1.0f, -1.0f, 1.0f };
 	vertexData[5].position = { -1.0f,  1.0f,  1.0f, 1.0f };
 	vertexData[6].position = { -1.0f, -1.0f, -1.0f, 1.0f };
 	vertexData[7].position = { -1.0f, -1.0f,  1.0f, 1.0f };
 
-	// 前面 (z = +1) : 描画インデックスは[8,9,10][10,9,11]
+	// 前面: 描画インデックスは[8,9,10][10,9,11]
 	vertexData[8].position  = { -1.0f,  1.0f, 1.0f, 1.0f };
 	vertexData[9].position  = {  1.0f,  1.0f, 1.0f, 1.0f };
 	vertexData[10].position = { -1.0f, -1.0f, 1.0f, 1.0f };
 	vertexData[11].position = {  1.0f, -1.0f, 1.0f, 1.0f };
 
-	// 後面 (z = -1) : 描画インデックスは[12,13,14][14,13,15]
+	// 後面: 描画インデックスは[12,13,14][14,13,15]
 	vertexData[12].position = {  1.0f,  1.0f, -1.0f, 1.0f };
 	vertexData[13].position = { -1.0f,  1.0f, -1.0f, 1.0f };
 	vertexData[14].position = {  1.0f, -1.0f, -1.0f, 1.0f };
 	vertexData[15].position = { -1.0f, -1.0f, -1.0f, 1.0f };
 
-	// 上面 (y = +1) : 描画インデックスは[16,17,18][18,17,19]
+	// 上面: 描画インデックスは[16,17,18][18,17,19]
 	vertexData[16].position = { -1.0f, 1.0f, -1.0f, 1.0f };
 	vertexData[17].position = {  1.0f, 1.0f, -1.0f, 1.0f };
 	vertexData[18].position = { -1.0f, 1.0f,  1.0f, 1.0f };
 	vertexData[19].position = {  1.0f, 1.0f,  1.0f, 1.0f };
 
-	// 下面 (y = -1) : 描画インデックスは[20,21,22][22,21,23]
+	// 下面: 描画インデックスは[20,21,22][22,21,23]
 	vertexData[20].position = { -1.0f, -1.0f,  1.0f, 1.0f };
 	vertexData[21].position = {  1.0f, -1.0f,  1.0f, 1.0f };
 	vertexData[22].position = { -1.0f, -1.0f, -1.0f, 1.0f };
@@ -93,7 +93,7 @@ void Skybox::CreateBox() {
 	uint32_t* indexData = nullptr;
 	indexResource_->Map(0, nullptr, reinterpret_cast<void**>(&indexData));
 
-	// 各面のインデックス (内側に向くように)
+	// 各面のインデックス
 	// 右面
 	indexData[0] = 0;  indexData[1] = 1;  indexData[2] = 2;
 	indexData[3] = 2;  indexData[4] = 1;  indexData[5] = 3;
@@ -132,11 +132,11 @@ void Skybox::Update() {
 void Skybox::Draw() {
 	ID3D12GraphicsCommandList* commandList = skyboxCommon_->GetDirectXCommon()->GetCommandList();
 
-	// マテリアル (RootParameter 0: PS b0)
+	// マテリアル
 	commandList->SetGraphicsRootConstantBufferView(0, materialResource_->GetGPUVirtualAddress());
-	// 変換行列 (RootParameter 1: VS b1)
+	// 変換行列
 	commandList->SetGraphicsRootConstantBufferView(1, transformationMatrixResource_->GetGPUVirtualAddress());
-	// テクスチャ (RootParameter 2: PS t0)
+	// テクスチャ
 	srvManager_->SetGraphicsRootDescriptorTable(2, textureIndex_);
 
 	// 頂点バッファ・インデックスバッファをセット

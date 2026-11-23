@@ -57,7 +57,7 @@ void TitleScene::Initialize() {
 	SpriteCommon* spriteCommon = SpriteCommon::GetInstance();
 	TextureManager* tm = TextureManager::GetInstance();
 
-	// テキストスプライトプールを事前確保（実行時のD3D12バッファ生成ヒッチを完全防止）
+	// テキストスプライトプールを事前確保
 	TextRenderer::GetInstance()->PrewarmPool(2500);
 
 	// 必須テクスチャのロード
@@ -75,7 +75,7 @@ void TitleScene::Initialize() {
 
 	tm->LoadTexture("assets/textures/title_logo_dawn_cropped.png");
 
-	// パーティクルグループの作成（CAM 03 墜落現場用: リアルな濃煙パフテクスチャ）
+	// パーティクルグループの作成
 	ParticleManager::GetInstance()->CreateParticleGroup("TitleSmoke", "assets/textures/smoke_puff.png");
 	ParticleManager::GetInstance()->SetBlendMode("TitleSmoke", BlendMode::kNormal);
 
@@ -83,7 +83,7 @@ void TitleScene::Initialize() {
 	ParticleManager::GetInstance()->SetBlendMode("TitleSpark", BlendMode::kAdd);
 
 	// ============================
-	// 3D背景の初期化 (A+B)
+	// 3D背景の初期化
 	// ============================
 	CameraManager::GetInstance()->CreateCamera("TitleCamera");
 	CameraManager::GetInstance()->SetActiveCamera("TitleCamera");
@@ -101,7 +101,7 @@ void TitleScene::Initialize() {
 	const bool fromCache = s_cache_.isCached;
 	if (fromCache) {
 		// ============================================================
-		// キャッシュからの0ms高速復元（D3D12リソース生成2,000バッファ完全スキップ）
+		// キャッシュからの0ms高速復元
 		// ============================================================
 		skybox_ = std::move(s_cache_.skybox);
 		locations_ = std::move(s_cache_.locations);
@@ -170,7 +170,7 @@ void TitleScene::Initialize() {
 		ResetOSDesktopWindows();
 	} else {
 		// ============================================================
-		// 初回生成（パーツ・セグメント・モデルの削減は一切行わず100%保持）
+		// 初回生成
 		// ============================================================
 		// コンソールブート時の完全漆黒背景スプライト
 		consoleBgSprite_ = std::make_unique<Sprite>();
@@ -181,7 +181,7 @@ void TitleScene::Initialize() {
 		consoleBgSprite_->SetColor({ 0.0f, 0.0f, 0.0f, 1.0f });
 		consoleBgSprite_->Update();
 
-		// 出撃シーケンス用ブラックアウトスプライト（黒フェード）
+		// 出撃シーケンス用ブラックアウトスプライト
 		sortieFlashSprite_ = std::make_unique<Sprite>();
 		sortieFlashSprite_->Initialize(spriteCommon, "assets/textures/white1x1.png");
 		sortieFlashSprite_->SetAnchorPoint({ 0.0f, 0.0f });
@@ -190,7 +190,7 @@ void TitleScene::Initialize() {
 		sortieFlashSprite_->SetColor({ 0.0f, 0.0f, 0.0f, 0.0f });
 		sortieFlashSprite_->Update();
 
-		// フルOSデスクトップ環境の初期化（512枚プール＆24枚カーソル）
+		// フルOSデスクトップ環境の初期化
 		InitializeOSDesktop(spriteCommon);
 
 		skybox_ = std::make_unique<Skybox>();
@@ -205,7 +205,7 @@ void TitleScene::Initialize() {
 		InitializeLocations3D(titleCamera, duskSky, whiteSky);
 	}
 
-	// 誘導灯・回転灯の自発光（エミッシブ）設定
+	// 誘導灯・回転灯の自発光設定
 	Model* guideModel = ModelManager::GetInstance()->FindModel("Resources/models/title/Tunnel_guide.obj");
 	if (guideModel) {
 		guideModel->SetMaterialEnableLighting(0, false);
@@ -251,7 +251,7 @@ void TitleScene::Update() {
 	animTimer_ += dt;
 	stateTimer_ += dt;
 
-	// マウスカーソルが非表示モードの場合、自アプリがフォアグラウンドの時のみ消去（他アプリ操作時はOS標準カーソルを表示）
+	// マウスカーソルが非表示モードの場合、自アプリがフォアグラウンドの時のみ消去
 	HWND hwnd = Input::GetInstance() ? Input::GetInstance()->GetHwnd() : nullptr;
 	bool isForeground = (hwnd && ::GetForegroundWindow() == hwnd);
 	if (!isForeground) {
@@ -283,7 +283,6 @@ void TitleScene::Update() {
 
 	LocationData& loc = CurrentLocation();
 
-	// ★ 重要：カメラ更新を機体・背景モデルの行列計算より「先」に実行！
 	if (state_ == TitleState::DroneView || state_ == TitleState::WindowClose || state_ == TitleState::ConsoleBoot) {
 		UpdateLocationCamera(loc, dt, false);
 	} else if (state_ == TitleState::Menu) {
@@ -315,7 +314,7 @@ void TitleScene::Update() {
 		break;
 	}
 
-	// 環境切り替え（Skybox）
+	// 環境切り替え
 	if (skybox_) {
 		skybox_->SetTextureIndex(loc.skyboxTexIndex);
 		skybox_->SetColor(loc.skyboxColor);
@@ -407,15 +406,14 @@ void TitleScene::Update() {
 
 void TitleScene::Draw() {
 	if (state_ == TitleState::ConsoleBoot) {
-		// コンソールブート時のみ3D描画をスキップ（黒画面からスタート）
+		// コンソールブート時のみ3D描画をスキップ
 		return;
 	}
 
 	LocationData& loc = CurrentLocation();
 	Camera* titleCamera = CameraManager::GetInstance()->GetActiveCamera();
 
-	// 墜落現場専用：「何も映さずノイズだけがいいね」
-	// ドローン視点時のみ3Dは一切映さず、フラットな背景のみ描画してポストエフェクトの全面砂嵐ノイズに委ねる！
+	// 墜落現場のドローン視点用ノイズ背景
 	if (loc.id == TitleLocation::CrashedForest && state_ == TitleState::DroneView) {
 		if (skybox_) {
 			skybox_->SetColor({ 0.18f, 0.18f, 0.20f, 1.0f });
@@ -427,7 +425,7 @@ void TitleScene::Draw() {
 
 	if (skybox_) {
 		if (loc.id == TitleLocation::Tunnel) {
-			// 地下トンネル内は完全な暗黒空間（開口部の外側も漆黒にして天球を完全遮蔽）
+			// 地下トンネル内は完全な暗黒空間
 			skybox_->SetColor({ 0.0f, 0.0f, 0.0f, 1.0f });
 		} else {
 			skybox_->SetColor(loc.skyboxColor);
@@ -438,7 +436,7 @@ void TitleScene::Draw() {
 
 	Object3dCommon::GetInstance()->SetupCommonState();
 
-	// 背景セット（モデル未作成ならスキップ）
+	// 背景セット
 	if (loc.envObject) {
 		loc.envObject->Draw();
 	}
@@ -453,12 +451,12 @@ void TitleScene::Draw() {
 		PrimitiveModel* pm = PrimitiveModel::GetInstance();
 		MyMath::Vector3 origin = loc.origin;
 		uint32_t shadowTex = (softShadowTexIndex_ != 0) ? softShadowTexIndex_ : whiteTexIndex_;
-		// 主脚（左右車輪下）
+		// 主脚
 		pm->DrawPlane({ 2.8f, 1.0f, 2.8f }, { 0.0f, 0.0f, 0.0f }, { origin.x - 1.4f, origin.y + 0.02f, origin.z + 0.5f }, { 0.0f, 0.0f, 0.0f, 0.32f }, shadowTex, titleCamera);
 		pm->DrawPlane({ 2.8f, 1.0f, 2.8f }, { 0.0f, 0.0f, 0.0f }, { origin.x + 1.4f, origin.y + 0.02f, origin.z + 0.5f }, { 0.0f, 0.0f, 0.0f, 0.32f }, shadowTex, titleCamera);
-		// 前脚（機首車輪下）
+		// 前脚
 		pm->DrawPlane({ 2.0f, 1.0f, 2.0f }, { 0.0f, 0.0f, 0.0f }, { origin.x, origin.y + 0.02f, origin.z - 2.8f }, { 0.0f, 0.0f, 0.0f, 0.28f }, shadowTex, titleCamera);
-		// 胴体中央のアンビエントオクルージョン影（淡いソフトフェード）
+		// 胴体中央のアンビエントオクルージョン影
 		pm->DrawPlane({ 5.5f, 1.0f, 9.5f }, { 0.0f, 0.5f, 0.0f }, { origin.x, origin.y + 0.015f, origin.z }, { 0.0f, 0.0f, 0.0f, 0.20f }, shadowTex, titleCamera);
 	}
 
@@ -467,7 +465,7 @@ void TitleScene::Draw() {
 		PrimitiveModel* pm = PrimitiveModel::GetInstance();
 		MyMath::Vector3 origin = loc.origin;
 		uint32_t scorchTex = (crashScorchTexIndex_ != 0) ? crashScorchTexIndex_ : whiteTexIndex_;
-		// 激突・胴体滑走の長大な溝デカール (Scorch Trench: 手前から激突点まで伸びる黒焦げブレーキ痕)
+		// 激突・胴体滑走の長大な溝デカール
 		pm->DrawPlane({ 4.5f, 1.0f, 22.0f }, { 0.0f, -0.85f, 0.0f }, { origin.x + 4.0f, origin.y + 0.010f, origin.z - 7.0f }, { 0.01f, 0.01f, 0.01f, 0.92f }, scorchTex, titleCamera);
 		// 胴体激突地点の大きな焦げ跡クレーターデカール
 		pm->DrawPlane({ 10.5f, 1.0f, 16.0f }, { 0.0f, -0.8f, 0.0f }, { origin.x, origin.y + 0.012f, origin.z }, { 0.02f, 0.02f, 0.02f, 0.92f }, scorchTex, titleCamera);
@@ -485,34 +483,34 @@ void TitleScene::Draw() {
 	if (loc.id == TitleLocation::Tunnel && titleCamera) {
 		PrimitiveModel* pm = PrimitiveModel::GetInstance();
 
-		// 高速で壁面・天井・路面を前方に流れるリニア誘導指標ライト（過剰発光・白飛びを抑制：項目1）
+		// 高速で壁面・天井・路面を前方に流れるリニア誘導指標ライト
 		constexpr float kFlightSpeed = 130.0f;
 		constexpr float kMarkerSpacing = 2.4f;
 		float scrollZ = -std::fmod(animTimer_ * kFlightSpeed, kMarkerSpacing);
 		for (float z = -40.0f; z <= 40.0f; z += kMarkerSpacing) {
 			float markerZ = z + scrollZ;
-			// 左右の壁面（X = ±6.25m, Y = 1.8m）: 適正なシアンガイドライン
+			// 左右の壁面: 適正なシアンガイドライン
 			pm->DrawPlane({ 0.14f, 1.0f, 2.8f }, { 0.0f, 0.0f, 1.5707963f }, { -6.25f, 1.8f, markerZ }, { 0.15f, 0.65f, 1.4f, 0.85f }, whiteTexIndex_, titleCamera, BlendMode::kAdd);
 			pm->DrawPlane({ 0.14f, 1.0f, 2.8f }, { 0.0f, 0.0f, 1.5707963f }, {  6.25f, 1.8f, markerZ }, { 0.15f, 0.65f, 1.4f, 0.85f }, whiteTexIndex_, titleCamera, BlendMode::kAdd);
 
-			// 天井誘導ライン（X = 0.0m, Y = 4.8m）: 適正な黄色ライン（白飛び防止：項目1）
+			// 天井誘導ライン: 適正な黄色ライン
 			pm->DrawPlane({ 0.50f, 1.0f, 2.4f }, { 3.14159265f, 0.0f, 0.0f }, { 0.0f, 4.8f, markerZ }, { 1.25f, 0.95f, 0.25f, 0.85f }, whiteTexIndex_, titleCamera, BlendMode::kAdd);
 			pm->DrawPlane({ 1.10f, 1.0f, 2.6f }, { 3.14159265f, 0.0f, 0.0f }, { 0.0f, 4.805f, markerZ }, { 0.45f, 0.35f, 0.08f, 0.35f }, softShadowTexIndex_ != 0 ? softShadowTexIndex_ : whiteTexIndex_, titleCamera, BlendMode::kAdd);
 
-			// 路面高速流動マーカー（X = ±2.5m, Y = 0.03m）: 適正な黄色マーカー
+			// 路面高速流動マーカー: 適正な黄色マーカー
 			pm->DrawPlane({ 0.12f, 1.0f, 1.8f }, { 0.0f, 0.0f, 0.0f }, { -2.5f, 0.03f, markerZ }, { 1.10f, 0.85f, 0.20f, 0.80f }, whiteTexIndex_, titleCamera, BlendMode::kAdd);
 			pm->DrawPlane({ 0.12f, 1.0f, 1.8f }, { 0.0f, 0.0f, 0.0f }, {  2.5f, 0.03f, markerZ }, { 1.10f, 0.85f, 0.20f, 0.80f }, whiteTexIndex_, titleCamera, BlendMode::kAdd);
 		}
 
-		// スラスター推進器噴射炎（Afterburner クラスによる単発エンジン・ショックダイヤモンド高品位描画）
+		// スラスター推進器噴射炎
 		if (afterburner_) {
 			afterburner_->Draw(currentAircraftMatrix_, titleCamera);
 
-			// ノズル開口部内部のプラズマ発光ディスク＆照り返しグロー（過剰発光を抑え、機体形状をくっきり見せる：項目1）
+			// ノズル開口部内部のプラズマ発光ディスク＆照り返しグロー
 			MyMath::Vector3 localNozzleCore = { 0.0f, 0.011f, 7.50f };
 			MyMath::Vector3 worldNozzleCore = MyMath::TransformV3(localNozzleCore, currentAircraftMatrix_);
 			MyMath::Vector3 nozzleRot = loc.aircraftRotation;
-			// ノズル中心のプラズマディスク（開口部サイズジャストに調整）
+			// ノズル中心のプラズマディスク
 			pm->DrawPlane({ 0.35f, 1.0f, 0.35f }, { 1.5707963f, nozzleRot.y, 0.0f }, worldNozzleCore, { 1.2f, 1.6f, 2.2f, 0.85f }, softShadowTexIndex_ != 0 ? softShadowTexIndex_ : whiteTexIndex_, titleCamera, BlendMode::kAdd);
 			// ノズル外周の控えめなグローハロ
 			pm->DrawPlane({ 0.70f, 1.0f, 0.70f }, { 1.5707963f, nozzleRot.y, 0.0f }, worldNozzleCore, { 0.15f, 0.45f, 1.0f, 0.35f }, softShadowTexIndex_ != 0 ? softShadowTexIndex_ : whiteTexIndex_, titleCamera, BlendMode::kAdd);
@@ -544,12 +542,12 @@ void TitleScene::DrawUI() {
 		// 背景オーバーレイ
 		backgroundPanel_.Draw();
 
-		// メニュー移行トランジション（0.35秒間の滑らかな起動フェードイン＆走査線展開：項目3）
+		// メニュー移行トランジション
 		if (menuEnterTimer_ > 0.0f) {
 			DrawTransitionGlitch();
 		}
 
-		// フルOSデスクトップ環境（マルチウィンドウ、タスクバー、デスクトップアイコン、カスタムカーソル）
+		// フルOSデスクトップ環境
 		DrawOSDesktop();
 	} else if (state_ == TitleState::SortieSequence) {
 		DrawSortieSequence();
@@ -563,10 +561,7 @@ void TitleScene::Finalize() {
 	isMissionSelectModalOpen_ = false;
 	missionSelectModalAnim_ = 0.0f;
 
-	// ------------------------------------------------------------
 	// 静的リソースキャッシュへの退避
-	// 次回タイトル訪問時のリソース生成と3D背景の再初期化をスキップ
-	// ------------------------------------------------------------
 	s_cache_.skybox = std::move(skybox_);
 	s_cache_.locations = std::move(locations_);
 	s_cache_.afterburner = std::move(afterburner_);

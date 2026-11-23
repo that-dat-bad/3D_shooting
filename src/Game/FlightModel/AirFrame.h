@@ -2,15 +2,15 @@
 #include <algorithm>
 #include "DamageModel.h"
 
-// --- 外部ファイルから読み込むためのデータ構造体（DTO） ---
+// --- 外部ファイルから読み込むためのデータ構造体 ---
 struct AirframeData {
 	float emptyFrameMass;   // 骨組みのみの空虚重量 (kg)
 	float maxInternalFuel;  // 内蔵燃料の最大容量 (kg)
 	float baseDrag;         // 基本の空気抵抗係数
-	float liftCoefficient;  // 揚力係数（翼の性能）
+	float liftCoefficient;  // 揚力係数
 	float wingArea;         // 翼面積 (m^2)
 	float maxHealth;        // 最大耐久値
-	float centerOfGravityZ; // 重心のZ位置 (正: 機首側, 負: 尾翼側)
+	float centerOfGravityZ; // 重心のZ位置
 
 	// --- 揚力・失速 ---
 	float criticalAoA;          // 臨界迎え角（rad）
@@ -29,7 +29,7 @@ struct AirframeData {
 	float flapLiftBonus;        // フラップ展開時のCL増加量
 	float flapDragBonus;        // フラップ展開時のCd増加量
 	float flapMaxSpeed;         // フラップが使用可能な最大速度 (m/s)
-	float flapDeploySpeed;      // フラップ展開/収納速度 (0→1の速度/sec)
+	float flapDeploySpeed;      // フラップ展開/収納速度
 
 	// --- エアブレーキ ---
 	float airBrakeDragBonus;    // エアブレーキ展開時のCd増加量
@@ -46,8 +46,7 @@ enum class DamageZone {
 	Count
 };
 
-// --- 機体フレームクラス本体 ---
-// 機体のフレームや物理的特性を管理するクラス
+// 機体フレームクラス
 class Airframe {
 public:
 	Airframe() : currentInternalFuel_(0.0f), currentHealth_(0.0f),
@@ -98,7 +97,7 @@ public:
 	float GetControlDamageFactor() const;         // 尾翼ダメージで操舵低下
 	float GetFuelLeakRate() const;                // 燃料タンクダメージで燃料漏れ
 
-	// --- アクセッサ（既存 + 新規） ---
+	// --- アクセッサ ---
 	float GetTotalMass() const;
 
 	float GetCurrentInternalFuel() const { return currentInternalFuel_; }
@@ -124,7 +123,7 @@ public:
 	float GetNegativeGLimit() const { return negativeGLimit_; }
 
 private:
-	// --- 物理スペック（不変データ） ---
+	// --- 物理スペック ---
 	float emptyFrameMass_ = 0.0f;      // 骨組みのみの空虚重量 (kg)
 	float maxInternalFuel_ = 0.0f;     // 内蔵燃料の最大容量 (kg)
 	float baseDrag_ = 0.0f;            // 基本空気抵抗係数
@@ -155,19 +154,19 @@ private:
 	float airBrakeDragBonus_ = 0.0f;
 	float airBrakeDeploySpeed_ = 0.0f;
 
-	// --- 現在の状態（変動データ） ---
+	// --- 現在の状態 ---
 	float currentInternalFuel_; // 現在の内蔵燃料 (kg)
 	float currentHealth_;       // 現在の耐久値
 
 	// フラップ状態
-	float flapPosition_;        // 0.0 (収納) ～ 1.0 (全展開)
+	float flapPosition_;        // 0.0 ～ 1.0
 	bool  flapDesired_;
 
 	// エアブレーキ状態
-	float airBrakePosition_;    // 0.0 (収納) ～ 1.0 (全展開)
+	float airBrakePosition_;    // 0.0 ～ 1.0
 	bool  airBrakeDesired_;
 
-	// ダメージ状態（各部位 0.0～1.0）
+	// ダメージ状態
 	float damageState_[static_cast<int>(DamageZone::Count)];
 
 	// 詳細パーツダメージモデル

@@ -190,7 +190,7 @@ void PlayerCamera::Update(float rawDt, FlightModel* flightModel, MouseAimControl
     Input* input = Input::GetInstance();
 
     // =========================================================================
-    // フリービュー (Cキー押下中)
+    // フリービュー
     // =========================================================================
     if (input && input->PushKey(DIK_C)) {
         if (!freeViewActive_) {
@@ -258,7 +258,7 @@ void PlayerCamera::Update(float rawDt, FlightModel* flightModel, MouseAimControl
         return;
     }
 
-    // ズーム切替 (右クリックのみFOVが変化し、マウス移動による動的FOV変動は一切行わない)
+    // ズーム切替
     if (input && input->TriggerMouse(1)) {
         isZoomed_ = !isZoomed_;
     }
@@ -270,7 +270,7 @@ void PlayerCamera::Update(float rawDt, FlightModel* flightModel, MouseAimControl
         currentFov_ = targetFov;
     }
 
-    // 固定ブーム距離D・固定ブーム高さH（ズーム時のみ画面下部の機体比率を保つようHを比例スケール）
+    // 固定ブーム距離D・固定ブーム高さH
     const float fovScale = (std::min)(1.0f, std::tan(currentFov_ * 0.5f) / std::tan(kBaseFov * 0.5f));
     currentDist_ = (std::max)(5.0f, cameraDistance_);
     currentHeight_ = cameraHeight_ * fovScale;
@@ -289,7 +289,7 @@ void PlayerCamera::Update(float rawDt, FlightModel* flightModel, MouseAimControl
     }
 
     // =========================================================================
-    // マニュアル操縦モード (mouseAimEnabled == false)
+    // マニュアル操縦モード
     // =========================================================================
     if (!mouseAimEnabled || !mouseAimController) {
         const float wnManual = std::clamp(cameraPosLag_, 1.0f, 20.0f) * 1.15f;
@@ -322,19 +322,13 @@ void PlayerCamera::Update(float rawDt, FlightModel* flightModel, MouseAimControl
         return;
     }
 
-    // =========================================================================
-    // War Thunder準拠 マウスエイム追従カメラ
-    // 1. 一定FOV・一定距離D・一定高さHの剛体ブーム: P_cam = P_aircraft - D*Zc + H*Yc
-    //    → ビュー空間における機体座標が毎フレーム厳密に (0, -H, +D) となり、前後揺れ(酔い)が完全にゼロ。
-    // 2. ハードクランプ壁のない均一過減衰2次球面ダンパで Zc → aimDir を滑らかに回転追従
-    //    → 微小な上下振りの手ブレを95%以上遮断しつつ、大角度旋回でも壁への吸いつきが一切発生しない。
-    // =========================================================================
+    // マウスエイム追従カメラ
     const Vector3 aimDir = SafeNormalize(mouseAimController->GetTargetDirection(), forward);
 
     const float wnAim = std::clamp(cameraLookLag_, 1.5f, 20.0f) * 1.15f;
     camForward_ = StepSphericalSpringDamper(camForward_, aimDir, camAngVel_, wnAim, 1.08f, dt, camUp_);
 
-    // ワールド水平基準Up安定化 ＋ 微量な機体バンク感(8%) ＋ 天頂付近の並行輸送ブレンド
+    // ワールド水平基準Up安定化 ＋ 微量な機体バンク感 ＋ 天頂付近の並行輸送ブレンド
     Vector3 transportedUp = Subtract(camUp_, Multiply(Dot(camUp_, camForward_), camForward_));
     transportedUp = SafeNormalize(transportedUp, { 0.0f, 1.0f, 0.0f });
 

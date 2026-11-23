@@ -9,7 +9,7 @@ using namespace MyMath;
 void BulletManager::Initialize(uint32_t maxBullets) {
 	maxBullets_ = maxBullets;
 	bullets_.resize(maxBullets_);
-	// 全弾丸を非活性状態で初期化（Bulletのデフォルトコンストラクタで isAlive_ = false）
+	// 全弾丸を非活性状態で初期化
 }
 
 void BulletManager::Update(float dt) {
@@ -53,7 +53,7 @@ void BulletManager::DrawTracerSegment(const Vector3& p1, const Vector3& p2, int 
 	rotate.y = std::atan2(dir.x, dir.z);
 	rotate.x = std::asin(-dir.y);
 
-	// セグメントインデックスに応じた減衰（先端ほど太く明るく、後ろに行くほど細くフェード）
+	// セグメントインデックスに応じた減衰
 	float widthFactor = 1.0f;
 	float alphaFactor = 1.0f;
 	if (segmentIndex == 0) {
@@ -71,7 +71,7 @@ void BulletManager::DrawTracerSegment(const Vector3& p1, const Vector3& p2, int 
 	}
 
 	float thickness = 0.15f * widthFactor;
-	// シリンダーの本来の長さは 2.0（-1.0〜1.0）なので、スケール長は length * 0.5f
+	// シリンダーの本来の長さは 2.0なので、スケール長は length * 0.5f
 	Vector3 scale = { thickness, thickness, length * 0.5f };
 	Vector4 color = { 1.0f, 0.3f, 0.05f, 1.0f * alphaFactor }; // 黄オレンジ系の発光色
 

@@ -1,6 +1,3 @@
-// Dagor / War Thunder 準拠 水面頂点シェーダー
-// カスケード波スペクトル近似による海面変位 + 川リボン対応
-
 struct VertexInput
 {
     float32_t4 position : POSITION0;
@@ -40,7 +37,7 @@ struct TransformationMatrix
 ConstantBuffer<Material> gMaterial : register(b0);
 ConstantBuffer<TransformationMatrix> gTransformationMatrix : register(b1);
 
-// 4オクターブの方向性波（Phillips/JONSWAPカスケード近似）
+// 4オクターブの方向性波
 float EvaluateCascadeWave(float2 xz, float timeSec, out float3 outNormal)
 {
     const float2 dirs[4] = {
@@ -97,8 +94,7 @@ VertexOutput main(VertexInput input)
     output.normal = worldNormal;
     output.texcoord = input.texcoord;
 
-    // World を既に適用済みなので ViewProj に相当する変換を逆算（Worldが単位行列前提の時はWVPと一致）
-    // Object3d の World が単位行列でない場合にも対応するためローカル変位に戻して WVP 適用
+    // ローカル変位を適用してWVP変換
     float4 localPos = input.position;
     if (!isRiver)
     {

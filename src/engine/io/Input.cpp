@@ -72,7 +72,7 @@ void Input::Update()
 		mouse_->GetDeviceState(sizeof(mouseState_), &mouseState_);
 	}
 
-	// Win32 API のマウスボタン状態も統合（フォーカス状態やDirectInput一時ロスト時にも確実に検出）
+	// Win32 API のマウスボタン状態も統合
 	if ((::GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0) {
 		mouseState_.rgbButtons[0] = 0x80;
 	}
@@ -83,7 +83,7 @@ void Input::Update()
 		mouseState_.rgbButtons[2] = 0x80;
 	}
 
-	// Win32 API のキー状態も統合（フォーカス遷移時やDirectInput一時ロスト時にも確実に検出）
+	// Win32 API のキー状態も統合
 	if ((::GetAsyncKeyState(VK_SPACE) & 0x8000) != 0) {
 		keys_[DIK_SPACE] = 0x80;
 	}

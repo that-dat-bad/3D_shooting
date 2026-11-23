@@ -61,7 +61,7 @@ enum class TypeBState {
 	Evading
 };
 
-// 空中ターゲット（敵AI）
+// 空中ターゲット
 class Enemy : public ICollisionBody3D {
 public:
 	Enemy();
@@ -108,7 +108,7 @@ public:
 	void SetTerrainChunkManager(TerrainChunkManager* terrain) { terrain_ = terrain; }
 	void SetTargetEnemy(Enemy* target) { targetEnemy_ = target; }
 
-	// 峡谷中心X評価（地形に沿った低空誘導用）
+	// 峡谷中心X評価
 	static float EvaluateCanyonCenterX(float worldZ);
 
 	// === アクセッサ ===
@@ -221,10 +221,11 @@ private:
 	// 描画用3Dオブジェクト
 	std::unique_ptr<Object3d> object3d_ = nullptr;
 	AircraftVisualModel visualModel_;
+	bool useVisualModel_ = false;
 	std::unique_ptr<Afterburner> afterburner_ = nullptr;
 	uint32_t ringTexIndex_ = 0;
 
-	// 特殊機体・演出用状態（僚機 / 峡谷ドローン / 多部位西側機）
+	// 特殊機体・演出用状態
 	float specialAnimTimer_ = 0.0f;
 	float specialPhaseTimer_ = 0.0f;
 	MyMath::Vector3 specialPos_{};

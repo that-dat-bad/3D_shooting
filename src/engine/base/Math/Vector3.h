@@ -43,21 +43,21 @@ namespace MyMath {
 	float Dot(const Vector3& v1, const Vector3& v2);
 
 	/// <summary>
-	/// ベクトルの長さ (ノルム)
+	/// ベクトルの長さ
 	/// </summary>
 	/// <param name="v">対象ベクトル</param>
 	/// <returns>ベクトルの長さ</returns>
 	float Length(const Vector3& v);
 
 	/// <summary>
-	/// ベクトルの正規化 (長さを1にする)
+	/// ベクトルの正規化
 	/// </summary>
 	/// <param name="v">対象ベクトル</param>
 	/// <returns>正規化されたベクトル</returns>
 	Vector3 Normalize(const Vector3& v);
 
 	/// <summary>
-	/// ベクトルの外積 (クロス積)
+	/// ベクトルの外積
 	/// </summary>
 	/// <param name="v1">ベクトル1</param>
 	/// <param name="v2">ベクトル2</param>
@@ -69,7 +69,7 @@ namespace MyMath {
 	/// </summary>
 	/// <param name="v1">開始値</param>
 	/// <param name="v2">終了値</param>
-	/// <param name="t">補間係数 (0.0 ～ 1.0)</param>
+	/// <param name="t">補間係数</param>
 	/// <returns>補間されたベクトル</returns>
 	Vector3 Lerp(const Vector3& v1, const Vector3& v2, float t);
 }

@@ -52,7 +52,7 @@ void TextureManager::LoadTexture(const std::string& filePath) {
 	DirectX::TexMetadata fileMetadata;
 	hr = DirectX::GetMetadataFromDDSFile(wFilePath.c_str(), DirectX::DDS_FLAGS_NONE, fileMetadata);
 
-	if (wFilePath.ends_with(L".dds")) {//ddsで終わっていたらddsとする(要改修)
+	if (wFilePath.ends_with(L".dds")) {//ddsで終わっていたらddsとする
 		hr = DirectX::LoadFromDDSFile(wFilePath.c_str(), DirectX::DDS_FLAGS_NONE, nullptr, image);
 	} else {
 		hr = DirectX::LoadFromWICFile(wFilePath.c_str(), DirectX::WIC_FLAGS_FORCE_SRGB, nullptr, image);
@@ -71,8 +71,7 @@ void TextureManager::LoadTexture(const std::string& filePath) {
 	}
 
 
-	// --- テクスチャデータを追加 ---
-	// 追加した要素の参照を取得する
+	// テクスチャデータを追加
 	TextureData& textureData = textureDatas_[filePath];
 
 

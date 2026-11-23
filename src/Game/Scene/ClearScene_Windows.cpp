@@ -280,7 +280,7 @@ void ClearScene::DrawTheaterReconWindow(const PseudoOS::Window& win) {
 	tr->Print("HackGen", "SECTOR TOPOGRAPHY [SURFACE RECON]:", startX, cy, 11.5f, { 0.45f, 0.95f, 0.85f, 0.98f });
 	cy += 18.0f;
 
-	// 1. 3Dワイヤーフレーム作戦マップ (h = 160)
+	// 1. 3Dワイヤーフレーム作戦マップ
 	float mapH = 160.0f;
 	pseudoOS_.DrawPanel({ startX, cy }, { frameW, mapH }, { 0.01f, 0.03f, 0.05f, 0.88f }, { 0.20f, 0.60f, 0.80f, 0.70f }, 1.0f);
 

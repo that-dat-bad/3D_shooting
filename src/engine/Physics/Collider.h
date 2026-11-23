@@ -8,7 +8,7 @@
 // ============================================================
 
 /// <summary>
-/// コライダーの種類（3D）
+/// コライダーの種類
 /// </summary>
 enum class ColliderType3D {
 	Sphere,
@@ -32,7 +32,7 @@ struct AABBCollider {
 };
 
 /// <summary>
-/// レイ（光線）構造体
+/// レイ構造体
 /// </summary>
 struct Ray {
 	MyMath::Vector3 origin = { 0.0f, 0.0f, 0.0f };
@@ -57,7 +57,7 @@ struct RaycastHit {
 // ============================================================
 
 /// <summary>
-/// コライダーの種類（2D）
+/// コライダーの種類
 /// </summary>
 enum class ColliderType2D {
 	Circle,
@@ -65,7 +65,7 @@ enum class ColliderType2D {
 };
 
 /// <summary>
-/// 円コライダー（2D）
+/// 円コライダー
 /// </summary>
 struct CircleCollider {
 	Vector2 center;
@@ -73,7 +73,7 @@ struct CircleCollider {
 };
 
 /// <summary>
-/// 矩形コライダー（2D / AABB）
+/// 矩形コライダー
 /// </summary>
 struct RectCollider {
 	Vector2 min;

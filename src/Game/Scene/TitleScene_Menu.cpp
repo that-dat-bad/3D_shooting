@@ -659,7 +659,6 @@ void TitleScene::DrawMenuCard() {
 	}
 
 	// システム認証ステータス行
-	// テキスト背面に完全不透明の黒ベタ矩形を敷くことで、背後の水平線を完璧にマスクして可読性を100%確保
 	const float authY = cardY + 172.0f;
 	const float authCenterX = cardX + cardWidth * 0.5f;
 	const char* authStr = isMissionSelectModalOpen_
@@ -670,10 +669,7 @@ void TitleScene::DrawMenuCard() {
 	tr->Print("HackGenRegular", authStr, authCenterX, authY, 11.0f, { 0.0f, 1.0f, 0.12f, 0.90f }, { 0.5f, 0.5f });
 
 	if (state_ == TitleState::SortieSequence) {
-		// ============================================================
 		// 出撃シーケンス専用コンソール
-		// 他のUIと一切被らず、美しい映画的演出を実現
-		// ============================================================
 		float consoleY = cardY + 196.0f;
 		const float consoleW = cardWidth - 36.0f;
 		const float consoleX = cardX + 18.0f;
@@ -707,7 +703,6 @@ void TitleScene::DrawMenuCard() {
 			float t = (sortieTimer_ - 1.30f) / 0.30f;
 			catProgress = 0.89f + t * 0.02f;
 		} else if (sortieTimer_ < 1.75f) {
-			// 100%突破！
 			float t = (sortieTimer_ - 1.60f) / 0.15f;
 			catProgress = 0.91f + (1.0f - std::pow(1.0f - t, 3.0f)) * 0.09f;
 		} else {
@@ -1074,7 +1069,7 @@ void TitleScene::DrawOSD() {
 		tr->Print("HackGen", "--:--:--:-- [FROZEN]", left + 120.0f, top + 9.0f, 15.0f, { 0.85f, 0.30f, 0.30f, 0.85f });
 		tr->Print("HackGen", "CARRIER LINK: SEVERED // SENSOR FAULT DETECTED", left + 8.0f, top + 30.0f, 11.5f, { 1.0f, 0.45f, 0.45f, 0.80f });
 
-		// --- 右上: DISCONNECTED 警告テキスト（点滅）---
+		// --- 右上: DISCONNECTED 警告テキスト---
 		bool blinkRight = (std::fmod(animTimer_, 0.6f) < 0.4f);
 		MyMath::Vector4 rightCol = blinkRight ? MyMath::Vector4{ 1.0f, 0.20f, 0.20f, 0.98f } : MyMath::Vector4{ 0.65f, 0.12f, 0.12f, 0.45f };
 		tr->Print("HackGen", "BAT --%  SIG [NO CARRIER]  0.0Mb/s  DISCONNECTED", right - 365.0f, top + 9.0f, 13.5f, rightCol);
@@ -1099,7 +1094,7 @@ void TitleScene::DrawOSD() {
 		// 通常ロケーションHUD表示
 		// ============================================================
 
-		// --- 左上: REC & タイムコード (HackGen) ---
+		// --- 左上: REC & タイムコード ---
 		tr->Print("HackGen", "REC", left + 24.0f, top + 9.0f, 15.0f, { 1.0f, 0.95f, 0.95f, 0.95f });
 
 		char timeBuf[32];
@@ -1127,7 +1122,7 @@ void TitleScene::DrawOSD() {
 		snprintf(rightHudBuf, sizeof(rightHudBuf), "BAT %d%%  SIG [%s]  %.1fMb/s  4K/60P", batPercent, sigBars, dataRate);
 		tr->Print("HackGen", rightHudBuf, right - 280.0f, top + 9.0f, 13.5f, { 0.85f, 0.95f, 1.0f, 0.80f });
 
-		// --- 左下: カメラ番号 & ロケーション (HackGen) ---
+		// --- 左下: カメラ番号 & ロケーション ---
 		std::string camName;
 		std::string camCoord;
 		if (transitionTimer_ > 0.0f) {
@@ -1152,7 +1147,7 @@ void TitleScene::DrawOSD() {
 		tr->Print("HackGen", camName, left + 8.0f, bottom - 38.0f, 17.0f, { 0.85f, 0.95f, 1.0f, 0.90f });
 		tr->Print("HackGen", camCoord, left + 8.0f, bottom - 18.0f, 12.0f, { 0.65f, 0.75f, 0.85f, 0.60f });
 
-		// --- 右下: 光学系 & リンク情報 (HackGen) ---
+		// --- 右下: 光学系 & リンク情報 ---
 		tr->Print("HackGen", "ZOOM 1.0x   F/2.8   ISO 400", right - 210.0f, bottom - 38.0f, 14.0f, { 0.85f, 0.95f, 1.0f, 0.75f });
 		tr->Print("HackGen", "LINK: SECURE LIVE FEED", right - 210.0f, bottom - 18.0f, 12.0f, { 0.46f, 0.80f, 0.49f, 0.70f });
 	}
@@ -1230,7 +1225,6 @@ void TitleScene::DrawWindowClose() {
 		windowCloseBorderSprites_[5]->Draw();
 
 		// ウィンドウ中央のステータス情報枠
-		// アニメーション中のアルファ曲線: 開始時に素早くフェードインし、終盤ウィンドウ消滅に合わせてフェードアウト
 		float fadeIn = (std::min)(1.0f, t / 0.12f);
 		float fadeOut = (std::clamp)((0.88f - t) / 0.18f, 0.0f, 1.0f);
 		float textAlpha = fadeIn * fadeOut;

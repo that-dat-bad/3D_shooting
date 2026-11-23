@@ -22,12 +22,12 @@ namespace MissionSchemaDefaults {
 	inline constexpr MyMath::Vector3 kDefaultPlayerStartPos = { 0.0f, 100.0f, 0.0f };
 }
 
-// ミッション一覧（マニフェスト）エントリデータ（各ミッションの件名・別名・ファイルパス等のメタデータ一元管理）
+// ミッション一覧エントリデータ
 struct MissionEntry {
-	std::string id = "[01]";                           // ミッションID（例: "[00]", "[01]"）
+	std::string id = "[01]";                           // ミッションID
 	std::string filePath = "";                        // ミッションJSONファイルパス
-	std::string title = "";                           // 作戦件名・主要タイトル（例: "Obuchenie"）
-	std::string aliasName = "";                       // 作戦別名・コードネーム（例: "ZADANIE 00"）
+	std::string title = "";                           // 作戦件名・主要タイトル
+	std::string aliasName = "";                       // 作戦別名・コードネーム
 	std::string subTitle = "";                        // 日本語件名・サブタイトル
 	bool isLocked = false;                            // 解放フラグ
 };
@@ -70,19 +70,19 @@ namespace MyMath {
 // ミッションの構成データ
 struct MissionData {
 	std::string name = "Default Mission";
-	std::string aliasName = "";                  // 作戦別名・コードネーム（例: "ZADANIE 00"）
-	std::string subTitle = "";                   // サブタイトル（例: "オブチェーニエ：訓練・教程 — 極夜の異変 —"）
-	std::string difficulty = "NORMAL";           // 難易度表示（例: "NORMAL", "HARD", "EXPERT"）
+	std::string aliasName = "";                  // 作戦別名・コードネーム
+	std::string subTitle = "";                   // サブタイトル
+	std::string difficulty = "NORMAL";           // 難易度表示
 	std::string areaName = "SECTOR 07";          // 作戦空域名称
 	std::string description = "Destroy all enemy aircraft and ground targets.";
 	float playerHP = MissionSchemaDefaults::kDefaultPlayerHp;
 	MyMath::Vector3 playerPosition = MissionSchemaDefaults::kDefaultPlayerStartPos;
-	float playerYawDeg = MissionSchemaDefaults::kDefaultPlayerYawDeg; // 初期方位角（度, 0=+Z北向き, 時計回り）
+	float playerYawDeg = MissionSchemaDefaults::kDefaultPlayerYawDeg; // 初期方位角
 	std::vector<EnemySpawnData> enemies;
 	std::vector<GroundEnemySpawnData> groundEnemies;
 
 	// --- Phase 1: ミッション目標 & トリガーシステム ---
-	float timeLimit = MissionSchemaDefaults::kDefaultTimeLimitSeconds; // ミッション制限時間 (秒, 0 = 無制限)
+	float timeLimit = MissionSchemaDefaults::kDefaultTimeLimitSeconds; // ミッション制限時間
 	std::vector<MissionObjective> objectives;                          // ミッション目標リスト
 	std::vector<MissionTrigger> triggers;                              // トリガーリスト
 
@@ -180,15 +180,15 @@ public:
 	// デフォルトのミッションデータを構築して保存
 	void CreateDefaultMission(const std::string& filepath);
 
-	// === ミッション一覧（マニフェスト・別名一元管理） ===
+	// === ミッション一覧 ===
 
-	// missions.json（ミッション一覧インデックス）をロード
+	// missions.jsonをロード
 	bool LoadMissionManifest(const std::string& manifestPath = "Resources/missions/missions.json");
 
 	// missions.json にミッション一覧を保存
 	bool SaveMissionManifest(const std::string& manifestPath = "Resources/missions/missions.json");
 
-	// ミッションエントリ一覧を取得（未ロード時は自動ロード）
+	// ミッションエントリ一覧を取得
 	const std::vector<MissionEntry>& GetMissionEntries();
 
 	// デフォルトの missions.json を生成
@@ -289,7 +289,7 @@ private:
 	std::vector<ObjectiveStatus> initialObjectiveStatuses_;
 	std::vector<bool> initialTriggerEnabled_;
 
-	// --- ミッション一覧（マニフェスト） ---
+	// --- ミッション一覧 ---
 	std::vector<MissionEntry> missionEntries_;
 	bool isManifestLoaded_ = false;
 

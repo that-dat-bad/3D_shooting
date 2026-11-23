@@ -21,7 +21,7 @@ public:
 	void Initialize(const std::wstring& title = L"DirectXGame", const std::wstring& version = L"1.0");
 
 	/// <summary>
-	/// Windowsメッセージの処理 (毎フレーム呼ぶ)
+	/// Windowsメッセージの処理
 	/// </summary>
 	/// <returns>終了メッセージを受け取った場合は true</returns>
 	bool ProcessMessage();

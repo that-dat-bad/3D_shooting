@@ -39,6 +39,10 @@ void from_json(const json& j, ActivePostEffect& effect) {
 	effect.colorB = j.value("colorB", 1.0f);
 }
 
+namespace {
+	constexpr uint32_t kMaxPassesPerFrame = 32;
+}
+
 std::unique_ptr<PostEffect> PostEffect::instance_ = nullptr;
 
 PostEffect* PostEffect::GetInstance() {
@@ -58,7 +62,7 @@ void PostEffect::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager) {
 	CreateGraphicsPipelines();
 
 	size_t cbAlignedSize = (sizeof(PostEffectParams) + 0xff) & ~0xff;
-	postEffectParamsBuffer_ = dxCommon_->CreateBufferResource(cbAlignedSize * 64);
+	postEffectParamsBuffer_ = dxCommon_->CreateBufferResource(cbAlignedSize * kMaxPassesPerFrame * DirectXCommon::kSwapChainBufferCount_);
 	HRESULT hr = postEffectParamsBuffer_->Map(0, nullptr, reinterpret_cast<void**>(&mappedPostEffectParams_));
 	assert(SUCCEEDED(hr));
 }
@@ -183,7 +187,7 @@ void PostEffect::LoadDissolveMasks() {
 void PostEffect::CreateGraphicsPipelines() {
 	Microsoft::WRL::ComPtr<IDxcBlob> vsBlob = dxCommon_->CompileShader(L"./assets/shaders/FullScreen.VS.hlsl", L"vs_6_0");
 
-	// ピクセルシェーダーのコンパイル（各種エフェクト）
+	// ピクセルシェーダーのコンパイル
 	Microsoft::WRL::ComPtr<IDxcBlob> psNone = dxCommon_->CompileShader(L"./assets/shaders/CopyImage.PS.hlsl", L"ps_6_0");
 	Microsoft::WRL::ComPtr<IDxcBlob> psColorTint = dxCommon_->CompileShader(L"./assets/shaders/ColorTint.PS.hlsl", L"ps_6_0");
 	Microsoft::WRL::ComPtr<IDxcBlob> psVignette = dxCommon_->CompileShader(L"./assets/shaders/Vignette.PS.hlsl", L"ps_6_0");
@@ -224,7 +228,7 @@ void PostEffect::CreateGraphicsPipelines() {
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc{};
 	psoDesc.pRootSignature = rootSignature_.Get();
 
-	// フルスクリーン三角形: 頂点入力なし（SV_VertexID で生成）
+	// フルスクリーン三角形: 頂点入力なし
 	psoDesc.InputLayout = { nullptr, 0 };
 
 	psoDesc.VS = { vsBlob->GetBufferPointer(), vsBlob->GetBufferSize() };
@@ -235,7 +239,7 @@ void PostEffect::CreateGraphicsPipelines() {
 	rasterizer.FillMode = D3D12_FILL_MODE_SOLID;
 	psoDesc.RasterizerState = rasterizer;
 
-	// ブレンド（不透明）
+	// ブレンド
 	D3D12_BLEND_DESC blendDesc{};
 	blendDesc.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
 	psoDesc.BlendState = blendDesc;
@@ -251,7 +255,7 @@ void PostEffect::CreateGraphicsPipelines() {
 	psoDesc.SampleDesc.Count = 1;
 	psoDesc.SampleMask = D3D12_DEFAULT_SAMPLE_MASK;
 
-	// 各エフェクト用の PSO を生成 (Dissolveは別root signatureなのでスキップ)
+	// 各エフェクト用の PSO を生成
 	for (size_t i = 0; i < static_cast<size_t>(PostEffectType::kCountOfPostEffects); ++i) {
 		if (i == static_cast<size_t>(PostEffectType::kDissolve)) { continue; }
 		psoDesc.PS = { pixelShaders[i]->GetBufferPointer(), pixelShaders[i]->GetBufferSize() };
@@ -383,8 +387,9 @@ void PostEffect::DrawSinglePass(ID3D12GraphicsCommandList* commandList, const Ac
 	commandList->SetGraphicsRootDescriptorTable(0, srvManager_->GetGPUDescriptorHandle(srvIndex));
 
 	// Set Parameters
-	if (passIndex >= 64) passIndex = 63; // Limit to buffer boundary
-	size_t offset = cbAlignedSize * passIndex;
+	const uint32_t clampedPass = (passIndex >= kMaxPassesPerFrame) ? (kMaxPassesPerFrame - 1) : passIndex;
+	const size_t slot = static_cast<size_t>(dxCommon_->GetCurrentFrameIndex()) * kMaxPassesPerFrame + clampedPass;
+	const size_t offset = cbAlignedSize * slot;
 	PostEffectParams* param = reinterpret_cast<PostEffectParams*>(reinterpret_cast<uint8_t*>(mappedPostEffectParams_) + offset);
 	
 	param->time = time_;
@@ -548,7 +553,7 @@ void PostEffect::ApplyBuiltInPreset(const std::string& presetName) {
 		iso.colorB = 0.1f;
 		iso.intensity = 0.45f; // Tolerance
 		iso.dirX = 0.15f;      // Smoothness
-		iso.dirY = 1.0f;       // Desaturation (Full monochrome for non-red)
+		iso.dirY = 1.0f;       // Desaturation
 		activeEffects_.push_back(iso);
 	}
 }

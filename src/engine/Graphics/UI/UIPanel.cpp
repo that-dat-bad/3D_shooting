@@ -5,7 +5,7 @@
 void UIPanel::Initialize(SpriteCommon* spriteCommon) {
 	spriteCommon_ = spriteCommon;
 
-	// white1x1.png をパネル背景に使用（色はSetColorで制御）
+	// white1x1.png をパネル背景に使用
 	backgroundSprite_ = std::make_unique<Sprite>();
 	backgroundSprite_->Initialize(spriteCommon_, "assets/textures/white1x1.png");
 }

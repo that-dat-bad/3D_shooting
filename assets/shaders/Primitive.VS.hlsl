@@ -1,6 +1,3 @@
-// Primitive.VS.hlsl
-// ボーン（スキニング）計算を省いた軽量な頂点シェーダー
-
 struct VertexInput
 {
     float32_t4 position : POSITION0;

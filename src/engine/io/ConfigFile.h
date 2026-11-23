@@ -3,8 +3,7 @@
 #include <unordered_map>
 #include <vector>
 
-// 汎用CFG / INI設定ファイルパーサー
-// [Section] 構造、Key = Value ペア、# / ; / // コメントに対応
+// CFG/INI設定ファイルパーサー
 class ConfigFile {
 public:
 	ConfigFile() = default;
@@ -49,9 +48,9 @@ private:
 	static std::string RemoveComments(const std::string& line);
 
 private:
-	// section -> (key -> value)
+	// section ->
 	std::unordered_map<std::string, std::unordered_map<std::string, std::string>> data_;
-	// セクションの順序を保持（保存時の見栄えのため）
+	// セクションの順序を保持
 	std::vector<std::string> sectionOrder_;
 	std::unordered_map<std::string, std::vector<std::string>> keyOrder_;
 };

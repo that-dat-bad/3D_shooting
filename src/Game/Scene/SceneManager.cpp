@@ -40,7 +40,7 @@ SceneManager::SceneManager(std::unique_ptr<AbstractSceneFactory> factory)
 	: sceneFactory_(std::move(factory)) {
 	
 #ifdef _DEBUG
-	// ログファイルの初期化（ヘッダー書き込み：Debugビルドのみ）
+	// ログファイルの初期化
 	FILE* fp = nullptr;
 	if (fopen_s(&fp, "scene_transition.log", "w") == 0 && fp) {
 		std::time_t now = std::time(nullptr);
@@ -95,13 +95,13 @@ void SceneManager::SwitchScene(int nextSceneID) {
 #endif
 	int prevSceneID = currentSceneID;
 
-	// 1. 直前のシーンの Finalize（状態退避）
+	// 1. 直前のシーンの Finalize
 #ifdef _DEBUG
 	auto tFinStart = std::chrono::high_resolution_clock::now();
 #endif
 	if (currentScene != nullptr) {
 		currentScene->Finalize();
-		// 現在のシーンを破棄せず、次回のためにキャッシュプールに退避（D3D12リソースを保持）
+		// 現在のシーンを破棄せず、次回のためにキャッシュプールに退避
 		scenePool_[currentSceneID] = std::move(currentScene);
 	}
 #ifdef _DEBUG
@@ -335,7 +335,7 @@ void SceneManager::Update() {
 	DrawProfilerImGui();
 #endif
 
-	// シーン切り替え判定（static変数が変更されたかチェック）
+	// シーン切り替え判定
 	int nextSceneID = currentScene->GetSceneID();
 	if (nextSceneID != currentSceneID) {
 		SwitchScene(nextSceneID);
@@ -354,7 +354,7 @@ void SceneManager::DrawUI() {
 	}
 
 #ifdef _DEBUG
-	// 画面上部HUDオーバーレイの描画（Debugビルドのみ）
+	// 画面上部HUDオーバーレイの描画
 	DrawOverlayHUD();
 #endif
 }

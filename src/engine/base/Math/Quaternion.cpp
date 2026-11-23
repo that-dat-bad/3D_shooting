@@ -31,13 +31,13 @@ Quaternion MyMath::Slerp(const MyMath::Quaternion& q1, const MyMath::Quaternion&
 	float dot = q1.x * q2.x + q1.y * q2.y + q1.z * q2.z + q1.w * q2.w;
 	Quaternion q3 = { q2.x, q2.y, q2.z, q2.w };
 
-	// 逆回転のほうが近い場合は反転させる（最短距離を回るようにする）
+	// 逆回転のほうが近い場合は反転させる
 	if (dot < 0.0f) {
 		q3 = { -q2.x, -q2.y, -q2.z, -q2.w };
 		dot = -dot;
 	}
 
-	// 角度が近すぎる場合はゼロ除算を防ぐため普通の線形補間(Lerp)で済ませる
+	// 角度が近すぎる場合はゼロ除算を防ぐため普通の線形補間で済ませる
 	if (dot > 0.9995f) {
 		Quaternion res = {
 			q1.x + t * (q3.x - q1.x), q1.y + t * (q3.y - q1.y),

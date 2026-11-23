@@ -11,7 +11,7 @@ CameraManager* CameraManager::GetInstance() {
 }
 
 void CameraManager::Initialize() {
-	// デフォルトカメラを作っておく（"default" という名前で）
+	// デフォルトカメラを作っておく
 	CreateCamera("default");
 	SetActiveCamera("default");
 }
@@ -21,7 +21,7 @@ void CameraManager::Finalize() {
 }
 
 void CameraManager::CreateCamera(const std::string& name) {
-	// 既に同じ名前があったら何もしない（あるいは上書き）
+	// 既に同じ名前があったら何もしない
 	if (cameras_.contains(name)) {
 		return;
 	}

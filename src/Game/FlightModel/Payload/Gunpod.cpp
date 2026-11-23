@@ -7,7 +7,7 @@ void GunPod::Initialize(const GunPodData& data) {
 	maxAmmo_ = data.maxAmmo;
 	currentAmmo_ = data.maxAmmo; // 初期状態ではフル装填
 
-	// 発射間隔の計算（fireRate が 0 以下の場合は安全対策）
+	// 発射間隔の計算
 	if (data.fireRate > 0.0f) {
 		fireInterval_ = 1.0f / data.fireRate;
 	} else {

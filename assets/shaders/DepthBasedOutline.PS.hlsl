@@ -6,11 +6,11 @@ SamplerState gSamplerLinear : register(s0);
 cbuffer PostEffectParams : register(b0)
 {
     int32_t kernelSize;
-    float intensity;      // 輪郭検出の感度・乗算値 (Multiplier)
+    float intensity;      // 輪郭検出の感度・乗算値
     float dirX;
     float dirY;
     float time;
-    float3 colorTint;     // 輪郭線のカラー (R, G, B)
+    float3 colorTint;     // 輪郭線のカラー
 };
 
 struct PixelShaderOutput

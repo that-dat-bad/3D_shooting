@@ -11,7 +11,7 @@ void TitleScene::InitializeLocations3D(Camera* titleCamera, uint32_t duskSky, ui
 	locations_.resize(static_cast<size_t>(TitleLocation::Count));
 
 	// ------------------------------------------------------------
-	// 1. 地下トンネル基地: トンネル + 道路 + 誘導灯（自発光） + 天井回転灯（飛行中M-21）
+	// 1. 地下トンネル基地: トンネル + 道路 + 誘導灯 + 天井回転灯
 	// ------------------------------------------------------------
 	{
 		LocationData& loc = locations_[static_cast<int>(TitleLocation::Tunnel)];
@@ -20,8 +20,8 @@ void TitleScene::InitializeLocations3D(Camera* titleCamera, uint32_t duskSky, ui
 		loc.aircraftModelPath = "Resources/models/m21.gltf"; // 車輪なし・ギア格納飛行モデル
 		loc.origin = { 0.0f, 0.0f, 0.0f };
 		loc.envModelPath = "Resources/models/title/Tunnel.obj";
-		loc.aircraftOffset = { 0.0f, 2.0f, 0.0f };          // トンネル中央の空中に浮上（高度2.0m）
-		loc.aircraftRotation = { 0.0f, 3.14159265f, 0.0f }; // 機首を奥（進行方向 +Z）に向けて前進飛行
+		loc.aircraftOffset = { 0.0f, 2.0f, 0.0f };          // トンネル中央の空中に浮上
+		loc.aircraftRotation = { 0.0f, 3.14159265f, 0.0f }; // 機首を奥に向けて前進飛行
 		loc.propellerRpm = 2500.0f;                          // 巡航飛行推力
 		loc.skyboxTexIndex = whiteSky;
 		loc.skyboxColor = { 0.0f, 0.0f, 0.0f, 1.0f }; // 天球を完全な黒にして暗黒空間にする
@@ -44,7 +44,7 @@ void TitleScene::InitializeLocations3D(Camera* titleCamera, uint32_t duskSky, ui
 			rotateLight.rotateSpeed = 4.0f; // 回転灯のY軸自転 (rad/sec)
 			loc.extraEnvParts.push_back(std::move(rotateLight));
 
-			// トンネルを前後に大幅に連結（端に15個ずつ、中央と合わせて計31個、全長約1.25km）
+			// トンネルを前後に大幅に連結
 			constexpr float kTunnelLength = 40.383094f;
 			constexpr int kTunnelSegmentsPerSide = 15;
 			for (int i = 1; i <= kTunnelSegmentsPerSide; ++i) {
@@ -66,7 +66,7 @@ void TitleScene::InitializeLocations3D(Camera* titleCamera, uint32_t duskSky, ui
 					guidePart.offset = { 0.0f, 0.0f, zOffset };
 					loc.extraEnvParts.push_back(std::move(guidePart));
 
-					// 2セグメントごと（約80m間隔）に天井警告回転灯を追加配置
+					// 2セグメントごとに天井警告回転灯を追加配置
 					if (i % 2 == 0) {
 						ExtraEnvPart rotatePart;
 						rotatePart.modelPath = "Resources/models/title/Tunnel_rotate.obj";
@@ -82,7 +82,7 @@ void TitleScene::InitializeLocations3D(Camera* titleCamera, uint32_t duskSky, ui
 		LocationLighting& l = loc.lighting;
 		l.lightType = 2 | 4;                              // ポイントライト＋後方投光スポットライトでトンネル壁面・路面を照らす
 		l.dirIntensity = 0.0f;
-		// スラスターノズル位置（Z=-3.8m）からのエレクトリックブルー照り返し（白飛び抑制：項目1）
+		// スラスターノズル位置からのエレクトリックブルー照り返し
 		l.pointColor = { 0.18f, 0.60f, 0.95f, 1.0f };
 		l.pointOffset = { 0.0f, 1.95f, -3.8f };
 		l.pointIntensity = 1.8f;                          // 過剰発光を抑え、機体ディテールを保つ
@@ -99,13 +99,13 @@ void TitleScene::InitializeLocations3D(Camera* titleCamera, uint32_t duskSky, ui
 		l.spotAngleDeg = 48.0f;
 		l.spotFalloffStartDeg = 24.0f;
 
-		// トンネル後方チェイスカメラ（機体テールの単発アフターバーナー＆ショックダイヤモンドを克明に捉える）
+		// トンネル後方チェイスカメラ
 		loc.camera = { 8.2f, 0.7f, 1.05f, 0.20f, 0.15f, 0.22f, 0.45f, true };
 		loc.grade = { { 0.05f, 0.08f, 0.15f }, 0.08f, 0.50f };
 	}
 
 	// ------------------------------------------------------------
-	// 2. 格納庫: 元のハンガーモデル + 作業灯 + 天井投光器（金属質感とスペキュラ反射を適正化：項目4, 5, 9）
+	// 2. 格納庫: 元のハンガーモデル + 作業灯 + 天井投光器
 	// ------------------------------------------------------------
 	{
 		LocationData& loc = locations_[static_cast<int>(TitleLocation::Hangar)];
@@ -113,7 +113,7 @@ void TitleScene::InitializeLocations3D(Camera* titleCamera, uint32_t duskSky, ui
 		loc.name = "Hangar";
 		loc.origin = { 0.0f, 0.0f, 0.0f };
 		loc.envModelPath = "Resources/models/title/hangar.obj";
-		loc.aircraftOffset = { 0.0f, 2.02f, 0.0f };       // 車輪底面（Y=-2.02m）が床面（Y=0）にピタリ接地
+		loc.aircraftOffset = { 0.0f, 2.02f, 0.0f };       // 車輪底面が床面にピタリ接地
 		loc.aircraftRotation = { 0.0f, 0.5f, 0.0f };
 		loc.skyboxTexIndex = duskSky;                    // 建造物トラスのないピュアスカイでキャノピーへの白い斜線映り込みを根絶
 		loc.skyboxColor = { 0.10f, 0.10f, 0.12f, 1.0f }; // 屋内なので空は暗く抑える
@@ -123,7 +123,7 @@ void TitleScene::InitializeLocations3D(Camera* titleCamera, uint32_t duskSky, ui
 		l.dirColor = { 0.60f, 0.70f, 0.88f, 1.0f };      // シャッター隙間からの青白い外光
 		l.dirDirection = MyMath::Normalize({ 0.45f, -0.65f, 0.60f });
 		l.dirIntensity = 0.38f;                           // 環境光を落として手前のネオングリーンUIを鮮明に浮き立たせる
-		l.pointColor = { 1.0f, 0.85f, 0.65f, 1.0f };     // 作業灯（暖色投光）
+		l.pointColor = { 1.0f, 0.85f, 0.65f, 1.0f };     // 作業灯
 		l.pointOffset = { -4.5f, 2.5f, -3.5f };
 		l.pointIntensity = 1.15f;
 		l.pointRadius = 20.0f;
@@ -137,7 +137,7 @@ void TitleScene::InitializeLocations3D(Camera* titleCamera, uint32_t duskSky, ui
 		l.spotAngleDeg = 42.0f;
 		l.spotFalloffStartDeg = 24.0f;
 
-		// 安定した見下ろし・見上げの周回カメラ（注視点高さを持ち上げ、下部バナーとの主翼被りを物理的に解消：項目5）
+		// 安定した見下ろし・見上げの周回カメラ
 		loc.camera = { 11.5f, 0.0f, 2.4f, 0.0f, 1.55f, 0.05f, 0.0f, false };
 		loc.grade = { { 0.05f, 0.08f, 0.15f }, 0.08f, 0.55f };
 	}
@@ -150,7 +150,7 @@ void TitleScene::InitializeLocations3D(Camera* titleCamera, uint32_t duskSky, ui
 		loc.id = TitleLocation::CrashedForest;
 		loc.name = "CrashedForest";
 		loc.origin = { 5000.0f, 0.0f, 5000.0f };
-		loc.envModelPath = "assets/models/terrain.obj"; // 起伏のある荒野・地面テクスチャモデル（背景の虚無を解消：項目2）
+		loc.envModelPath = "assets/models/terrain.obj"; // 起伏のある荒野・地面テクスチャモデル
 		loc.envScale = { 15.0f, 2.5f, 15.0f };
 		loc.envRotation = { 0.0f, 0.0f, 0.0f };
 		loc.aircraftModelPath = "Resources/models/m21_crashed.gltf"; // 激突・焦げ跡テクスチャ適用モデル
@@ -179,7 +179,7 @@ void TitleScene::InitializeLocations3D(Camera* titleCamera, uint32_t duskSky, ui
 		l.pointDecay = 1.3f;
 		l.pointFlicker = 0.35f;
 
-		// めり込み防止：十分な距離（15.5m）と俯瞰高さ（3.2m）で全景を見渡すシネマティックカメラ
+		// めり込み防止：十分な距離と俯瞰高さで全景を見渡すシネマティックカメラ
 		loc.camera = { 15.5f, 0.0f, 3.2f, 0.0f, 0.8f, 0.05f, 0.0f, false };
 		loc.grade = { { 0.04f, 0.05f, 0.07f }, 0.04f, 0.5f };
 	}
@@ -192,7 +192,7 @@ void TitleScene::InitializeLocations3D(Camera* titleCamera, uint32_t duskSky, ui
 void TitleScene::SetupLocation(LocationData& loc, Camera* camera) {
 	Object3dCommon* common = Object3dCommon::GetInstance();
 
-	// 背景セットモデル（存在しなければ描画しない＝モデル制作前でも動作する）
+	// 背景セットモデル
 	if (!loc.envModelPath.empty()) {
 		if (TitleAssetExists(loc.envModelPath)) {
 			ModelManager::GetInstance()->LoadModel(loc.envModelPath);
@@ -208,7 +208,7 @@ void TitleScene::SetupLocation(LocationData& loc, Camera* camera) {
 		}
 	}
 
-	// 追加の環境パーツ（道路、誘導灯、回転灯など）
+	// 追加の環境パーツ
 	for (auto& extra : loc.extraEnvParts) {
 		if (!extra.modelPath.empty()) {
 			if (TitleAssetExists(extra.modelPath)) {
@@ -232,7 +232,7 @@ void TitleScene::SetupLocation(LocationData& loc, Camera* camera) {
 	loc.visualModel->SetupFromSingleModel(loc.aircraftModelPath);
 	loc.visualModel->SetPropellerRpm(loc.propellerRpm);
 	if (loc.id == TitleLocation::Tunnel) {
-		// トンネル内では前進（+Z方向）に向けるため、モデルの自動180度回転をキャンセル
+		// トンネル内では前進に向けるため、モデルの自動180度回転をキャンセル
 		loc.visualModel->SetBaseRotation({ 0.0f, 0.0f, 0.0f });
 	}
 	for (DamagePart part : loc.hiddenParts) {
@@ -253,21 +253,21 @@ void TitleScene::SetupLocation(LocationData& loc, Camera* camera) {
 		}
 	}
 
-	// キャノピー（ガラス部分）の半透明・高環境反射・鋭角スペキュラ設定
+	// キャノピーの半透明・高環境反射・鋭角スペキュラ設定
 	loc.visualModel->SetupCanopyMaterial();
 
 	// ロケーション別マテリアルの質感設定
 	if (loc.id == TitleLocation::Hangar) {
-		// 格納庫: 軍用機らしいジュラルミン・メタリック質感（モデル本来のカラーを保護）
+		// 格納庫: 軍用機らしいジュラルミン・メタリック質感
 		loc.visualModel->SetMaterialProperties(48.0f, 1.35f, 0.45f);
 	} else if (loc.id == TitleLocation::Tunnel) {
-		// トンネル: スラスター光を反射する金属肌（モデル本来のカラーを保護）
+		// トンネル: スラスター光を反射する金属肌
 		loc.visualModel->SetMaterialProperties(40.0f, 1.20f, 0.40f);
 	} else if (loc.id == TitleLocation::CrashedForest) {
 		// 墜落現場: 激突・炎上による黒焦げ・煤煙テクスチャを鮮明に映し出すダークトーン
 		loc.visualModel->SetMaterialProperties(16.0f, 0.25f, 0.05f);
 		loc.visualModel->SetMaterialColor({ 0.70f, 0.68f, 0.68f, 1.0f });
-		// 残存した右主翼や昇降舵を激突の衝撃力で歪ませる（激突の説得力向上：項目8）
+		// 残存した右主翼や昇降舵を激突の衝撃力で歪ませる
 		loc.visualModel->SetPartLocalTransform(DamagePart::Wing_R, { 1.0f, 1.0f, 1.0f }, { 0.08f, -0.05f, 0.12f }, { 0.0f, 0.04f, -0.02f });
 		loc.visualModel->SetPartLocalTransform(DamagePart::Wing1_R, { 1.0f, 1.0f, 1.0f }, { 0.10f, -0.06f, 0.15f }, { 0.0f, 0.06f, -0.03f });
 		loc.visualModel->SetPartLocalTransform(DamagePart::Elevator1, { 1.0f, 1.0f, 1.0f }, { -0.22f, 0.0f, 0.08f }, { 0.0f, -0.03f, 0.0f });
@@ -292,7 +292,7 @@ void TitleScene::ApplyLocationLighting(const LocationData& loc) {
 	if (PointLight* point = common->GetPointLightData()) {
 		float intensity = l.pointIntensity;
 		if (l.pointFlicker > 0.0f) {
-			// 複数の正弦波を重ねて不規則な炎のゆらぎを作る（0〜1）
+			// 複数の正弦波を重ねて不規則な炎のゆらぎを作る
 			float n = 0.5f
 				+ 0.25f * std::sin(animTimer_ * 13.0f)
 				+ 0.15f * std::sin(animTimer_ * 29.0f + 1.3f)
@@ -333,32 +333,30 @@ void TitleScene::UpdateLocationCamera(const LocationData& loc, float dt, bool me
 	cameraTheta_ += orbitSpeed * dt;
 
 	if (c.isTunnelCamera) {
-		// トンネル専用チェイスカメラワーク：
-		// 機体後方（-Z側）から単発アフターバーナーノズル・ショックダイヤモンド・推進炎を正面に捉える
+		// トンネル専用チェイスカメラ
 		float swayX = std::sin(cameraTheta_) * 1.3f;
 		float currentDist = menuMode ? c.distance * 1.15f : (c.distance + std::sin(animTimer_ * 0.8f) * c.distanceSway);
 		float currentH = c.height + std::sin(animTimer_ * 1.1f) * c.heightSway;
 
 		// 機体およびノズルのワールド位置
-		// m21.gltf のローカルノズル位置は Z = +7.60m。aircraftRotation (0, π, 0) によりワールドでは Z = -7.60m
 		MyMath::Vector3 acPos = MyMath::Add(loc.origin, loc.aircraftOffset);
 		float nozzleOffsetZ = afterburner_ ? afterburner_->GetSingleNozzleOffset().z : 7.60f;
 		float nozzleOffsetY = afterburner_ ? afterburner_->GetSingleNozzleOffset().y : 0.011f;
 		float nozzleOffsetX = afterburner_ ? afterburner_->GetSingleNozzleOffset().x : 0.0f;
-		// 機体が 180度回転 (aircraftRotation.y = π) しているため、ローカル+Zはワールド-Z
+		// 機体が 180度回転しているため、ローカル+Zはワールド-Z
 		MyMath::Vector3 nozzleCenter = { acPos.x - nozzleOffsetX, acPos.y + nozzleOffsetY, acPos.z - nozzleOffsetZ };
 
-		// 注視点：ノズル出口から少し機体側（+Z方向）に入った尾部〜主翼根元付近を注視
+		// 注視点：ノズル出口から少し機体側に入った尾部〜主翼根元付近を注視
 		MyMath::Vector3 target;
 		target.x = nozzleCenter.x;
 		target.y = nozzleCenter.y + c.lookAtHeight;
-		target.z = nozzleCenter.z + 2.8f; // ノズルの少し前方（機体内部寄り）を見通すことで自然な構図に
+		target.z = nozzleCenter.z + 2.8f; // ノズルの少し前方を見通すことで自然な構図に
 
-		// カメラ位置：ノズルおよび噴射炎のさらに後方（-Z側）に配置し、少し斜め上方から見下ろす
+		// カメラ位置：ノズルおよび噴射炎のさらに後方に配置し、少し斜め上方から見下ろす
 		MyMath::Vector3 camPos;
 		camPos.x = target.x + 0.35f + swayX; // わずかに斜め後方にオフセットして立体感を強調
 		camPos.y = nozzleCenter.y + currentH;
-		camPos.z = nozzleCenter.z - currentDist; // ノズルから currentDist (約8.2m) 後方
+		camPos.z = nozzleCenter.z - currentDist; // ノズルから currentDist 後方
 
 		float dx = target.x - camPos.x;
 		float dy = target.y - camPos.y;
@@ -366,7 +364,7 @@ void TitleScene::UpdateLocationCamera(const LocationData& loc, float dt, bool me
 		float yaw = std::atan2(dx, dz);
 		float pitch = std::atan2(-dy, std::sqrt(dx * dx + dz * dz));
 
-		// ドローン挙動：左右移動速度（cos）に合わせてカメラを自然にバンク傾き
+		// ドローン挙動：左右移動速度に合わせてカメラを自然にバンク傾き
 		float swayVx = std::cos(cameraTheta_) * 1.3f;
 		float droneRoll = -swayVx * bankTilt * 0.05f;
 
@@ -388,13 +386,12 @@ void TitleScene::UpdateLocationCamera(const LocationData& loc, float dt, bool me
 	MyMath::Vector3 toTarget = MyMath::Subtract(target, camPos);
 	MyMath::Vector3 dir = MyMath::Normalize(toTarget);
 
-	// MakeAffineMatrix (Rx * Ry * Rz) に厳密に一致するオイラー角の幾何学解
-	// これにより周回時のYaw/Pitchクロスカップリングによる不自然な前後ジッター・ガタつきを根本根絶
+	// オイラー角の算出
 	float yaw = std::atan2(dir.x, dir.z);
 	float clampedY = std::clamp(dir.y, -0.999f, 0.999f);
 	float pitch = -std::asin(clampedY);
 
-	// ドローン挙動：旋回移動による向心バンク傾き（手ぶれ・振動はゼロ、滑らかな旋回傾き）
+	// ドローン挙動：旋回移動による向心バンク傾き
 	float baseRoll = -orbitSpeed * bankTilt * 1.2f;
 	float dynamicRoll = baseRoll + std::cos(cameraTheta_) * 0.015f * bankTilt;
 
@@ -423,7 +420,7 @@ void TitleScene::UpdateLocations3D(float dt) {
 		MyMath::Vector3 pos = MyMath::Add(loc.origin, loc.aircraftOffset);
 		MyMath::Vector3 rot = loc.aircraftRotation;
 
-		// トンネル内の飛行モーション（低空巡航飛行の浮遊動揺・バンク・推力微振動）
+		// トンネル内の飛行モーション
 		if (loc.id == TitleLocation::Tunnel && enableTunnelMotion_) {
 			float swayY = std::sin(animTimer_ * 2.2f) * 0.08f + std::sin(animTimer_ * 4.5f) * 0.02f;
 			float swayX = std::sin(animTimer_ * 1.3f) * 0.18f;
@@ -431,7 +428,7 @@ void TitleScene::UpdateLocations3D(float dt) {
 			pos.x += swayX;
 			pos.y += swayY + engineVibe;
 
-			// 機体の姿勢（バンク傾き ＆ 迎え角ピッチ）
+			// 機体の姿勢
 			float roll = -std::cos(animTimer_ * 1.3f) * 0.045f;
 			float pitch = 0.025f + std::sin(animTimer_ * 2.2f) * 0.015f;
 			rot.x += pitch;
@@ -445,7 +442,7 @@ void TitleScene::UpdateLocations3D(float dt) {
 			loc.debrisModel->Update(MyMath::MakeAffineMatrix({ 1.0f, 1.0f, 1.0f }, loc.debrisRotation, debrisPos), dt);
 		}
 
-		// トンネル専用：手前方向へ超高速スクロールして猛烈な飛行前進感を演出（時速約470km/h）
+		// トンネル専用：手前方向へ超高速スクロールして猛烈な飛行前進感を演出
 		float tunnelScrollZ = 0.0f;
 		if (loc.id == TitleLocation::Tunnel) {
 			constexpr float kTunnelLength = 40.383094f;
@@ -481,7 +478,7 @@ void TitleScene::UpdateLocations3D(float dt) {
 			}
 
 			crashSparkTimer_ += dt;
-			if (crashSparkTimer_ >= 0.12f) { // 火花は控えめに、極小の赤熱火の粉（ember）のみ
+			if (crashSparkTimer_ >= 0.12f) { // 火花は控えめに、極小の赤熱火の粉のみ
 				crashSparkTimer_ = 0.0f;
 				MyMath::Vector3 sparkPos = MyMath::Add(loc.origin, loc.aircraftOffset);
 				sparkPos.x -= 1.5f;
@@ -505,7 +502,7 @@ void TitleScene::UpdateLocations3D(float dt) {
 
 		if (loc.envObject) {
 			MyMath::Vector3 envPos = loc.origin;
-			envPos.z -= tunnelScrollZ; // 機体前進に伴い背景は手前（-Z方向）へスクロール
+			envPos.z -= tunnelScrollZ; // 機体前進に伴い背景は手前へスクロール
 			loc.envObject->SetTranslate(envPos);
 			loc.envObject->SetRotate(loc.envRotation);
 			loc.envObject->SetScale(loc.envScale);
@@ -521,7 +518,7 @@ void TitleScene::UpdateLocations3D(float dt) {
 				}
 				MyMath::Vector3 partRot = MyMath::Add(extra.rotation, { 0.0f, extra.currentAngle, 0.0f });
 				MyMath::Vector3 partPos = MyMath::Add(loc.origin, extra.offset);
-				partPos.z -= tunnelScrollZ; // 追加パーツも手前（-Z方向）へスクロール
+				partPos.z -= tunnelScrollZ; // 追加パーツも手前へスクロール
 				extra.object->SetTranslate(partPos);
 				extra.object->SetRotate(partRot);
 				extra.object->SetScale(extra.scale);
@@ -559,7 +556,7 @@ void TitleScene::PrewarmAllTitleCamerasAndLocations(float dt) {
 		titleCamera = cm->GetActiveCamera();
 	}
 
-	// 2. タイトルの全ロケーション専用カメラ（Hangar, Tunnel, CrashedForest）を作成・登録
+	// 2. タイトルの全ロケーション専用カメラを作成・登録
 	const char* camNames[] = {
 		"TitleCamera_Hangar",
 		"TitleCamera_Tunnel",
@@ -574,7 +571,7 @@ void TitleScene::PrewarmAllTitleCamerasAndLocations(float dt) {
 
 	if (prewarmPhase_ == 0) {
 		// ============================================================
-		// Phase 0: タイトルの全カメラ（周回・定点・Live Feed用）のパラメータ計算・更新
+		// Phase 0: タイトルの全カメラのパラメータ計算・更新
 		// ============================================================
 		for (size_t i = 0; i < locations_.size() && i < 3; ++i) {
 			const LocationData& loc = locations_[i];
@@ -584,7 +581,7 @@ void TitleScene::PrewarmAllTitleCamerasAndLocations(float dt) {
 			}
 		}
 
-		// メインカメラ (TitleCamera) をメニュー遷移時ロケーションに合わせて先行更新
+		// メインカメラをメニュー遷移時ロケーションに合わせて先行更新
 		if (!locations_.empty()) {
 			int targetLocIdx = (CurrentLocation().id == TitleLocation::CrashedForest) ? 0 : currentLocationIndex_;
 			if (targetLocIdx >= 0 && targetLocIdx < static_cast<int>(locations_.size())) {
@@ -608,7 +605,7 @@ void TitleScene::PrewarmAllTitleCamerasAndLocations(float dt) {
 #endif
 	} else if (prewarmPhase_ == 1) {
 		// ============================================================
-		// Phase 1: Hangar (CH 01) & CrashedForest (CH 03) の全オブジェクト行列更新
+		// Phase 1: Hangar & CrashedForest の全オブジェクト行列更新
 		// ============================================================
 		for (size_t i : { static_cast<size_t>(TitleLocation::Hangar), static_cast<size_t>(TitleLocation::CrashedForest) }) {
 			if (i < locations_.size()) {
@@ -664,7 +661,7 @@ void TitleScene::PrewarmAllTitleCamerasAndLocations(float dt) {
 #endif
 	} else if (prewarmPhase_ == 2) {
 		// ============================================================
-		// Phase 2: Tunnel (CH 02) の全オブジェクト（31セグメント約100パーツ）更新 & テクスチャフラッシュ
+		// Phase 2: Tunnel の全オブジェクト更新 & テクスチャフラッシュ
 		// ============================================================
 		if (static_cast<size_t>(TitleLocation::Tunnel) < locations_.size()) {
 			LocationData& loc = locations_[static_cast<size_t>(TitleLocation::Tunnel)];
@@ -691,7 +688,7 @@ void TitleScene::PrewarmAllTitleCamerasAndLocations(float dt) {
 				loc.envObject->Update();
 			}
 
-			// トンネルの全セグメントパーツ（約100パーツ）
+			// トンネルの全セグメントパーツ
 			for (auto& extra : loc.extraEnvParts) {
 				if (extra.object) {
 					MyMath::Vector3 ep = MyMath::Add(loc.origin, extra.offset);

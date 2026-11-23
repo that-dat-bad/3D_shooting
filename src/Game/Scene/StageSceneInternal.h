@@ -30,6 +30,6 @@
 #endif
 
 namespace StageSceneInternal {
-    // 固定フレームレートの deltaTime (60FPS想定)
+    // 固定フレームレートの deltaTime
     static constexpr float kDeltaTime = 1.0f / 60.0f;
 }

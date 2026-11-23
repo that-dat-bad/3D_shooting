@@ -7,6 +7,7 @@
 #include "../../engine/Graphics/PostProcess/PostEffect.h"
 #include "../../engine/Graphics/Model/Object3dCommon.h"
 #include "../../engine/Graphics/Model/PrimitiveModel.h"
+#include "../../engine/Graphics/Camera/CameraManager.h"
 #include "../Environment/TerrainChunkManager.h"
 #include "../System/GameResult.h"
 #include "../System/AsyncPreloadManager.h"
@@ -45,7 +46,7 @@ void ClearScene::PrewarmAssets() {
 		TextureManager::GetInstance()->LoadTexture("assets/textures/white1x1.png");
 
 		// ============================
-		// 疑似OS環境（タクティカルシアン仕様：TacticalCyan）および背景パネル初期化
+		// 疑似OS環境および背景パネル初期化
 		// ============================
 		InitializeOS(spriteCommon, PseudoOS::Theme::TacticalCyan,
 			"DAWN_OS TACTICAL OPERATION DEBRIEF [v4.12.0]",
@@ -66,7 +67,7 @@ void ClearScene::PrewarmAssets() {
 
 		pseudoOS_.ClearWindows();
 
-		// Window 0: メインデブリーフィングコンソール（右側配置・左側に3D軌跡と等高線を広く見せる）
+		// Window 0: メインデブリーフィングコンソール
 		PseudoOS::Window win0;
 		win0.id = 0;
 		win0.title = "DEBRIEF : OPERATION DAWN [SUCCESS]";
@@ -83,7 +84,7 @@ void ClearScene::PrewarmAssets() {
 		};
 		pseudoOS_.AddWindow(win0);
 
-		// メイン操作ウィンドウ（DEBRIEF: win0）を初期状態で最前面＆FOCUSに設定
+		// メイン操作ウィンドウを初期状態で最前面＆FOCUSに設定
 		pseudoOS_.BringWindowToFront(0);
 
 		// ============================
@@ -248,9 +249,13 @@ void ClearScene::Initialize() {
 		if (!tcm->IsLoaded()) {
 			tcm->Initialize(Object3dCommon::GetInstance(), &tacticalCam_, result.terrainPath);
 		}
+		if (!hasSavedTerrainDrawDistance_) {
+			savedTerrainDrawDistance_ = tcm->GetDrawDistance();
+			hasSavedTerrainDrawDistance_ = true;
+		}
 		tcm->SetCamera(&tacticalCam_);
 		tcm->SetDrawDistance(32000.0f);
-		tcm->Update(trajCenter_);
+		tcm->Update(trajCenter_, &tacticalCam_);
 	}
 
 	// 最新リザルト値の反映
@@ -351,7 +356,7 @@ void ClearScene::Update() {
 	UpdateTacticalCamera();
 	if (auto* tcm = TerrainChunkManager::GetInstance(); tcm && tcm->IsLoaded()) {
 		tcm->SetCamera(&tacticalCam_);
-		tcm->Update(trajCenter_);
+		tcm->Update(trajCenter_, &tacticalCam_);
 	}
 
 	Input* input = Input::GetInstance();
@@ -365,7 +370,7 @@ void ClearScene::Update() {
 		}
 	}
 
-	// 疑似OSデスクトップ環境更新（入力自動取得＆ウィンドウ開閉アニメーション自動管理）
+	// 疑似OSデスクトップ環境更新
 	pseudoOS_.Update(dt);
 
 	if (isAutoDemoActive_) {
@@ -397,7 +402,7 @@ void ClearScene::Update() {
 		selectionManager_.Update();
 		int currIndex = selectionManager_.GetSelectedIndex();
 
-		// キーボード/ゲームパッド操作があった場合、またはメニュー選択時はメインウィンドウ（win0）を最前面フォーカスに維持
+		// キーボード/ゲームパッド操作があった場合、またはメニュー選択時はメインウィンドウを最前面フォーカスに維持
 		if (input->TriggerKey(DIK_UP) || input->TriggerKey(DIK_DOWN) ||
 		    input->TriggerKey(DIK_LEFT) || input->TriggerKey(DIK_RIGHT) ||
 		    input->TriggerKey(DIK_RETURN) || input->TriggerKey(DIK_SPACE) ||
@@ -445,6 +450,7 @@ void ClearScene::UpdateTacticalCamera() {
 	tacticalCam_.SetRotate({ pitch, yaw, 0.0f });
 	tacticalCam_.SetTranslate(camPos);
 	tacticalCam_.Update();
+	Object3dCommon::GetInstance()->SetCameraPosition(camPos);
 }
 
 void ClearScene::DrawTacticalAircraftMarker(
@@ -456,7 +462,7 @@ void ClearScene::DrawTacticalAircraftMarker(
 	const Vector4& color) {
 	if (!prim) return;
 
-	// 垂直ドロップライン（AC7風の機体下への垂線）
+	// 垂直ドロップライン
 	prim->DrawLine3D(pos, { pos.x, groundY + 4.0f, pos.z }, { color.x, color.y, color.z, 0.85f }, &tacticalCam_);
 
 	Vector3 dir = forward;
@@ -492,7 +498,7 @@ void ClearScene::DrawTacticalAircraftMarker(
 		};
 	};
 
-	// コンパクトで視認性の高いカーナビ風3Dシェブロン（複数機表示対応サイズ）
+	// コンパクトで視認性の高いカーナビ風3Dシェブロン
 	const float hThick = 6.5f;
 	Vector3 topPts[4] = {
 		makePt( 48.0f,   0.0f,  hThick),
@@ -506,7 +512,7 @@ void ClearScene::DrawTacticalAircraftMarker(
 		makePt(-16.0f,   0.0f, -hThick),
 		makePt(-34.0f,  28.0f, -hThick)
 	};
-	// 緑単色ソリッド面（上面2枚・下面2枚・側面8枚）
+	// 緑単色ソリッド面
 	prim->DrawTriangle3D(topPts[0], topPts[1], topPts[2], color, &tacticalCam_);
 	prim->DrawTriangle3D(topPts[0], topPts[2], topPts[3], color, &tacticalCam_);
 	prim->DrawTriangle3D(botPts[0], botPts[1], botPts[2], color, &tacticalCam_);
@@ -517,7 +523,7 @@ void ClearScene::DrawTacticalAircraftMarker(
 		prim->DrawTriangle3D(topPts[k], botPts[nk], topPts[nk], color, &tacticalCam_);
 	}
 
-	// 枠線（面よりちょっと濃いめの緑・Zファイティング防止のため極小オフセット）
+	// 枠線
 	const float edgeExpand = 0.4f;
 	Vector3 edgeTopPts[4] = {
 		makePt( 48.0f + edgeExpand,   0.0f,               hThick + edgeExpand),
@@ -554,7 +560,7 @@ void ClearScene::DrawTacticalAircraftMarker(
 }
 
 void ClearScene::Draw() {
-	// 1. 3D等高線地形 + プレイヤー飛行軌跡の描画（余計な情報なし）
+	// 1. 3D等高線地形 + プレイヤー飛行軌跡の描画
 	if (auto* tcm = TerrainChunkManager::GetInstance(); tcm && tcm->IsLoaded()) {
 		tcm->DrawContourMap(&tacticalCam_);
 	}
@@ -604,7 +610,7 @@ void ClearScene::Draw() {
 				}
 			}
 
-			// 実際の飛行軌跡を描画（通過済み発光 + 未到達薄線）
+			// 実際の飛行軌跡を描画
 			for (size_t i = 0; i + 1 < traj.size(); ++i) {
 				const Vector3& a = traj[i].pos;
 				const Vector3& b = (i == activeSegIdx) ? curPos : traj[i + 1].pos;
@@ -635,7 +641,7 @@ void ClearScene::Draw() {
 		postEffect->ClearActiveEffects();
 
 		if (isRewinding_) {
-			// 本物のVHS巻き戻しシェーダー（走査線乱れ＋高速スクロール＋水平ノイズ＋色収差＋湾曲）
+			// 本物のVHS巻き戻しシェーダー
 			ActivePostEffect scanline;
 			scanline.type = PostEffectType::kScanLine;
 			scanline.intensity = 0.60f;
@@ -658,7 +664,7 @@ void ClearScene::Draw() {
 			dist.intensity = 0.10f;
 			postEffect->AddActiveEffect(dist);
 		} else {
-			// 1. ネオン・シアン発光ブルーム（しっとりとした軍用モニターの輝き）
+			// 1. ネオン・シアン発光ブルーム
 			ActivePostEffect bloom;
 			bloom.type = PostEffectType::kBloom;
 			bloom.intensity = 0.85f;
@@ -666,7 +672,7 @@ void ClearScene::Draw() {
 			bloom.dirY = 0.72f; // 輝度閾値
 			postEffect->AddActiveEffect(bloom);
 
-			// 2. CRTモニター走査線（繊細なスキャンライン）
+			// 2. CRTモニター走査線
 			ActivePostEffect scanline;
 			scanline.type = PostEffectType::kScanLine;
 			scanline.intensity = 0.08f;
@@ -680,7 +686,7 @@ void ClearScene::Draw() {
 			noise.intensity = 0.12f;
 			postEffect->AddActiveEffect(noise);
 
-			// 4. 上品な色収差（RGBフリンジ）
+			// 4. 上品な色収差
 			ActivePostEffect chromatic;
 			chromatic.type = PostEffectType::kChromaticAberration;
 			chromatic.intensity = 0.006f;
@@ -708,13 +714,13 @@ void ClearScene::DrawUI() {
 		uploadSprite_->Draw();
 	};
 
-	// 1. 背景パネルは3D等高線マップを見せるため透過（非描画）
+	// 1. 背景パネルは3D等高線マップを見せるため透過
 
 	// 画面全体のゆっくり動くサイバースキャンビーム
 	float beamY = std::fmod(animTimer_ * 80.0f, kScreenHeight - 32.0f);
 	DrawRectHelper({ 0.0f, beamY }, { kScreenWidth, 2.0f }, { 0.25f, 0.85f, 1.0f, 0.18f }, BlendMode::kAdd);
 
-	// 2. 疑似OSデスクトップ環境（マルチウィンドウ、タスクバー、カスタムカーソル）
+	// 2. 疑似OSデスクトップ環境
 	pseudoOS_.Draw();
 
 	if (isAutoDemoActive_) {
@@ -736,7 +742,7 @@ void ClearScene::DrawUI() {
 	}
 
 	// ------------------------------------------------------------
-	// ボタン決定フラッシュ＆波紋フィードバック（0.18秒）
+	// ボタン決定フラッシュ＆波紋フィードバック
 	// ------------------------------------------------------------
 	if (btnClickFlashTimer_ > 0.0f && uploadSprite_) {
 		float flashAlpha = btnClickFlashTimer_ / 0.18f;
@@ -744,7 +750,7 @@ void ClearScene::DrawUI() {
 	}
 
 	// ------------------------------------------------------------
-	// VHSテープのリワインド（巻き戻し）演出
+	// VHSテープのリワインド演出
 	// ------------------------------------------------------------
 	DrawRewindEffectUI();
 
@@ -811,6 +817,13 @@ void ClearScene::UpdateAutoDemo(float dt) {
 }
 
 void ClearScene::Finalize() {
+	if (auto* tcm = TerrainChunkManager::GetInstance(); tcm && tcm->IsLoaded()) {
+		if (hasSavedTerrainDrawDistance_) {
+			tcm->SetDrawDistance(savedTerrainDrawDistance_);
+			hasSavedTerrainDrawDistance_ = false;
+		}
+		tcm->SetCamera(CameraManager::GetInstance()->GetActiveCamera());
+	}
 	PostEffect::GetInstance()->ClearActiveEffects();
 	UITextRegistry::GetInstance()->Clear();
 }

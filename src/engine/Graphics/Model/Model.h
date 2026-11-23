@@ -13,7 +13,6 @@ class Camera;
 
 // <summary>
 // 3Dモデルデータを保持し描画を行うクラス
-// (アセットファイルからのデータ読み込み、アニメーション対応)
 // </summary>
 class Model {
 public:
@@ -31,7 +30,7 @@ public:
 	void Draw();
 
 	// <summary>
-	// 特定のノード（とその子孫）のみを描画するコマンド発行
+	// 特定のノードのみを描画するコマンド発行
 	// </summary>
 	void DrawNode(const std::string& nodeName);
 
@@ -135,7 +134,7 @@ public:
 
 	static ModelData LoadModelFile(const std::string& directoryPath, const std::string& filename);
 	// <summary>
-	// Assimp を経由しない軽量OBJローダー（静的メッシュ専用：ボーン・アニメーション非対応）
+	// Assimp を経由しない軽量OBJローダー
 	// 地形チャンクなど大量の単純OBJを高速に読み込むためのもの
 	// </summary>
 	static ModelData LoadObjFileFast(const std::string& filePath);
@@ -144,7 +143,7 @@ public:
 	ModelData GetModelData() const { return modelData_; }
 
 	// <summary>
-	// 事前パース済みモデルデータからの初期化（マルチスレッド並列ロード対応）
+	// 事前パース済みモデルデータからの初期化
 	// </summary>
 	void InitializeFromModelData(ModelCommon* modelCommon, ModelData modelData);
 
@@ -170,9 +169,9 @@ public:
 	void SetMaterialEnableLighting(uint32_t materialIndex, bool enableLighting);
 	// マテリアルの反射強度を設定
 	void SetMaterialSpecularIntensity(uint32_t materialIndex, float intensity);
-	// マテリアルの自発光（エミッシブ）を設定
+	// マテリアルの自発光を設定
 	void SetMaterialEmissive(uint32_t materialIndex, const Vector3& color, float intensity);
-	// マテリアルの光沢度（シャープさ）を設定
+	// マテリアルの光沢度を設定
 	void SetMaterialShininess(uint32_t materialIndex, float shininess);
 	// マテリアルの環境反射係数を設定
 	void SetMaterialEnvironmentCoefficient(uint32_t materialIndex, float coefficient);

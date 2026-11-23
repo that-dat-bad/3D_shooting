@@ -27,7 +27,7 @@ public:
 	void SetFontName(const std::string& name) { fontName_ = name; }
 	const std::string& GetFontName() const { return fontName_; }
 
-	// --- 装飾（ドロップシャドウ） ---
+	// --- 装飾 ---
 	void SetDropShadow(bool enable, const Vector2& offset = {2.0f, 2.0f}, const Vector4& color = {0.0f, 0.0f, 0.0f, 1.0f}) {
 		hasDropShadow_ = enable;
 		shadowOffset_ = offset;
@@ -53,7 +53,7 @@ public:
 	Vector2 GetOuterShadowOffset() const { return outerShadowOffset_; }
 	Vector4 GetOuterShadowColor() const { return outerShadowColor_; }
 
-	// --- 装飾（アウトライン） ---
+	// --- 装飾 ---
 	void SetOutline(bool enable, float thickness = 1.0f, const Vector4& color = {0.0f, 0.0f, 0.0f, 1.0f}) {
 		hasOutline_ = enable;
 		outlineThickness_ = thickness;

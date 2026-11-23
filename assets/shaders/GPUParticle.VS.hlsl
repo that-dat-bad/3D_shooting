@@ -22,8 +22,7 @@ VertexShaderOutput main(VertexShaderInput input, uint32_t instanceId : SV_Instan
     uint32_t particleIndex = gAliveList[instanceId];
     ParticleCS particle = gParticles[particleIndex];
     
-    // Extract camera axes directly from the rows of the billboard matrix.
-    // With -Zpr (row-major), the rows map exactly to the C++ matrix rows.
+    // ビルボード行列からカメラ軸を取得
     float3 xAxis = gPerView.billboardMatrix[0].xyz;
     float3 yAxis = gPerView.billboardMatrix[1].xyz;
     float3 zAxis = gPerView.billboardMatrix[2].xyz;

@@ -46,7 +46,7 @@ public:
 	// initialWorldMatrix: 切り離された瞬間のワールド行列
 	// baseVelocity: 機体の現在速度
 	// ejectionForce: 散乱方向の追加力
-	// targetNodeName: 描画対象ノード名（空の場合はモデル全体）
+	// targetNodeName: 描画対象ノード名
 	void SpawnDebris(Model* model, const Matrix4x4& initialWorldMatrix, const Vector3& baseVelocity, const Vector3& ejectionForce, const std::string& targetNodeName = "");
 
 private:

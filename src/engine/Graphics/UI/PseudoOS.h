@@ -58,7 +58,7 @@ public:
 	// dt: デルタタイム
 	void Update(float dt);
 
-	// 更新（マウス入力指定版）
+	// 更新
 	// dt: デルタタイム
 	void Update(float dt, const Vector2& mousePos, bool isLDown, bool isLTrig);
 
@@ -126,7 +126,7 @@ public:
 	bool IsCustomCursorVisible() const { return isCursorVisible_; }
 
 	// ========================================================
-	// OS描画プリミティブ（スプライトプール自動管理）
+	// OS描画プリミティブ
 	// ========================================================
 	void DrawRect(const Vector2& pos, const Vector2& size, const Vector4& color);
 	void DrawBorder(const Vector2& pos, const Vector2& size, const Vector4& color, float thick = 1.5f);
@@ -136,7 +136,7 @@ public:
 	void DrawWindowCloseButton(const Vector2& pos, float size, bool isHovered);
 
 	// ========================================================
-	// 共通画面演出（CRT電源オフ収束・ボタン発光フィードバック）
+	// 共通画面演出
 	// ========================================================
 	// CRT電源オフ演出の描画
 	// progress: 進行度
@@ -164,7 +164,7 @@ public:
 	Vector2 GetCursorPos() const { return cursorPos_; }
 	bool IsCursorInsideWindow(int windowId) const;
 
-	// スプライトプールの直接管理（シーン終了時のキャッシュ退避等）
+	// スプライトプールの直接管理
 	std::vector<std::unique_ptr<Sprite>>& GetSpritePool() { return spritePool_; }
 	std::vector<std::unique_ptr<Sprite>>& GetCursorSprites() { return cursorSprites_; }
 	void SetSpritePool(std::vector<std::unique_ptr<Sprite>> pool) { spritePool_ = std::move(pool); }
@@ -177,12 +177,12 @@ private:
 	void DrawTaskbar();
 	void DrawCustomCursor();
 
-	// スプライトプール（512枚）
+	// スプライトプール
 	SpriteCommon* spriteCommon_ = nullptr;
 	std::vector<std::unique_ptr<Sprite>> spritePool_;
 	size_t spritePoolIdx_ = 0;
 
-	// カーソル専用スプライト（24枚）
+	// カーソル専用スプライト
 	std::vector<std::unique_ptr<Sprite>> cursorSprites_;
 
 	Theme currentTheme_ = Theme::TerminalGreen;

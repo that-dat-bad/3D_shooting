@@ -13,7 +13,7 @@ VSOutput main(VSInput input, uint instanceId : SV_InstanceID)
     // StructuredBufferから、現在のインスタンスに対応するデータを取得
     ParticleForGPU particle = gParticleData[instanceId];
 
-    // 座標変換 (パーティクルごとのWVP行列を使用)
+    // 座標変換
     output.svpos = mul(input.position, particle.WVP);
     
     // UV座標はそのまま

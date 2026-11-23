@@ -20,7 +20,7 @@ public:
 	static ModelManager* GetInstance();
 
 	/// <summary>
-	/// デフォルトコンストラクタ (std::make_unique対応のためpublic)
+	/// デフォルトコンストラクタ
 	/// </summary>
 	ModelManager();
 
@@ -34,9 +34,9 @@ public:
 	void LoadModel(const std::string& filePath);
 
 	/// <summary>
-	/// 複数スレッドを活用したモデルの並列読み込み（全CPUコアでAssimpパースを同時実行）
+	/// 複数スレッドを活用したモデルの並列読み込み
 	/// </summary>
-	/// <param name="useFastObjLoader">true: .obj を Assimp ではなく軽量ローダーで読む（静的メッシュ専用）</param>
+	/// <param name="useFastObjLoader">true: .obj を Assimp ではなく軽量ローダーで読む</param>
 	void LoadModelsParallel(const std::vector<std::string>& filePaths, bool useFastObjLoader = false);
 
 	/// <summary>直近の LoadModelsParallel の内訳（ms）</summary>

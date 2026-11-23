@@ -133,6 +133,7 @@ void Enemy::Initialize(
 	isInDivePass_ = false;
 	isDownedSpiral_ = false;
 	isCrashedFloor_ = false;
+	useVisualModel_ = false;
 	brokenPart_ = 0;
 	pendingBrokenPartLog_.clear();
 	playerFlightModel_ = playerFlightModel;
@@ -290,14 +291,34 @@ void Enemy::Initialize(
 	}
 
 	// 標準敵3Dオブジェクトの生成
-	object3d_ = std::make_unique<Object3d>();
-	object3d_->Initialize(Object3dCommon::GetInstance());
-	object3d_->SetCamera(activeCam);
-	object3d_->SetModel(modelPath);
+	collisionRadius_ = 8.0f;
+	if (modelPath.ends_with(".gltf")) {
+		useVisualModel_ = true;
+		visualModel_.Initialize(Object3dCommon::GetInstance(), activeCam);
+		visualModel_.SetupFromSingleModel(modelPath);
+		if (modelPath.find("m15") != std::string::npos) {
+			visualModel_.SetMaterialProperties(42.0f, 0.75f, 0.28f);
+			visualModel_.SetMaterialColor({ 0.56f, 0.61f, 0.68f, 1.00f });
+		} else if (modelPath.find("m21") == std::string::npos) {
+			visualModel_.SetMaterialProperties(42.0f, 0.75f, 0.28f);
+			visualModel_.SetMaterialColor({ 0.46f, 0.50f, 0.48f, 1.00f });
+		} else {
+			visualModel_.SetMaterialProperties(48.0f, 1.15f, 0.45f);
+		}
+		visualModel_.SetupCanopyMaterial();
+		visualModel_.ResetAllPartsVisible();
+		visualModel_.Update(flightModel_.GetWorldMatrix(), 0.0f);
+		object3d_.reset();
+	} else {
+		object3d_ = std::make_unique<Object3d>();
+		object3d_->Initialize(Object3dCommon::GetInstance());
+		object3d_->SetCamera(activeCam);
+		object3d_->SetModel(modelPath);
 
-	object3d_->GetModel()->SetEnvironmentCoefficient(0.4f);
-	object3d_->GetModel()->SetSpecularIntensity(1.5f);
-	object3d_->SetScale({ 1.0f, 1.0f, 1.0f });
+		object3d_->GetModel()->SetEnvironmentCoefficient(0.4f);
+		object3d_->GetModel()->SetSpecularIntensity(1.5f);
+		object3d_->SetScale({ 1.0f, 1.0f, 1.0f });
+	}
 
 	RebuildBehaviorTree();
 }
@@ -319,12 +340,12 @@ void Enemy::SetWaypointPath(const WaypointPath& path) {
 static MyMath::Vector3 QuaternionToEuler(const MyMath::Quaternion& q) {
 	MyMath::Vector3 euler{};
 
-	// ロール (X軸回り)
+	// ロール
 	float sinr_cosp = 2.0f * (q.w * q.x + q.y * q.z);
 	float cosr_cosp = 1.0f - 2.0f * (q.x * q.x + q.y * q.y);
 	euler.x = std::atan2(sinr_cosp, cosr_cosp);
 
-	// ピッチ (Y軸回り)
+	// ピッチ
 	float sinp = 2.0f * (q.w * q.y - q.z * q.x);
 	if (std::fabs(sinp) >= 1.0f) {
 		euler.y = std::copysign(3.14159265f / 2.0f, sinp);
@@ -332,7 +353,7 @@ static MyMath::Vector3 QuaternionToEuler(const MyMath::Quaternion& q) {
 		euler.y = std::asin(sinp);
 	}
 
-	// ヨー (Z軸回り)
+	// ヨー
 	float siny_cosp = 2.0f * (q.w * q.z + q.x * q.y);
 	float cosy_cosp = 1.0f - 2.0f * (q.y * q.y + q.z * q.z);
 	euler.z = std::atan2(siny_cosp, cosy_cosp);
@@ -374,7 +395,27 @@ MyMath::Vector3 Enemy::GetDirectionToPlayer() const {
 }
 
 void Enemy::SetAimTargetDirection(const MyMath::Vector3& targetDir, float deltaTime) {
-	aimController_.SetTargetDirection(targetDir);
+	MyMath::Vector3 safeDir = targetDir;
+	if (terrain_ && terrain_->IsLoaded()) {
+		const MyMath::Vector3 pos = flightModel_.GetPosition();
+		const MyMath::Vector3 fwd = flightModel_.GetForwardDirection();
+		const auto currHit = terrain_->QuerySurfaceAt(pos.x, pos.z, -485.0f);
+		const auto aheadHit = terrain_->QuerySurfaceAt(pos.x + fwd.x * 260.0f, pos.z + fwd.z * 260.0f, -485.0f);
+		const float surfaceY = (std::max)({ currHit.landY, currHit.waterY, aheadHit.landY, aheadHit.waterY });
+		const float clearance = pos.y - surfaceY;
+		if (clearance < 220.0f) {
+			const float t = std::clamp((220.0f - clearance) / 140.0f, 0.0f, 1.0f);
+			const float minY = 0.08f + 0.48f * t;
+			if (safeDir.y < minY) {
+				safeDir.y = minY;
+				const float len = MyMath::Length(safeDir);
+				if (len > 0.001f) {
+					safeDir = MyMath::Multiply(1.0f / len, safeDir);
+				}
+			}
+		}
+	}
+	aimController_.SetTargetDirection(safeDir);
 	float finalPitch = 0.0f;
 	float finalRoll = 0.0f;
 	float finalYaw = 0.0f;
@@ -875,6 +916,12 @@ void Enemy::Update(float deltaTime) {
 
 	if (!isAlive_) { return; }
 
+	if (terrain_ && terrain_->IsLoaded()) {
+		const MyMath::Vector3 pos = flightModel_.GetPosition();
+		const auto hit = terrain_->QuerySurfaceAt(pos.x, pos.z, -485.0f);
+		flightModel_.SetGroundElevation((std::max)(hit.landY, hit.waterY));
+	}
+
 	UpdateAI(deltaTime);
 	flightModel_.Update(deltaTime);
 
@@ -883,9 +930,16 @@ void Enemy::Update(float deltaTime) {
 	}
 
 	// オブジェクトに位置と姿勢を適用
-	object3d_->SetTranslate(flightModel_.GetPosition());
-	object3d_->SetRotate(QuaternionToEuler(flightModel_.GetOrientation()));
-	object3d_->Update();
+	if (useVisualModel_) {
+		if (Camera* cam = CameraManager::GetInstance()->GetActiveCamera()) {
+			visualModel_.SetCamera(cam);
+		}
+		visualModel_.Update(flightModel_.GetWorldMatrix(), deltaTime);
+	} else if (object3d_) {
+		object3d_->SetTranslate(flightModel_.GetPosition());
+		object3d_->SetRotate(QuaternionToEuler(flightModel_.GetOrientation()));
+		object3d_->Update();
+	}
 }
 
 void Enemy::Draw() {
@@ -918,6 +972,11 @@ void Enemy::Draw() {
 	}
 
 	if (!isAlive_) { return; }
+	if (useVisualModel_) {
+		visualModel_.SetCamera(CameraManager::GetInstance()->GetActiveCamera());
+		visualModel_.Draw();
+		return;
+	}
 	if (!object3d_) { return; }
 
 	object3d_->Draw();

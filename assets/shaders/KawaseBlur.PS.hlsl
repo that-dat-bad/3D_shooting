@@ -22,7 +22,7 @@ PixelShaderOutput main(VertexShaderOutput input)
     gTexture.GetDimensions(width, height);
     float32_t2 uvStepSize = float32_t2(rcp((float32_t)width), rcp((float32_t)height));
 
-    // Calculate sample offset based on intensity (distance)
+    // Calculate sample offset based on intensity
     float2 dUV = uvStepSize * intensity;
 
     float32_t4 color = float32_t4(0.0f, 0.0f, 0.0f, 0.0f);
