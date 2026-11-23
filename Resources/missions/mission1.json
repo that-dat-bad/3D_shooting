@@ -1,34 +1,449 @@
 {
-    "name": "AIRSPACE DEFENSE",
-    "aliasName": "OP: IRON SHIELD",
-    "subTitle": "敵要撃部隊 要撃スクランブル",
-    "areaName": "SECTOR 04 : MOUNTAIN VALLEY",
-    "description": "峡谷地帯を低空侵入する敵先鋭飛行部隊の迎撃作戦。狭隘な地形での高G機動戦が予想される。友軍基地への到達前に敵機をすべて撃墜せよ。",
-    "playerHP": 100.0,
-    "playerPosition": {
-        "x": 0.0,
-        "y": 100.0,
-        "z": 0.0
-    },
-    "timeLimit": 240.0,
-    "enemies": [],
-    "groundEnemies": [],
-    "objectives": [
+  "name": "AIRSPACE DEFENSE",
+  "aliasName": "OP: IRON SHIELD",
+  "subTitle": "沿岸防空スクランブル要撃作戦",
+  "difficulty": "NORMAL",
+  "areaName": "NORTHERN BAY // COASTAL AIRSPACE",
+  "description": "領海湾内へ侵入した敵先遣編隊および精鋭要撃隊を2ウェーブで撃破する即応空戦ミッション。海上低空から沿岸山岳空域にかけて、BehaviorTreeによる戦術AIとのドッグファイトを展開せよ。",
+  "playerHP": 100.0,
+  "playerPosition": {
+    "x": 200.0,
+    "y": 360.0,
+    "z": -5350.0
+  },
+  "playerYawDeg": 0.0,
+  "timeLimit": 180.0,
+  "minAmmoReserve": 200,
+  "fadeOutOnClear": false,
+  "isTutorialDebrief": false,
+  "isClearAutoDemo": false,
+  "disableGenericRadio": false,
+  "waypointPaths": [
+    {
+      "name": "bay_patrol_loop",
+      "isLoop": true,
+      "points": [
         {
-            "name": "Intercept Advanced Enemy Wing",
-            "description": "敵先鋭飛行隊の全機要撃 (INTERCEPT ADVANCED ENEMY WING)",
-            "type": "DestroyAll",
-            "isPrimary": true,
-            "status": "Active"
+          "position": { "x": 250.0, "y": 420.0, "z": -3750.0 },
+          "speed": 230.0
         },
         {
-            "name": "Defend Border Pass",
-            "description": "防衛ライン死守・領空侵犯の阻止 (DEFEND BORDER PASS)",
-            "type": "Survive",
-            "isPrimary": false,
-            "status": "Active"
+          "position": { "x": 850.0, "y": 460.0, "z": -4200.0 },
+          "speed": 230.0
+        },
+        {
+          "position": { "x": 200.0, "y": 420.0, "z": -4850.0 },
+          "speed": 230.0
+        },
+        {
+          "position": { "x": -550.0, "y": 460.0, "z": -4200.0 },
+          "speed": 230.0
         }
-    ],
-    "triggers": [],
-    "waypointPaths": []
+      ]
+    }
+  ],
+  "enemies": [
+    {
+      "position": { "x": 220.0, "y": 410.0, "z": -4250.0 },
+      "modelPath": "Resources/models/m21.gltf",
+      "health": 32.0,
+      "aiType": "FollowWaypoint",
+      "waypointPathName": "bay_patrol_loop",
+      "behaviorTree": {
+        "root": {
+          "type": "BTRootNode",
+          "children": [
+            {
+              "type": "BTSelectorNode",
+              "children": [
+                {
+                  "type": "BTSequenceNode",
+                  "children": [
+                    { "type": "BTConditionHealthNode", "thresholdPct": 25.0 },
+                    { "type": "BTConditionDistanceNode", "distanceMeters": 320.0 },
+                    { "type": "BTActionRetreatNode", "safeDistance": 420.0, "useEvadeWobble": true }
+                  ]
+                },
+                {
+                  "type": "BTSequenceNode",
+                  "children": [
+                    { "type": "BTConditionDistanceNode", "distanceMeters": 650.0 },
+                    { "type": "BTActionAggressionNode", "engagementRange": 2500.0, "fireRange": 1200.0 }
+                  ]
+                },
+                {
+                  "type": "BTActionWaitPatrolNode",
+                  "cruiseThrottle": 0.68,
+                  "allowOpportunisticFire": true
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "position": { "x": 40.0, "y": 430.0, "z": -4100.0 },
+      "modelPath": "Resources/models/m21.gltf",
+      "health": 30.0,
+      "aiType": "FollowWaypoint",
+      "waypointPathName": "bay_patrol_loop",
+      "behaviorTree": {
+        "root": {
+          "type": "BTRootNode",
+          "children": [
+            {
+              "type": "BTSelectorNode",
+              "children": [
+                {
+                  "type": "BTSequenceNode",
+                  "children": [
+                    { "type": "BTConditionHealthNode", "thresholdPct": 25.0 },
+                    { "type": "BTConditionDistanceNode", "distanceMeters": 320.0 },
+                    { "type": "BTActionRetreatNode", "safeDistance": 420.0, "useEvadeWobble": true }
+                  ]
+                },
+                {
+                  "type": "BTSequenceNode",
+                  "children": [
+                    { "type": "BTConditionDistanceNode", "distanceMeters": 650.0 },
+                    { "type": "BTActionAggressionNode", "engagementRange": 2500.0, "fireRange": 1200.0 }
+                  ]
+                },
+                {
+                  "type": "BTActionWaitPatrolNode",
+                  "cruiseThrottle": 0.68,
+                  "allowOpportunisticFire": true
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "position": { "x": 400.0, "y": 430.0, "z": -4100.0 },
+      "modelPath": "Resources/models/m21.gltf",
+      "health": 30.0,
+      "aiType": "FollowWaypoint",
+      "waypointPathName": "bay_patrol_loop",
+      "behaviorTree": {
+        "root": {
+          "type": "BTRootNode",
+          "children": [
+            {
+              "type": "BTSelectorNode",
+              "children": [
+                {
+                  "type": "BTSequenceNode",
+                  "children": [
+                    { "type": "BTConditionHealthNode", "thresholdPct": 25.0 },
+                    { "type": "BTConditionDistanceNode", "distanceMeters": 320.0 },
+                    { "type": "BTActionRetreatNode", "safeDistance": 420.0, "useEvadeWobble": true }
+                  ]
+                },
+                {
+                  "type": "BTSequenceNode",
+                  "children": [
+                    { "type": "BTConditionDistanceNode", "distanceMeters": 650.0 },
+                    { "type": "BTActionAggressionNode", "engagementRange": 2500.0, "fireRange": 1200.0 }
+                  ]
+                },
+                {
+                  "type": "BTActionWaitPatrolNode",
+                  "cruiseThrottle": 0.68,
+                  "allowOpportunisticFire": true
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "groundEnemies": [],
+  "objectives": [
+    {
+      "name": "WAVE 1: Intercept Vanguard Patrol",
+      "description": "湾内侵入の先遣編隊（3機）を撃破せよ",
+      "type": "DestroyCount",
+      "status": "Active",
+      "isPrimary": true,
+      "isHidden": false,
+      "requiredKills": 3,
+      "targetIndex": -1,
+      "areaCenter": { "x": 0.0, "y": 0.0, "z": 0.0 },
+      "areaRadius": 100.0,
+      "duration": 0.0,
+      "minHP": 0.0,
+      "minThrottle": 0.0,
+      "startDelaySeconds": 0.0,
+      "guideAppearDelaySeconds": 0.0,
+      "guideTitle": "【WAVE 1】先遣編隊（3機）を迎撃せよ",
+      "guideSub": "【マウス】操縦 ／【左クリック】機銃（リードマーカーを狙え）／【W/S】加減速",
+      "showProgressBar": true,
+      "gateStepIndex": 0,
+      "gateTotalCount": 0,
+      "enableGatePassCheck": false,
+      "enableBoundaryLineCheck": false,
+      "waitRadioBeforeComplete": false,
+      "allowSteering": true,
+      "allowThrottle": true,
+      "allowWeapon": true,
+      "enableAltitudeAlerts": true,
+      "enableHighAltitudeCaution": false
+    },
+    {
+      "name": "WAVE 2: Eliminate Elite Interceptors",
+      "description": "増援の精鋭要撃隊（2機）を撃破せよ",
+      "type": "DestroyCount",
+      "status": "Inactive",
+      "isPrimary": true,
+      "isHidden": false,
+      "requiredKills": 5,
+      "targetIndex": -1,
+      "areaCenter": { "x": 0.0, "y": 0.0, "z": 0.0 },
+      "areaRadius": 100.0,
+      "duration": 0.0,
+      "minHP": 0.0,
+      "minThrottle": 0.0,
+      "startDelaySeconds": 0.0,
+      "guideAppearDelaySeconds": 0.0,
+      "guideTitle": "【WAVE 2】精鋭要撃隊（M-15 × 2）を撃墜せよ",
+      "guideSub": "高機動エース機が接近中。急旋回とリード射撃で仕留めろ！",
+      "showProgressBar": true,
+      "gateStepIndex": 0,
+      "gateTotalCount": 0,
+      "enableGatePassCheck": false,
+      "enableBoundaryLineCheck": false,
+      "waitRadioBeforeComplete": false,
+      "allowSteering": true,
+      "allowThrottle": true,
+      "allowWeapon": true,
+      "enableAltitudeAlerts": true,
+      "enableHighAltitudeCaution": false
+    }
+  ],
+  "triggers": [
+    {
+      "name": "Wave 1 Mission Start",
+      "condition": "OnMissionStart",
+      "isEnabled": true,
+      "isRepeatable": false,
+      "delaySeconds": 0.0,
+      "actions": [
+        {
+          "type": "PushSystemLog",
+          "logCategory": "SYS",
+          "logTimestamp": true,
+          "message": "DAWN_OS // SCRAMBLE INTERCEPT ENGAGED"
+        },
+        {
+          "type": "PushSystemLog",
+          "logCategory": "RWR",
+          "logTimestamp": false,
+          "message": "3 HOSTILE CONTACTS DETECTED OVER NORTHERN BAY"
+        },
+        {
+          "type": "PlayRadioDialogue",
+          "speakerName": "AWACS SKY EYE",
+          "speakerFaction": "Awacs",
+          "message": "全機、緊急迎撃（スクランブル）！ 湾内上空に敵先遣編隊3機を確認、直ちに迎撃せよ！",
+          "messageDuration": 4.0,
+          "radioInterrupt": false
+        }
+      ]
+    },
+    {
+      "name": "First Splash Radio",
+      "condition": "OnKillCount",
+      "killCount": 1,
+      "isEnabled": true,
+      "isRepeatable": false,
+      "delaySeconds": 0.0,
+      "actions": [
+        {
+          "type": "PushSystemLog",
+          "logCategory": "SYS",
+          "logTimestamp": false,
+          "message": "SPLASH ONE // HOSTILE AIRFRAME CONFIRMED DOWN"
+        },
+        {
+          "type": "PlayRadioDialogue",
+          "speakerName": "AWACS SKY EYE",
+          "speakerFaction": "Awacs",
+          "message": "1機撃墜を確認！ その調子で残る編隊を排除しろ！",
+          "messageDuration": 2.8,
+          "radioInterrupt": false
+        }
+      ]
+    },
+    {
+      "name": "Wave 1 Complete -> Spawn Wave 2",
+      "condition": "OnObjectiveComplete",
+      "objectiveIndex": 0,
+      "isEnabled": true,
+      "isRepeatable": false,
+      "delaySeconds": 0.0,
+      "actions": [
+        {
+          "type": "SetObjective",
+          "objectiveIndex": 1,
+          "newStatus": "Active"
+        },
+        {
+          "type": "SpawnEnemies",
+          "spawnEnemies": [
+            {
+              "position": { "x": -250.0, "y": 740.0, "z": -3150.0 },
+              "modelPath": "Resources/models/m15.gltf",
+              "health": 42.0,
+              "aiType": "ChaseAttack",
+              "waypointPathName": "",
+              "behaviorTree": {
+                "root": {
+                  "type": "BTRootNode",
+                  "children": [
+                    {
+                      "type": "BTSelectorNode",
+                      "children": [
+                        {
+                          "type": "BTSequenceNode",
+                          "children": [
+                            { "type": "BTConditionHealthNode", "thresholdPct": 15.0 },
+                            { "type": "BTConditionDistanceNode", "distanceMeters": 260.0 },
+                            { "type": "BTActionRetreatNode", "safeDistance": 400.0, "useEvadeWobble": true }
+                          ]
+                        },
+                        {
+                          "type": "BTActionAggressionNode",
+                          "engagementRange": 3000.0,
+                          "fireRange": 1200.0
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "position": { "x": 680.0, "y": 780.0, "z": -3250.0 },
+              "modelPath": "Resources/models/m15.gltf",
+              "health": 55.0,
+              "aiType": "CruiseEvade",
+              "waypointPathName": "",
+              "behaviorTree": {
+                "root": {
+                  "type": "BTRootNode",
+                  "children": [
+                    {
+                      "type": "BTSelectorNode",
+                      "children": [
+                        {
+                          "type": "BTSequenceNode",
+                          "children": [
+                            { "type": "BTConditionHealthNode", "thresholdPct": 40.0 },
+                            { "type": "BTConditionDistanceNode", "distanceMeters": 380.0 },
+                            { "type": "BTActionRetreatNode", "safeDistance": 460.0, "useEvadeWobble": true }
+                          ]
+                        },
+                        {
+                          "type": "BTSequenceNode",
+                          "children": [
+                            { "type": "BTConditionDistanceNode", "distanceMeters": 230.0 },
+                            { "type": "BTActionRetreatNode", "safeDistance": 420.0, "useEvadeWobble": true }
+                          ]
+                        },
+                        {
+                          "type": "BTActionAggressionNode",
+                          "engagementRange": 3000.0,
+                          "fireRange": 1250.0
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "type": "PushSystemLog",
+          "logCategory": "ALR",
+          "logTimestamp": false,
+          "message": "WARNING: HIGH-SPEED REINFORCEMENTS // M-15 x2 INBOUND"
+        },
+        {
+          "type": "PushSystemLog",
+          "logCategory": "RWR",
+          "logTimestamp": false,
+          "message": "BEARING NORTH // COASTAL RIDGE OVERFLIGHT"
+        },
+        {
+          "type": "PlayRadioDialogue",
+          "speakerName": "AWACS SKY EYE",
+          "speakerFaction": "Awacs",
+          "message": "警戒しろ！ 北側山稜上空から敵精鋭機2機が急接近中！",
+          "messageDuration": 3.4,
+          "radioInterrupt": true
+        },
+        {
+          "type": "PlayRadioDialogue",
+          "speakerName": "STRIGON 1",
+          "speakerFaction": "Enemy",
+          "message": "先遣隊を落としたか……面白い、俺たちが相手になってやろう！",
+          "messageDuration": 3.2,
+          "radioInterrupt": false
+        }
+      ]
+    },
+    {
+      "name": "One Hostile Remaining",
+      "condition": "OnKillCount",
+      "killCount": 4,
+      "isEnabled": true,
+      "isRepeatable": false,
+      "delaySeconds": 0.0,
+      "actions": [
+        {
+          "type": "PushSystemLog",
+          "logCategory": "SYS",
+          "logTimestamp": false,
+          "message": "HOSTILE DOWN // ONE CONTACT REMAINING"
+        },
+        {
+          "type": "PlayRadioDialogue",
+          "speakerName": "AWACS SKY EYE",
+          "speakerFaction": "Awacs",
+          "message": "残り1機！ 逃がすな、仕留めろ！",
+          "messageDuration": 2.6,
+          "radioInterrupt": false
+        }
+      ]
+    },
+    {
+      "name": "Wave 2 Complete",
+      "condition": "OnObjectiveComplete",
+      "objectiveIndex": 1,
+      "isEnabled": true,
+      "isRepeatable": false,
+      "delaySeconds": 0.0,
+      "actions": [
+        {
+          "type": "PushSystemLog",
+          "logCategory": "SYS",
+          "logTimestamp": false,
+          "message": "ALL HOSTILES NEUTRALIZED // AIRSPACE SECURED"
+        },
+        {
+          "type": "PlayRadioDialogue",
+          "speakerName": "AWACS SKY EYE",
+          "speakerFaction": "Awacs",
+          "message": "全敵機の撃墜を確認！ 作戦完了、見事な腕前だ！",
+          "messageDuration": 3.0,
+          "radioInterrupt": true
+        }
+      ]
+    }
+  ]
 }

@@ -3,6 +3,14 @@
     "missions": [
         {
             "id": "[01]",
+            "filePath": "Resources/missions/mission1.json",
+            "title": "AIRSPACE DEFENSE",
+            "aliasName": "OP: IRON SHIELD",
+            "subTitle": "沿岸防空スクランブル要撃作戦",
+            "isLocked": false
+        },
+        {
+            "id": "[02]",
             "filePath": "Resources/missions/mission_clear_demo.json",
             "title": "CLEAR DEMO -自動クリア演出-",
             "aliasName": "DEMO 01",

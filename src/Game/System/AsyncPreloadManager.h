@@ -12,7 +12,7 @@ public:
     static AsyncPreloadManager* GetInstance();
 
     // バックグラウンドスレッドでステージリソースの事前非同期ロードを開始
-    void StartStagePreloadAsync(const std::string& missionPath = "Resources/missions/mission00.json",
+    void StartStagePreloadAsync(const std::string& missionPath = "Resources/missions/mission1.json",
                                 const std::string& aircraftCfgPath = "Resources/aircraft/mig21.cfg");
 
     // プリロードが完了しているか

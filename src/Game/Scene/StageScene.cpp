@@ -259,7 +259,7 @@ void StageScene::ResetGameplayState() {
 	auto& missionManager = MissionManager::GetInstance();
 	std::string loadPath = missionManager.GetCurrentFilePath();
 	if (loadPath.empty()) {
-		loadPath = "Resources/missions/mission_clear_demo.json";
+		loadPath = "Resources/missions/mission1.json";
 	}
 	if (!AsyncPreloadManager::GetInstance()->ApplyPreloadedMission(missionManager, loadPath)) {
 		auto t0 = std::chrono::high_resolution_clock::now();
