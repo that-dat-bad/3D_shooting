@@ -3,9 +3,9 @@
 #include "StageScene.h"
 #include "ClearScene.h"
 #include "GameOverScene.h"
+#ifdef USE_IMGUI
 #include "DebugScene.h"
 #include "MissionEditorScene.h"
-#ifdef _DEBUG
 #include "EffectEditorScene.h"
 #endif
 
@@ -25,13 +25,13 @@ std::unique_ptr<IScene> SceneFactory::CreateScene(int sceneID) {
 	case SCENE::GAMEOVER:
 		newScene = std::make_unique<GameOverScene>();
 		break;
+#ifdef USE_IMGUI
 	case SCENE::DEBUG:
 		newScene = std::make_unique<DebugScene>();
 		break;
 	case SCENE::MISSION_EDITOR:
 		newScene = std::make_unique<MissionEditorScene>();
 		break;
-#ifdef _DEBUG
 	case SCENE::EFFECT_EDITOR:
 		newScene = std::make_unique<EffectEditorScene>();
 		break;

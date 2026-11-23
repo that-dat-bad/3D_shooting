@@ -1,9 +1,8 @@
 #include "EffectEditorScene.h"
 
-#ifdef _DEBUG
+#ifdef USE_IMGUI
 
 #include "../../engine/Graphics/Camera/CameraManager.h"
-#include "../../engine/Graphics/Model/ModelManager.h"
 #include "../../engine/Graphics/Model/Object3dCommon.h"
 #include "../../engine/Graphics/Model/PrimitiveModel.h"
 #include "../../engine/Graphics/Model/SkyboxCommon.h"
@@ -12,13 +11,10 @@
 #include "../../engine/Graphics/System/TextureManager.h"
 #include "../../engine/Graphics/Text/TextRenderer.h"
 #include "../../engine/io/Input.h"
+#include "../../../external/imgui/imgui.h"
 #include <Windows.h>
 #include <cmath>
 #include <cstdio>
-
-#ifdef USE_IMGUI
-#include "../../../external/imgui/imgui.h"
-#endif
 
 using namespace MyMath;
 
@@ -29,6 +25,7 @@ void EffectEditorScene::Initialize() {
 	if (Input::GetInstance()) {
 		Input::GetInstance()->UnlockCursor();
 	}
+	ImGui::SetMouseCursor(ImGuiMouseCursor_Arrow);
 	while (::ShowCursor(TRUE) < 0) {}
 	::SetCursor(::LoadCursor(nullptr, IDC_ARROW));
 
@@ -57,15 +54,6 @@ void EffectEditorScene::Initialize() {
 	skybox_->SetTextureIndex(skyboxTexIndex);
 	Object3dCommon::GetInstance()->SetDefaultEnvTextureIndex(skyboxTexIndex);
 
-	// 地面モデル初期化
-	ModelManager::GetInstance()->LoadModel("models/terrain.obj");
-	groundObject_ = std::make_unique<Object3d>();
-	groundObject_->Initialize(Object3dCommon::GetInstance());
-	groundObject_->SetCamera(camera);
-	groundObject_->SetModel("models/terrain.obj");
-	groundObject_->SetTranslate({ 0.0f, -1.0f, 0.0f });
-	groundObject_->Update();
-
 	// エフェクト初期化
 	EffectManager::GetInstance()->Initialize();
 	emitOrigin_ = { 0.0f, 0.0f, 0.0f };
@@ -85,13 +73,9 @@ void EffectEditorScene::Update() {
 	Input* input = Input::GetInstance();
 	Camera* camera = CameraManager::GetInstance()->GetActiveCamera();
 
-	bool imguiWantsMouse = false;
-	bool imguiWantsKeyboard = false;
-#ifdef USE_IMGUI
 	ImGuiIO& io = ImGui::GetIO();
-	imguiWantsMouse = io.WantCaptureMouse;
-	imguiWantsKeyboard = io.WantCaptureKeyboard;
-#endif
+	bool imguiWantsMouse = io.WantCaptureMouse;
+	bool imguiWantsKeyboard = io.WantCaptureKeyboard;
 
 	// カメラ操作
 	if (camera && input) {
@@ -139,10 +123,7 @@ void EffectEditorScene::Update() {
 		Object3dCommon::GetInstance()->SetCameraPosition(translate);
 	}
 
-	if (groundObject_) {
-		groundObject_->Update();
-	}
-	if (skybox_) {
+	if (isSkyboxVisible_ && skybox_) {
 		skybox_->Update();
 	}
 
@@ -155,8 +136,13 @@ void EffectEditorScene::Update() {
 			previewHandle_->stop();
 			simulateConditionTrue_ = false;
 		}
-		if (input->TriggerKey(DIK_C) && ParticleManager::GetInstance()) {
-			ParticleManager::GetInstance()->ClearAllParticles();
+		if (input->TriggerKey(DIK_C)) {
+			if (ParticleManager::GetInstance()) {
+				ParticleManager::GetInstance()->ClearAllParticles();
+			}
+			if (GPUParticleManager::GetInstance() && GPUParticleManager::GetInstance()->IsInitialized()) {
+				GPUParticleManager::GetInstance()->ClearAllParticles();
+			}
 		}
 	}
 
@@ -168,19 +154,18 @@ void EffectEditorScene::Update() {
 	// エフェクトマネージャの更新
 	EffectManager::GetInstance()->Update();
 
-#ifdef USE_IMGUI
 	// エフェクト編集GUI
 	EffectManager::GetInstance()->DrawDebugGui(previewHandle_);
 
 	// シーン操作パネル
-	ImGui::Begin("Effect Scene & Handle Tester [DEBUG]");
-	ImGui::TextColored(ImVec4(0.3f, 0.95f, 0.7f, 1.0f), "/// INDEPENDENT EFFECT EDITOR SCENE (DEBUG ONLY) ///");
+	ImGui::Begin("Effect Scene & Handle Tester [DEV]");
+	ImGui::TextColored(ImVec4(0.3f, 0.95f, 0.7f, 1.0f), "/// INDEPENDENT EFFECT EDITOR SCENE (DEVELOPMENT ONLY) ///");
 	ImGui::Text("Camera: Right-Drag Rotate | WASD+QE Move (Shift: Fast) | R Reset");
 	ImGui::Separator();
 
-	ImGui::Checkbox("Skybox Visible", &isSkyboxVisible_);
+	ImGui::Checkbox("Floor Grid", &showGrid_);
 	ImGui::SameLine();
-	ImGui::Checkbox("Ground Visible", &isGroundVisible_);
+	ImGui::Checkbox("Skybox Visible", &isSkyboxVisible_);
 	ImGui::SameLine();
 	ImGui::Checkbox("Show Height Limit Ring", &showHeightLimitGuide_);
 
@@ -242,7 +227,6 @@ void EffectEditorScene::Update() {
 	}
 
 	ImGui::End();
-#endif
 }
 
 void EffectEditorScene::DrawReferenceGridAndHeightLimit(Camera* camera) {
@@ -252,34 +236,36 @@ void EffectEditorScene::DrawReferenceGridAndHeightLimit(Camera* camera) {
 	}
 
 	// グリッド描画
-	const float baseY = emitOrigin_.y;
-	const Vector4 gridCol = { 0.30f, 0.42f, 0.48f, 0.45f };
-	const Vector4 axisXCol = { 0.90f, 0.28f, 0.28f, 0.80f };
-	const Vector4 axisZCol = { 0.28f, 0.55f, 0.95f, 0.80f };
-	const Vector4 axisYCol = { 0.30f, 0.95f, 0.45f, 0.85f };
+	if (showGrid_) {
+		const float baseY = emitOrigin_.y;
+		const Vector4 gridCol = { 0.30f, 0.42f, 0.48f, 0.45f };
+		const Vector4 axisXCol = { 0.90f, 0.28f, 0.28f, 0.80f };
+		const Vector4 axisZCol = { 0.28f, 0.55f, 0.95f, 0.80f };
+		const Vector4 axisYCol = { 0.30f, 0.95f, 0.45f, 0.85f };
 
-	for (int i = -10; i <= 10; i += 2) {
-		const float offset = static_cast<float>(i);
-		const Vector4 colZ = (i == 0) ? axisXCol : gridCol;
-		const Vector4 colX = (i == 0) ? axisZCol : gridCol;
+		for (int i = -10; i <= 10; i += 2) {
+			const float offset = static_cast<float>(i);
+			const Vector4 colZ = (i == 0) ? axisXCol : gridCol;
+			const Vector4 colX = (i == 0) ? axisZCol : gridCol;
+			prim->DrawLine3D(
+				{ emitOrigin_.x - 10.0f, baseY, emitOrigin_.z + offset },
+				{ emitOrigin_.x + 10.0f, baseY, emitOrigin_.z + offset },
+				colZ,
+				camera);
+			prim->DrawLine3D(
+				{ emitOrigin_.x + offset, baseY, emitOrigin_.z - 10.0f },
+				{ emitOrigin_.x + offset, baseY, emitOrigin_.z + 10.0f },
+				colX,
+				camera);
+		}
+
+		// 高さ目盛り線
 		prim->DrawLine3D(
-			{ emitOrigin_.x - 10.0f, baseY, emitOrigin_.z + offset },
-			{ emitOrigin_.x + 10.0f, baseY, emitOrigin_.z + offset },
-			colZ,
-			camera);
-		prim->DrawLine3D(
-			{ emitOrigin_.x + offset, baseY, emitOrigin_.z - 10.0f },
-			{ emitOrigin_.x + offset, baseY, emitOrigin_.z + 10.0f },
-			colX,
+			emitOrigin_,
+			{ emitOrigin_.x, emitOrigin_.y + 15.0f, emitOrigin_.z },
+			axisYCol,
 			camera);
 	}
-
-	// 高さ目盛り線
-	prim->DrawLine3D(
-		emitOrigin_,
-		{ emitOrigin_.x, emitOrigin_.y + 15.0f, emitOrigin_.z },
-		axisYCol,
-		camera);
 
 	if (!showHeightLimitGuide_ || !previewHandle_) {
 		return;
@@ -320,11 +306,8 @@ void EffectEditorScene::Draw() {
 	}
 
 	Object3dCommon::GetInstance()->SetupCommonState();
-	if (isGroundVisible_ && groundObject_) {
-		groundObject_->Draw();
-	}
-
 	DrawReferenceGridAndHeightLimit(camera);
+	EffectManager::GetInstance()->SetGpuUpdatePaused(false);
 	EffectManager::GetInstance()->Draw(camera);
 }
 
@@ -335,7 +318,7 @@ void EffectEditorScene::DrawUI() {
 	}
 	tr->Print(
 		"HackGen",
-		"[DEBUG] EFFECT MANAGER SCENE (F9) // External .effect Driven",
+		"[DEV] EFFECT MANAGER SCENE (F9) // External .effect Driven",
 		18.0f,
 		56.0f,
 		15.0f,
@@ -349,5 +332,5 @@ void EffectEditorScene::Finalize() {
 	}
 }
 
-#endif // _DEBUG
+#endif // USE_IMGUI
 

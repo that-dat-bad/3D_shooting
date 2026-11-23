@@ -48,6 +48,10 @@ struct FlightInfoUIData {
 	float speed = 0.0f;              // 飛行速度 (m/s)
 	int currentAmmo = 0;             // 現在の残弾数
 	int maxAmmo = 500;               // 最大装填数
+	int currentMissiles = 0;         // 現在のミサイル残弾数
+	int maxMissiles = 4;             // ミサイル最大搭載数
+	bool isMissileSelected = false;  // ミサイル選択中フラグ
+	int missileSeekerState = 0;      // シーカー状態 (0:Off..4:Locked)
 	float absoluteAltitude = 0.0f;   // 絶対高度
 	float relativeAltitude = 0.0f;   // 相対高度
 	float screenWidth = 1280.0f;     // 画面解像度幅
@@ -106,4 +110,8 @@ private:
 	// 5. 機関砲弾数
 	UIText labelAmmo_;
 	UIText valAmmo_;
+
+	// 6. ミサイル残弾数
+	UIText labelMissile_;
+	UIText valMissile_;
 };

@@ -48,6 +48,25 @@ struct StageHUDStructuralTelemetry {
 	int brokenPartIndex = 0; // 0: None, 1: PortWing, 2: StbdWing, 3: EngineCore
 };
 
+// IRミサイルシーカーHUDデータ
+struct StageHUDMissileSeekerData {
+	bool isMissileSelected = false;
+	int seekerState = 0; // 0:Off, 1:WarmingUp, 2:Searching, 3:Locking, 4:Locked
+	float warmupProgress = 0.0f;
+	float lockProgress = 0.0f;
+	Vector3 boresightWorldPoint{};
+	Vector3 seekerTrackWorldPoint{};
+	Vector3 aircraftRight{ 1.0f, 0.0f, 0.0f };
+	float outerGimbalAngleDeg = 12.0f;
+	float innerAcqAngleDeg = 4.5f;
+	int currentMissiles = 0;
+	int maxMissiles = 4;
+	float cooldownRatio = 0.0f;
+	bool hasTarget = false;
+	float targetDistanceMeters = 0.0f;
+	std::vector<Vector3> activeMissilePositions;
+};
+
 // HUD表示用データ
 struct StageHUDData {
 	float remainingTime = 300.0f;
@@ -72,6 +91,7 @@ struct StageHUDData {
 	std::vector<StageHUDSysLogEntry> systemLogs;
 	StageHUDGuideData guide{};
 	StageHUDStructuralTelemetry structuralTelemetry{};
+	StageHUDMissileSeekerData missileSeeker{};
 	bool showPullUpAlert = false;
 	bool showHighAltCaution = false;
 	bool showRwrAlert = false;
@@ -159,7 +179,7 @@ private:
 	void DrawRect(const Vector2& pos, const Vector2& size, const Vector4& color, const Vector2& anchor = { 0.0f, 0.0f }, BlendMode blendMode = BlendMode::kNormal);
 	void DrawBorderedPanel(const Vector2& pos, const Vector2& size, const Vector4& bgColor, const Vector4& borderColor, float borderWidth = 1.5f);
 	void DrawTargetBrackets(const Vector2& center, float halfSize, float cornerLen, float thickness, const Vector4& color);
-	void DrawRing(const Vector2& center, float radius, const Vector4& color, BlendMode blendMode = BlendMode::kNormal);
+	void DrawRing(const Vector2& center, float radius, const Vector4& color, BlendMode blendMode = BlendMode::kNormal, float thickness = 1.6f);
 	void DrawDot(const Vector2& center, float radius, const Vector4& color, BlendMode blendMode = BlendMode::kNormal);
 
 	// 3Dワールド座標から2Dスクリーン座標への投影
@@ -175,6 +195,7 @@ private:
 	void DrawTargetTelemetry();
 	void DrawAlerts();
 	void DrawReticles();
+	void DrawMissileSeeker();
 	void DrawLeadGuidanceLine(const Vector2& noseScreen, const Vector2& aimScreen, float alpha);
 	void DrawMouseAimReticle(const Vector2& aimScreen, float reticleScale, const Vector4& baseAimCol, const Vector4& baseTickCol);
 	void DrawBoresightReticle(const Vector2& noseScreen, float reticleScale, float alpha);

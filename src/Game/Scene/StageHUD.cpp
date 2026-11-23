@@ -10,7 +10,7 @@ namespace {
 	constexpr const char* kWhiteTexPath = "assets/textures/white1x1.png";
 	constexpr const char* kRingTexPath = "assets/textures/circle2.png";
 	constexpr const char* kDotTexPath = "assets/textures/circle.png";
-	constexpr size_t kInitialRectPoolCount = 64;
+	constexpr size_t kInitialRectPoolCount = 384;
 	constexpr size_t kInitialRingPoolCount = 16;
 	constexpr size_t kInitialDotPoolCount = 16;
 
@@ -105,6 +105,7 @@ void StageHUD::Draw() {
 	DrawTargetTelemetry();
 	DrawAlerts();
 	DrawReticles();
+	DrawMissileSeeker();
 }
 
 void StageHUD::DrawFadeOverlay() {
@@ -239,32 +240,55 @@ void StageHUD::DrawTargetBrackets(const Vector2& center, float halfSize, float c
 	DrawLine({ x1, y1 }, { x1, y1 - cornerLen }, thickness, color);
 }
 
-void StageHUD::DrawRing(const Vector2& center, float radius, const Vector4& color, BlendMode blendMode) {
-	Sprite* sp = AcquireRingSprite();
-	if (!sp) return;
+void StageHUD::DrawRing(const Vector2& center, float radius, const Vector4& color, BlendMode blendMode, float thickness) {
+	if (radius <= 0.5f || color.w <= 0.001f) {
+		return;
+	}
 
-	sp->SetBlendMode(blendMode);
-	sp->SetPosition(center);
-	sp->SetAnchorPoint({ 0.5f, 0.5f });
-	sp->SetSize({ radius * 2.0f, radius * 2.0f });
-	sp->SetRotation(0.0f);
-	sp->SetColor(color);
-	sp->Update();
-	sp->Draw();
+	const int segments = std::clamp(static_cast<int>(radius * 0.85f), 20, 64);
+	constexpr float kTwoPi = 6.28318530718f;
+	const float angleStep = kTwoPi / static_cast<float>(segments);
+	const float extend = thickness * 0.25f;
+
+	auto drawRingPass = [&](float passThickness, const Vector4& passColor) {
+		for (int i = 0; i < segments; ++i) {
+			const float a0 = static_cast<float>(i) * angleStep;
+			const float a1 = static_cast<float>(i + 1) * angleStep;
+			const Vector2 p0 = { center.x + std::cos(a0) * radius, center.y + std::sin(a0) * radius };
+			const Vector2 p1 = { center.x + std::cos(a1) * radius, center.y + std::sin(a1) * radius };
+
+			const float dx = p1.x - p0.x;
+			const float dy = p1.y - p0.y;
+			const float len = std::hypot(dx, dy);
+			if (len < 0.001f) {
+				continue;
+			}
+			const float ux = dx / len;
+			const float uy = dy / len;
+			const Vector2 segStart = { p0.x - ux * extend, p0.y - uy * extend };
+			const Vector2 segEnd = { p1.x + ux * extend, p1.y + uy * extend };
+			DrawLine(segStart, segEnd, passThickness, passColor, blendMode);
+		}
+	};
+
+	if (blendMode == BlendMode::kNormal) {
+		const Vector4 shadowCol = { 0.0f, 0.0f, 0.0f, color.w * 0.38f };
+		drawRingPass(thickness + 1.4f, shadowCol);
+	}
+	drawRingPass(thickness, color);
 }
 
 void StageHUD::DrawDot(const Vector2& center, float radius, const Vector4& color, BlendMode blendMode) {
-	Sprite* sp = AcquireDotSprite();
-	if (!sp) return;
+	if (radius <= 0.1f || color.w <= 0.001f) {
+		return;
+	}
 
-	sp->SetBlendMode(blendMode);
-	sp->SetPosition(center);
-	sp->SetAnchorPoint({ 0.5f, 0.5f });
-	sp->SetSize({ radius * 2.0f, radius * 2.0f });
-	sp->SetRotation(0.0f);
-	sp->SetColor(color);
-	sp->Update();
-	sp->Draw();
+	const float diameter = (std::max)(1.5f, radius * 2.0f);
+	if (blendMode == BlendMode::kNormal) {
+		const Vector4 shadowCol = { 0.0f, 0.0f, 0.0f, color.w * 0.42f };
+		DrawRect(center, { diameter + 1.6f, diameter + 1.6f }, shadowCol, { 0.5f, 0.5f }, BlendMode::kNormal);
+	}
+	DrawRect(center, { diameter, diameter }, color, { 0.5f, 0.5f }, blendMode);
 }
 
 bool StageHUD::ProjectToScreen(const Vector3& worldPos, const Matrix4x4& vpMat, float screenW, float screenH, Vector2& outScreen) const {
@@ -714,12 +738,12 @@ void StageHUD::DrawTargetMarkers() {
 					leadClamped);
 
 				if (!leadClamped) {
-					Vector4 leadCol = { 0.38f, 1.00f, 0.72f, 0.98f * alpha };
+					Vector4 leadCol = { 0.44f, 0.92f, 0.66f, 0.84f * alpha };
 					Vector4 lineCol = leadCol;
-					lineCol.w *= 0.38f;
-					DrawLine(screenPt, leadScreen, 1.2f, lineCol, BlendMode::kAdd);
-					DrawRing(leadScreen, 15.0f * hudScale, leadCol, BlendMode::kAdd);
-					DrawDot(leadScreen, 2.5f * hudScale, leadCol, BlendMode::kAdd);
+					lineCol.w *= 0.32f;
+					DrawLine(screenPt, leadScreen, 1.1f, lineCol, BlendMode::kNormal);
+					DrawRing(leadScreen, 13.5f * hudScale, leadCol, BlendMode::kNormal, 1.5f);
+					DrawDot(leadScreen, 1.5f * hudScale, leadCol, BlendMode::kNormal);
 				}
 				if (hudData_.hitMarkerTimer > 0.0f) {
 					const float inner = 5.0f * hudScale;
@@ -972,46 +996,60 @@ void StageHUD::DrawLeadGuidanceLine(const Vector2& noseScreen, const Vector2& ai
 
 	if (dist > 12.0f) {
 		Vector4 lineCol = isWarningMode_
-			? Vector4{ 1.0f, 0.30f, 0.20f, 0.50f * alpha }
-			: Vector4{ 0.42f, 0.78f, 0.45f, 0.40f * alpha };
-		DrawLine(noseScreen, aimScreen, 1.5f, lineCol);
+			? Vector4{ 0.95f, 0.32f, 0.22f, 0.42f * alpha }
+			: Vector4{ 0.56f, 0.86f, 0.58f, 0.32f * alpha };
+		DrawLine(noseScreen, aimScreen, 1.2f, lineCol, BlendMode::kNormal);
 
 		Vector2 midPos = {
 			(noseScreen.x + aimScreen.x) * 0.5f,
 			(noseScreen.y + aimScreen.y) * 0.5f
 		};
-		DrawDot(midPos, 2.0f, isWarningMode_ ? Vector4{ 1.0f, 0.40f, 0.20f, 0.70f * alpha } : Vector4{ 0.42f, 0.78f, 0.45f, 0.60f * alpha });
+		DrawDot(midPos, 1.4f, isWarningMode_ ? Vector4{ 0.95f, 0.38f, 0.22f, 0.58f * alpha } : Vector4{ 0.56f, 0.86f, 0.58f, 0.50f * alpha }, BlendMode::kNormal);
 	}
 }
 
 void StageHUD::DrawMouseAimReticle(const Vector2& aimScreen, float reticleScale, const Vector4& baseAimCol, const Vector4& baseTickCol) {
-	// War Thunder準拠: 半径約 10px の小さなエイムサークル＋中心ドット
-	float reticleRadius = 10.5f * reticleScale;
+	// War Thunder準拠: 半径約 11px の極細中空エイムサークル＋中心ピップ
+	float reticleRadius = 11.0f * reticleScale;
 
-	// 外周リング
-	DrawRing(aimScreen, reticleRadius, baseAimCol);
+	// 中空外周リング
+	DrawRing(aimScreen, reticleRadius, baseAimCol, BlendMode::kNormal, 1.5f);
 
-	// 中心ドット
-	DrawDot(aimScreen, 2.0f, baseTickCol);
+	// 中心極小ピップ
+	DrawDot(aimScreen, 1.5f, baseTickCol, BlendMode::kNormal);
 }
 
 void StageHUD::DrawBoresightReticle(const Vector2& noseScreen, float reticleScale, float alpha) {
-	float pulseScale = (firePunchTimer_ > 0.0f) ? 1.25f : 1.0f;
+	float pulseScale = (firePunchTimer_ > 0.0f) ? 1.15f : 1.0f;
 	pulseScale *= reticleScale;
 	Vector4 crossColor;
 	if (isWarningMode_) {
-		crossColor = { 1.0f, 0.3f, 0.2f, 0.95f * alpha };
+		crossColor = { 0.96f, 0.32f, 0.22f, 0.88f * alpha };
 	} else if (firePunchTimer_ > 0.0f) {
-		crossColor = { 1.0f, 0.85f, 0.40f, 1.0f * alpha };
+		crossColor = { 0.96f, 0.84f, 0.42f, 0.88f * alpha };
 	} else {
-		crossColor = { 0.45f, 0.82f, 0.48f, 0.85f * alpha }; // War Thunder HUDグリーン
+		crossColor = { 0.56f, 0.88f, 0.58f, 0.82f * alpha }; // War Thunder風 落ち着いたHUDグリーン
 	}
 
-	// War Thunder準拠: 機首方向を示す大サークル
-	DrawRing(noseScreen, 23.0f * pulseScale, crossColor);
+	// War Thunder準拠: 機首方向を示す中空大サークル＋外向き4方向ティック
+	const float radius = 22.0f * pulseScale;
+	const float tickLen = 5.0f * pulseScale;
+	DrawRing(noseScreen, radius, crossColor, BlendMode::kNormal, 1.6f);
 
-	// 中心小ドット
-	DrawDot(noseScreen, 2.0f, crossColor);
+	const Vector4 tickShadow = { 0.0f, 0.0f, 0.0f, crossColor.w * 0.38f };
+	auto drawOuterTick = [&](const Vector2& dir) {
+		const Vector2 p0 = { noseScreen.x + dir.x * radius, noseScreen.y + dir.y * radius };
+		const Vector2 p1 = { noseScreen.x + dir.x * (radius + tickLen), noseScreen.y + dir.y * (radius + tickLen) };
+		DrawLine(p0, p1, 2.8f, tickShadow, BlendMode::kNormal);
+		DrawLine(p0, p1, 1.5f, crossColor, BlendMode::kNormal);
+	};
+	drawOuterTick({ 1.0f, 0.0f });
+	drawOuterTick({ -1.0f, 0.0f });
+	drawOuterTick({ 0.0f, 1.0f });
+	drawOuterTick({ 0.0f, -1.0f });
+
+	// 中心極小ピップ
+	DrawDot(noseScreen, 1.5f, crossColor, BlendMode::kNormal);
 }
 
 void StageHUD::DrawReticles() {
@@ -1080,5 +1118,140 @@ void StageHUD::DrawReticles() {
 	// -----------------------------------------------------------------
 	if (noseVisible) {
 		DrawBoresightReticle(noseScreen, reticleScale, alpha);
+	}
+}
+
+void StageHUD::DrawMissileSeeker() {
+	if (!hudData_.showReticles) {
+		return;
+	}
+	if (isShuttingDown_ && shutdownTimer_ >= 0.35f) {
+		return;
+	}
+
+	const float deployT = std::clamp(deployTimer_ / 0.40f, 0.0f, 1.0f);
+	const float shutdownAlpha = isShuttingDown_ ? (1.0f - shutdownTimer_ / 0.35f) : 1.0f;
+	const float alpha = deployT * std::clamp(shutdownAlpha, 0.0f, 1.0f);
+	if (alpha <= 0.01f) {
+		return;
+	}
+
+	const float scaleX = hudData_.screenWidth / 1280.0f;
+	const float scaleY = hudData_.screenHeight / 720.0f;
+	const float hudScale = std::clamp((std::min)(scaleX, scaleY), 0.70f, 1.45f);
+	const auto& seeker = hudData_.missileSeeker;
+
+	// 飛翔中ミサイルの位置マーカー描画（選択兵装に関わらず表示）
+	for (const auto& mPos : seeker.activeMissilePositions) {
+		Vector2 mScreen{};
+		if (ProjectToScreen(mPos, hudData_.viewProjectionMatrix, hudData_.screenWidth, hudData_.screenHeight, mScreen)) {
+			const float d = 7.0f * hudScale;
+			const Vector4 mslCol = { 0.45f, 0.94f, 1.00f, 0.92f * alpha };
+			DrawLine({ mScreen.x, mScreen.y - d }, { mScreen.x + d, mScreen.y }, 1.6f, mslCol);
+			DrawLine({ mScreen.x + d, mScreen.y }, { mScreen.x, mScreen.y + d }, 1.6f, mslCol);
+			DrawLine({ mScreen.x, mScreen.y + d }, { mScreen.x - d, mScreen.y }, 1.6f, mslCol);
+			DrawLine({ mScreen.x - d, mScreen.y }, { mScreen.x, mScreen.y - d }, 1.6f, mslCol);
+			PrintShadowedMarkerText("MSL", mScreen.x + 11.0f * hudScale, mScreen.y - 6.0f * hudScale, 11.0f * hudScale, mslCol);
+		}
+	}
+
+	if (!seeker.isMissileSelected) {
+		return;
+	}
+
+	constexpr float kDegToRad = 3.14159265358979f / 180.0f;
+	constexpr float kRefDist = 500.0f;
+	const Vector3 boresightRef = Add(hudData_.aircraftPosition, Multiply(kRefDist, hudData_.aircraftForward));
+
+	auto computeConeRadiusPx = [&](float angleDeg, float fallbackPx) -> float {
+		Vector2 cPt{}, ePt{};
+		const float offset = kRefDist * std::tan(angleDeg * kDegToRad);
+		const Vector3 edgeRef = Add(boresightRef, Multiply(offset, seeker.aircraftRight));
+		if (ProjectToScreen(boresightRef, hudData_.viewProjectionMatrix, hudData_.screenWidth, hudData_.screenHeight, cPt) &&
+			ProjectToScreen(edgeRef, hudData_.viewProjectionMatrix, hudData_.screenWidth, hudData_.screenHeight, ePt)) {
+			const float r = std::hypot(ePt.x - cPt.x, ePt.y - cPt.y);
+			if (r > 8.0f && r < hudData_.screenHeight * 0.65f) {
+				return r;
+			}
+		}
+		return fallbackPx;
+	};
+
+	const float outerRadius = computeConeRadiusPx(seeker.outerGimbalAngleDeg, 125.0f * hudScale);
+	const float innerRadius = computeConeRadiusPx(seeker.innerAcqAngleDeg, 46.0f * hudScale);
+
+	Vector2 outerCenter{};
+	bool outerClamped = false;
+	ProjectToScreenClamped(
+		seeker.boresightWorldPoint,
+		hudData_.viewProjectionMatrix,
+		hudData_.screenWidth,
+		hudData_.screenHeight,
+		38.0f,
+		outerCenter,
+		outerClamped);
+
+	Vector2 innerCenter = outerCenter;
+	bool innerClamped = outerClamped;
+	if (seeker.hasTarget && (seeker.seekerState == 3 || seeker.seekerState == 4)) {
+		ProjectToScreenClamped(
+			seeker.seekerTrackWorldPoint,
+			hudData_.viewProjectionMatrix,
+			hudData_.screenWidth,
+			hudData_.screenHeight,
+			38.0f,
+			innerCenter,
+			innerClamped);
+	}
+
+	const float labelFont = 13.0f * hudScale;
+	const Vector2 statusAnchor = { 0.5f, 0.0f };
+	const float statusTextY = outerCenter.y + outerRadius + 10.0f * hudScale;
+
+	if (seeker.currentMissiles <= 0) {
+		const Vector4 emptyCol = { 0.96f, 0.28f, 0.24f, 0.82f * alpha };
+		DrawRing(outerCenter, outerRadius, emptyCol, BlendMode::kNormal, 1.6f);
+		PrintShadowedMarkerText("AAM // NO MISSILES", outerCenter.x, statusTextY, labelFont, emptyCol, statusAnchor);
+		return;
+	}
+
+	if (seeker.seekerState == 1) {
+		// WarmingUp
+		const float rWarm = outerRadius * (0.45f + 0.55f * std::clamp(seeker.warmupProgress, 0.0f, 1.0f));
+		const Vector4 warmCol = { 0.62f, 0.90f, 0.70f, 0.68f * alpha };
+		DrawRing(outerCenter, rWarm, warmCol, BlendMode::kNormal, 1.6f);
+		PrintShadowedMarkerText("IR SEEKER // COOLING", outerCenter.x, statusTextY, labelFont, warmCol, statusAnchor);
+	} else if (seeker.seekerState == 2) {
+		// Searching
+		const Vector4 outerCol = { 0.88f, 0.92f, 0.90f, 0.62f * alpha };
+		const Vector4 innerCol = { 0.48f, 0.92f, 0.60f, 0.82f * alpha };
+		DrawRing(outerCenter, outerRadius, outerCol, BlendMode::kNormal, 1.6f);
+		DrawRing(outerCenter, innerRadius, innerCol, BlendMode::kNormal, 1.8f);
+		PrintShadowedMarkerText("IR SEEKER // SEARCH [SCROLL: GUN]", outerCenter.x, statusTextY, labelFont, innerCol, statusAnchor);
+	} else if (seeker.seekerState == 3) {
+		// Locking
+		const Vector4 outerCol = { 1.00f, 0.78f, 0.22f, 0.78f * alpha };
+		const Vector4 innerCol = { 1.00f, 0.82f, 0.24f, 0.88f * alpha };
+		const float trackRadius = innerRadius * (1.20f - 0.25f * std::clamp(seeker.lockProgress, 0.0f, 1.0f));
+		DrawRing(outerCenter, outerRadius, outerCol, BlendMode::kNormal, 1.6f);
+		DrawRing(innerCenter, trackRadius, innerCol, BlendMode::kNormal, 1.8f);
+		char buf[64]{};
+		std::snprintf(buf, sizeof(buf), "IR TRACKING [%d%%]", static_cast<int>(std::round(seeker.lockProgress * 100.0f)));
+		PrintShadowedMarkerText(buf, outerCenter.x, statusTextY, labelFont, innerCol, statusAnchor);
+	} else if (seeker.seekerState == 4) {
+		// Locked (War Thunder風 中空赤ロックリング)
+		const Vector4 lockRed = { 1.00f, 0.22f, 0.18f, 0.90f * alpha };
+		DrawRing(outerCenter, outerRadius, lockRed, BlendMode::kNormal, 1.6f);
+		DrawRing(innerCenter, innerRadius * 0.90f, lockRed, BlendMode::kNormal, 1.8f);
+		DrawTargetBrackets(innerCenter, innerRadius * 0.95f + 6.0f * hudScale, 8.0f * hudScale, 1.8f, lockRed);
+
+		const float blink = 0.55f + 0.45f * std::sin(animTimer_ * 18.0f);
+		Vector4 textCol = lockRed;
+		textCol.w *= blink;
+		if (seeker.cooldownRatio > 0.01f) {
+			PrintShadowedMarkerText("IR LOCK // RELOADING...", outerCenter.x, statusTextY, labelFont, lockRed, statusAnchor);
+		} else {
+			PrintShadowedMarkerText("IR LOCK // FIRE [LMB]", outerCenter.x, statusTextY, labelFont, textCol, statusAnchor);
+		}
 	}
 }

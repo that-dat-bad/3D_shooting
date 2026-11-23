@@ -39,7 +39,7 @@
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v143</PlatformToolset>
-    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <WholeProgramOptimization>false</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
@@ -73,7 +73,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_WINDOWS;USE_IMGUI;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <TreatWarningAsError>true</TreatWarningAsError>
@@ -260,6 +260,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="src\Game\FlightModel\FlightInstructor.h" />
     <ClInclude Include="src\Game\FlightModel\MouseAimController.h" />
     <ClInclude Include="src\Game\FlightModel\Payload\Gunpod.h" />
+    <ClInclude Include="src\Game\FlightModel\Payload\MissileLauncher.h" />
     <ClInclude Include="src\Game\FlightModel\Payload\IPayload.h">
       <DeploymentContent>true</DeploymentContent>
     </ClInclude>
@@ -356,6 +357,8 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="src\Game\Enemy\GroundEnemy.h" />
     <ClInclude Include="src\Game\Bullet\Bullet.h" />
     <ClInclude Include="src\Game\Bullet\BulletManager.h" />
+    <ClInclude Include="src\Game\Bullet\Missile.h" />
+    <ClInclude Include="src\Game\Bullet\MissileManager.h" />
     <ClInclude Include="src\Game\Environment\Sun.h" />
     <ClInclude Include="src\Game\Environment\EnvironmentManager.h" />
     <ClInclude Include="src\Game\FlightModel\DamageModel.h" />
@@ -391,6 +394,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="src\Game\FlightModel\FlightInstructor.cpp" />
     <ClCompile Include="src\Game\FlightModel\MouseAimController.cpp" />
     <ClCompile Include="src\Game\FlightModel\Payload\Gunpod.cpp" />
+    <ClCompile Include="src\Game\FlightModel\Payload\MissileLauncher.cpp" />
     <ClCompile Include="src\Game\FlightModel\Payload\IPayload.cpp">
       <DeploymentContent>true</DeploymentContent>
     </ClCompile>
@@ -456,11 +460,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="src\engine\Graphics\Camera\DebugCamera.cpp" />
     <ClCompile Include="src\engine\Graphics\System\DirectXCommon.cpp" />
     <ClCompile Include="src\engine\io\Input.cpp" />
-    <ClCompile Include="src\Game\System\main.cpp">
-      <Optimization Condition="'$(Configuration)|$(Platform)'=='Development|x64'">MaxSpeed</Optimization>
-      <WholeProgramOptimization Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</WholeProgramOptimization>
-      <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Development|x64'">_WINDOWS;_UNICODE;UNICODE</PreprocessorDefinitions>
-    </ClCompile>
+    <ClCompile Include="src\Game\System\main.cpp" />
     <ClCompile Include="src\engine\base\StringUtility.cpp">
       <PrecompiledHeaderFile Condition="'$(Configuration)|$(Platform)'=='Development|x64'">stdafx.h</PrecompiledHeaderFile>
     </ClCompile>
@@ -506,6 +506,8 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="src\Game\Enemy\GroundEnemy.cpp" />
     <ClCompile Include="src\Game\Bullet\Bullet.cpp" />
     <ClCompile Include="src\Game\Bullet\BulletManager.cpp" />
+    <ClCompile Include="src\Game\Bullet\Missile.cpp" />
+    <ClCompile Include="src\Game\Bullet\MissileManager.cpp" />
     <ClCompile Include="src\engine\Graphics\UI\UIElement.cpp" />
     <ClCompile Include="src\engine\Graphics\UI\UIButton.cpp" />
     <ClCompile Include="src\engine\Graphics\UI\UIText.cpp" />

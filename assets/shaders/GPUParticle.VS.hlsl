@@ -18,24 +18,27 @@ ConstantBuffer<PerView> gPerView : register(b0);
 
 VertexShaderOutput main(VertexShaderInput input, uint32_t instanceId : SV_InstanceID) {
     VertexShaderOutput output;
-    
+
     uint32_t particleIndex = gAliveList[instanceId];
     ParticleCS particle = gParticles[particleIndex];
-    
-    // ビルボード行列からカメラ軸を取得
+
+    float32_t c = cos(particle.rotation);
+    float32_t s = sin(particle.rotation);
+    float32_t2 rotatedLocal = float32_t2(
+        input.position.x * c - input.position.y * s,
+        input.position.x * s + input.position.y * c
+    );
+
     float3 xAxis = gPerView.billboardMatrix[0].xyz;
     float3 yAxis = gPerView.billboardMatrix[1].xyz;
-    float3 zAxis = gPerView.billboardMatrix[2].xyz;
-    
-    // Compute world position by scaling and adding along the camera axes
+
     float3 worldPos = particle.translate;
-    worldPos += xAxis * (input.position.x * particle.scale.x);
-    worldPos += yAxis * (input.position.y * particle.scale.y);
-    worldPos += zAxis * (input.position.z * particle.scale.z);
-    
+    worldPos += xAxis * (rotatedLocal.x * particle.scale.x);
+    worldPos += yAxis * (rotatedLocal.y * particle.scale.y);
+
     output.position = mul(float4(worldPos, 1.0f), gPerView.viewProjection);
     output.texcoord = input.texcoord;
     output.color = particle.color;
-    
+
     return output;
 }

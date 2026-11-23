@@ -8,7 +8,9 @@
 #include "AudioManager.h"
 #include "../../engine/Graphics/System/SrvManager.h"
 #include "ImguiManager.h"
+#ifdef USE_IMGUI
 #include "../../engine/Debug/UIEditorWindow.h"
+#endif
 #include "../../engine/Graphics/System/TextureManager.h"
 #include "../../engine/Graphics/Model/ModelManager.h"
 #include "../../engine/Graphics/Camera/CameraManager.h"

@@ -1,10 +1,9 @@
 #pragma once
-#ifdef _DEBUG
+#ifdef USE_IMGUI
 
 #include "IScene.h"
 #include <memory>
 #include "../../engine/base/Math/MyMath.h"
-#include "../../engine/Graphics/Model/Object3d.h"
 #include "../../engine/Graphics/Model/Skybox.h"
 #include "../../engine/Graphics/Particle/EffectManager.h"
 
@@ -21,16 +20,15 @@ private:
 	void DrawReferenceGridAndHeightLimit(Camera* camera);
 
 	std::unique_ptr<Skybox> skybox_ = nullptr;
-	std::unique_ptr<Object3d> groundObject_ = nullptr;
 	EffectHandle* previewHandle_ = nullptr;
 
 	MyMath::Vector3 emitOrigin_ = { 0.0f, 0.0f, 0.0f };
-	bool isSkyboxVisible_ = true;
-	bool isGroundVisible_ = true;
+	bool isSkyboxVisible_ = false;
+	bool showGrid_ = true;
 	bool showHeightLimitGuide_ = true;
 	bool simulateConditionTrue_ = false;
 	uint32_t whiteTexIndex_ = 0;
 };
 
-#endif // _DEBUG
+#endif // USE_IMGUI
 

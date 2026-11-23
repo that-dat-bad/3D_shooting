@@ -83,8 +83,10 @@ void Game::Initialize() {
 	// 全シーン事前ウォームアップ
 	sceneManager->PrewarmAllScenes();
 
+#ifdef USE_IMGUI
 	// 6. Win32 ネイティブ UIエディタ別ウィンドウの初期化
 	UIEditorWindow::GetInstance()->Initialize(winApp->GetHwnd());
+#endif
 }
 
 void Game::Update() {
@@ -125,16 +127,18 @@ void Game::Update() {
 	ImGui::End();
 #endif // USE_IMGUI
 
-	// Win32 ネイティブ UIエディタの更新
-	UIEditorWindow::GetInstance()->Update();
-
 	// ヒッチ＆フレームタイム監視パネル
 	HitchDetector::GetInstance()->DrawImGui();
+
+#ifdef USE_IMGUI
+	// Win32 ネイティブ UIエディタの更新
+	UIEditorWindow::GetInstance()->Update();
 
 	// F1キーでエディタウィンドウの表示/非表示切り替え
 	if (Input::GetInstance()->TriggerKey(DIK_F1)) {
 		UIEditorWindow::GetInstance()->Toggle();
 	}
+#endif
 
 	// Escキーによる強制終了は無効化
 	// if (Input::GetInstance()->TriggerKey(DIK_ESCAPE)) {
@@ -230,8 +234,10 @@ void Game::Finalize() {
 	// 6. 基盤システムの終了処理
 	DirectXCommon::GetInstance()->Finalize();
 
+#ifdef USE_IMGUI
 	// 7. UIエディタウィンドウの終了
 	UIEditorWindow::GetInstance()->Finalize();
+#endif
 
 	// 8. ウィンドウの終了処理
 	if (winApp) {

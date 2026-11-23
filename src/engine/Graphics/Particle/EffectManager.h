@@ -9,6 +9,7 @@
 #include "../System/BlendMode.h"
 #include "../Model/PrimitiveModel.h"
 #include "ParticleManager.h"
+#include "GPUParticleManager.h"
 #include "../Camera/CameraManager.h"
 
 using namespace MyMath;
@@ -27,6 +28,7 @@ struct EffectParticleLayer {
 	std::string texturePath = "assets/textures/smoke_particle.png";
 	BlendMode blendMode = BlendMode::kNormal;
 	uint32_t emitCount = 3u;
+	bool useGpu = false;
 	ParticleParameters params{};
 };
 
@@ -288,9 +290,10 @@ public:
 	void StopAllHandles();
 
 	void ApplyLayerParticleGroup(const EffectParticleLayer& layer);
+	void SetGpuUpdatePaused(bool paused) { gpuUpdatePaused_ = paused; }
 	size_t GetActiveEffectCount() const { return effects_.size(); }
 
-#ifdef _DEBUG
+#ifdef USE_IMGUI
 	// デバッグ用GUI
 	void DrawDebugGui(EffectHandle* previewHandle = nullptr);
 #endif
@@ -308,8 +311,9 @@ private:
 	std::unordered_map<std::string, std::unique_ptr<EffectHandle>> namedHandles_;
 	std::vector<std::unique_ptr<EffectHandle>> handles_;
 	bool isInitialized_ = false;
+	bool gpuUpdatePaused_ = false;
 
-#ifdef _DEBUG
+#ifdef USE_IMGUI
 	int selectedPresetIndex_ = 0;
 	int selectedLayerIndex_ = 0;
 	char newEffectFileName_[128] = "custom_effect";

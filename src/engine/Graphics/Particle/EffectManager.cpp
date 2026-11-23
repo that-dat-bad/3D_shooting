@@ -7,7 +7,7 @@
 #include <algorithm>
 #include <cmath>
 
-#if defined(_DEBUG) && defined(USE_IMGUI)
+#ifdef USE_IMGUI
 #include "../../../../external/imgui/imgui.h"
 #endif
 
@@ -88,6 +88,7 @@ bool EffectPreset::LoadFromEffectFile(const std::string& path) {
 		layer.texturePath = cfg.GetString(sec, "texturePath", "assets/textures/smoke_particle.png");
 		layer.blendMode = ParseBlendMode(cfg.GetString(sec, "blendMode", "Normal"));
 		layer.emitCount = static_cast<uint32_t>((std::max)(1, cfg.GetInt(sec, "emitCount", 3)));
+		layer.useGpu = cfg.GetBool(sec, "useGpu", false);
 
 		ParticleParameters& p = layer.params;
 		p.maxRiseHeight = cfg.GetFloat(sec, "maxRiseHeight", 5.5f);
@@ -172,6 +173,7 @@ bool EffectPreset::SaveToEffectFile(const std::string& path) const {
 		file << "texturePath = " << layer.texturePath << "\n";
 		file << "blendMode = " << BlendModeToString(layer.blendMode) << "\n";
 		file << "emitCount = " << layer.emitCount << "\n";
+		file << "useGpu = " << (layer.useGpu ? "true" : "false") << "\n";
 		file << "maxRiseHeight = " << p.maxRiseHeight << "\n";
 		file << "minLifeTime = " << p.minLifeTime << "\n";
 		file << "maxLifeTime = " << p.maxLifeTime << "\n";
@@ -292,12 +294,26 @@ void EffectHandle::Delete() {
 void EffectHandle::EmitBurstNow() {
 	const EffectPreset* preset = GetResolvedPreset();
 	ParticleManager* pm = ParticleManager::GetInstance();
-	if (!preset || !pm) {
+	GPUParticleManager* gpu = GPUParticleManager::GetInstance();
+	if (!preset) {
 		return;
 	}
 
 	for (const auto& layer : preset->layers) {
-		if (layer.emitCount > 0u && !layer.groupName.empty()) {
+		if (layer.emitCount == 0u) {
+			continue;
+		}
+		if (layer.useGpu) {
+			if (gpu && gpu->IsInitialized()) {
+				if (!layer.texturePath.empty()) {
+					TextureManager::GetInstance()->LoadTexture(layer.texturePath);
+					gpu->SetTexture(TextureManager::GetInstance()->GetTextureIndexByFilePath(layer.texturePath));
+				}
+				gpu->SetBlendMode(layer.blendMode);
+				gpu->EnqueueEmit(position_, layer.params, layer.emitCount);
+				totalEmittedParticles_ += layer.emitCount;
+			}
+		} else if (pm && !layer.groupName.empty()) {
 			EffectManager::GetInstance()->ApplyLayerParticleGroup(layer);
 			pm->Emit(layer.groupName, position_, layer.params, layer.emitCount);
 			totalEmittedParticles_ += layer.emitCount;
@@ -777,6 +793,12 @@ void EffectManager::EnsureCoreParticleGroupsCreated() {
 }
 
 void EffectManager::ApplyLayerParticleGroup(const EffectParticleLayer& layer) {
+	if (!layer.texturePath.empty()) {
+		TextureManager::GetInstance()->LoadTexture(layer.texturePath);
+	}
+	if (layer.useGpu) {
+		return;
+	}
 	ParticleManager* pm = ParticleManager::GetInstance();
 	if (!pm || layer.groupName.empty() || layer.texturePath.empty()) {
 		return;
@@ -842,6 +864,7 @@ void EffectManager::Initialize() {
 	EnsureCoreParticleGroupsCreated();
 	effects_.clear();
 	StopAllHandles();
+	gpuUpdatePaused_ = false;
 
 	if (!isInitialized_) {
 		LoadAllEffectsFromDirectory("Resources/effects");
@@ -850,6 +873,10 @@ void EffectManager::Initialize() {
 }
 
 void EffectManager::Update(float dt) {
+	if (GPUParticleManager* gpu = GPUParticleManager::GetInstance(); gpu && gpu->IsInitialized()) {
+		gpu->SetDeltaTime(dt);
+	}
+
 	for (auto it = effects_.begin(); it != effects_.end();) {
 		(*it)->Update(dt);
 		if ((*it)->IsDead()) {
@@ -881,6 +908,16 @@ void EffectManager::Update(float dt) {
 void EffectManager::Draw(Camera* camera) {
 	for (auto& effect : effects_) {
 		effect->Draw(camera);
+	}
+
+	if (camera) {
+		GPUParticleManager* gpu = GPUParticleManager::GetInstance();
+		if (gpu && gpu->IsInitialized()) {
+			if (!gpuUpdatePaused_) {
+				gpu->Update();
+			}
+			gpu->Draw(camera->GetViewProjectionMatrix(), camera->GetWorldMatrix());
+		}
 	}
 }
 
@@ -1023,14 +1060,13 @@ void EffectManager::EmitMuzzleFlash(const Vector3& position, const Vector3& dire
 	AddEffect(std::make_unique<MuzzleFlashEffect>(position, direction));
 }
 
-#ifdef _DEBUG
-void EffectManager::DrawDebugGui(EffectHandle* previewHandle) {
 #ifdef USE_IMGUI
+void EffectManager::DrawDebugGui(EffectHandle* previewHandle) {
 	if (!isInitialized_) {
 		Initialize();
 	}
 
-	ImGui::Begin("Effect Manager (.effect Editor) [DEBUG]");
+	ImGui::Begin("Effect Manager (.effect Editor) [DEV]");
 
 	// ファイル管理
 	if (ImGui::CollapsingHeader("1. Effect File (.effect) Management", ImGuiTreeNodeFlags_DefaultOpen)) {
@@ -1219,9 +1255,11 @@ void EffectManager::DrawDebugGui(EffectHandle* previewHandle) {
 			}
 
 			ImGui::Separator();
+			ImGui::Checkbox("Use GPU Particle (Compute Shader)", &layer.useGpu);
 			ImGui::Text("--- 量・寿命・上昇上限高さ ---");
 			int emitCnt = static_cast<int>(layer.emitCount);
-			if (ImGui::SliderInt("Emit Count (1回の発生量)", &emitCnt, 1, 60)) {
+			const int maxEmitSlider = layer.useGpu ? 5000 : 60;
+			if (ImGui::SliderInt("Emit Count (1回の発生量)", &emitCnt, 1, maxEmitSlider)) {
 				layer.emitCount = static_cast<uint32_t>((std::max)(1, emitCnt));
 			}
 			ImGui::SliderFloat("Max Rise Height (上昇上限高さ m)", &pp.maxRiseHeight, 0.0f, 35.0f, "%.2f m (0=無制限)");
@@ -1275,6 +1313,9 @@ void EffectManager::DrawDebugGui(EffectHandle* previewHandle) {
 			if (ParticleManager::GetInstance()) {
 				ParticleManager::GetInstance()->ClearAllParticles();
 			}
+			if (GPUParticleManager::GetInstance() && GPUParticleManager::GetInstance()->IsInitialized()) {
+				GPUParticleManager::GetInstance()->ClearAllParticles();
+			}
 		}
 
 		if (previewHandle) {
@@ -1286,13 +1327,21 @@ void EffectManager::DrawDebugGui(EffectHandle* previewHandle) {
 				previewHandle->GetTotalEmittedParticles());
 		}
 		if (ParticleManager::GetInstance()) {
-			ImGui::Text("Active Particles in Scene: %u", ParticleManager::GetInstance()->GetTotalActiveParticleCount());
+			ImGui::Text("Active CPU Particles in Scene: %u", ParticleManager::GetInstance()->GetTotalActiveParticleCount());
+		}
+		if (GPUParticleManager* gpu = GPUParticleManager::GetInstance(); gpu && gpu->IsInitialized()) {
+			bool readbackEnabled = gpu->IsReadbackDebugEnabled();
+			if (ImGui::Checkbox("GPU Readback Stats (Debug)", &readbackEnabled)) {
+				gpu->SetReadbackDebugEnabled(readbackEnabled);
+			}
+			ImGui::Text(
+				"GPU Particles: Capacity %u | Last Frame Emit: %u | Alive (Readback): %u",
+				gpu->GetMaxParticles(),
+				gpu->GetLastFrameEmitCount(),
+				readbackEnabled ? gpu->GetDebugAliveCount() : 0u);
 		}
 	}
 
 	ImGui::End();
-#else
-	(void)previewHandle;
-#endif
 }
-#endif
+#endif // USE_IMGUI

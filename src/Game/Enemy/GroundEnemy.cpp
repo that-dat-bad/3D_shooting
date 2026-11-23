@@ -11,6 +11,7 @@
 #include "../../engine/Graphics/Camera/CameraManager.h"
 #include "../FlightModel/FlightModel.h"
 #include "../Bullet/Bullet.h"
+#include "../Bullet/Missile.h"
 #include "../../engine/base/logger.h"
 
 namespace {
@@ -503,8 +504,17 @@ void GroundEnemy::TakeDamage(float damage) {
 void GroundEnemy::OnCollision(ICollisionBody3D* other) {
 	if (!isAlive_ || !IsHostile()) return;
 
+	// プレイヤーのミサイルとの衝突
+	if (other->GetCollisionAttribute() & CollisionAttribute::kPlayerMissile) {
+		auto* missile = dynamic_cast<Missile*>(other);
+		const float dmg = missile ? missile->GetDamage() : 120.0f;
+		const MyMath::Vector3 hitPos = missile ? missile->GetPosition() : position_;
+
+		EffectManager::GetInstance()->EmitHitEffect(hitPos);
+		TakeDamage(dmg);
+	}
 	// プレイヤーの機銃弾との衝突
-	if (other->GetCollisionAttribute() & CollisionAttribute::kPlayerBullet) {
+	else if (other->GetCollisionAttribute() & CollisionAttribute::kPlayerBullet) {
 		auto* bullet = dynamic_cast<Bullet*>(other);
 		float dmg = bullet ? bullet->GetDamage() : 10.0f;
 		MyMath::Vector3 bulletPos = bullet ? bullet->GetPosition() : position_;

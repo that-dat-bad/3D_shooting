@@ -251,9 +251,21 @@ void StageScene::ResetGameplayState() {
 	mouseAimEnabled_ = true;
 	Input::GetInstance()->UnlockCursor();
 
-	// 武装・弾丸
+	// 武装・弾丸・ミサイル
 	gunpod_.Initialize(gunpodData);
 	bulletManager_.Initialize(512);
+
+	flightModel_.ClearPayloads();
+	auto launcher = std::make_unique<MissileLauncher>();
+	launcher->Initialize(MissileLauncherData{});
+	missileLauncher_ = launcher.get();
+	flightModel_.AddPayload(std::move(launcher));
+
+	missileManager_.Initialize(16);
+	missileManager_.Clear();
+	missileManager_.ResetSeeker();
+	activeWeaponMode_ = WeaponMode::Gun;
+	weaponSwitchCooldown_ = 0.0f;
 
 	// ミッションデータのロード
 	auto& missionManager = MissionManager::GetInstance();
@@ -633,18 +645,34 @@ void StageScene::Draw() {
 		DrawGround();
 	}
 
-	// 目標リング・弾丸描画
+	// 目標リング・弾丸・ミサイル描画
 	DrawMissionReachAreaRings(cam);
 
-	bulletManager_.Draw(cam);
-
-	// エフェクト描画
-	EffectManager::GetInstance()->Draw(cam);
-
-	if (!isPaused_) {
-		GPUParticleManager::GetInstance()->Update();
+	if (missileLauncher_ && !isGameOver_ && (combatBootSequence_.IsFinished() || sortieIntroTimer_ >= 4.50f)) {
+		const Vector3 acPos = flightModel_.GetPosition();
+		const Vector3 acRight = flightModel_.GetRightDirection();
+		const Vector3 acUp = flightModel_.GetUpDirection();
+		const Vector3 acFwd = flightModel_.GetForwardDirection();
+		const int pylonCount = missileLauncher_->GetPylonCount();
+		for (int i = 0; i < pylonCount; ++i) {
+			if (!missileLauncher_->IsPylonLoaded(i)) {
+				continue;
+			}
+			const Vector3 offset = missileLauncher_->GetPylonLocalOffset(i);
+			const Vector3 pylonWorldPos = Add(
+				acPos,
+				Add(Add(Multiply(offset.x, acRight), Multiply(offset.y, acUp)), Multiply(offset.z, acFwd))
+			);
+			missileManager_.DrawMountedMissile(pylonWorldPos, acRight, acUp, acFwd, cam);
+		}
 	}
-	GPUParticleManager::GetInstance()->Draw(cam->GetViewProjectionMatrix(), cam->GetWorldMatrix());
+
+	bulletManager_.Draw(cam);
+	missileManager_.Draw(cam);
+
+	// エフェクト描画（CPU＋GPUパーティクル統合）
+	EffectManager::GetInstance()->SetGpuUpdatePaused(isPaused_);
+	EffectManager::GetInstance()->Draw(cam);
 
 	// ベイパーコーンエフェクト描画
 	DrawVaporConeEffect(cam);

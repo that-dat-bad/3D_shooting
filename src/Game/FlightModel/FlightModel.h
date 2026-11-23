@@ -28,6 +28,7 @@ public:
 
 	// -- ペイロードの管理 --
 	void AddPayload(std::unique_ptr<IPayload> payload);
+	void ClearPayloads() { payloads_.clear(); }
 	void FireWeapons(); // トリガーを引いた時用
 
 

@@ -101,6 +101,9 @@ public:
 	// damage: ダメージ量
 	void TakeDamage(float damage);
 
+	// ミサイル直撃・爆風ダメージ処理
+	void ApplyMissileDamage(float damage, const MyMath::Vector3& hitPos);
+
 	// ウェイポイントパス設定
 	void SetWaypointPath(const WaypointPath& path);
 

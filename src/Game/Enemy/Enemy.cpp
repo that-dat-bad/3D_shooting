@@ -4,6 +4,7 @@
 #include <cmath>
 #include "BehaviorTree/EnemyBehaviorNodes.h"
 #include "../Bullet/Bullet.h"
+#include "../Bullet/Missile.h"
 #include "../Environment/TerrainChunkManager.h"
 #include "../Graphics/DebrisManager.h"
 #include "../../engine/Graphics/Model/Object3d.h"
@@ -1028,8 +1029,75 @@ void Enemy::TakeDamage(float damage) {
 	}
 }
 
+void Enemy::ApplyMissileDamage(float damage, const MyMath::Vector3& hitPos) {
+	if (!isAlive_ || IsAlly() || damage <= 0.001f) {
+		return;
+	}
+
+	if (aiType_ == AIType::CanyonWesternFighter) {
+		if (isInDivePass_) {
+			return;
+		}
+		hitMarkerTriggered_ = true;
+		if (EffectManager::GetInstance()) {
+			EffectManager::GetInstance()->EmitDestroyEffect(hitPos);
+		}
+
+		const float bankRoll = -std::clamp(specialVel_.x * 0.015f, -0.65f, 0.65f);
+		MyMath::Vector3 right{}, up{}, fwd{};
+		BuildAircraftBasis(specialVel_, bankRoll, right, up, fwd);
+
+		const MyMath::Vector3 relHit = MyMath::Subtract(hitPos, specialPos_);
+		const float localX = MyMath::Dot(relHit, right);
+		const float localZ = MyMath::Dot(relHit, fwd);
+
+		if (localX <= -1.25f) {
+			portWingHp_ = (std::max)(0.0f, portWingHp_ - damage);
+		} else if (localX >= 1.25f) {
+			stbdWingHp_ = (std::max)(0.0f, stbdWingHp_ - damage);
+		} else if (localZ <= -1.20f) {
+			engineCoreHp_ = (std::max)(0.0f, engineCoreHp_ - damage);
+		} else {
+			engineCoreHp_ = (std::max)(0.0f, engineCoreHp_ - damage);
+		}
+		health_ = (std::min)({ portWingHp_, stbdWingHp_, engineCoreHp_ });
+
+		if (portWingHp_ <= 0.0f) {
+			TriggerWesternStructuralBreak(1);
+		} else if (stbdWingHp_ <= 0.0f) {
+			TriggerWesternStructuralBreak(2);
+		} else if (engineCoreHp_ <= 0.0f) {
+			TriggerWesternStructuralBreak(3);
+		}
+		return;
+	}
+
+	hitMarkerTriggered_ = true;
+	health_ = (std::max)(0.0f, health_ - damage);
+	flightModel_.ProcessBulletHit(hitPos, damage);
+	if (EffectManager::GetInstance()) {
+		EffectManager::GetInstance()->EmitHitEffect(hitPos);
+	}
+
+	if (health_ <= 0.0f || (aiType_ != AIType::CanyonDrone && flightModel_.GetAirframe().IsDestroyed())) {
+		health_ = 0.0f;
+		isAlive_ = false;
+		if (EffectManager::GetInstance()) {
+			EffectManager::GetInstance()->EmitDestroyEffect(flightModel_.GetPosition());
+		}
+	}
+}
+
 void Enemy::OnCollision(ICollisionBody3D* other) {
 	if (!isAlive_ || IsAlly()) { return; }
+
+	if (other->GetCollisionAttribute() & CollisionAttribute::kPlayerMissile) {
+		auto* missile = dynamic_cast<Missile*>(other);
+		const MyMath::Vector3 hitPos = missile ? missile->GetPosition() : flightModel_.GetPosition();
+		const float dmg = missile ? missile->GetDamage() : 120.0f;
+		ApplyMissileDamage(dmg, hitPos);
+		return;
+	}
 
 	if (aiType_ == AIType::CanyonWesternFighter) {
 		if (isInDivePass_) {

@@ -35,6 +35,9 @@ void InfoUI::Initialize(SpriteCommon* spriteCommon) {
 
 	SetupTextElement(labelAmmo_, "機関砲");
 	SetupTextElement(valAmmo_, "0");
+
+	SetupTextElement(labelMissile_, "ミサイル");
+	SetupTextElement(valMissile_, "0 / 0");
 }
 
 void InfoUI::SetVisible(bool visible) {
@@ -49,6 +52,8 @@ void InfoUI::SetVisible(bool visible) {
 	valRalt_.SetVisible(visible);
 	labelAmmo_.SetVisible(visible);
 	valAmmo_.SetVisible(visible);
+	labelMissile_.SetVisible(visible);
+	valMissile_.SetVisible(visible);
 }
 
 void InfoUI::Update(float dt, const FlightInfoUIData& data) {
@@ -169,25 +174,63 @@ void InfoUI::Update(float dt, const FlightInfoUIData& data) {
 	// 5. 弾数 - WT画像準拠で空行セクションギャップを挿入
 	// -------------------------------------------------------------
 	currentY += InfoUIDefaults::kSectionGap * scale;
+	const Vector4 activeWeaponCol = { 0.62f, 1.00f, 0.74f, 1.00f * currentAlpha };
+	const Vector4 inactiveWeaponCol = { 0.72f, 0.76f, 0.80f, 0.82f * currentAlpha };
 	{
 		const int currentAmmo = (std::max)(0, data_.currentAmmo);
 		const bool isLowAmmo = (data_.maxAmmo > 0 &&
 			static_cast<float>(currentAmmo) / static_cast<float>(data_.maxAmmo) <= InfoUIDefaults::kLowAmmoThresholdRatio);
 
-		Vector4 ammoCol = isLowAmmo ? InfoUIDefaults::kLowAmmoColor : baseTextColor;
-		ammoCol.w *= currentAlpha;
+		Vector4 gunLabelCol = !data_.isMissileSelected ? activeWeaponCol : inactiveWeaponCol;
+		Vector4 ammoCol = isLowAmmo ? InfoUIDefaults::kLowAmmoColor : gunLabelCol;
+		ammoCol.w = isLowAmmo ? currentAlpha : gunLabelCol.w;
 
 		char valBuf[32];
 		std::snprintf(valBuf, sizeof(valBuf), "%d", currentAmmo);
 
+		labelAmmo_.SetText(!data_.isMissileSelected ? "> 機関砲" : "  機関砲");
 		labelAmmo_.SetPosition({ baseX, currentY });
 		labelAmmo_.SetFontSize(fontSize);
-		labelAmmo_.SetColor(baseTextColor);
+		labelAmmo_.SetColor(gunLabelCol);
 
 		valAmmo_.SetText(valBuf);
 		valAmmo_.SetPosition({ valueX, currentY });
 		valAmmo_.SetFontSize(fontSize);
 		valAmmo_.SetColor(ammoCol);
+
+		currentY += lineSpacing;
+	}
+
+	// -------------------------------------------------------------
+	// 6. ミサイル残弾
+	// -------------------------------------------------------------
+	{
+		const int currentMsl = (std::max)(0, data_.currentMissiles);
+		const int maxMsl = (std::max)(0, data_.maxMissiles);
+		const bool isMslEmpty = (currentMsl <= 0);
+		const bool isMslLocked = (data_.isMissileSelected && data_.missileSeekerState == 4);
+
+		Vector4 mslLabelCol = data_.isMissileSelected ? activeWeaponCol : inactiveWeaponCol;
+		if (isMslLocked) {
+			mslLabelCol = { 1.00f, 0.30f, 0.25f, 1.00f * currentAlpha };
+		}
+		Vector4 mslValCol = isMslEmpty ? InfoUIDefaults::kLowAmmoColor : mslLabelCol;
+		if (isMslEmpty) {
+			mslValCol.w *= currentAlpha;
+		}
+
+		char valBuf[32];
+		std::snprintf(valBuf, sizeof(valBuf), "%d / %d", currentMsl, maxMsl);
+
+		labelMissile_.SetText(data_.isMissileSelected ? "> ミサイル" : "  ミサイル");
+		labelMissile_.SetPosition({ baseX, currentY });
+		labelMissile_.SetFontSize(fontSize);
+		labelMissile_.SetColor(mslLabelCol);
+
+		valMissile_.SetText(valBuf);
+		valMissile_.SetPosition({ valueX, currentY });
+		valMissile_.SetFontSize(fontSize);
+		valMissile_.SetColor(mslValCol);
 	}
 
 	// 全 UIText の更新処理
@@ -201,6 +244,8 @@ void InfoUI::Update(float dt, const FlightInfoUIData& data) {
 	valRalt_.Update();
 	labelAmmo_.Update();
 	valAmmo_.Update();
+	labelMissile_.Update();
+	valMissile_.Update();
 }
 
 void InfoUI::Draw() {
@@ -223,4 +268,7 @@ void InfoUI::Draw() {
 
 	labelAmmo_.Draw();
 	valAmmo_.Draw();
+
+	labelMissile_.Draw();
+	valMissile_.Draw();
 }

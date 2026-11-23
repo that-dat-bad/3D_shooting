@@ -212,7 +212,21 @@ void StageScene::UpdateCombatFiring(float gameDeltaTime) {
 	isFiringThisFrame_ = false;
 	const bool allowWeapon = MissionManager::GetInstance().IsPlayerWeaponAllowed();
 
-	if (allowWeapon && input && input->PushMouse(0) && !isMissionCleared_ && !isMissionFailed_ && sortieIntroTimer_ >= sortieIntroDuration_) {
+	if (weaponSwitchCooldown_ > 0.0f) {
+		weaponSwitchCooldown_ = (std::max)(0.0f, weaponSwitchCooldown_ - gameDeltaTime);
+	}
+
+	// マウススクロールホイールで機関砲 / ミサイルを切り替え
+	if (allowWeapon && IsGameplayActive() && !isPaused_ && !combatBootSequence_.IsWaitingForSpace() && input) {
+		const Input::MouseMove mouseMove = input->GetMouseMove();
+		if (mouseMove.lZ != 0 && weaponSwitchCooldown_ <= 0.0f) {
+			activeWeaponMode_ = (activeWeaponMode_ == WeaponMode::Gun) ? WeaponMode::Missile : WeaponMode::Gun;
+			weaponSwitchCooldown_ = 0.12f;
+		}
+	}
+
+	const bool canFireWeapon = allowWeapon && input && !isMissionCleared_ && !isMissionFailed_ && sortieIntroTimer_ >= sortieIntroDuration_;
+	if (canFireWeapon && activeWeaponMode_ == WeaponMode::Gun && input->PushMouse(0)) {
 		int ammoBefore = gunpod_.GetCurrentAmmo();
 		gunpod_.Fire();
 		if (gunpod_.GetCurrentAmmo() < ammoBefore) {
@@ -286,6 +300,26 @@ void StageScene::UpdateCombatFiring(float gameDeltaTime) {
 					pLight->intensity = 30.0f;
 					pLight->radius = 30.0f;
 					pLight->decay = 2.0f;
+				}
+			}
+		}
+	} else if (canFireWeapon && activeWeaponMode_ == WeaponMode::Missile && input->TriggerMouse(0)) {
+		if (missileLauncher_ && missileLauncher_->IsReadyToFire() && missileManager_.IsLocked()) {
+			Vector3 localPylonOffset{};
+			if (missileLauncher_->TryConsumeMissile(localPylonOffset)) {
+				const Vector3 acPos = flightModel_.GetPosition();
+				const Vector3 acRight = flightModel_.GetRightDirection();
+				const Vector3 acUp = flightModel_.GetUpDirection();
+				const Vector3 acFwd = flightModel_.GetForwardDirection();
+				const Vector3 launchPos = Add(
+					acPos,
+					Add(Add(Multiply(localPylonOffset.x, acRight), Multiply(localPylonOffset.y, acUp)), Multiply(localPylonOffset.z, acFwd))
+				);
+
+				if (missileManager_.LaunchLockedMissile(launchPos, flightModel_.GetVelocity(), acFwd)) {
+					if (CameraManager::GetInstance()->GetActiveCamera()) {
+						CameraManager::GetInstance()->GetActiveCamera()->Shake(0.18f, 1.2f);
+					}
 				}
 			}
 		}
@@ -533,6 +567,8 @@ void StageScene::ApplyMissionLiveSyncUpdate() {
 
 	static const std::vector<EnemySpawnData> kEmptyAir = {};
 	static const std::vector<GroundEnemySpawnData> kEmptyGround = {};
+	missileManager_.Clear();
+	missileManager_.ResetSeeker();
 	enemyManager_.SetWaypointPaths(liveData.waypointPaths);
 	enemyManager_.SetTerrainChunkManager(terrainChunkManager_);
 	enemyManager_.Initialize(
@@ -562,6 +598,22 @@ void StageScene::UpdateCombatAndMission(float gameDeltaTime) {
 		gunpod_.Update(gameDeltaTime);
 		bulletManager_.Update(gameDeltaTime);
 		enemyManager_.Update(gameDeltaTime);
+
+		const bool seekerEnabled =
+			(activeWeaponMode_ == WeaponMode::Missile) &&
+			MissionManager::GetInstance().IsPlayerWeaponAllowed() &&
+			IsGameplayActive() &&
+			!isPaused_;
+		const int remainingMissiles = missileLauncher_ ? missileLauncher_->GetCurrentMissiles() : 0;
+		missileManager_.UpdateSeeker(
+			gameDeltaTime,
+			seekerEnabled,
+			remainingMissiles,
+			flightModel_.GetPosition(),
+			flightModel_.GetForwardDirection(),
+			enemyManager_
+		);
+		missileManager_.Update(gameDeltaTime, enemyManager_, terrainChunkManager_);
 	}
 
 	if (enemyManager_.GetLastHitMarkerTriggered()) {
@@ -650,6 +702,9 @@ void StageScene::UpdateCombatAndMission(float gameDeltaTime) {
 
 		for (auto& bullet : bulletManager_.GetBullets()) {
 			collisionSystem_.Register(&bullet);
+		}
+		for (auto& missile : missileManager_.GetMissiles()) {
+			collisionSystem_.Register(&missile);
 		}
 		for (auto* enemy : enemyManager_.GetAliveEnemies()) {
 			collisionSystem_.Register(enemy);
@@ -1005,6 +1060,21 @@ void StageScene::UpdateDebugAndStatusUI(float gameDeltaTime) {
 		enemyManager_.GetAliveAirCount(), enemyManager_.GetAliveGroundCount());
 	ImGui::Text("Ammo: %d / %d", gunpod_.GetCurrentAmmo(), gunpod_.GetMaxAmmo());
 	ImGui::Text("Bullets Active: %u", bulletManager_.GetActiveBulletCount());
+	ImGui::Text("Weapon Mode: %s (Scroll to Switch)", activeWeaponMode_ == WeaponMode::Missile ? "MISSILE" : "GUN");
+	if (missileLauncher_) {
+		const auto& seeker = missileManager_.GetSeekerStatus();
+		const char* seekerLabels[] = { "OFF", "WARMING", "SEARCH", "LOCKING", "LOCKED" };
+		const int stIdx = std::clamp(static_cast<int>(seeker.state), 0, 4);
+		ImGui::Text("Missiles: %d / %d | Active: %u | Seeker: %s (%.0f%%)",
+			missileLauncher_->GetCurrentMissiles(),
+			missileLauncher_->GetMaxMissiles(),
+			missileManager_.GetActiveMissileCount(),
+			seekerLabels[stIdx],
+			seeker.lockProgress * 100.0f);
+		if (ImGui::Button("Replenish Missiles")) {
+			missileLauncher_->ReplenishMissiles();
+		}
+	}
 	
 	ImGui::Separator();
 	ImGui::Text("=== Alive Air Enemies (%d) ===", enemyManager_.GetAliveAirCount());
@@ -1094,12 +1164,6 @@ void StageScene::UpdateDebugAndStatusUI(float gameDeltaTime) {
 				RadioFaction::Enemy);
 		}
 	}
-
-#ifdef _DEBUG
-	if (EffectManager::GetInstance()) {
-		EffectManager::GetInstance()->DrawDebugGui();
-	}
-#endif
 
 	if (isMissionCleared_) {
 		ImGui::TextColored(ImVec4(0, 1, 0, 1), "*** MISSION CLEAR ***");
@@ -1505,6 +1569,29 @@ void StageScene::UpdatePostEffects(float deltaTime) {
 	hudData.hitMarkerTimer = hitMarkerTimer_;
 	hudData.fadeOutAlpha = clearFadeOutActive_ ? std::clamp(clearFadeOutTimer_ / 1.65f, 0.0f, 1.0f) : 0.0f;
 
+	{
+		const auto& seeker = missileManager_.GetSeekerStatus();
+		hudData.missileSeeker.isMissileSelected = (activeWeaponMode_ == WeaponMode::Missile);
+		hudData.missileSeeker.seekerState = static_cast<int>(seeker.state);
+		hudData.missileSeeker.warmupProgress = seeker.warmupProgress;
+		hudData.missileSeeker.lockProgress = seeker.lockProgress;
+		hudData.missileSeeker.boresightWorldPoint = seeker.boresightWorldPoint;
+		hudData.missileSeeker.seekerTrackWorldPoint = seeker.seekerTrackWorldPoint;
+		hudData.missileSeeker.aircraftRight = flightModel_.GetRightDirection();
+		hudData.missileSeeker.outerGimbalAngleDeg = seeker.outerGimbalAngleDeg;
+		hudData.missileSeeker.innerAcqAngleDeg = seeker.innerAcqAngleDeg;
+		hudData.missileSeeker.currentMissiles = missileLauncher_ ? missileLauncher_->GetCurrentMissiles() : 0;
+		hudData.missileSeeker.maxMissiles = missileLauncher_ ? missileLauncher_->GetMaxMissiles() : 0;
+		hudData.missileSeeker.cooldownRatio = missileLauncher_ ? missileLauncher_->GetCooldownRatio() : 0.0f;
+		hudData.missileSeeker.hasTarget = seeker.hasTarget;
+		hudData.missileSeeker.targetDistanceMeters = seeker.targetDistance;
+		for (const auto& m : missileManager_.GetMissiles()) {
+			if (m.IsAlive()) {
+				hudData.missileSeeker.activeMissilePositions.push_back(m.GetPosition());
+			}
+		}
+	}
+
 	hud_.Update(deltaTime, hudData);
 
 	// 5. War Thunder風フライト計器UIの更新
@@ -1513,6 +1600,10 @@ void StageScene::UpdatePostEffects(float deltaTime) {
 	infoData.speed = flightModel_.GetSpeed();
 	infoData.currentAmmo = gunpod_.GetCurrentAmmo();
 	infoData.maxAmmo = gunpod_.GetMaxAmmo();
+	infoData.currentMissiles = missileLauncher_ ? missileLauncher_->GetCurrentMissiles() : 0;
+	infoData.maxMissiles = missileLauncher_ ? missileLauncher_->GetMaxMissiles() : 0;
+	infoData.isMissileSelected = (activeWeaponMode_ == WeaponMode::Missile);
+	infoData.missileSeekerState = static_cast<int>(missileManager_.GetSeekerStatus().state);
 	infoData.absoluteAltitude = flightModel_.GetPosition().y;
 	infoData.relativeAltitude = currentAgl;
 	infoData.screenWidth = static_cast<float>(WinApp::kClientWidth);

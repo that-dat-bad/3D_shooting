@@ -12,8 +12,10 @@
 #include "FlightModel/FlightInstructor.h"
 #include "FlightModel/MouseAimController.h"
 #include "FlightModel/Payload/Gunpod.h"
+#include "FlightModel/Payload/MissileLauncher.h"
 #include "Enemy/EnemyManager.h"
 #include "Bullet/BulletManager.h"
+#include "Bullet/MissileManager.h"
 #include "../Graphics/AircraftVisualModel.h"
 #include "../Graphics/DebrisManager.h"
 #include "../../engine/Physics/CollisionSystem.h"
@@ -121,9 +123,18 @@ private:
 	// ============================
 	// 戦闘システム
 	// ============================
+	enum class WeaponMode {
+		Gun = 0,
+		Missile = 1
+	};
+	WeaponMode activeWeaponMode_ = WeaponMode::Gun;
+	float weaponSwitchCooldown_ = 0.0f;
+
 	GunPod gunpod_;
+	MissileLauncher* missileLauncher_ = nullptr; // 所有権は flightModel_ が保持
 	EnemyManager enemyManager_;
 	BulletManager bulletManager_;
+	MissileManager missileManager_;
 	bool enableEnemies_ = true; // 敵出現フラグ
 
 	// --- 統合当たり判定 ---
