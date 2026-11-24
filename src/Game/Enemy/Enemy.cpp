@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <filesystem>
 #include "BehaviorTree/EnemyBehaviorNodes.h"
 #include "../Bullet/Bullet.h"
 #include "../Bullet/Missile.h"
@@ -71,6 +72,33 @@ namespace {
 		mat.m[3][0] = position.x; mat.m[3][1] = position.y; mat.m[3][2] = position.z; mat.m[3][3] = 1.0f;
 		return mat;
 	}
+
+	std::string ResolveColliderModelPath(const std::string& modelPath, const std::string& explicitColPath) {
+		namespace fs = std::filesystem;
+		std::error_code ec;
+		if (!explicitColPath.empty() && fs::exists(explicitColPath, ec)) {
+			return explicitColPath;
+		}
+		if (modelPath.empty()) {
+			return modelPath;
+		}
+		const fs::path src(modelPath);
+		const fs::path dir = src.parent_path();
+		const std::string stem = src.stem().string();
+		const std::string origExt = src.extension().string();
+
+		const std::array<std::string, 4> exts = { origExt, ".gltf", ".glb", ".obj" };
+		for (const auto& ext : exts) {
+			if (ext.empty()) {
+				continue;
+			}
+			const fs::path candidate = dir / (stem + "_col" + ext);
+			if (fs::exists(candidate, ec)) {
+				return candidate.generic_string();
+			}
+		}
+		return modelPath;
+	}
 }
 
 Enemy::Enemy() = default;
@@ -125,7 +153,8 @@ void Enemy::Initialize(
 	FlightModel* playerFlightModel,
 	BulletManager* bulletManager,
 	AIType aiType,
-	const std::string& behaviorTreeJson
+	const std::string& behaviorTreeJson,
+	const std::string& colliderModelPath
 ) {
 	maxHealth_ = maxHealth;
 	health_ = maxHealth;
@@ -292,6 +321,40 @@ void Enemy::Initialize(
 		MyMath::Vector3 right{}, up{}, fwd{};
 		BuildAircraftBasis(specialVel_, 0.0f, right, up, fwd);
 		visualModel_.Update(BuildWorldMatrixFromBasis(right, up, fwd, specialPos_), 0.0f);
+		return;
+	}
+
+	if (aiType_ == AIType::BarrageBalloon) {
+		anchoredPosition_ = position;
+		useVisualModel_ = false;
+
+		flightModel_.SetPosition(anchoredPosition_);
+		flightModel_.SetVelocity({ 0.0f, 0.0f, 0.0f });
+		flightModel_.SetThrottle(0.0f);
+		flightModel_.SetThrottleInput(0.0f);
+		flightModel_.SetControlInput(0.0f, 0.0f, 0.0f);
+		flightModel_.SetAutopilot(true);
+
+		object3d_ = std::make_unique<Object3d>();
+		object3d_->Initialize(Object3dCommon::GetInstance());
+		object3d_->SetCamera(activeCam);
+		object3d_->SetModel(modelPath);
+		if (object3d_->GetModel()) {
+			object3d_->GetModel()->SetEnvironmentCoefficient(0.18f);
+			object3d_->GetModel()->SetSpecularIntensity(0.45f);
+		}
+		object3d_->SetScale({ 1.0f, 1.0f, 1.0f });
+		object3d_->SetTranslate(anchoredPosition_);
+		object3d_->SetRotate({ 0.0f, 0.0f, 0.0f });
+		object3d_->Update();
+
+		const std::string colPath = ResolveColliderModelPath(modelPath, colliderModelPath);
+		ModelManager::GetInstance()->LoadModel(colPath);
+		if (Model* colModel = ModelManager::GetInstance()->FindModel(colPath)) {
+			flightModel_.BuildMeshCollider(colModel, { 0.0f, 0.0f, 0.0f });
+		}
+		const auto& mc = flightModel_.GetDamageModel().GetMeshCollider();
+		collisionRadius_ = mc.IsValid() ? (std::max)(12.0f, mc.GetBoundingRadius() + 2.5f) : 14.0f;
 		return;
 	}
 
@@ -570,8 +633,10 @@ void Enemy::UpdateAllyWingman(float deltaTime) {
 		afterburner_->Update(dt, coraxThrottle);
 	}
 
-	const MyMath::Vector3 wingL = MyMath::Add(MyMath::Add(specialPos_, MyMath::Multiply(-6.0f, right)), MyMath::Multiply(-2.0f, fwd));
-	const MyMath::Vector3 wingR = MyMath::Add(MyMath::Add(specialPos_, MyMath::Multiply(6.0f, right)), MyMath::Multiply(-2.0f, fwd));
+	const MyMath::Vector3 tipFwd = MyMath::Multiply(-4.72f, fwd);
+	const MyMath::Vector3 tipUp = MyMath::Multiply(0.09f, up);
+	const MyMath::Vector3 wingL = MyMath::Add(MyMath::Add(specialPos_, MyMath::Multiply(-4.50f, right)), MyMath::Add(tipFwd, tipUp));
+	const MyMath::Vector3 wingR = MyMath::Add(MyMath::Add(specialPos_, MyMath::Multiply(4.50f, right)), MyMath::Add(tipFwd, tipUp));
 
 	if (hasLastWingTips_) {
 		const MyMath::Vector3 deltaL = MyMath::Subtract(wingL, lastWingTipL_);
@@ -923,6 +988,24 @@ void Enemy::Update(float deltaTime) {
 		return;
 	}
 
+	if (aiType_ == AIType::BarrageBalloon) {
+		if (!isAlive_) { return; }
+		flightModel_.SetPosition(anchoredPosition_);
+		flightModel_.SetVelocity({ 0.0f, 0.0f, 0.0f });
+		flightModel_.SetThrottle(0.0f);
+		flightModel_.SetThrottleInput(0.0f);
+		flightModel_.Update(deltaTime);
+		flightModel_.SetPosition(anchoredPosition_);
+		flightModel_.SetVelocity({ 0.0f, 0.0f, 0.0f });
+		if (object3d_) {
+			object3d_->SetCamera(CameraManager::GetInstance()->GetActiveCamera());
+			object3d_->SetTranslate(flightModel_.GetPosition());
+			object3d_->SetRotate(QuaternionToEuler(flightModel_.GetOrientation()));
+			object3d_->Update();
+		}
+		return;
+	}
+
 	if (!isAlive_) { return; }
 
 	if (terrain_ && terrain_->IsLoaded()) {
@@ -1165,7 +1248,7 @@ bool Enemy::RefineCollision(const ICollisionBody3D* other) const {
 	if (aiType_ == AIType::CanyonWesternFighter) {
 		return TestCanyonWesternBulletMeshHit(bullet);
 	}
-	if (useVisualModel_) {
+	if (useVisualModel_ || aiType_ == AIType::BarrageBalloon) {
 		return flightModel_.TestBulletSegmentHit(bullet->GetPrevPosition(), bullet->GetPosition());
 	}
 	return true;
@@ -1277,7 +1360,7 @@ void Enemy::OnCollision(ICollisionBody3D* other) {
 		}
 
 		HitResult res;
-		if (bullet && useVisualModel_ && flightModel_.GetDamageModel().HasMeshCollider()) {
+		if (bullet && (useVisualModel_ || aiType_ == AIType::BarrageBalloon) && flightModel_.GetDamageModel().HasMeshCollider()) {
 			res = flightModel_.ProcessBulletSegmentHit(bullet->GetPrevPosition(), bullet->GetPosition(), dmg, &hitWorldPos);
 			if (!res.isValid()) {
 				return;

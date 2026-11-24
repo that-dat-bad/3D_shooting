@@ -8,6 +8,14 @@
             "aliasName": "DEMO 01",
             "subTitle": "クリア画面自動実演デモ",
             "isLocked": false
+        },
+        {
+            "id": "[02]",
+            "filePath": "Resources/missions/particle_demo.json",
+            "title": "PARTICLE DEMO -パーティクル総合実演-",
+            "aliasName": "DEMO 02",
+            "subTitle": "自動飛行・兵装・ベイパー・墜落デモ",
+            "isLocked": false
         }
     ]
 }

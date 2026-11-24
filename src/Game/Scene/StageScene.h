@@ -7,6 +7,7 @@
 #include "../../engine/Graphics/Model/Object3d.h"
 #include "../../engine/Graphics/Model/Skybox.h"
 #include "../Camera/PlayerCamera.h"
+#include "../Camera/ParticleDemoCamera.h"
 #include "FlightModel/AircraftConfig.h"
 #include "FlightModel/FlightModel.h"
 #include "FlightModel/FlightInstructor.h"
@@ -29,6 +30,10 @@
 #include "../UI/RadioCommunicator.h"
 #include "../UI/InfoUI.h"
 #include "../Graphics/Afterburner.h"
+#include "../Effect/CountermeasureSystem.h"
+#include "../Effect/AeroVaporSystem.h"
+#include "../Effect/AmbientWeatherSystem.h"
+#include "../Mission/ParticleDemoController.h"
 
 namespace StageRadioDefaults {
 	inline constexpr int kInitialKillCount = 0;
@@ -113,6 +118,7 @@ private:
 	// プレイヤーカメラ
 	// ============================
 	PlayerCamera playerCamera_;
+	ParticleDemoCamera particleDemoCamera_;
 
 	// ============================
 	// マウスエイム操縦
@@ -159,6 +165,7 @@ private:
 
 	// 追従マズルフラッシュ描画用タイマー
 	float muzzleFlashTimer_ = 0.0f;
+	MyMath::Vector3 lastMuzzleLocalOffset_{ 0.0f, 0.0f, 8.0f };
 	
 	// マズルフラッシュの間引き制御用カウンター
 	int muzzleFlashCount_ = 0;
@@ -202,6 +209,7 @@ private:
 
 	// ゲーム状態
 	bool isFreeFlightMode_ = false;
+	bool isParticleDemoMode_ = false;
 	bool isMissionCleared_ = false;
 	bool isMissionFailed_ = false;
 	bool isGameOver_ = false;
@@ -250,11 +258,6 @@ private:
 	float wepDetentTimer_ = 0.0f;
 	bool holdWForWep_ = false;
 
-	// 翼端エフェクト用の前フレーム位置保存
-	MyMath::Vector3 lastLeftWingTip_{};
-	MyMath::Vector3 lastRightWingTip_{};
-	bool hasLastWingTips_ = false;
-
 	// 経過時間
 	float totalTime_ = 0.0f;
 
@@ -263,6 +266,12 @@ private:
 
 	// 環境管理
 	EnvironmentManager environmentManager_;
+
+	// GPUパーティクル連携エフェクト群（単一責務モジュール委譲）
+	CountermeasureSystem countermeasures_;
+	AeroVaporSystem aeroVapor_;
+	AmbientWeatherSystem ambientWeather_;
+	ParticleDemoController particleDemo_;
 
 	// 地形チャンク管理
 	TerrainChunkManager* terrainChunkManager_ = nullptr;

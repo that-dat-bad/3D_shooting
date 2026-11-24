@@ -2,11 +2,6 @@
 #include "../System/TextureManager.h"
 #include <algorithm>
 #include <cassert>
-#include <cstring>
-
-#ifdef USE_IMGUI
-#include "../../../external/imgui/imgui.h"
-#endif // USE_IMGUI
 
 std::unique_ptr<GPUParticleManager> GPUParticleManager::instance_ = nullptr;
 
@@ -30,6 +25,10 @@ void GPUParticleManager::Initialize(DirectXCommon* dxCommon, SrvManager* srvMana
 	CreateCommandSignature();
 	CreateModel();
 
+	ClearWakeFields();
+	ambientVolume_ = {};
+	pendingDroppedEmitRequests_ = 0u;
+	lastFrameDroppedEmitRequests_ = 0u;
 	needsInitializeParticles_ = true;
 	isInitialized_ = true;
 }
@@ -38,7 +37,8 @@ void GPUParticleManager::Finalize() {
 	particleBuffer_.Reset();
 	freeListIndexBuffer_.Reset();
 	freeListBuffer_.Reset();
-	aliveListBuffer_.Reset();
+	aliveListAlphaBuffer_.Reset();
+	aliveListAddBuffer_.Reset();
 	indirectArgsBuffer_.Reset();
 
 	for (uint32_t i = 0; i < kFrameCount; ++i) {
@@ -66,282 +66,19 @@ void GPUParticleManager::Finalize() {
 	commandSignature_.Reset();
 
 	pendingEmitRequests_.clear();
+	ClearWakeFields();
+	ambientVolume_ = {};
+	pendingDroppedEmitRequests_ = 0u;
+	lastFrameDroppedEmitRequests_ = 0u;
 	isInitialized_ = false;
 	needsInitializeParticles_ = true;
 	hasCustomTexture_ = false;
 	manualEmitRequested_ = false;
 }
 
-void GPUParticleManager::CreateBuffers() {
-	// u0..u4 用に連続した5個のUAVディスクリプタを割り当て
-	particleUavIndex_ = srvManager_->Allocate();
-	freeListIndexUavIndex_ = srvManager_->Allocate();
-	freeListUavIndex_ = srvManager_->Allocate();
-	aliveListUavIndex_ = srvManager_->Allocate();
-	indirectArgsUavIndex_ = srvManager_->Allocate();
-
-	// グラフィックスルートパラメータ0 (t0..t1) 用に連続した2個のSRVディスクリプタを割り当て
-	particleSrvIndex_ = srvManager_->Allocate();
-	aliveListSrvIndex_ = srvManager_->Allocate();
-
-	// 1. Particle Buffer
-	particleBuffer_ = dxCommon_->CreateUAVBufferResource(sizeof(ParticleCS) * kMaxParticles);
-	srvManager_->CreateUAVforStructuredBuffer(particleUavIndex_, particleBuffer_.Get(), kMaxParticles, sizeof(ParticleCS));
-	srvManager_->CreateSRVforStructuredBuffer(particleSrvIndex_, particleBuffer_.Get(), kMaxParticles, sizeof(ParticleCS));
-
-	// 2. FreeListIndex Buffer
-	freeListIndexBuffer_ = dxCommon_->CreateUAVBufferResource(sizeof(int32_t));
-	srvManager_->CreateUAVforStructuredBuffer(freeListIndexUavIndex_, freeListIndexBuffer_.Get(), 1, sizeof(int32_t));
-
-	// 3. FreeList Buffer
-	freeListBuffer_ = dxCommon_->CreateUAVBufferResource(sizeof(uint32_t) * kMaxParticles);
-	srvManager_->CreateUAVforStructuredBuffer(freeListUavIndex_, freeListBuffer_.Get(), kMaxParticles, sizeof(uint32_t));
-
-	// 4. AliveList Buffer
-	aliveListBuffer_ = dxCommon_->CreateUAVBufferResource(sizeof(uint32_t) * kMaxParticles);
-	srvManager_->CreateUAVforStructuredBuffer(aliveListUavIndex_, aliveListBuffer_.Get(), kMaxParticles, sizeof(uint32_t));
-	srvManager_->CreateSRVforStructuredBuffer(aliveListSrvIndex_, aliveListBuffer_.Get(), kMaxParticles, sizeof(uint32_t));
-
-	// 5. IndirectArgs Buffer
-	indirectArgsBuffer_ = dxCommon_->CreateUAVBufferResource(sizeof(D3D12_DRAW_ARGUMENTS));
-	srvManager_->CreateUAVforStructuredBuffer(indirectArgsUavIndex_, indirectArgsBuffer_.Get(), 4, sizeof(uint32_t));
-
-	// 6. EmitRequest Buffers (フレーム別二重化)
-	for (uint32_t i = 0; i < kFrameCount; ++i) {
-		emitRequestSrvIndex_[i] = srvManager_->Allocate();
-		emitRequestBuffer_[i] = dxCommon_->CreateBufferResource(sizeof(GpuEmitRequest) * kMaxEmitRequests);
-		emitRequestBuffer_[i]->Map(0, nullptr, reinterpret_cast<void**>(&emitRequestMapped_[i]));
-		std::memset(emitRequestMapped_[i], 0, sizeof(GpuEmitRequest) * kMaxEmitRequests);
-		srvManager_->CreateSRVforStructuredBuffer(emitRequestSrvIndex_[i], emitRequestBuffer_[i].Get(), kMaxEmitRequests, sizeof(GpuEmitRequest));
-	}
-
-	// 7. PerFrame (フレーム別二重化)
-	perFrameBuffer_ = dxCommon_->CreateBufferResource(kCbAlignment * kFrameCount);
-	perFrameBuffer_->Map(0, nullptr, reinterpret_cast<void**>(&perFrameMapped_));
-	std::memset(perFrameMapped_, 0, kCbAlignment * kFrameCount);
-
-	// 8. PerView (フレーム別二重化)
-	perViewBuffer_ = dxCommon_->CreateBufferResource(kCbAlignment * kFrameCount);
-	perViewBuffer_->Map(0, nullptr, reinterpret_cast<void**>(&perViewMapped_));
-	std::memset(perViewMapped_, 0, kCbAlignment * kFrameCount);
-
-	// 9. Readback Buffer (デバッグ要求時のみ使用)
-	D3D12_HEAP_PROPERTIES heapProps = {};
-	heapProps.Type = D3D12_HEAP_TYPE_READBACK;
-
-	D3D12_RESOURCE_DESC resDesc = {};
-	resDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-	resDesc.Width = sizeof(uint32_t) * 5;
-	resDesc.Height = 1;
-	resDesc.DepthOrArraySize = 1;
-	resDesc.MipLevels = 1;
-	resDesc.Format = DXGI_FORMAT_UNKNOWN;
-	resDesc.SampleDesc.Count = 1;
-	resDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-
-	dxCommon_->GetDevice()->CreateCommittedResource(
-		&heapProps, D3D12_HEAP_FLAG_NONE, &resDesc,
-		D3D12_RESOURCE_STATE_COPY_DEST, nullptr,
-		IID_PPV_ARGS(&readbackBuffer_)
-	);
-}
-
-void GPUParticleManager::CreateComputePipeline() {
-	auto device = dxCommon_->GetDevice();
-
-	D3D12_ROOT_SIGNATURE_DESC descriptionRootSignature{};
-	descriptionRootSignature.Flags = D3D12_ROOT_SIGNATURE_FLAG_NONE;
-
-	D3D12_DESCRIPTOR_RANGE uavRange[1] = {};
-	uavRange[0].BaseShaderRegister = 0;
-	uavRange[0].NumDescriptors = 5;
-	uavRange[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_UAV;
-	uavRange[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-
-	D3D12_DESCRIPTOR_RANGE srvRange[1] = {};
-	srvRange[0].BaseShaderRegister = 0;
-	srvRange[0].NumDescriptors = 1;
-	srvRange[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-	srvRange[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-
-	D3D12_ROOT_PARAMETER rootParameters[3] = {};
-	rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-	rootParameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-	rootParameters[0].DescriptorTable.pDescriptorRanges = uavRange;
-	rootParameters[0].DescriptorTable.NumDescriptorRanges = 1;
-
-	rootParameters[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-	rootParameters[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-	rootParameters[1].Descriptor.ShaderRegister = 0;
-
-	rootParameters[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-	rootParameters[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_ALL;
-	rootParameters[2].DescriptorTable.pDescriptorRanges = srvRange;
-	rootParameters[2].DescriptorTable.NumDescriptorRanges = 1;
-
-	descriptionRootSignature.pParameters = rootParameters;
-	descriptionRootSignature.NumParameters = 3;
-
-	Microsoft::WRL::ComPtr<ID3DBlob> signatureBlob;
-	Microsoft::WRL::ComPtr<ID3DBlob> errorBlob;
-	HRESULT hr = D3D12SerializeRootSignature(&descriptionRootSignature, D3D_ROOT_SIGNATURE_VERSION_1, &signatureBlob, &errorBlob);
-	if (FAILED(hr)) {
-		OutputDebugStringA((char*)errorBlob->GetBufferPointer());
-		assert(false);
-	}
-	hr = device->CreateRootSignature(0, signatureBlob->GetBufferPointer(), signatureBlob->GetBufferSize(), IID_PPV_ARGS(&computeRootSignature_));
-	assert(SUCCEEDED(hr));
-
-	Microsoft::WRL::ComPtr<IDxcBlob> initCS = dxCommon_->CompileShader(L"assets/shaders/InitializeParticle.CS.hlsl", L"cs_6_0");
-	Microsoft::WRL::ComPtr<IDxcBlob> emitCS = dxCommon_->CompileShader(L"assets/shaders/EmitParticle.CS.hlsl", L"cs_6_0");
-	Microsoft::WRL::ComPtr<IDxcBlob> resetCS = dxCommon_->CompileShader(L"assets/shaders/ResetParticleArgs.CS.hlsl", L"cs_6_0");
-	Microsoft::WRL::ComPtr<IDxcBlob> updateCS = dxCommon_->CompileShader(L"assets/shaders/UpdateParticle.CS.hlsl", L"cs_6_0");
-
-	D3D12_COMPUTE_PIPELINE_STATE_DESC psoDesc{};
-	psoDesc.pRootSignature = computeRootSignature_.Get();
-
-	psoDesc.CS = { initCS->GetBufferPointer(), initCS->GetBufferSize() };
-	hr = device->CreateComputePipelineState(&psoDesc, IID_PPV_ARGS(&initPipelineState_));
-	assert(SUCCEEDED(hr));
-
-	psoDesc.CS = { emitCS->GetBufferPointer(), emitCS->GetBufferSize() };
-	hr = device->CreateComputePipelineState(&psoDesc, IID_PPV_ARGS(&emitPipelineState_));
-	assert(SUCCEEDED(hr));
-
-	psoDesc.CS = { resetCS->GetBufferPointer(), resetCS->GetBufferSize() };
-	hr = device->CreateComputePipelineState(&psoDesc, IID_PPV_ARGS(&resetArgsPipelineState_));
-	assert(SUCCEEDED(hr));
-
-	psoDesc.CS = { updateCS->GetBufferPointer(), updateCS->GetBufferSize() };
-	hr = device->CreateComputePipelineState(&psoDesc, IID_PPV_ARGS(&updatePipelineState_));
-	assert(SUCCEEDED(hr));
-}
-
-void GPUParticleManager::CreateGraphicsPipeline() {
-	auto device = dxCommon_->GetDevice();
-
-	D3D12_ROOT_SIGNATURE_DESC descriptionRootSignature{};
-	descriptionRootSignature.Flags = D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT;
-
-	D3D12_ROOT_PARAMETER rootParameters[3] = {};
-
-	D3D12_DESCRIPTOR_RANGE descriptorRangeSRV[1] = {};
-	descriptorRangeSRV[0].BaseShaderRegister = 0;
-	descriptorRangeSRV[0].NumDescriptors = 2;
-	descriptorRangeSRV[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-	descriptorRangeSRV[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-
-	rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-	rootParameters[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
-	rootParameters[0].DescriptorTable.pDescriptorRanges = descriptorRangeSRV;
-	rootParameters[0].DescriptorTable.NumDescriptorRanges = 1;
-
-	rootParameters[1].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
-	rootParameters[1].ShaderVisibility = D3D12_SHADER_VISIBILITY_VERTEX;
-	rootParameters[1].Descriptor.ShaderRegister = 0;
-
-	D3D12_DESCRIPTOR_RANGE descriptorRangeTex[1] = {};
-	descriptorRangeTex[0].BaseShaderRegister = 0;
-	descriptorRangeTex[0].NumDescriptors = 1;
-	descriptorRangeTex[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV;
-	descriptorRangeTex[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND;
-
-	rootParameters[2].ParameterType = D3D12_ROOT_PARAMETER_TYPE_DESCRIPTOR_TABLE;
-	rootParameters[2].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-	rootParameters[2].DescriptorTable.pDescriptorRanges = descriptorRangeTex;
-	rootParameters[2].DescriptorTable.NumDescriptorRanges = 1;
-
-	D3D12_STATIC_SAMPLER_DESC staticSamplers[1] = {};
-	staticSamplers[0].Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR;
-	staticSamplers[0].AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-	staticSamplers[0].AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-	staticSamplers[0].AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-	staticSamplers[0].ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
-	staticSamplers[0].MaxLOD = D3D12_FLOAT32_MAX;
-	staticSamplers[0].ShaderRegister = 0;
-	staticSamplers[0].ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-
-	descriptionRootSignature.pParameters = rootParameters;
-	descriptionRootSignature.NumParameters = 3;
-	descriptionRootSignature.pStaticSamplers = staticSamplers;
-	descriptionRootSignature.NumStaticSamplers = 1;
-
-	Microsoft::WRL::ComPtr<ID3DBlob> signatureBlob;
-	Microsoft::WRL::ComPtr<ID3DBlob> errorBlob;
-	HRESULT hr = D3D12SerializeRootSignature(&descriptionRootSignature, D3D_ROOT_SIGNATURE_VERSION_1, &signatureBlob, &errorBlob);
-	if (FAILED(hr)) {
-		OutputDebugStringA((char*)errorBlob->GetBufferPointer());
-		assert(false);
-	}
-	hr = device->CreateRootSignature(0, signatureBlob->GetBufferPointer(), signatureBlob->GetBufferSize(), IID_PPV_ARGS(&graphicsRootSignature_));
-	assert(SUCCEEDED(hr));
-
-	D3D12_INPUT_ELEMENT_DESC inputElementDescs[] = {
-		{ "POSITION", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-		{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,       0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-		{ "NORMAL",   0, DXGI_FORMAT_R32G32B32_FLOAT,    0, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-	};
-
-	Microsoft::WRL::ComPtr<IDxcBlob> vsBlob = dxCommon_->CompileShader(L"assets/shaders/GPUParticle.VS.hlsl", L"vs_6_0");
-	Microsoft::WRL::ComPtr<IDxcBlob> psBlob = dxCommon_->CompileShader(L"assets/shaders/GPUParticle.PS.hlsl", L"ps_6_0");
-
-	D3D12_GRAPHICS_PIPELINE_STATE_DESC graphicsPipelineStateDesc{};
-	graphicsPipelineStateDesc.pRootSignature = graphicsRootSignature_.Get();
-	graphicsPipelineStateDesc.InputLayout = { inputElementDescs, _countof(inputElementDescs) };
-	graphicsPipelineStateDesc.VS = { vsBlob->GetBufferPointer(), vsBlob->GetBufferSize() };
-	graphicsPipelineStateDesc.PS = { psBlob->GetBufferPointer(), psBlob->GetBufferSize() };
-	graphicsPipelineStateDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
-	graphicsPipelineStateDesc.RasterizerState.FillMode = D3D12_FILL_MODE_SOLID;
-	graphicsPipelineStateDesc.DepthStencilState.DepthEnable = TRUE;
-	graphicsPipelineStateDesc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
-	graphicsPipelineStateDesc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
-	graphicsPipelineStateDesc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
-	graphicsPipelineStateDesc.NumRenderTargets = 1;
-	graphicsPipelineStateDesc.RTVFormats[0] = dxCommon_->GetRTVFormat();
-	graphicsPipelineStateDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-	graphicsPipelineStateDesc.SampleDesc.Count = 1;
-	graphicsPipelineStateDesc.SampleMask = D3D12_DEFAULT_SAMPLE_MASK;
-
-	for (size_t i = 0; i < static_cast<size_t>(BlendMode::kCountOf); ++i) {
-		graphicsPipelineStateDesc.BlendState = GetBlendDesc(static_cast<BlendMode>(i));
-		hr = device->CreateGraphicsPipelineState(&graphicsPipelineStateDesc, IID_PPV_ARGS(&graphicsPipelineStates_[i]));
-		assert(SUCCEEDED(hr));
-	}
-}
-
-void GPUParticleManager::CreateModel() {
-	vertexBuffer_ = dxCommon_->CreateBufferResource(sizeof(VertexData) * 4);
-
-	vertexBufferView_.BufferLocation = vertexBuffer_->GetGPUVirtualAddress();
-	vertexBufferView_.SizeInBytes = sizeof(VertexData) * 4;
-	vertexBufferView_.StrideInBytes = sizeof(VertexData);
-
-	VertexData* vertexData = nullptr;
-	vertexBuffer_->Map(0, nullptr, reinterpret_cast<void**>(&vertexData));
-
-	vertexData[0] = { {-0.5f, -0.5f, 0.0f, 1.0f}, {0.0f, 1.0f}, {0.0f, 0.0f, -1.0f} };
-	vertexData[1] = { {-0.5f,  0.5f, 0.0f, 1.0f}, {0.0f, 0.0f}, {0.0f, 0.0f, -1.0f} };
-	vertexData[2] = { { 0.5f, -0.5f, 0.0f, 1.0f}, {1.0f, 1.0f}, {0.0f, 0.0f, -1.0f} };
-	vertexData[3] = { { 0.5f,  0.5f, 0.0f, 1.0f}, {1.0f, 0.0f}, {0.0f, 0.0f, -1.0f} };
-}
-
-void GPUParticleManager::CreateCommandSignature() {
-	auto device = dxCommon_->GetDevice();
-
-	D3D12_INDIRECT_ARGUMENT_DESC argDesc = {};
-	argDesc.Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW;
-
-	D3D12_COMMAND_SIGNATURE_DESC cmdSigDesc = {};
-	cmdSigDesc.ByteStride = sizeof(D3D12_DRAW_ARGUMENTS);
-	cmdSigDesc.NumArgumentDescs = 1;
-	cmdSigDesc.pArgumentDescs = &argDesc;
-
-	HRESULT hr = device->CreateCommandSignature(&cmdSigDesc, nullptr, IID_PPV_ARGS(&commandSignature_));
-	assert(SUCCEEDED(hr));
-}
-
 void GPUParticleManager::InitializeParticles() {
 	auto commandList = dxCommon_->GetCommandList();
+	srvManager_->PreDraw();
 
 	commandList->SetPipelineState(initPipelineState_.Get());
 	commandList->SetComputeRootSignature(computeRootSignature_.Get());
@@ -354,13 +91,94 @@ void GPUParticleManager::InitializeParticles() {
 	dxCommon_->UAVBarrier(particleBuffer_.Get());
 	dxCommon_->UAVBarrier(freeListIndexBuffer_.Get());
 	dxCommon_->UAVBarrier(freeListBuffer_.Get());
-	dxCommon_->UAVBarrier(aliveListBuffer_.Get());
+	dxCommon_->UAVBarrier(aliveListAlphaBuffer_.Get());
+	dxCommon_->UAVBarrier(aliveListAddBuffer_.Get());
 	dxCommon_->UAVBarrier(indirectArgsBuffer_.Get());
 }
 
-void GPUParticleManager::EnqueueEmit(const Vector3& position, const ParticleParameters& params, uint32_t count) {
-	if (count == 0u || pendingEmitRequests_.size() >= kMaxEmitRequests) {
+void GPUParticleManager::SetWakeField(uint32_t slot, const GpuWakeField& field) {
+	if (slot >= kMaxWakeFields) {
 		return;
+	}
+	wakeFields_[slot] = field;
+}
+
+void GPUParticleManager::ClearWakeFields() {
+	for (auto& wf : wakeFields_) {
+		wf = GpuWakeField{};
+		wf.active = 0u;
+	}
+}
+
+void GPUParticleManager::EnqueueRichEmit(const GpuParticleEmitDesc& desc) {
+	if (desc.count == 0u) {
+		return;
+	}
+	if (pendingEmitRequests_.size() >= kMaxEmitRequests) {
+		pendingDroppedEmitRequests_++;
+		return;
+	}
+
+	GpuEmitRequest req{};
+	req.origin = desc.origin;
+	req.randomPositionRange = desc.randomPositionRange;
+	req.minVelocity = desc.minVelocity;
+	req.minLifeTime = desc.minLifeTime;
+	req.maxVelocity = desc.maxVelocity;
+	req.maxLifeTime = desc.maxLifeTime;
+	req.acceleration = desc.acceleration;
+	req.maxRiseHeight = desc.maxRiseHeight;
+	req.minColor = desc.minColor;
+	req.maxColor = desc.maxColor;
+	req.minScale = desc.minScale;
+	req.maxScale = desc.maxScale;
+	req.endScale = desc.endScale;
+	req.scaleEasing = desc.scaleEasing;
+	req.minRotation = desc.minRotation;
+	req.maxRotation = desc.maxRotation;
+	req.minRotationSpeed = desc.minRotationSpeed;
+	req.maxRotationSpeed = desc.maxRotationSpeed;
+	req.startOffset = 0u;
+	req.count = desc.count;
+	req.flags = desc.flags;
+	req.seedSalt = seedCounter_++;
+	req.shapeType = static_cast<uint32_t>(desc.shape);
+	req.drag = desc.drag;
+	req.curlStrength = desc.curlStrength;
+	req.curlFrequency = desc.curlFrequency;
+	req.stretchFactor = desc.stretchFactor;
+	req.minTemperature = desc.minTemperature;
+	req.maxTemperature = desc.maxTemperature;
+	req.coolingRate = desc.coolingRate;
+	req.floorY = desc.useCustomFloorY ? desc.floorY : defaultFloorY_;
+	req.restitution = desc.restitution;
+	req.emissiveIntensity = desc.emissiveIntensity;
+	req.softDistance = desc.softDistance;
+	req.emitAxis = desc.emitAxis;
+	req.radialSpeedMin = desc.radialSpeedMin;
+	req.radialSpeedMax = desc.radialSpeedMax;
+	req.ringRadius = desc.ringRadius;
+	req.wakeSensitivity = desc.wakeSensitivity;
+	req.padding0 = 0.0f;
+
+	pendingEmitRequests_.push_back(req);
+}
+
+void GPUParticleManager::EnqueueEmit(const Vector3& position, const ParticleParameters& params, uint32_t count) {
+	if (count == 0u) {
+		return;
+	}
+	if (pendingEmitRequests_.size() >= kMaxEmitRequests) {
+		pendingDroppedEmitRequests_++;
+		return;
+	}
+
+	uint32_t flags = params.fadeOut ? GPUParticleFlags::kFadeOut : GPUParticleFlags::kNone;
+	if (blendMode_ == BlendMode::kAdd || blendMode_ == BlendMode::kScreen) {
+		flags |= GPUParticleFlags::kAdditive;
+	}
+	if (params.isStretched) {
+		flags |= GPUParticleFlags::kStretched;
 	}
 
 	GpuEmitRequest req{};
@@ -384,8 +202,26 @@ void GPUParticleManager::EnqueueEmit(const Vector3& position, const ParticlePara
 	req.maxRotationSpeed = params.maxRotationSpeed;
 	req.startOffset = 0u;
 	req.count = count;
-	req.flags = params.fadeOut ? kParticleFlagFadeOut : 0u;
+	req.flags = flags;
 	req.seedSalt = seedCounter_++;
+	req.shapeType = static_cast<uint32_t>(GPUParticleShape::SoftCircle);
+	req.drag = 0.0f;
+	req.curlStrength = 0.0f;
+	req.curlFrequency = 0.12f;
+	req.stretchFactor = params.stretchFactor;
+	req.minTemperature = 0.0f;
+	req.maxTemperature = 0.0f;
+	req.coolingRate = 0.0f;
+	req.floorY = defaultFloorY_;
+	req.restitution = 0.45f;
+	req.emissiveIntensity = 1.0f;
+	req.softDistance = 3.0f;
+	req.emitAxis = { 0.0f, 1.0f, 0.0f };
+	req.radialSpeedMin = 0.0f;
+	req.radialSpeedMax = 0.0f;
+	req.ringRadius = 0.0f;
+	req.wakeSensitivity = 1.0f;
+	req.padding0 = 0.0f;
 
 	pendingEmitRequests_.push_back(req);
 }
@@ -407,13 +243,21 @@ void GPUParticleManager::ClearAllParticles() {
 	legacyFrequencyTime_ = 0.0f;
 	needsInitializeParticles_ = true;
 	debugInstanceCount_ = 0u;
+	debugAlphaInstanceCount_ = 0u;
+	debugAdditiveInstanceCount_ = 0u;
+	debugFreeListIndex_ = static_cast<int32_t>(kMaxParticles - 1u);
 	lastFrameEmitCount_ = 0u;
+	pendingDroppedEmitRequests_ = 0u;
+	lastFrameDroppedEmitRequests_ = 0u;
 }
 
 void GPUParticleManager::Update() {
 	if (!isInitialized_) {
 		return;
 	}
+
+	// コンピュートディスパッチ前に必ずSRV/UAVディスクリプタヒープをバインド
+	srvManager_->PreDraw();
 
 	if (needsInitializeParticles_) {
 		InitializeParticles();
@@ -424,8 +268,10 @@ void GPUParticleManager::Update() {
 	if (enableReadbackDebug_ && readbackBuffer_) {
 		uint32_t* mappedData = nullptr;
 		if (SUCCEEDED(readbackBuffer_->Map(0, nullptr, reinterpret_cast<void**>(&mappedData)))) {
-			debugInstanceCount_ = mappedData[1];
-			debugFreeListIndex_ = *reinterpret_cast<int32_t*>(&mappedData[4]);
+			debugAlphaInstanceCount_ = mappedData[1];
+			debugAdditiveInstanceCount_ = mappedData[5];
+			debugInstanceCount_ = debugAlphaInstanceCount_ + debugAdditiveInstanceCount_;
+			debugFreeListIndex_ = *reinterpret_cast<int32_t*>(&mappedData[8]);
 			readbackBuffer_->Unmap(0, nullptr);
 		}
 	}
@@ -469,15 +315,33 @@ void GPUParticleManager::Update() {
 	}
 	pendingEmitRequests_.clear();
 	lastFrameEmitCount_ = totalEmitCount;
+	lastFrameDroppedEmitRequests_ = pendingDroppedEmitRequests_;
+	pendingDroppedEmitRequests_ = 0u;
+
+	// アクティブなウェイク場数を集計
+	uint32_t activeWakeCount = 0u;
+	for (uint32_t w = 0u; w < kMaxWakeFields; ++w) {
+		if (wakeFields_[w].active != 0u) {
+			activeWakeCount = w + 1u;
+		}
+	}
 
 	// フレーム別PerFrame CBV更新
-	PerFrame* perFrame = reinterpret_cast<PerFrame*>(perFrameMapped_ + static_cast<size_t>(frameIndex) * kCbAlignment);
+	PerFrame* perFrame = reinterpret_cast<PerFrame*>(perFrameMapped_ + static_cast<size_t>(frameIndex) * kPerFrameCbAlignment);
 	perFrame->time = time_;
 	perFrame->deltaTime = clampedDt;
 	perFrame->requestCount = requestCount;
 	perFrame->totalEmitCount = totalEmitCount;
+	perFrame->ambient = ambientVolume_;
+	for (uint32_t w = 0u; w < kMaxWakeFields; ++w) {
+		perFrame->wakeFields[w] = wakeFields_[w];
+	}
+	perFrame->defaultFloorY = defaultFloorY_;
+	perFrame->activeWakeCount = activeWakeCount;
+	perFrame->globalCurlTimeScale = 1.0f;
+	perFrame->pad0 = 0.0f;
 
-	const D3D12_GPU_VIRTUAL_ADDRESS perFrameGpuAddr = perFrameBuffer_->GetGPUVirtualAddress() + static_cast<size_t>(frameIndex) * kCbAlignment;
+	const D3D12_GPU_VIRTUAL_ADDRESS perFrameGpuAddr = perFrameBuffer_->GetGPUVirtualAddress() + static_cast<size_t>(frameIndex) * kPerFrameCbAlignment;
 	auto commandList = dxCommon_->GetCommandList();
 	commandList->SetComputeRootSignature(computeRootSignature_.Get());
 
@@ -496,7 +360,7 @@ void GPUParticleManager::Update() {
 		dxCommon_->UAVBarrier(freeListBuffer_.Get());
 	}
 
-	// 2. Reset IndirectArgs Pass（複数Updateスレッドグループ間の競合を完全排除）
+	// 2. Reset IndirectArgs Pass（2バケット両方をリセット）
 	commandList->SetPipelineState(resetArgsPipelineState_.Get());
 	srvManager_->SetComputeRootDescriptorTable(0, particleUavIndex_);
 	commandList->SetComputeRootConstantBufferView(1, perFrameGpuAddr);
@@ -514,7 +378,8 @@ void GPUParticleManager::Update() {
 	dxCommon_->UAVBarrier(particleBuffer_.Get());
 	dxCommon_->UAVBarrier(freeListIndexBuffer_.Get());
 	dxCommon_->UAVBarrier(freeListBuffer_.Get());
-	dxCommon_->UAVBarrier(aliveListBuffer_.Get());
+	dxCommon_->UAVBarrier(aliveListAlphaBuffer_.Get());
+	dxCommon_->UAVBarrier(aliveListAddBuffer_.Get());
 	dxCommon_->UAVBarrier(indirectArgsBuffer_.Get());
 }
 
@@ -529,23 +394,43 @@ void GPUParticleManager::Draw(const Matrix4x4& viewProjection, const Matrix4x4& 
 		hasCustomTexture_ = true;
 	}
 
+	const uint32_t depthSrvIndex = dxCommon_->GetDepthSrvIndex();
+	const bool useDepthSoftParticles = (depthSrvIndex != 0u && dxCommon_->GetDepthStencilBuffer() != nullptr);
+
 	const uint32_t frameIndex = dxCommon_->GetCurrentFrameIndex() % kFrameCount;
 	PerView* perView = reinterpret_cast<PerView*>(perViewMapped_ + static_cast<size_t>(frameIndex) * kCbAlignment);
 	perView->viewProjection = viewProjection;
 	perView->billboardMatrix = billboardMatrix;
+	perView->cameraPosition = { billboardMatrix.m[3][0], billboardMatrix.m[3][1], billboardMatrix.m[3][2] };
+	perView->nearClip = cameraNearClip_;
+	perView->farClip = cameraFarClip_;
+	perView->time = time_;
+	perView->hasDepthTexture = useDepthSoftParticles ? 1u : 0u;
+	perView->pad0 = 0.0f;
 
 	auto commandList = dxCommon_->GetCommandList();
-	const size_t blendIdx = static_cast<size_t>(blendMode_);
-	commandList->SetPipelineState(graphicsPipelineStates_[blendIdx].Get());
+	srvManager_->PreDraw();
 	commandList->SetGraphicsRootSignature(graphicsRootSignature_.Get());
 	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
 	commandList->IASetVertexBuffers(0, 1, &vertexBufferView_);
 
-	srvManager_->SetGraphicsRootDescriptorTable(0, particleSrvIndex_);
-	commandList->SetGraphicsRootConstantBufferView(1, perViewBuffer_->GetGPUVirtualAddress() + static_cast<size_t>(frameIndex) * kCbAlignment);
-	srvManager_->SetGraphicsRootDescriptorTable(2, textureSrvIndex_);
+	// 深度バッファをソフトパーティクル読取状態へ遷移
+	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandle = dxCommon_->GetRenderTextureRTVHandle(0);
+	if (useDepthSoftParticles) {
+		D3D12_RESOURCE_BARRIER depthBarrier = {};
+		depthBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+		depthBarrier.Transition.pResource = dxCommon_->GetDepthStencilBuffer();
+		depthBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+		depthBarrier.Transition.StateBefore = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+		depthBarrier.Transition.StateAfter = D3D12_RESOURCE_STATE_DEPTH_READ | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+		commandList->ResourceBarrier(1, &depthBarrier);
 
-	D3D12_RESOURCE_BARRIER barriers[3] = {};
+		D3D12_CPU_DESCRIPTOR_HANDLE readOnlyDsvHandle = dxCommon_->GetReadOnlyDSVHandle();
+		commandList->OMSetRenderTargets(1, &rtvHandle, false, &readOnlyDsvHandle);
+	}
+
+	// GPUパーティクルバッファをDraw用状態へ遷移
+	D3D12_RESOURCE_BARRIER barriers[4] = {};
 
 	barriers[0].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
 	barriers[0].Transition.pResource = indirectArgsBuffer_.Get();
@@ -560,15 +445,36 @@ void GPUParticleManager::Draw(const Matrix4x4& viewProjection, const Matrix4x4& 
 	barriers[1].Transition.StateAfter = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
 
 	barriers[2].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-	barriers[2].Transition.pResource = aliveListBuffer_.Get();
+	barriers[2].Transition.pResource = aliveListAlphaBuffer_.Get();
 	barriers[2].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
 	barriers[2].Transition.StateBefore = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
 	barriers[2].Transition.StateAfter = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
 
-	commandList->ResourceBarrier(3, barriers);
+	barriers[3].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+	barriers[3].Transition.pResource = aliveListAddBuffer_.Get();
+	barriers[3].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+	barriers[3].Transition.StateBefore = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+	barriers[3].Transition.StateAfter = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
 
+	commandList->ResourceBarrier(4, barriers);
+
+	// 共通ルートバインド（深度未設定時は R32_FLOAT Null SRV で型一致させる）
+	srvManager_->SetGraphicsRootDescriptorTable(0, particleSrvIndex_);
+	commandList->SetGraphicsRootConstantBufferView(2, perViewBuffer_->GetGPUVirtualAddress() + static_cast<size_t>(frameIndex) * kCbAlignment);
+	srvManager_->SetGraphicsRootDescriptorTable(3, textureSrvIndex_);
+	srvManager_->SetGraphicsRootDescriptorTable(4, useDepthSoftParticles ? depthSrvIndex : nullDepthSrvIndex_);
+
+	// Pass 1: Normal Alpha バケット（爆煙・ベイパー・吹雪・チャフ等）
+	commandList->SetPipelineState(graphicsPipelineStates_[static_cast<size_t>(BlendMode::kNormal)].Get());
+	srvManager_->SetGraphicsRootDescriptorTable(1, aliveListAlphaSrvIndex_);
 	commandList->ExecuteIndirect(commandSignature_.Get(), 1, indirectArgsBuffer_.Get(), 0, nullptr, 0);
 
+	// Pass 2: Additive HDR バケット（黒体爆炎・閃光・火花・衝撃波等）
+	commandList->SetPipelineState(graphicsPipelineStates_[static_cast<size_t>(BlendMode::kAdd)].Get());
+	srvManager_->SetGraphicsRootDescriptorTable(1, aliveListAddSrvIndex_);
+	commandList->ExecuteIndirect(commandSignature_.Get(), 1, indirectArgsBuffer_.Get(), sizeof(D3D12_DRAW_ARGUMENTS), nullptr, 0);
+
+	// UAV状態へ戻す
 	barriers[0].Transition.StateBefore = D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT;
 	barriers[0].Transition.StateAfter = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
 
@@ -578,7 +484,24 @@ void GPUParticleManager::Draw(const Matrix4x4& viewProjection, const Matrix4x4& 
 	barriers[2].Transition.StateBefore = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
 	barriers[2].Transition.StateAfter = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
 
-	commandList->ResourceBarrier(3, barriers);
+	barriers[3].Transition.StateBefore = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+	barriers[3].Transition.StateAfter = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
+
+	commandList->ResourceBarrier(4, barriers);
+
+	// 深度バッファを通常 DEPTH_WRITE 状態へ復元
+	if (useDepthSoftParticles) {
+		D3D12_RESOURCE_BARRIER depthBarrier = {};
+		depthBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+		depthBarrier.Transition.pResource = dxCommon_->GetDepthStencilBuffer();
+		depthBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+		depthBarrier.Transition.StateBefore = D3D12_RESOURCE_STATE_DEPTH_READ | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+		depthBarrier.Transition.StateAfter = D3D12_RESOURCE_STATE_DEPTH_WRITE;
+		commandList->ResourceBarrier(1, &depthBarrier);
+
+		D3D12_CPU_DESCRIPTOR_HANDLE normalDsvHandle = dxCommon_->GetDSVHandle();
+		commandList->OMSetRenderTargets(1, &rtvHandle, false, &normalDsvHandle);
+	}
 
 	// デバッグ要求時のみGPU→CPU Readbackを実行
 	if (enableReadbackDebug_ && readbackBuffer_) {
@@ -596,8 +519,8 @@ void GPUParticleManager::Draw(const Matrix4x4& viewProjection, const Matrix4x4& 
 		copyBarriers[1].Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_SOURCE;
 		commandList->ResourceBarrier(2, copyBarriers);
 
-		commandList->CopyBufferRegion(readbackBuffer_.Get(), 0, indirectArgsBuffer_.Get(), 0, sizeof(uint32_t) * 4);
-		commandList->CopyBufferRegion(readbackBuffer_.Get(), 16, freeListIndexBuffer_.Get(), 0, sizeof(int32_t));
+		commandList->CopyBufferRegion(readbackBuffer_.Get(), 0, indirectArgsBuffer_.Get(), 0, sizeof(uint32_t) * 8u);
+		commandList->CopyBufferRegion(readbackBuffer_.Get(), sizeof(uint32_t) * 8u, freeListIndexBuffer_.Get(), 0, sizeof(int32_t));
 
 		copyBarriers[0].Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_SOURCE;
 		copyBarriers[0].Transition.StateAfter = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
@@ -605,42 +528,4 @@ void GPUParticleManager::Draw(const Matrix4x4& viewProjection, const Matrix4x4& 
 		copyBarriers[1].Transition.StateAfter = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
 		commandList->ResourceBarrier(2, copyBarriers);
 	}
-}
-
-void GPUParticleManager::DrawImGui() {
-#ifdef USE_IMGUI
-	ImGui::Begin("GPU Particle System");
-
-	if (ImGui::CollapsingHeader("Status", ImGuiTreeNodeFlags_DefaultOpen)) {
-		ImGui::Checkbox("Enable GPU Readback Stats", &enableReadbackDebug_);
-		ImGui::Text("Max Particles: %u", kMaxParticles);
-
-		uint32_t activeParticles = debugInstanceCount_;
-		int32_t freeParticles = debugFreeListIndex_ + 1;
-
-		ImGui::Text("Alive Particles: %u", activeParticles);
-		ImGui::Text("Free Particles: %d", freeParticles);
-
-		float util = static_cast<float>(activeParticles) / static_cast<float>(kMaxParticles);
-		ImGui::ProgressBar(util, ImVec2(0.f, 0.f), std::to_string(activeParticles).c_str());
-	}
-
-	if (ImGui::CollapsingHeader("Emitter Settings", ImGuiTreeNodeFlags_DefaultOpen)) {
-		ImGui::DragFloat3("Translate", &guiEmitTranslate_.x, 0.1f);
-		ImGui::SliderInt("Count", &guiEmitCount_, 1, static_cast<int>(kMaxParticles));
-		ImGui::DragFloat("Radius", &guiEmitRadius_, 0.1f, 0.0f, 50.0f);
-		ImGui::DragFloat("Frequency (s)", &guiEmitFrequency_, 0.01f, 0.0f, 5.0f);
-
-		if (ImGui::Button("Manual Emit")) {
-			SetEmitParams(guiEmitTranslate_, static_cast<uint32_t>(guiEmitCount_), guiEmitRadius_, guiEmitFrequency_);
-			Emit();
-		}
-		ImGui::SameLine();
-		if (ImGui::Button("Clear GPU Particles")) {
-			ClearAllParticles();
-		}
-	}
-
-	ImGui::End();
-#endif
 }

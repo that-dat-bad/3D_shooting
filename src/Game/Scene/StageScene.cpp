@@ -296,6 +296,7 @@ void StageScene::ResetGameplayState() {
 
 	// 武装・弾丸・ミサイル
 	gunpod_.Initialize(gunpodData);
+	lastMuzzleLocalOffset_ = gunpod_.GetLastFiredMuzzleOffset();
 	bulletManager_.Initialize(512);
 
 	flightModel_.ClearPayloads();
@@ -327,8 +328,19 @@ void StageScene::ResetGameplayState() {
 	}
 
 	const auto& mission = missionManager.GetCurrentMission();
-	isFreeFlightMode_ = (loadPath.find("free_flight") != std::string::npos) ||
+	isParticleDemoMode_ = mission.isParticleDemo ||
+		(loadPath.find("particle_demo") != std::string::npos);
+	isFreeFlightMode_ = isParticleDemoMode_ ||
+		(loadPath.find("free_flight") != std::string::npos) ||
 		(mission.name == "Free Flight");
+	particleDemo_.Reset(isParticleDemoMode_);
+	particleDemoCamera_.Reset();
+	if (isFreeFlightMode_) {
+		initialSpeed = 400.0f / 3.6f;
+		throttle_ = 0.8f;
+		flightModel_.SetThrottle(throttle_);
+		flightModel_.SetThrottleInput(throttle_);
+	}
 	if (!isFreeFlightMode_ && loadPath.find("mission_clear_demo") == std::string::npos) {
 		MissionSyncManager::GetInstance()->Initialize();
 		MissionSyncManager::GetInstance()->SetActiveMissionFilePath(loadPath);
@@ -389,9 +401,29 @@ void StageScene::ResetGameplayState() {
 		enableEnemies_ ? mission.groundEnemies : kEmptyGroundEnemies
 	);
 
-	// エフェクトマネージャー初期化＆残存破片のクリア
+	// エフェクトマネージャー初期化＆残存破片・GPUパーティクルのリセット
 	EffectManager::GetInstance()->Initialize();
 	DebrisManager::GetInstance()->Clear();
+	if (GPUParticleManager* gpu = GPUParticleManager::GetInstance(); gpu && gpu->IsInitialized()) {
+		gpu->ClearAllParticles();
+		gpu->ClearWakeFields();
+		gpu->SetDefaultFloorY(0.0f);
+	}
+	countermeasures_.Reset(60);
+	aeroVapor_.Reset();
+	ambientWeather_.Reset(AmbientWeatherSystem::WeatherPreset::IceDust);
+
+	// 地形標高連動のGPU多段階爆発フックを登録
+	EffectManager::GetInstance()->SetDestroyEffectHook([this](const Vector3& pos) {
+		float floorY = 0.0f;
+		if (!isFreeFlightMode_ && terrainChunkManager_ && terrainChunkManager_->IsLoaded()) {
+			const auto surf = terrainChunkManager_->QuerySurfaceAt(pos.x, pos.z, -485.0f);
+			floorY = (surf.type == TerrainChunkManager::SurfaceType::Water)
+				? (std::max)(surf.landY, surf.waterY)
+				: surf.landY;
+		}
+		GpuExplosionEmitter::EmitMultiStage(pos, floorY, 1.0f, GpuExplosionEmitter::ScalePreset::Tactical);
+	});
 
 	// ゲーム状態リセット
 	isMissionCleared_ = false;
@@ -442,6 +474,10 @@ void StageScene::ResetGameplayState() {
 	if (mission.isClearAutoDemo) {
 		combatBootSequence_.SetQuickMode(false);
 		combatBootSequence_.SetAutoAdvanceDelay(1.8f);
+		GameResult::GetInstance().isRetry = false;
+	} else if (isParticleDemoMode_) {
+		combatBootSequence_.SetQuickMode(true);
+		combatBootSequence_.SetAutoAdvanceDelay(0.0f);
 		GameResult::GetInstance().isRetry = false;
 	} else if (GameResult::GetInstance().isRetry) {
 		combatBootSequence_.SetQuickMode(true);
@@ -784,6 +820,14 @@ void StageScene::DrawUI() {
 }
 
 void StageScene::Finalize() {
+	EffectManager::GetInstance()->SetDestroyEffectHook(nullptr);
+	if (GPUParticleManager* gpu = GPUParticleManager::GetInstance(); gpu && gpu->IsInitialized()) {
+		gpu->ClearAllParticles();
+		gpu->ClearWakeFields();
+		GpuAmbientVolume offVol{};
+		offVol.active = 0u;
+		gpu->SetAmbientVolume(offVol);
+	}
 	MissionSyncManager::GetInstance()->Finalize();
 	MissionManager::GetInstance().BindEnemyManager(nullptr);
 #ifdef _DEBUG

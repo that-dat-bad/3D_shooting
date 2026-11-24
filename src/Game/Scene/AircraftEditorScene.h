@@ -102,6 +102,8 @@ private:
 	bool showSubColliders_ = false;
 	bool showPylons_ = true;
 	bool showNozzleGizmo_ = true;
+	bool showGunMuzzles_ = true;
+	int selectedMuzzleIndex_ = 0;
 	int highlightedColliderIndex_ = -1;
 	int highlightedMeshPartIndex_ = -1;
 	MeshHitResult lastRaycastHit_{};

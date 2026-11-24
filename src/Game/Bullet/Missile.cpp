@@ -6,6 +6,7 @@
 #include "../Environment/TerrainChunkManager.h"
 #include "../../engine/Graphics/Particle/EffectManager.h"
 #include "../../engine/Graphics/Particle/ParticleManager.h"
+#include "../../engine/Graphics/Particle/GPUParticleManager.h"
 
 using namespace MyMath;
 
@@ -162,72 +163,153 @@ void Missile::Update(float dt, TerrainChunkManager* terrain) {
 
 void Missile::EmitTrailParticles() {
 	ParticleManager* pm = ParticleManager::GetInstance();
-	if (!pm) {
-		return;
-	}
+	GPUParticleManager* gpu = GPUParticleManager::GetInstance();
+	const bool useGpu = (gpu && gpu->IsInitialized());
 
 	const Vector3 moveDelta = Subtract(position_, prevPosition_);
 	const float moveDist = Length(moveDelta);
-	const int steps = std::clamp(static_cast<int>(std::ceil(moveDist / 1.5f)), 1, 12);
 
 	if (isMotorBurning_) {
-		ParticleParameters smokeParams{};
-		smokeParams.minVelocity = { -1.2f, -0.8f, -1.2f };
-		smokeParams.maxVelocity = {  1.2f,  1.4f,  1.2f };
-		smokeParams.randomPositionRange = 0.25f;
-		smokeParams.minColor = { 0.86f, 0.88f, 0.90f, 0.72f };
-		smokeParams.maxColor = { 0.96f, 0.97f, 0.98f, 0.88f };
-		smokeParams.minLifeTime = 2.2f;
-		smokeParams.maxLifeTime = 3.4f;
-		smokeParams.minScale = 0.55f;
-		smokeParams.maxScale = 0.95f;
-		smokeParams.endScale = 4.2f;
-		smokeParams.fadeOut = true;
-		smokeParams.scaleEasing = 0.45f;
-		smokeParams.minRotation = 0.0f;
-		smokeParams.maxRotation = 6.283185f;
-		smokeParams.minRotationSpeed = -1.2f;
-		smokeParams.maxRotationSpeed = 1.2f;
+		if (useGpu) {
+			// 隙間なく連なる高密度ロケット噴煙コア（GPU VaporMist + CurlNoise）
+			const int steps = std::clamp(static_cast<int>(std::ceil(moveDist / 0.55f)), 1, 20);
+			for (int i = 0; i < steps; ++i) {
+				const float t = (static_cast<float>(i) + 0.5f) / static_cast<float>(steps);
+				const Vector3 samplePos = Subtract(Lerp(prevPosition_, position_, t), Multiply(1.45f, forward_));
 
-		for (int i = 0; i < steps; ++i) {
-			const float t = (static_cast<float>(i) + 0.5f) / static_cast<float>(steps);
-			const Vector3 samplePos = Subtract(Lerp(prevPosition_, position_, t), Multiply(1.3f, forward_));
-			pm->Emit("ExplosionSmoke", samplePos, smokeParams, 1);
+				GpuParticleEmitDesc core{};
+				core.origin = samplePos;
+				core.randomPositionRange = 0.14f;
+				core.minVelocity = Add(Multiply(-10.0f, forward_), { -0.8f, -0.5f, -0.8f });
+				core.maxVelocity = Add(Multiply(-4.0f, forward_), { 0.8f, 1.0f, 0.8f });
+				core.minLifeTime = 2.4f;
+				core.maxLifeTime = 3.8f;
+				core.minScale = 0.36f;
+				core.maxScale = 0.62f;
+				core.endScale = 3.4f;
+				core.scaleEasing = 0.45f;
+				core.minColor = { 0.86f, 0.88f, 0.92f, 0.52f };
+				core.maxColor = { 0.98f, 0.99f, 1.00f, 0.70f };
+				core.count = 1u;
+				core.flags = GPUParticleFlags::kFadeOut | GPUParticleFlags::kCurlNoise |
+				             GPUParticleFlags::kSoftParticle | GPUParticleFlags::kWorldUnitsPerSec;
+				core.shape = GPUParticleShape::VaporMist;
+				core.drag = 2.2f;
+				core.curlStrength = 4.2f;
+				core.curlFrequency = 0.25f;
+				core.softDistance = 2.0f;
+				gpu->EnqueueRichEmit(core);
+
+				// 外側に広がって長く漂う拡散煙
+				if ((i % 2) == 0) {
+					GpuParticleEmitDesc outer{};
+					outer.origin = samplePos;
+					outer.randomPositionRange = 0.32f;
+					outer.minVelocity = { -1.6f, -0.6f, -1.6f };
+					outer.maxVelocity = {  1.6f,  1.8f,  1.6f };
+					outer.minLifeTime = 3.2f;
+					outer.maxLifeTime = 4.8f;
+					outer.minScale = 0.72f;
+					outer.maxScale = 1.15f;
+					outer.endScale = 5.6f;
+					outer.scaleEasing = 0.55f;
+					outer.minColor = { 0.72f, 0.75f, 0.80f, 0.24f };
+					outer.maxColor = { 0.88f, 0.90f, 0.94f, 0.36f };
+					outer.count = 1u;
+					outer.flags = GPUParticleFlags::kFadeOut | GPUParticleFlags::kCurlNoise |
+					              GPUParticleFlags::kSoftParticle | GPUParticleFlags::kWorldUnitsPerSec;
+					outer.shape = GPUParticleShape::SmokeCloud;
+					outer.drag = 1.6f;
+					outer.curlStrength = 5.0f;
+					outer.curlFrequency = 0.18f;
+					outer.softDistance = 2.5f;
+					gpu->EnqueueRichEmit(outer);
+				}
+			}
+		} else if (pm) {
+			const int steps = std::clamp(static_cast<int>(std::ceil(moveDist / 1.5f)), 1, 12);
+			ParticleParameters smokeParams{};
+			smokeParams.minVelocity = { -1.2f, -0.8f, -1.2f };
+			smokeParams.maxVelocity = {  1.2f,  1.4f,  1.2f };
+			smokeParams.randomPositionRange = 0.25f;
+			smokeParams.minColor = { 0.86f, 0.88f, 0.90f, 0.72f };
+			smokeParams.maxColor = { 0.96f, 0.97f, 0.98f, 0.88f };
+			smokeParams.minLifeTime = 2.2f;
+			smokeParams.maxLifeTime = 3.4f;
+			smokeParams.minScale = 0.55f;
+			smokeParams.maxScale = 0.95f;
+			smokeParams.endScale = 4.2f;
+			smokeParams.fadeOut = true;
+			smokeParams.scaleEasing = 0.45f;
+			smokeParams.minRotation = 0.0f;
+			smokeParams.maxRotation = 6.283185f;
+			smokeParams.minRotationSpeed = -1.2f;
+			smokeParams.maxRotationSpeed = 1.2f;
+
+			for (int i = 0; i < steps; ++i) {
+				const float t = (static_cast<float>(i) + 0.5f) / static_cast<float>(steps);
+				const Vector3 samplePos = Subtract(Lerp(prevPosition_, position_, t), Multiply(1.3f, forward_));
+				pm->Emit("ExplosionSmoke", samplePos, smokeParams, 1);
+			}
 		}
 
-		// ノズル噴射炎
-		ParticleParameters fireParams{};
-		const Vector3 nozzlePos = Subtract(position_, Multiply(1.45f, forward_));
-		fireParams.minVelocity = Multiply(-18.0f, forward_);
-		fireParams.maxVelocity = Multiply(-8.0f, forward_);
-		fireParams.randomPositionRange = 0.08f;
-		fireParams.minColor = { 1.0f, 0.55f, 0.12f, 0.95f };
-		fireParams.maxColor = { 1.0f, 0.95f, 0.60f, 1.00f };
-		fireParams.minLifeTime = 0.04f;
-		fireParams.maxLifeTime = 0.09f;
-		fireParams.minScale = 0.45f;
-		fireParams.maxScale = 0.75f;
-		fireParams.endScale = 0.10f;
-		fireParams.fadeOut = true;
-		pm->Emit("ExplosionFire", nozzlePos, fireParams, 2);
+		// ノズル噴射炎＋高温排気コア
+		if (pm) {
+			ParticleParameters fireParams{};
+			const Vector3 nozzlePos = Subtract(position_, Multiply(1.45f, forward_));
+			fireParams.minVelocity = Multiply(-18.0f, forward_);
+			fireParams.maxVelocity = Multiply(-8.0f, forward_);
+			fireParams.randomPositionRange = 0.08f;
+			fireParams.minColor = { 1.0f, 0.55f, 0.12f, 0.95f };
+			fireParams.maxColor = { 1.0f, 0.95f, 0.60f, 1.00f };
+			fireParams.minLifeTime = 0.04f;
+			fireParams.maxLifeTime = 0.09f;
+			fireParams.minScale = 0.45f;
+			fireParams.maxScale = 0.75f;
+			fireParams.endScale = 0.10f;
+			fireParams.fadeOut = true;
+			pm->Emit("ExplosionFire", nozzlePos, fireParams, 2);
+		}
 	} else if (elapsedTime_ > spec_.initialBoostDelay) {
 		// 燃焼終了後の慣性滑空時は薄い尾煙のみ残す
-		ParticleParameters glideSmoke{};
-		glideSmoke.minVelocity = { -0.5f, -0.4f, -0.5f };
-		glideSmoke.maxVelocity = {  0.5f,  0.6f,  0.5f };
-		glideSmoke.randomPositionRange = 0.15f;
-		glideSmoke.minColor = { 0.75f, 0.77f, 0.80f, 0.22f };
-		glideSmoke.maxColor = { 0.85f, 0.87f, 0.90f, 0.32f };
-		glideSmoke.minLifeTime = 0.8f;
-		glideSmoke.maxLifeTime = 1.4f;
-		glideSmoke.minScale = 0.35f;
-		glideSmoke.maxScale = 0.55f;
-		glideSmoke.endScale = 1.6f;
-		glideSmoke.fadeOut = true;
-		glideSmoke.scaleEasing = 0.5f;
-
-		if (steps >= 1) {
-			const Vector3 tailPos = Subtract(position_, Multiply(1.3f, forward_));
+		const Vector3 tailPos = Subtract(position_, Multiply(1.3f, forward_));
+		if (useGpu) {
+			GpuParticleEmitDesc glide{};
+			glide.origin = tailPos;
+			glide.randomPositionRange = 0.18f;
+			glide.minVelocity = { -0.5f, -0.4f, -0.5f };
+			glide.maxVelocity = {  0.5f,  0.6f,  0.5f };
+			glide.minLifeTime = 0.9f;
+			glide.maxLifeTime = 1.5f;
+			glide.minScale = 0.30f;
+			glide.maxScale = 0.50f;
+			glide.endScale = 1.8f;
+			glide.scaleEasing = 0.50f;
+			glide.minColor = { 0.78f, 0.80f, 0.84f, 0.16f };
+			glide.maxColor = { 0.88f, 0.90f, 0.94f, 0.24f };
+			glide.count = 1u;
+			glide.flags = GPUParticleFlags::kFadeOut | GPUParticleFlags::kCurlNoise |
+			              GPUParticleFlags::kSoftParticle | GPUParticleFlags::kWorldUnitsPerSec;
+			glide.shape = GPUParticleShape::VaporMist;
+			glide.drag = 2.0f;
+			glide.curlStrength = 2.2f;
+			glide.curlFrequency = 0.22f;
+			glide.softDistance = 1.6f;
+			gpu->EnqueueRichEmit(glide);
+		} else if (pm) {
+			ParticleParameters glideSmoke{};
+			glideSmoke.minVelocity = { -0.5f, -0.4f, -0.5f };
+			glideSmoke.maxVelocity = {  0.5f,  0.6f,  0.5f };
+			glideSmoke.randomPositionRange = 0.15f;
+			glideSmoke.minColor = { 0.75f, 0.77f, 0.80f, 0.22f };
+			glideSmoke.maxColor = { 0.85f, 0.87f, 0.90f, 0.32f };
+			glideSmoke.minLifeTime = 0.8f;
+			glideSmoke.maxLifeTime = 1.4f;
+			glideSmoke.minScale = 0.35f;
+			glideSmoke.maxScale = 0.55f;
+			glideSmoke.endScale = 1.6f;
+			glideSmoke.fadeOut = true;
+			glideSmoke.scaleEasing = 0.5f;
 			pm->Emit("ExplosionSmoke", tailPos, glideSmoke, 1);
 		}
 	}

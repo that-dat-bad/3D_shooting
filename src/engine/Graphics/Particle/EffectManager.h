@@ -5,9 +5,11 @@
 #include <vector>
 #include <unordered_map>
 #include <cstdint>
+#include <functional>
 #include "../base/Math/MyMath.h"
 #include "../System/BlendMode.h"
 #include "../Model/PrimitiveModel.h"
+#include "EffectGpuPresetBridge.h"
 #include "ParticleManager.h"
 #include "GPUParticleManager.h"
 #include "../Camera/CameraManager.h"
@@ -30,6 +32,7 @@ struct EffectParticleLayer {
 	uint32_t emitCount = 3u;
 	bool useGpu = false;
 	ParticleParameters params{};
+	EffectGpuRichParams gpuRich{};
 };
 
 // エフェクト設定データ
@@ -263,6 +266,8 @@ public:
 	// 破壊エフェクト発生
 	// position: 発生座標
 	void EmitDestroyEffect(const Vector3& position);
+	// 破壊エフェクト発生時の外部GPU演出フック登録（nullptrで解除）
+	void SetDestroyEffectHook(std::function<void(const Vector3&)> hook) { destroyEffectHook_ = std::move(hook); }
 	// マズルフラッシュ発生
 	// position: 発生座標
 	void EmitMuzzleFlash(const Vector3& position, const Vector3& direction);
@@ -312,6 +317,7 @@ private:
 	std::vector<std::unique_ptr<EffectHandle>> handles_;
 	bool isInitialized_ = false;
 	bool gpuUpdatePaused_ = false;
+	std::function<void(const Vector3&)> destroyEffectHook_;
 
 #ifdef USE_IMGUI
 	int selectedPresetIndex_ = 0;

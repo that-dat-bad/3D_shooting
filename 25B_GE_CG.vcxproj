@@ -282,7 +282,9 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="src\engine\Debug\UIEditorWindow.h" />
     <ClInclude Include="src\engine\Graphics\Particle\ParticleEmitter.h" />
     <ClInclude Include="src\engine\Graphics\Particle\ParticleManager.h" />
+    <ClInclude Include="src\engine\Graphics\Particle\GPUParticleTypes.h" />
     <ClInclude Include="src\engine\Graphics\Particle\GPUParticleManager.h" />
+    <ClInclude Include="src\engine\Graphics\Particle\EffectGpuPresetBridge.h" />
     <ClInclude Include="src\engine\Graphics\Particle\EffectManager.h" />
     <ClInclude Include="src\engine\Graphics\Camera\Camera.h" />
     <ClInclude Include="src\engine\Graphics\Camera\CameraManager.h" />
@@ -384,8 +386,16 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="src\Game\UI\RadioCommunicator.h" />
     <ClInclude Include="src\Game\UI\InfoUI.h" />
     <ClInclude Include="src\Game\Mission\MissionSyncManager.h" />
+    <ClInclude Include="src\Game\Mission\ParticleDemoController.h" />
+    <ClInclude Include="src\Game\Camera\ParticleDemoCamera.h" />
     <ClInclude Include="src\Game\Scene\EffectEditorScene.h" />
     <ClInclude Include="src\Game\Scene\AircraftEditorScene.h" />
+    <ClInclude Include="src\Game\Effect\GpuExplosionEmitter.h" />
+    <ClInclude Include="src\Game\Effect\CountermeasureSystem.h" />
+    <ClInclude Include="src\Game\Effect\AeroVaporSystem.h" />
+    <ClInclude Include="src\Game\Effect\AmbientWeatherSystem.h" />
+    <ClInclude Include="src\Game\Effect\VirtualFlybyJet.h" />
+    <ClInclude Include="src\Game\Effect\ParticleContestShowcase.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\Game\Graphics\AircraftVisualModel.cpp" />
@@ -420,6 +430,8 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="src\engine\Graphics\Particle\ParticleEmitter.cpp" />
     <ClCompile Include="src\engine\Graphics\Particle\ParticleManager.cpp" />
     <ClCompile Include="src\engine\Graphics\Particle\GPUParticleManager.cpp" />
+    <ClCompile Include="src\engine\Graphics\Particle\GPUParticleManager_Pipeline.cpp" />
+    <ClCompile Include="src\engine\Graphics\Particle\EffectGpuPresetBridge.cpp" />
     <ClCompile Include="src\engine\Graphics\Particle\EffectManager.cpp" />
     <ClCompile Include="src\engine\Graphics\Camera\Camera.cpp" />
     <ClCompile Include="src\engine\Graphics\Camera\CameraManager.cpp" />
@@ -528,9 +540,17 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="src\Game\UI\RadioCommunicator.cpp" />
     <ClCompile Include="src\Game\UI\InfoUI.cpp" />
     <ClCompile Include="src\Game\Mission\MissionSyncManager.cpp" />
+    <ClCompile Include="src\Game\Mission\ParticleDemoController.cpp" />
+    <ClCompile Include="src\Game\Camera\ParticleDemoCamera.cpp" />
     <ClCompile Include="src\Game\Scene\EffectEditorScene.cpp" />
     <ClCompile Include="src\Game\Scene\AircraftEditorScene.cpp" />
     <ClCompile Include="src\Game\Scene\AircraftEditorScene_UI.cpp" />
+    <ClCompile Include="src\Game\Effect\GpuExplosionEmitter.cpp" />
+    <ClCompile Include="src\Game\Effect\CountermeasureSystem.cpp" />
+    <ClCompile Include="src\Game\Effect\AeroVaporSystem.cpp" />
+    <ClCompile Include="src\Game\Effect\AmbientWeatherSystem.cpp" />
+    <ClCompile Include="src\Game\Effect\VirtualFlybyJet.cpp" />
+    <ClCompile Include="src\Game\Effect\ParticleContestShowcase.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="external\imgui\LICENSE.txt" />

@@ -54,7 +54,8 @@ enum class AIType {
 	FollowWaypoint,
 	AllyWingman,
 	CanyonDrone,
-	CanyonWesternFighter
+	CanyonWesternFighter,
+	BarrageBalloon
 };
 
 enum class TypeBState {
@@ -89,7 +90,8 @@ public:
 		FlightModel* playerFlightModel,
 		BulletManager* bulletManager,
 		AIType aiType = AIType::ChaseAttack,
-		const std::string& behaviorTreeJson = ""
+		const std::string& behaviorTreeJson = "",
+		const std::string& colliderModelPath = ""
 	);
 
 	// 更新
@@ -278,6 +280,7 @@ private:
 	// AI設定・ステート
 	AIType aiType_ = AIType::ChaseAttack;
 	TypeBState typeBState_ = TypeBState::Cruising;
+	MyMath::Vector3 anchoredPosition_{};
 	MyMath::Vector3 cruiseDirection_ = { 0.0f, 0.0f, 1.0f };
 	std::vector<Waypoint> waypointPoints_;
 	bool waypointIsLoop_ = false;

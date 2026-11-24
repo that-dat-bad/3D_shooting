@@ -32,6 +32,7 @@ struct GameResult {
 	bool isRetry = false;           // リトライ出撃か
 	bool isHalcyonDaysTutorial = false; // Operation Halcyon Days チュートリアルクリアか
 	bool isClearAutoDemo = false;       // クリア画面自動デモ再生フラグ
+	bool hideClearTerrain = false;      // クリア画面の背景地形を非表示にするフラグ
 	GameOverReason gameOverReason = GameOverReason::Destroyed; // 失敗要因
 	TitleEntryReason titleEntryReason = TitleEntryReason::InitialBoot; // タイトル画面への突入理由
 	std::vector<TrajectorySample> flightTrajectory; // ステージ中のプレイヤー飛行軌跡
@@ -47,6 +48,7 @@ struct GameResult {
 		isRetry = false;
 		isHalcyonDaysTutorial = false;
 		isClearAutoDemo = false;
+		hideClearTerrain = false;
 		gameOverReason = GameOverReason::Destroyed;
 		titleEntryReason = TitleEntryReason::InitialBoot;
 		flightTrajectory.clear();

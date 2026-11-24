@@ -1,6 +1,6 @@
 {
     "name": "Free Flight",
-    "description": "Unrestricted flight operations over Sector 07. Enjoy aerobatics and scenic cruising without combat threats or time limits.",
+    "description": "Unrestricted flight operations over Sector 07 with stationary barrage balloons, non-hostile target drones, and ground structures for missile & gunnery testing.",
     "playerHP": 100.0,
     "playerPosition": {
         "x": 0.0,
@@ -8,9 +8,75 @@
         "z": 0.0
     },
     "timeLimit": 0.0,
-    "enemies": [],
-    "groundEnemies": [],
+    "enemies": [
+        {
+            "position": { "x": 0.0, "y": 190.0, "z": 850.0 },
+            "modelPath": "Resources/models/barrage_balloon.gltf",
+            "health": 80.0,
+            "aiType": "BarrageBalloon",
+            "waypointPathName": ""
+        },
+        {
+            "position": { "x": -220.0, "y": 230.0, "z": 1150.0 },
+            "modelPath": "Resources/models/barrage_balloon.gltf",
+            "health": 80.0,
+            "aiType": "BarrageBalloon",
+            "waypointPathName": ""
+        },
+        {
+            "position": { "x": 220.0, "y": 210.0, "z": 1300.0 },
+            "modelPath": "Resources/models/barrage_balloon.gltf",
+            "health": 80.0,
+            "aiType": "BarrageBalloon",
+            "waypointPathName": ""
+        },
+        {
+            "position": { "x": 0.0, "y": 260.0, "z": 1650.0 },
+            "modelPath": "Resources/models/barrage_balloon.gltf",
+            "health": 80.0,
+            "aiType": "BarrageBalloon",
+            "waypointPathName": ""
+        },
+        {
+            "position": { "x": -320.0, "y": 260.0, "z": 1450.0 },
+            "modelPath": "Resources/models/m15.gltf",
+            "health": 80.0,
+            "aiType": "FollowWaypoint",
+            "waypointPathName": "TargetOrbitA",
+            "behaviorTree": {
+                "useCustomParamsOnly": true,
+                "overrideParams": {
+                    "engageDist": 0.0,
+                    "fireRange": 0.0,
+                    "patrolThrottle": 0.62
+                }
+            }
+        }
+    ],
+    "groundEnemies": [
+        {
+            "position": { "x": -180.0, "y": 0.0, "z": 1150.0 },
+            "aiType": "Structure",
+            "health": 80.0
+        },
+        {
+            "position": { "x": 220.0, "y": 0.0, "z": 1750.0 },
+            "aiType": "Structure",
+            "health": 80.0
+        }
+    ],
     "objectives": [],
     "triggers": [],
-    "waypointPaths": []
+    "waypointPaths": [
+        {
+            "name": "TargetOrbitA",
+            "isLoop": true,
+            "points": [
+                { "x": -550.0, "y": 260.0, "z": 950.0 },
+                { "x": 550.0, "y": 260.0, "z": 950.0 },
+                { "x": 550.0, "y": 260.0, "z": 2100.0 },
+                { "x": -550.0, "y": 260.0, "z": 2100.0 }
+            ]
+        }
+    ]
 }

@@ -24,6 +24,7 @@ namespace MyMath {
 struct EnemySpawnData {
 	MyMath::Vector3 position{};
 	std::string modelPath = "";
+	std::string colliderModelPath = "";
 	float health = 50.0f;
 	AIType aiType = AIType::ChaseAttack;
 	std::string waypointPathName = "";
@@ -46,6 +47,7 @@ inline void to_json(nlohmann::json& j, const EnemySpawnData& e) {
 	else if (e.aiType == AIType::AllyWingman) aiStr = "AllyWingman";
 	else if (e.aiType == AIType::CanyonDrone) aiStr = "CanyonDrone";
 	else if (e.aiType == AIType::CanyonWesternFighter) aiStr = "CanyonWesternFighter";
+	else if (e.aiType == AIType::BarrageBalloon) aiStr = "BarrageBalloon";
 
 	j = nlohmann::json{
 		{"position", e.position},
@@ -54,6 +56,9 @@ inline void to_json(nlohmann::json& j, const EnemySpawnData& e) {
 		{"aiType", aiStr},
 		{"waypointPathName", e.waypointPathName}
 	};
+	if (!e.colliderModelPath.empty()) {
+		j["colliderModelPath"] = e.colliderModelPath;
+	}
 
 	if (!e.behaviorTreeJson.empty()) {
 		try {
@@ -67,6 +72,7 @@ inline void to_json(nlohmann::json& j, const EnemySpawnData& e) {
 inline void from_json(const nlohmann::json& j, EnemySpawnData& e) {
 	if (j.contains("position")) j.at("position").get_to(e.position);
 	if (j.contains("modelPath")) j.at("modelPath").get_to(e.modelPath);
+	if (j.contains("colliderModelPath")) j.at("colliderModelPath").get_to(e.colliderModelPath);
 	if (j.contains("health")) j.at("health").get_to(e.health);
 
 	std::string aiStr = "ChaseAttack";
@@ -83,6 +89,8 @@ inline void from_json(const nlohmann::json& j, EnemySpawnData& e) {
 		e.aiType = AIType::CanyonDrone;
 	} else if (aiStr == "CanyonWesternFighter") {
 		e.aiType = AIType::CanyonWesternFighter;
+	} else if (aiStr == "BarrageBalloon") {
+		e.aiType = AIType::BarrageBalloon;
 	} else {
 		e.aiType = AIType::ChaseAttack;
 	}

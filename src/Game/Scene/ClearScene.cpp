@@ -245,7 +245,7 @@ void ClearScene::Initialize() {
 	UpdateTacticalCamera();
 
 	auto* tcm = TerrainChunkManager::GetInstance();
-	if (tcm) {
+	if (tcm && !result.hideClearTerrain) {
 		if (!tcm->IsLoaded()) {
 			tcm->Initialize(Object3dCommon::GetInstance(), &tacticalCam_, result.terrainPath);
 		}
@@ -354,7 +354,8 @@ void ClearScene::Update() {
 	}
 
 	UpdateTacticalCamera();
-	if (auto* tcm = TerrainChunkManager::GetInstance(); tcm && tcm->IsLoaded()) {
+	if (auto* tcm = TerrainChunkManager::GetInstance();
+	    tcm && tcm->IsLoaded() && !GameResult::GetInstance().hideClearTerrain) {
 		tcm->SetCamera(&tacticalCam_);
 		tcm->Update(trajCenter_, &tacticalCam_);
 	}
@@ -378,6 +379,14 @@ void ClearScene::Update() {
 		if (sceneID != SCENE::CLEAR) {
 			return;
 		}
+	}
+
+	// パーティクルデモ時はクリア画面表示後に自動でリトライへ移行
+	if (GameResult::GetInstance().hideClearTerrain &&
+	    !isRewinding_ &&
+	    !isUploading_ &&
+	    animTimer_ >= 3.5f) {
+		replayButton_.Click();
 	}
 
 	// VHS巻き戻し演出
@@ -561,7 +570,8 @@ void ClearScene::DrawTacticalAircraftMarker(
 
 void ClearScene::Draw() {
 	// 1. 3D等高線地形 + プレイヤー飛行軌跡の描画
-	if (auto* tcm = TerrainChunkManager::GetInstance(); tcm && tcm->IsLoaded()) {
+	if (auto* tcm = TerrainChunkManager::GetInstance();
+	    tcm && tcm->IsLoaded() && !GameResult::GetInstance().hideClearTerrain) {
 		tcm->DrawContourMap(&tacticalCam_);
 	}
 
@@ -617,7 +627,7 @@ void ClearScene::Draw() {
 				if (i <= activeSegIdx) {
 					prim->DrawLine3D(a, b, trajCol, &tacticalCam_);
 					prim->DrawLine3D({ a.x, a.y + 4.0f, a.z }, { b.x, b.y + 4.0f, b.z }, trajCol, &tacticalCam_);
-					if (tcm && tcm->IsLoaded()) {
+					if (tcm && tcm->IsLoaded() && !GameResult::GetInstance().hideClearTerrain) {
 						float ga = tcm->GetTerrainHeightAt(a.x, a.z, 0.0f) + 5.0f;
 						float gb = tcm->GetTerrainHeightAt(b.x, b.z, 0.0f) + 5.0f;
 						prim->DrawLine3D({ a.x, ga, a.z }, { b.x, gb, b.z }, trajGroundCol, &tacticalCam_);
@@ -631,7 +641,9 @@ void ClearScene::Draw() {
 			}
 		}
 
-		float groundY = (tcm && tcm->IsLoaded()) ? tcm->GetTerrainHeightAt(curPos.x, curPos.z, 0.0f) : 0.0f;
+		float groundY = (tcm && tcm->IsLoaded() && !GameResult::GetInstance().hideClearTerrain)
+			? tcm->GetTerrainHeightAt(curPos.x, curPos.z, 0.0f)
+			: 0.0f;
 		DrawTacticalAircraftMarker(prim, curPos, curForward, curUp, groundY, playerGreen);
 	}
 

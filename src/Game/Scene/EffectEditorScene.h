@@ -6,6 +6,7 @@
 #include "../../engine/base/Math/MyMath.h"
 #include "../../engine/Graphics/Model/Skybox.h"
 #include "../../engine/Graphics/Particle/EffectManager.h"
+#include "../Effect/ParticleContestShowcase.h"
 
 // エフェクトエディタシーン
 class EffectEditorScene : public IScene {
@@ -28,6 +29,7 @@ private:
 	bool showHeightLimitGuide_ = true;
 	bool simulateConditionTrue_ = false;
 	uint32_t whiteTexIndex_ = 0;
+	ParticleContestShowcase contestShowcase_;
 };
 
 #endif // USE_IMGUI

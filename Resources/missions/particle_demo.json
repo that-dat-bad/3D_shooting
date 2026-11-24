@@ -1,0 +1,44 @@
+{
+    "name": "PARTICLE DEMO -パーティクル総合実演-",
+    "aliasName": "DEMO 02",
+    "subTitle": "自動飛行・兵装・ベイパー・墜落デモ",
+    "difficulty": "DEMO",
+    "areaName": "SECTOR 07 // PARTICLE SHOWCASE",
+    "description": "会話なしのフリーフライト空域で、自動飛行・アフターバーナー・翼端ベイパー・機銃掃射・ミサイル発射・フレア放出・最終自機撃墜演出を自動実演し、ミッション完了となります。",
+    "playerHP": 100.0,
+    "playerPosition": {
+        "x": 0.0,
+        "y": 150.0,
+        "z": 0.0
+    },
+    "playerYawDeg": 0.0,
+    "timeLimit": 0.0,
+    "minAmmoReserve": 200,
+    "fadeOutOnClear": false,
+    "isTutorialDebrief": false,
+    "isClearAutoDemo": false,
+    "isParticleDemo": true,
+    "disableGenericRadio": true,
+    "enemies": [
+        {
+            "position": { "x": 0.0, "y": 175.0, "z": 950.0 },
+            "modelPath": "Resources/models/barrage_balloon.gltf",
+            "colliderModelPath": "Resources/models/barrage_balloon_col.gltf",
+            "health": 60.0,
+            "aiType": "BarrageBalloon",
+            "waypointPathName": ""
+        },
+        {
+            "position": { "x": 160.0, "y": 250.0, "z": 2450.0 },
+            "modelPath": "Resources/models/barrage_balloon.gltf",
+            "colliderModelPath": "Resources/models/barrage_balloon_col.gltf",
+            "health": 70.0,
+            "aiType": "BarrageBalloon",
+            "waypointPathName": ""
+        }
+    ],
+    "groundEnemies": [],
+    "objectives": [],
+    "triggers": [],
+    "waypointPaths": []
+}

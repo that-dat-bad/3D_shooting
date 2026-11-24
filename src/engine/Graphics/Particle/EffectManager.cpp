@@ -133,6 +133,8 @@ bool EffectPreset::LoadFromEffectFile(const std::string& path) {
 		p.isStretched = cfg.GetBool(sec, "isStretched", false);
 		p.stretchFactor = cfg.GetFloat(sec, "stretchFactor", 1.0f);
 
+		EffectGpuPresetBridge::LoadFromConfig(cfg, sec, layer.gpuRich);
+
 		EffectManager::GetInstance()->ApplyLayerParticleGroup(layer);
 		layers.push_back(layer);
 	}
@@ -205,7 +207,9 @@ bool EffectPreset::SaveToEffectFile(const std::string& path) const {
 		file << "minRotationSpeed = " << p.minRotationSpeed << "\n";
 		file << "maxRotationSpeed = " << p.maxRotationSpeed << "\n";
 		file << "isStretched = " << (p.isStretched ? "true" : "false") << "\n";
-		file << "stretchFactor = " << p.stretchFactor << "\n\n";
+		file << "stretchFactor = " << p.stretchFactor << "\n";
+		EffectGpuPresetBridge::SaveToStream(file, layer.gpuRich);
+		file << "\n";
 	}
 
 	return true;
@@ -305,13 +309,19 @@ void EffectHandle::EmitBurstNow() {
 		}
 		if (layer.useGpu) {
 			if (gpu && gpu->IsInitialized()) {
-				if (!layer.texturePath.empty()) {
-					TextureManager::GetInstance()->LoadTexture(layer.texturePath);
-					gpu->SetTexture(TextureManager::GetInstance()->GetTextureIndexByFilePath(layer.texturePath));
+				if (layer.gpuRich.useRichGpu) {
+					if (EffectGpuPresetBridge::EmitLayer(layer, position_)) {
+						totalEmittedParticles_ += layer.emitCount;
+					}
+				} else {
+					if (!layer.texturePath.empty()) {
+						TextureManager::GetInstance()->LoadTexture(layer.texturePath);
+						gpu->SetTexture(TextureManager::GetInstance()->GetTextureIndexByFilePath(layer.texturePath));
+					}
+					gpu->SetBlendMode(layer.blendMode);
+					gpu->EnqueueEmit(position_, layer.params, layer.emitCount);
+					totalEmittedParticles_ += layer.emitCount;
 				}
-				gpu->SetBlendMode(layer.blendMode);
-				gpu->EnqueueEmit(position_, layer.params, layer.emitCount);
-				totalEmittedParticles_ += layer.emitCount;
 			}
 		} else if (pm && !layer.groupName.empty()) {
 			EffectManager::GetInstance()->ApplyLayerParticleGroup(layer);
@@ -916,12 +926,14 @@ void EffectManager::Draw(Camera* camera) {
 			if (!gpuUpdatePaused_) {
 				gpu->Update();
 			}
+			gpu->SetCameraClipParams(camera->GetNearClip(), camera->GetFarClip());
 			gpu->Draw(camera->GetViewProjectionMatrix(), camera->GetWorldMatrix());
 		}
 	}
 }
 
 void EffectManager::Finalize() {
+	destroyEffectHook_ = nullptr;
 	effects_.clear();
 	namedHandles_.clear();
 	handles_.clear();
@@ -1054,6 +1066,9 @@ void EffectManager::EmitHitPlaneEffect(const Vector3& position) {
 
 void EffectManager::EmitDestroyEffect(const Vector3& position) {
 	AddEffect(std::make_unique<ExplosionParticleEffect>(position));
+	if (destroyEffectHook_) {
+		destroyEffectHook_(position);
+	}
 }
 
 void EffectManager::EmitMuzzleFlash(const Vector3& position, const Vector3& direction) {
@@ -1256,29 +1271,38 @@ void EffectManager::DrawDebugGui(EffectHandle* previewHandle) {
 
 			ImGui::Separator();
 			ImGui::Checkbox("Use GPU Particle (Compute Shader)", &layer.useGpu);
+			const bool useWorldUnits = layer.useGpu && layer.gpuRich.useRichGpu && layer.gpuRich.worldUnitsPerSec;
 			ImGui::Text("--- 量・寿命・上昇上限高さ ---");
 			int emitCnt = static_cast<int>(layer.emitCount);
-			const int maxEmitSlider = layer.useGpu ? 5000 : 60;
+			const int maxEmitSlider = layer.useGpu ? (layer.gpuRich.useRichGpu ? 10000 : 5000) : 60;
 			if (ImGui::SliderInt("Emit Count (1回の発生量)", &emitCnt, 1, maxEmitSlider)) {
 				layer.emitCount = static_cast<uint32_t>((std::max)(1, emitCnt));
 			}
 			ImGui::SliderFloat("Max Rise Height (上昇上限高さ m)", &pp.maxRiseHeight, 0.0f, 35.0f, "%.2f m (0=無制限)");
 			ImGui::DragFloatRange2("LifeTime (寿命 Min/Max 秒)", &pp.minLifeTime, &pp.maxLifeTime, 0.05f, 0.02f, 20.0f, "Min: %.2f s", "Max: %.2f s");
-			ImGui::SliderFloat("Spawn Range (発生位置ばらつき m)", &pp.randomPositionRange, 0.0f, 10.0f, "%.2f m");
+			ImGui::SliderFloat("Spawn Range (発生位置ばらつき m)", &pp.randomPositionRange, 0.0f, 100.0f, "%.2f m");
 
 			ImGui::Separator();
-			ImGui::Text("--- 上昇速度・初速 & 与える加速度 ---");
-			ImGui::DragFloatRange2("Upward Speed Y (上昇初速 Min/Max)", &pp.minVelocity.y, &pp.maxVelocity.y, 0.001f, -1.0f, 2.0f, "Min: %.4f", "Max: %.4f");
-			float horizDrift = (std::max)(std::abs(pp.minVelocity.x), std::abs(pp.maxVelocity.x));
-			if (ImGui::SliderFloat("Horizontal Spread X/Z (横広がり速度)", &horizDrift, 0.0f, 0.5f, "%.4f")) {
-				pp.minVelocity.x = -horizDrift;
-				pp.maxVelocity.x =  horizDrift;
-				pp.minVelocity.z = -horizDrift;
-				pp.maxVelocity.z =  horizDrift;
+			ImGui::Text(useWorldUnits ? "--- 速度・加速度 (m/s, m/s^2) ---" : "--- 上昇速度・初速 & 与える加速度 ---");
+			const float velStep = useWorldUnits ? 0.25f : 0.001f;
+			const float velMin = useWorldUnits ? -120.0f : -5.0f;
+			const float velMax = useWorldUnits ? 120.0f : 5.0f;
+			const float accelStep = useWorldUnits ? 0.2f : 0.0001f;
+			const float accelMin = useWorldUnits ? -60.0f : -1.0f;
+			const float accelMax = useWorldUnits ? 60.0f : 1.0f;
+			if (!useWorldUnits) {
+				ImGui::DragFloatRange2("Upward Speed Y (上昇初速 Min/Max)", &pp.minVelocity.y, &pp.maxVelocity.y, 0.001f, -1.0f, 2.0f, "Min: %.4f", "Max: %.4f");
+				float horizDrift = (std::max)(std::abs(pp.minVelocity.x), std::abs(pp.maxVelocity.x));
+				if (ImGui::SliderFloat("Horizontal Spread X/Z (横広がり速度)", &horizDrift, 0.0f, 0.5f, "%.4f")) {
+					pp.minVelocity.x = -horizDrift;
+					pp.maxVelocity.x =  horizDrift;
+					pp.minVelocity.z = -horizDrift;
+					pp.maxVelocity.z =  horizDrift;
+				}
 			}
-			ImGui::DragFloat3("Min Velocity (X, Y, Z)", &pp.minVelocity.x, 0.001f, -5.0f, 5.0f, "%.4f");
-			ImGui::DragFloat3("Max Velocity (X, Y, Z)", &pp.maxVelocity.x, 0.001f, -5.0f, 5.0f, "%.4f");
-			ImGui::DragFloat3("Acceleration (加速度 X, Y, Z)", &pp.acceleration.x, 0.0001f, -1.0f, 1.0f, "%.5f");
+			ImGui::DragFloat3("Min Velocity (X, Y, Z)", &pp.minVelocity.x, velStep, velMin, velMax, useWorldUnits ? "%.2f" : "%.4f");
+			ImGui::DragFloat3("Max Velocity (X, Y, Z)", &pp.maxVelocity.x, velStep, velMin, velMax, useWorldUnits ? "%.2f" : "%.4f");
+			ImGui::DragFloat3("Acceleration (加速度 X, Y, Z)", &pp.acceleration.x, accelStep, accelMin, accelMax, useWorldUnits ? "%.2f" : "%.5f");
 
 			ImGui::Separator();
 			ImGui::Text("--- スケール・カラー・回転 ---");
@@ -1288,10 +1312,13 @@ void EffectManager::DrawDebugGui(EffectHandle* previewHandle) {
 			ImGui::Checkbox("Alpha Fade Out", &pp.fadeOut);
 			ImGui::ColorEdit4("Min Color (RGBA)", &pp.minColor.x);
 			ImGui::ColorEdit4("Max Color (RGBA)", &pp.maxColor.x);
-			ImGui::DragFloatRange2("Rotation Speed (回転速度)", &pp.minRotationSpeed, &pp.maxRotationSpeed, 0.01f, -10.0f, 10.0f, "%.2f", "%.2f");
+			ImGui::DragFloatRange2("Rotation Speed (回転速度)", &pp.minRotationSpeed, &pp.maxRotationSpeed, 0.05f, -20.0f, 20.0f, "%.2f", "%.2f");
 			ImGui::Checkbox("Stretched Billboard", &pp.isStretched);
 			if (pp.isStretched) {
-				ImGui::SliderFloat("Stretch Factor", &pp.stretchFactor, 0.01f, 20.0f);
+				ImGui::SliderFloat("Stretch Factor", &pp.stretchFactor, 0.005f, 20.0f, "%.3f");
+			}
+			if (layer.useGpu) {
+				EffectGpuPresetBridge::DrawImGuiControls(layer);
 			}
 		}
 	}

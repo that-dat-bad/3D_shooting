@@ -94,6 +94,7 @@ struct MissionData {
 	bool fadeOutOnClear = false;
 	bool isTutorialDebrief = false;
 	bool isClearAutoDemo = false;
+	bool isParticleDemo = false;
 	bool disableGenericRadio = false;
 };
 
@@ -118,6 +119,7 @@ inline void to_json(nlohmann::json& j, const MissionData& m) {
 		{"fadeOutOnClear", m.fadeOutOnClear},
 		{"isTutorialDebrief", m.isTutorialDebrief},
 		{"isClearAutoDemo", m.isClearAutoDemo},
+		{"isParticleDemo", m.isParticleDemo},
 		{"disableGenericRadio", m.disableGenericRadio}
 	};
 }
@@ -142,6 +144,7 @@ inline void from_json(const nlohmann::json& j, MissionData& m) {
 	if (j.contains("fadeOutOnClear")) j.at("fadeOutOnClear").get_to(m.fadeOutOnClear);
 	if (j.contains("isTutorialDebrief")) j.at("isTutorialDebrief").get_to(m.isTutorialDebrief);
 	if (j.contains("isClearAutoDemo")) j.at("isClearAutoDemo").get_to(m.isClearAutoDemo);
+	if (j.contains("isParticleDemo")) j.at("isParticleDemo").get_to(m.isParticleDemo);
 	if (j.contains("disableGenericRadio")) j.at("disableGenericRadio").get_to(m.disableGenericRadio);
 }
 

@@ -33,7 +33,12 @@ void StageScene::UpdateFlightControls(float gameDeltaTime) {
 
 	if (sortieIntroTimer_ < sortieIntroDuration_) {
 		flightModel_.SetControlInput(0.0f, 0.0f, 0.0f);
-		flightModel_.SetThrottleInput(0.0f);
+		if (isFreeFlightMode_) {
+			flightModel_.SetThrottle(throttle_);
+			flightModel_.SetThrottleInput(throttle_);
+		} else {
+			flightModel_.SetThrottleInput(0.0f);
+		}
 		return;
 	}
 
@@ -44,6 +49,43 @@ void StageScene::UpdateFlightControls(float gameDeltaTime) {
 	}
 
 	if (!isGameOver_) {
+		if (isParticleDemoMode_ && particleDemo_.IsActive()) {
+			ParticleDemoController::DemoContext ctx{};
+			ctx.dt = gameDeltaTime;
+			ctx.position = flightModel_.GetPosition();
+			ctx.forward = flightModel_.GetForwardDirection();
+			ctx.speed = flightModel_.GetSpeed();
+			ctx.normalThrottleLimit = (std::max)(0.1f, flightModel_.GetNormalThrottleLimit());
+			ctx.wepThrottleLimit = (std::max)(ctx.normalThrottleLimit, flightModel_.GetWepThrottleLimit());
+			ctx.enemyManager = &enemyManager_;
+			ctx.missileLocked = missileManager_.IsLocked();
+			ctx.missileReadyToFire = (missileLauncher_ && missileLauncher_->IsReadyToFire());
+			ctx.remainingMissiles = missileLauncher_ ? missileLauncher_->GetCurrentMissiles() : 0;
+
+			particleDemo_.Update(ctx);
+			const auto& demoOut = particleDemo_.GetOutput();
+			throttle_ = std::clamp(demoOut.throttle, 0.0f, ctx.wepThrottleLimit);
+			flightModel_.SetThrottleInput(throttle_);
+			mouseAimEnabled_ = true;
+			mouseAimController_.SetEnabled(true);
+			mouseAimController_.SetTargetDirection(demoOut.desiredDirection);
+			mouseAimController_.CalculateSteeringInput(
+				flightModel_.GetOrientation(),
+				kDeltaTime,
+				finalPitch, finalRoll, finalYaw
+			);
+			flightModel_.SetControlInput(finalPitch, finalRoll, finalYaw);
+			flightModel_.SetFlapInput(demoOut.flapInput);
+			flightModel_.SetAirBrakeInput(demoOut.airBrakeInput);
+			if (demoOut.triggerFlare) {
+				countermeasures_.TriggerSalvo();
+			}
+			if (input && input->TriggerKey(DIK_P)) {
+				SetPaused(true);
+			}
+			return;
+		}
+
 		const auto& missionManager = MissionManager::GetInstance();
 		const bool allowSteering = missionManager.IsPlayerSteeringAllowed();
 		const bool allowThrottle = missionManager.IsPlayerThrottleAllowed();
@@ -124,6 +166,11 @@ void StageScene::UpdateFlightControls(float gameDeltaTime) {
 		// --- ナイトビジョン ON/OFF トグル ---
 		if (input->TriggerKey(DIK_N)) {
 			isNvdActive_ = !isNvdActive_;
+		}
+
+		// --- チャフ＆フレア（カウンターメジャー）展開 ---
+		if (input->TriggerKey(DIK_X)) {
+			countermeasures_.TriggerSalvo();
 		}
 
 		// --- ベイルアウト / 緊急脱出 ---
@@ -256,8 +303,12 @@ void StageScene::UpdateCombatFiring(float gameDeltaTime) {
 		weaponSwitchCooldown_ = (std::max)(0.0f, weaponSwitchCooldown_ - gameDeltaTime);
 	}
 
-	// マウススクロールホイールで機関砲 / ミサイルを切り替え
-	if (allowWeapon && IsGameplayActive() && !isPaused_ && !combatBootSequence_.IsWaitingForSpace() && input) {
+	// デモ制御時またはマウススクロールホイールで機関砲 / ミサイルを切り替え
+	const bool demoControlled = (isParticleDemoMode_ && particleDemo_.IsActive());
+	const auto& demoOut = particleDemo_.GetOutput();
+	if (demoControlled) {
+		activeWeaponMode_ = demoOut.useMissileMode ? WeaponMode::Missile : WeaponMode::Gun;
+	} else if (allowWeapon && IsGameplayActive() && !isPaused_ && !combatBootSequence_.IsWaitingForSpace() && input) {
 		const Input::MouseMove mouseMove = input->GetMouseMove();
 		if (mouseMove.lZ != 0 && weaponSwitchCooldown_ <= 0.0f) {
 			activeWeaponMode_ = (activeWeaponMode_ == WeaponMode::Gun) ? WeaponMode::Missile : WeaponMode::Gun;
@@ -265,17 +316,29 @@ void StageScene::UpdateCombatFiring(float gameDeltaTime) {
 		}
 	}
 
-	const bool canFireWeapon = allowWeapon && input && !isMissionCleared_ && !isMissionFailed_ && sortieIntroTimer_ >= sortieIntroDuration_;
-	if (canFireWeapon && activeWeaponMode_ == WeaponMode::Gun && input->PushMouse(0)) {
+	const bool canFireWeapon = allowWeapon && !isMissionCleared_ && !isMissionFailed_ &&
+		sortieIntroTimer_ >= sortieIntroDuration_ && (input != nullptr || demoControlled);
+	const bool triggerGun = demoControlled ? demoOut.fireGun : (input && input->PushMouse(0));
+	const bool triggerMissile = demoControlled ? demoOut.fireMissile : (input && input->TriggerMouse(0));
+	if (canFireWeapon && activeWeaponMode_ == WeaponMode::Gun && triggerGun) {
 		int ammoBefore = gunpod_.GetCurrentAmmo();
 		gunpod_.Fire();
 		if (gunpod_.GetCurrentAmmo() < ammoBefore) {
 			isFiringThisFrame_ = true;
 			Vector3 aircraftPos = flightModel_.GetPosition();
+			Vector3 aircraftRight = flightModel_.GetRightDirection();
+			Vector3 aircraftUp = flightModel_.GetUpDirection();
 			Vector3 aircraftForward = flightModel_.GetForwardDirection();
 			Vector3 aircraftVelocity = flightModel_.GetVelocity();
 
-			Vector3 firePos = Add(aircraftPos, Multiply(8.0f, aircraftForward));
+			lastMuzzleLocalOffset_ = gunpod_.GetLastFiredMuzzleOffset();
+			Vector3 firePos = Add(
+				aircraftPos,
+				Add(
+					Add(Multiply(lastMuzzleLocalOffset_.x, aircraftRight), Multiply(lastMuzzleLocalOffset_.y, aircraftUp)),
+					Multiply(lastMuzzleLocalOffset_.z, aircraftForward)
+				)
+			);
 			Vector3 fireDir = aircraftForward;
 
 			float muzzleSpeed = 500.0f;
@@ -325,10 +388,6 @@ void StageScene::UpdateCombatFiring(float gameDeltaTime) {
 				EffectManager::GetInstance()->EmitMuzzleFlash(firePos, fireDir);
 				muzzleFlashTimer_ = 0.08f;
 
-				if (CameraManager::GetInstance()->GetActiveCamera()) {
-					CameraManager::GetInstance()->GetActiveCamera()->Shake(0.1f, 0.5f);
-				}
-
 				muzzleFlashRandomScale_ = 0.8f + (rand() % 40) / 100.0f;
 				muzzleFlashRandomRoll_ = (rand() % 628) / 100.0f;
 				muzzleFlashRandomAlpha_ = 0.8f + (rand() % 20) / 100.0f;
@@ -343,7 +402,7 @@ void StageScene::UpdateCombatFiring(float gameDeltaTime) {
 				}
 			}
 		}
-	} else if (canFireWeapon && activeWeaponMode_ == WeaponMode::Missile && input->TriggerMouse(0)) {
+	} else if (canFireWeapon && activeWeaponMode_ == WeaponMode::Missile && triggerMissile) {
 		if (missileLauncher_ && missileLauncher_->IsReadyToFire() && missileManager_.IsLocked()) {
 			Vector3 localPylonOffset{};
 			if (missileLauncher_->TryConsumeMissile(localPylonOffset)) {
@@ -448,6 +507,12 @@ void StageScene::UpdateFlightAndEffects(float gameDeltaTime) {
 	}
 	if (wasInSortieIntro_ && sortieIntroTimer_ >= sortieIntroDuration_) {
 		wasInSortieIntro_ = false;
+		if (isFreeFlightMode_) {
+			constexpr float kFreeFlightInitialSpeed = 400.0f / 3.6f;
+			flightModel_.SetVelocity(Multiply(kFreeFlightInitialSpeed, flightModel_.GetForwardDirection()));
+			flightModel_.SetThrottle(throttle_);
+			flightModel_.SetThrottleInput(throttle_);
+		}
 		if (!isGameOver_ && !isMissionCleared_) {
 			flightModel_.SetInvulnerable(false);
 		}
@@ -475,76 +540,10 @@ void StageScene::UpdateFlightAndEffects(float gameDeltaTime) {
 	// Blender MCP リアルタイム同期の更新
 	TerrainSyncManager::GetInstance()->Update();
 
-	// --- 翼端ボルテックスエフェクトの発生 ---
-	float currentG = flightModel_.GetCurrentG();
-	Vector3 aircraftPos = flightModel_.GetPosition();
-	Vector3 right = flightModel_.GetRightDirection();
-	Vector3 forward = flightModel_.GetForwardDirection();
-
-	Vector3 leftWingTip = Add(Add(aircraftPos, Multiply(-6.0f, right)), Multiply(-2.0f, forward));
-	Vector3 rightWingTip = Add(Add(aircraftPos, Multiply(6.0f, right)), Multiply(-2.0f, forward));
-
-	if (!isGameOver_ && currentG > 3.0f && flightModel_.GetSpeed() > 50.0f) {
-		float gFactor = (currentG - 3.0f) / 3.0f;
-		if (gFactor < 0.0f) { gFactor = 0.0f; }
-		if (gFactor > 1.0f) { gFactor = 1.0f; }
-
-		Vector4 baseColor = { 0.95f, 0.98f, 1.0f, 0.35f * gFactor };
-
-		ParticleParameters params;
-		params.minVelocity = { 0.0f, 0.0f, 0.0f };
-		params.maxVelocity = { 0.0f, 0.0f, 0.0f };
-		params.randomPositionRange = 0.0f;
-		params.minColor = baseColor;
-		params.maxColor = baseColor;
-		params.minLifeTime = 0.4f;
-		params.maxLifeTime = 0.4f;
-		params.minScale = 0.08f;
-		params.maxScale = 0.08f;
-		params.endScale = 0.12f;
-		params.fadeOut = true;
-		params.minRotation = 0.0f;
-		params.maxRotation = 0.0f;
-		params.minRotationSpeed = 0.0f;
-		params.maxRotationSpeed = 0.0f;
-		params.isStretched = true;
-		params.stretchFactor = 12.5f;
-
-		if (hasLastWingTips_) {
-			Vector3 deltaL = Subtract(leftWingTip, lastLeftWingTip_);
-			float distL = Length(deltaL);
-			Vector3 deltaR = Subtract(rightWingTip, lastRightWingTip_);
-
-			int steps = static_cast<int>(std::ceil(distL / 0.25f));
-			if (steps < 1) { steps = 1; }
-			if (steps > 40) { steps = 40; }
-
-			Vector3 stepDeltaL = Multiply(1.0f / static_cast<float>(steps), deltaL);
-			Vector3 stepDeltaR = Multiply(1.0f / static_cast<float>(steps), deltaR);
-
-			for (int i = 0; i < steps; ++i) {
-				float t = static_cast<float>(i) / static_cast<float>(steps);
-				Vector3 interpL = Lerp(lastLeftWingTip_, leftWingTip, t);
-				Vector3 interpR = Lerp(lastRightWingTip_, rightWingTip, t);
-
-				params.stretchDir = stepDeltaL;
-				ParticleManager::GetInstance()->Emit("Vortex", interpL, params, 1);
-
-				params.stretchDir = stepDeltaR;
-				ParticleManager::GetInstance()->Emit("Vortex", interpR, params, 1);
-			}
-		} else {
-			params.isStretched = false;
-			ParticleManager::GetInstance()->Emit("Vortex", leftWingTip, params, 1);
-			ParticleManager::GetInstance()->Emit("Vortex", rightWingTip, params, 1);
-		}
-
-		lastLeftWingTip_ = leftWingTip;
-		lastRightWingTip_ = rightWingTip;
-		hasLastWingTips_ = true;
-	} else {
-		hasLastWingTips_ = false;
-	}
+	const float currentG = flightModel_.GetCurrentG();
+	const Vector3 aircraftPos = flightModel_.GetPosition();
+	const Vector3 right = flightModel_.GetRightDirection();
+	const Vector3 forward = flightModel_.GetForwardDirection();
 
 	// --- 高速飛行時のスピード感演出 ---
 	float curSpeed = flightModel_.GetSpeed();
@@ -572,6 +571,60 @@ void StageScene::UpdateFlightAndEffects(float gameDeltaTime) {
 			streamParams.stretchFactor = 16.0f;
 			streamParams.stretchDir = Multiply(-1.0f, forward);
 			ParticleManager::GetInstance()->Emit("Vortex", streamSpawn, streamParams, 1);
+		}
+	}
+
+	// --- GPUパーティクル連携エフェクト群の更新 ---
+	{
+		const Vector3 acUp = flightModel_.GetUpDirection();
+		const Vector3 acVel = flightModel_.GetVelocity();
+
+		// 1. 航空機ウェイク場（翼端渦＆ジェット排気）＋極地吹雪／氷晶ダスト更新
+		AmbientWeatherSystem::WakeSource wake{};
+		wake.position = aircraftPos;
+		wake.velocity = acVel;
+		wake.forward = forward;
+		wake.right = right;
+		wake.halfWingspan = 4.50f;
+		wake.currentG = currentG;
+		wake.throttle = flightModel_.GetCurrentThrottle();
+		wake.afterburnerIntensity = flightModel_.GetAfterburnerIntensity();
+		wake.active = !isGameOver_;
+		ambientWeather_.SubmitWakeSource(0u, wake);
+
+		Camera* activeCam = CameraManager::GetInstance()->GetActiveCamera();
+		const Vector3 weatherCenter = activeCam ? activeCam->GetTranslate() : aircraftPos;
+		ambientWeather_.Update(gameDeltaTime, weatherCenter);
+
+		// 2. カウンターメジャー（チャフ＆フレア）更新
+		CountermeasureSystem::AircraftEmitterState cmState{};
+		cmState.position = aircraftPos;
+		cmState.velocity = acVel;
+		cmState.forward = forward;
+		cmState.right = right;
+		cmState.up = acUp;
+		cmState.floorY = flightModel_.GetGroundElevation();
+		countermeasures_.Update(gameDeltaTime, cmState);
+
+		// 3. 高G主翼上面ベイパークラウド・遷音速ベイパー・音速突破ソニックブーム更新
+		if (!isGameOver_) {
+			AeroVaporSystem::AircraftAeroState aero{};
+			aero.position = aircraftPos;
+			aero.velocity = acVel;
+			aero.forward = forward;
+			aero.right = right;
+			aero.up = acUp;
+			aero.speed = curSpeed;
+			aero.currentG = currentG;
+			aero.aoaRad = flightModel_.GetCurrentAoA();
+			aero.criticalAoARad = flightModel_.GetAirframe().GetCriticalAoA();
+			aero.halfWingspan = 4.50f;
+			aero.isStalling = flightModel_.IsStalling();
+			aeroVapor_.Update(gameDeltaTime, aero);
+
+			if (aeroVapor_.ConsumeSonicBoomTriggered() && activeCam) {
+				activeCam->Shake(0.35f, 1.8f);
+			}
 		}
 	}
 }
@@ -782,6 +835,12 @@ void StageScene::UpdateCombatAndMission(float gameDeltaTime) {
 		TriggerGameClear();
 	}
 
+	if (isParticleDemoMode_ && !isGameOver_ && !isMissionCleared_ && particleDemo_.ConsumeFinaleDeathRequested()) {
+		isBailout_ = false;
+		TriggerGameOver();
+		return;
+	}
+
 	// 機体壊滅判定
 	if (!isMissionFailed_ && flightModel_.GetAirframe().IsDestroyed()) {
 		TriggerGameOver();
@@ -871,7 +930,9 @@ void StageScene::UpdateCamera(float gameDeltaTime) {
 			sortieIntroTimer_ = combatBootSequence_.GetTimer();
 			float introProg = std::clamp(sortieIntroTimer_ / sortieIntroDuration_, 0.0f, 1.0f);
 
-			float boostSpeed = 22.0f + 28.0f * (1.0f - std::exp(-introProg * 2.2f));
+			float boostSpeed = isFreeFlightMode_
+				? (400.0f / 3.6f)
+				: (22.0f + 28.0f * (1.0f - std::exp(-introProg * 2.2f)));
 			flightModel_.SetVelocity(Multiply(boostSpeed, flightModel_.GetForwardDirection()));
 		}
 
@@ -880,8 +941,26 @@ void StageScene::UpdateCamera(float gameDeltaTime) {
 		Vector3 up = flightModel_.GetUpDirection();
 
 		if (combatBootSequence_.IsQuickMode()) {
-			// クイックリトライ・リスタート時は横からのドローン追従カメラではなく、即座に通常自機追従カメラ視点にする
-			playerCamera_.Update(gameDeltaTime, &flightModel_, &mouseAimController_, mouseAimEnabled_);
+			if (isParticleDemoMode_ && particleDemo_.IsActive()) {
+				Vector3 camPos{};
+				Vector3 lookTarget{};
+				ParticleDemoCamera::CameraContext camCtx{};
+				camCtx.dt = gameDeltaTime;
+				camCtx.elapsed = particleDemo_.GetElapsedTime();
+				camCtx.playerPos = pos;
+				camCtx.playerForward = forward;
+				camCtx.playerRight = right;
+				camCtx.playerUp = up;
+				camCtx.hasTarget = particleDemo_.HasActiveTarget();
+				camCtx.targetPos = particleDemo_.GetActiveTargetPosition();
+				camCtx.isExplosionHold = particleDemo_.IsExplosionHoldActive();
+				camCtx.isFlareFocus = particleDemo_.IsFlareFocusActive();
+				particleDemoCamera_.Update(camCtx, camPos, lookTarget);
+				playerCamera_.SnapTo(camPos, lookTarget);
+			} else {
+				// クイックリトライ・リスタート時は横からのドローン追従カメラではなく、即座に通常自機追従カメラ視点にする
+				playerCamera_.Update(gameDeltaTime, &flightModel_, &mouseAimController_, mouseAimEnabled_);
+			}
 		} else {
 			Vector3 camPos{};
 			Vector3 lookTarget{};
@@ -940,6 +1019,22 @@ void StageScene::UpdateCamera(float gameDeltaTime) {
 		Vector3 lookTarget = Add(pos, Multiply(0.5f, flightModel_.GetForwardDirection()));
 
 		playerCamera_.SnapTo(targetCamPos, lookTarget);
+	} else if (isParticleDemoMode_ && particleDemo_.IsActive()) {
+		Vector3 camPos{};
+		Vector3 lookTarget{};
+		ParticleDemoCamera::CameraContext camCtx{};
+		camCtx.dt = gameDeltaTime;
+		camCtx.elapsed = particleDemo_.GetElapsedTime();
+		camCtx.playerPos = pos;
+		camCtx.playerForward = flightModel_.GetForwardDirection();
+		camCtx.playerRight = flightModel_.GetRightDirection();
+		camCtx.playerUp = flightModel_.GetUpDirection();
+		camCtx.hasTarget = particleDemo_.HasActiveTarget();
+		camCtx.targetPos = particleDemo_.GetActiveTargetPosition();
+		camCtx.isExplosionHold = particleDemo_.IsExplosionHoldActive();
+		camCtx.isFlareFocus = particleDemo_.IsFlareFocusActive();
+		particleDemoCamera_.Update(camCtx, camPos, lookTarget);
+		playerCamera_.SnapTo(camPos, lookTarget);
 	} else {
 		playerCamera_.Update(gameDeltaTime, &flightModel_, &mouseAimController_, mouseAimEnabled_);
 	}
@@ -1096,8 +1191,94 @@ void StageScene::UpdateDebugAndStatusUI(float gameDeltaTime) {
 	ImGui::Text("Mouse: Aim direction (PID)");
 	ImGui::Text("LShift/LCtrl: Pitch | A/D: Roll | Q/E: Yaw (override)");
 	ImGui::Text("W/S: Throttle (Hold/Tap W at 100% -> WEP & A/B)");
-	ImGui::Text("F: Flaps | B: AirBrake");
+	ImGui::Text("F: Flaps | B: AirBrake | X: Chaff & Flares (%d/%d)",
+		countermeasures_.GetRemainingAmmo(), countermeasures_.GetMaxAmmo());
 	ImGui::Text("M: Mouse Aim [%s]", mouseAimEnabled_ ? "ON" : "OFF");
+
+	ImGui::Separator();
+	if (ImGui::CollapsingHeader("GPU Particle Effects (Contest)")) {
+		ImGui::Text("Mach: %.2f | Wing: %.0f%% | Stall: %.0f%% | Flares: %d/%d",
+			aeroVapor_.GetCurrentMach(),
+			aeroVapor_.GetCurrentWingVaporIntensity() * 100.0f,
+			aeroVapor_.GetCurrentStallVaporIntensity() * 100.0f,
+			countermeasures_.GetRemainingAmmo(),
+			countermeasures_.GetMaxAmmo());
+		ImGui::Text("Targets Alive -> Air: %d | Ground: %d",
+			enemyManager_.GetAliveAirCount(),
+			enemyManager_.GetAliveGroundCount());
+
+		int weatherIdx = static_cast<int>(ambientWeather_.GetPreset());
+		const char* weatherLabels[] = {
+			AmbientWeatherSystem::GetPresetName(AmbientWeatherSystem::WeatherPreset::Off),
+			AmbientWeatherSystem::GetPresetName(AmbientWeatherSystem::WeatherPreset::IceDust),
+			AmbientWeatherSystem::GetPresetName(AmbientWeatherSystem::WeatherPreset::PolarBlizzard),
+			AmbientWeatherSystem::GetPresetName(AmbientWeatherSystem::WeatherPreset::ArcticStorm)
+		};
+		if (ImGui::Combo("Polar Weather", &weatherIdx, weatherLabels, 4)) {
+			ambientWeather_.SetPreset(static_cast<AmbientWeatherSystem::WeatherPreset>(weatherIdx));
+		}
+
+		if (ImGui::Button("Deploy Chaff & Flares [X]")) {
+			countermeasures_.TriggerSalvo();
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Replenish Missiles & Flares")) {
+			countermeasures_.Replenish();
+			if (missileLauncher_) {
+				missileLauncher_->ReplenishMissiles();
+			}
+		}
+		if (ImGui::Button("Test Sonic Boom")) {
+			aeroVapor_.TriggerSonicBoom(
+				flightModel_.GetPosition(),
+				flightModel_.GetForwardDirection(),
+				flightModel_.GetVelocity(),
+				1.0f);
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Test GPU Explosion Ahead")) {
+			const Vector3 ahead = Add(flightModel_.GetPosition(), Multiply(65.0f, flightModel_.GetForwardDirection()));
+			EffectManager::GetInstance()->EmitDestroyEffect(ahead);
+		}
+		if (ImGui::Button("Spawn Barrage Balloon Ahead")) {
+			Vector3 spawnPos = Add(flightModel_.GetPosition(), Multiply(900.0f, flightModel_.GetForwardDirection()));
+			spawnPos.y = (std::max)(140.0f, flightModel_.GetPosition().y + 30.0f);
+			EnemySpawnData balloon{};
+			balloon.position = spawnPos;
+			balloon.modelPath = "Resources/models/barrage_balloon.gltf";
+			balloon.health = 80.0f;
+			balloon.aiType = AIType::BarrageBalloon;
+			enemyManager_.SpawnAirEnemies({ balloon });
+		}
+		if (ImGui::Button("Spawn Air Target Ahead")) {
+			Vector3 spawnPos = Add(flightModel_.GetPosition(), Multiply(1050.0f, flightModel_.GetForwardDirection()));
+			spawnPos.y = (std::max)(180.0f, flightModel_.GetPosition().y + 40.0f);
+			EnemySpawnData target{};
+			target.position = spawnPos;
+			target.modelPath = "Resources/models/m15.gltf";
+			target.health = 80.0f;
+			target.aiType = AIType::FollowWaypoint;
+			target.behaviorTreeJson = R"({"useCustomParamsOnly":true,"overrideParams":{"engageDist":0.0,"fireRange":0.0,"patrolThrottle":0.62}})";
+			enemyManager_.SpawnAirEnemies({ target });
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Spawn Ground Target Ahead")) {
+			Vector3 spawnPos = Add(flightModel_.GetPosition(), Multiply(850.0f, flightModel_.GetForwardDirection()));
+			if (!isFreeFlightMode_ && terrainChunkManager_ && terrainChunkManager_->IsLoaded()) {
+				const auto surf = terrainChunkManager_->QuerySurfaceAt(spawnPos.x, spawnPos.z, 0.0f);
+				spawnPos.y = (surf.type == TerrainChunkManager::SurfaceType::Water)
+					? (std::max)(surf.landY, surf.waterY)
+					: surf.landY;
+			} else {
+				spawnPos.y = 0.0f;
+			}
+			GroundEnemySpawnData groundTarget{};
+			groundTarget.position = spawnPos;
+			groundTarget.aiType = GroundAIType::Structure;
+			groundTarget.health = 80.0f;
+			enemyManager_.SpawnGroundEnemies({ groundTarget });
+		}
+	}
 	ImGui::Text("I: Instructor [%s]", flightInstructor_.IsEnabled() ? "ON" : "OFF");
 	ImGui::Text("P: Cursor Lock [%s]", (input && input->IsCursorLocked()) ? "LOCKED" : "FREE");
 

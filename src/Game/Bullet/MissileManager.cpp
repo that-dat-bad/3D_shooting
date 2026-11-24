@@ -76,6 +76,10 @@ namespace {
 			outAspectFactor = 1.05f;
 			return kDroneLockRange;
 		}
+		if (enemy->GetAIType() == AIType::BarrageBalloon) {
+			outAspectFactor = 1.15f;
+			return 3200.0f;
+		}
 		const Vector3 enemyFwd = (Length(enemy->GetForward()) > 0.0001f)
 			? Normalize(enemy->GetForward())
 			: Vector3{ 0.0f, 0.0f, 1.0f };

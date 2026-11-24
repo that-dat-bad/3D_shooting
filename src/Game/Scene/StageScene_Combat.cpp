@@ -595,6 +595,19 @@ void StageScene::UpdateEndSequence(float dt) {
 
 			if (endSeqTimer_ >= 2.55f) {
 				postEffect->ClearActiveEffects();
+				if (isParticleDemoMode_) {
+					auto& res = GameResult::GetInstance();
+					res.missionCleared = true;
+					res.isHalcyonDaysTutorial = MissionManager::GetInstance().GetCurrentMission().isTutorialDebrief;
+					res.isClearAutoDemo = MissionManager::GetInstance().GetCurrentMission().isClearAutoDemo;
+					res.hideClearTerrain = isParticleDemoMode_;
+					res.enemiesDestroyed = enemyManager_.GetDestroyedCount();
+					res.clearTimeSeconds = missionElapsedTime_;
+					res.playerHPRemaining = 0.0f;
+					res.playerMaxHP = playerMaxHP_;
+					sceneID = SCENE::CLEAR;
+					return;
+				}
 				sceneID = SCENE::GAMEOVER;
 				return;
 			}
@@ -777,6 +790,7 @@ void StageScene::UpdateEndSequence(float dt) {
 			res.missionCleared = true;
 			res.isHalcyonDaysTutorial = MissionManager::GetInstance().GetCurrentMission().isTutorialDebrief;
 			res.isClearAutoDemo = MissionManager::GetInstance().GetCurrentMission().isClearAutoDemo;
+			res.hideClearTerrain = isParticleDemoMode_;
 			res.enemiesDestroyed = enemyManager_.GetDestroyedCount();
 			res.clearTimeSeconds = missionElapsedTime_;
 			res.playerHPRemaining = playerHP_;

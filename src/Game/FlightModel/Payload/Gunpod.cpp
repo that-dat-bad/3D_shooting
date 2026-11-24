@@ -16,6 +16,13 @@ void GunPod::Initialize(const GunPodData& data) {
 
 	cooldownTimer_ = 0.0f;
 	isAttached_ = true;
+
+	muzzleOffsets_ = data.muzzleOffsets;
+	if (muzzleOffsets_.empty()) {
+		muzzleOffsets_.push_back({ 0.0f, 0.0f, 8.0f });
+	}
+	nextMuzzleIndex_ = 0;
+	lastFiredMuzzleOffset_ = muzzleOffsets_.front();
 }
 
 void GunPod::Update(float dt) {
@@ -36,6 +43,12 @@ void GunPod::Fire() {
 
 	// 弾を1発消費
 	currentAmmo_--;
+
+	// 発射砲口を記録し、複数門の場合は交互にローテーション
+	if (!muzzleOffsets_.empty()) {
+		lastFiredMuzzleOffset_ = muzzleOffsets_[nextMuzzleIndex_ % muzzleOffsets_.size()];
+		nextMuzzleIndex_ = (nextMuzzleIndex_ + 1) % muzzleOffsets_.size();
+	}
 
 	// クールダウンを発射間隔分セット
 	cooldownTimer_ = fireInterval_;

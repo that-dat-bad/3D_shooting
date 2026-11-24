@@ -669,6 +669,26 @@ void AircraftEditorScene::DrawAircraftGizmos(
 			drawNozzle(afterburner_->GetSingleNozzleOffset());
 		}
 	}
+
+	// 5. 機関砲マズル発射位置＆前方射線ガイド
+	if (showGunMuzzles_) {
+		const auto& muzzles = aircraftConfig_.GetGunpod().muzzleOffsets;
+		for (int i = 0; i < static_cast<int>(muzzles.size()); ++i) {
+			const auto& offset = muzzles[static_cast<size_t>(i)];
+			const bool isSelected = (i == selectedMuzzleIndex_);
+			const Vector4 markerCol = isSelected
+				? Vector4{ 1.0f, 0.95f, 0.20f, 1.0f }
+				: Vector4{ 1.0f, 0.55f, 0.15f, 0.92f };
+			const Vector4 lineCol = isSelected
+				? Vector4{ 1.0f, 0.92f, 0.30f, 0.95f }
+				: Vector4{ 1.0f, 0.55f, 0.15f, 0.65f };
+
+			DrawCrossMarker(offset, isSelected ? 0.35f : 0.26f, aircraftWorld, markerCol, camera);
+			const Vector3 pStart = TransformV3(offset, aircraftWorld);
+			const Vector3 pEnd = TransformV3({ offset.x, offset.y, offset.z + 6.5f }, aircraftWorld);
+			prim->DrawLine3D(pStart, pEnd, lineCol, camera);
+		}
+	}
 }
 
 void AircraftEditorScene::Draw() {

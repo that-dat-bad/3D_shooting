@@ -434,8 +434,16 @@ void StageScene::DrawMuzzleFlashEffect(Camera* cam) {
 	}
 
 	Vector3 aircraftPos = flightModel_.GetPosition();
+	Vector3 right = flightModel_.GetRightDirection();
+	Vector3 up = flightModel_.GetUpDirection();
 	Vector3 forward = flightModel_.GetForwardDirection();
-	Vector3 muzzlePos = Add(aircraftPos, Multiply(8.0f, forward));
+	Vector3 muzzlePos = Add(
+		aircraftPos,
+		Add(
+			Add(Multiply(lastMuzzleLocalOffset_.x, right), Multiply(lastMuzzleLocalOffset_.y, up)),
+			Multiply(lastMuzzleLocalOffset_.z, forward)
+		)
+	);
 	
 	float t = 1.0f - (muzzleFlashTimer_ / 0.08f); // 0.0 -> 1.0
 	if (t < 0.0f) { t = 0.0f; }
