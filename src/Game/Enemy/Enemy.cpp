@@ -252,6 +252,10 @@ void Enemy::Initialize(
 
 		visualModel_.Initialize(Object3dCommon::GetInstance(), activeCam);
 		visualModel_.SetupFromSingleModel(modelPath);
+		if (Model* westernModel = ModelManager::GetInstance()->FindModel(modelPath)) {
+			flightModel_.BuildMeshCollider(westernModel, visualModel_.GetBaseRotation());
+			collisionRadius_ = (std::max)(collisionRadius_, flightModel_.GetDamageModel().GetMeshCollider().GetBoundingRadius() + 2.5f);
+		}
 		visualModel_.SetMaterialProperties(42.0f, 0.65f, 0.22f);
 		visualModel_.SetupCanopyMaterial();
 		visualModel_.ResetAllPartsVisible();
@@ -297,6 +301,10 @@ void Enemy::Initialize(
 		useVisualModel_ = true;
 		visualModel_.Initialize(Object3dCommon::GetInstance(), activeCam);
 		visualModel_.SetupFromSingleModel(modelPath);
+		if (Model* enemyModel = ModelManager::GetInstance()->FindModel(modelPath)) {
+			flightModel_.BuildMeshCollider(enemyModel, visualModel_.GetBaseRotation());
+			collisionRadius_ = (std::max)(collisionRadius_, flightModel_.GetDamageModel().GetMeshCollider().GetBoundingRadius() + 2.5f);
+		}
 		if (modelPath.find("m15") != std::string::npos) {
 			visualModel_.SetMaterialProperties(42.0f, 0.75f, 0.28f);
 			visualModel_.SetMaterialColor({ 0.56f, 0.61f, 0.68f, 1.00f });
@@ -1088,6 +1096,81 @@ void Enemy::ApplyMissileDamage(float damage, const MyMath::Vector3& hitPos) {
 	}
 }
 
+bool Enemy::TestCanyonWesternBulletMeshHit(
+	const Bullet* bullet,
+	MeshHitResult* outLocalHit,
+	MyMath::Vector3* outWorldHitPos) const
+{
+	if (!bullet) {
+		return false;
+	}
+	const auto& mc = flightModel_.GetDamageModel().GetMeshCollider();
+	if (!mc.IsValid()) {
+		return true;
+	}
+
+	const float bankRoll = -std::clamp(specialVel_.x * 0.015f, -0.65f, 0.65f);
+	MyMath::Vector3 right{}, up{}, fwd{};
+	BuildAircraftBasis(specialVel_, bankRoll, right, up, fwd);
+
+	auto worldToBasisLocal = [&](const MyMath::Vector3& wp) -> MyMath::Vector3 {
+		const MyMath::Vector3 rel = MyMath::Subtract(wp, specialPos_);
+		return {
+			MyMath::Dot(rel, right),
+			MyMath::Dot(rel, up),
+			MyMath::Dot(rel, fwd)
+		};
+	};
+
+	const MyMath::Vector3 localStart = worldToBasisLocal(bullet->GetPrevPosition());
+	const MyMath::Vector3 localEnd = worldToBasisLocal(bullet->GetPosition());
+
+	MeshHitResult res = mc.IntersectSegmentLocal(
+		localStart,
+		localEnd,
+		0.40f,
+		[this](DamagePart p) { return visualModel_.IsPartVisible(p); });
+
+	if (res.hit) {
+		if (outLocalHit) {
+			*outLocalHit = res;
+		}
+		if (outWorldHitPos) {
+			*outWorldHitPos = {
+				specialPos_.x + right.x * res.localPoint.x + up.x * res.localPoint.y + fwd.x * res.localPoint.z,
+				specialPos_.y + right.y * res.localPoint.x + up.y * res.localPoint.y + fwd.y * res.localPoint.z,
+				specialPos_.z + right.z * res.localPoint.x + up.z * res.localPoint.y + fwd.z * res.localPoint.z
+			};
+		}
+	}
+	return res.hit;
+}
+
+bool Enemy::RefineCollision(const ICollisionBody3D* other) const {
+	if (!isAlive_ || IsAlly() || !other) {
+		return false;
+	}
+	if (!(other->GetCollisionAttribute() & CollisionAttribute::kPlayerBullet)) {
+		return true;
+	}
+	if (aiType_ == AIType::CanyonDrone || !flightModel_.GetDamageModel().HasMeshCollider()) {
+		return true;
+	}
+
+	const auto* bullet = dynamic_cast<const Bullet*>(other);
+	if (!bullet) {
+		return false;
+	}
+
+	if (aiType_ == AIType::CanyonWesternFighter) {
+		return TestCanyonWesternBulletMeshHit(bullet);
+	}
+	if (useVisualModel_) {
+		return flightModel_.TestBulletSegmentHit(bullet->GetPrevPosition(), bullet->GetPosition());
+	}
+	return true;
+}
+
 void Enemy::OnCollision(ICollisionBody3D* other) {
 	if (!isAlive_ || IsAlly()) { return; }
 
@@ -1105,33 +1188,69 @@ void Enemy::OnCollision(ICollisionBody3D* other) {
 		}
 		if (other->GetCollisionAttribute() & CollisionAttribute::kPlayerBullet) {
 			auto* bullet = dynamic_cast<Bullet*>(other);
-			const MyMath::Vector3 bulletPos = bullet ? bullet->GetPosition() : specialPos_;
+			MyMath::Vector3 hitWorldPos = bullet ? bullet->GetPosition() : specialPos_;
 			const float dmg = bullet ? bullet->GetDamage() : 10.0f;
 			if (dmg <= 0.001f) {
-				EffectManager::GetInstance()->EmitHitEffect(bulletPos);
+				EffectManager::GetInstance()->EmitHitEffect(hitWorldPos);
+				return;
+			}
+
+			MeshHitResult meshHit;
+			const bool hasMeshHit = bullet && flightModel_.GetDamageModel().HasMeshCollider()
+				&& TestCanyonWesternBulletMeshHit(bullet, &meshHit, &hitWorldPos);
+			if (bullet && flightModel_.GetDamageModel().HasMeshCollider() && !hasMeshHit) {
 				return;
 			}
 
 			hitMarkerTriggered_ = true;
-			EffectManager::GetInstance()->EmitHitEffect(bulletPos);
+			EffectManager::GetInstance()->EmitHitEffect(hitWorldPos);
 
-			const float bankRoll = -std::clamp(specialVel_.x * 0.015f, -0.65f, 0.65f);
-			MyMath::Vector3 right{}, up{}, fwd{};
-			BuildAircraftBasis(specialVel_, bankRoll, right, up, fwd);
-
-			const MyMath::Vector3 relHit = MyMath::Subtract(bulletPos, specialPos_);
-			const float localX = MyMath::Dot(relHit, right);
-			const float localZ = MyMath::Dot(relHit, fwd);
-
-			if (localX <= -1.25f) {
-				portWingHp_ = (std::max)(0.0f, portWingHp_ - dmg);
-			} else if (localX >= 1.25f) {
-				stbdWingHp_ = (std::max)(0.0f, stbdWingHp_ - dmg);
-			} else if (localZ <= -1.20f) {
-				engineCoreHp_ = (std::max)(0.0f, engineCoreHp_ - dmg);
+			if (hasMeshHit) {
+				switch (meshHit.part) {
+				case DamagePart::Wing_L:
+				case DamagePart::Wing1_L:
+				case DamagePart::Wing2_L:
+				case DamagePart::Aileron_L:
+					portWingHp_ = (std::max)(0.0f, portWingHp_ - dmg);
+					break;
+				case DamagePart::Wing_R:
+				case DamagePart::Wing1_R:
+				case DamagePart::Wing2_R:
+				case DamagePart::Aileron_R:
+					stbdWingHp_ = (std::max)(0.0f, stbdWingHp_ - dmg);
+					break;
+				case DamagePart::Tail:
+				case DamagePart::Rudder:
+				case DamagePart::Fin:
+				case DamagePart::Elevator0:
+				case DamagePart::Elevator1:
+				case DamagePart::Engine1:
+					engineCoreHp_ = (std::max)(0.0f, engineCoreHp_ - dmg);
+					break;
+				default:
+					portWingHp_ = (std::max)(0.0f, portWingHp_ - dmg * (1.0f - 0.42f));
+					engineCoreHp_ = (std::max)(0.0f, engineCoreHp_ - dmg * 0.42f);
+					break;
+				}
 			} else {
-				portWingHp_ = (std::max)(0.0f, portWingHp_ - dmg * (1.0f - 0.42f));
-				engineCoreHp_ = (std::max)(0.0f, engineCoreHp_ - dmg * 0.42f);
+				const float bankRoll = -std::clamp(specialVel_.x * 0.015f, -0.65f, 0.65f);
+				MyMath::Vector3 right{}, up{}, fwd{};
+				BuildAircraftBasis(specialVel_, bankRoll, right, up, fwd);
+
+				const MyMath::Vector3 relHit = MyMath::Subtract(hitWorldPos, specialPos_);
+				const float localX = MyMath::Dot(relHit, right);
+				const float localZ = MyMath::Dot(relHit, fwd);
+
+				if (localX <= -1.25f) {
+					portWingHp_ = (std::max)(0.0f, portWingHp_ - dmg);
+				} else if (localX >= 1.25f) {
+					stbdWingHp_ = (std::max)(0.0f, stbdWingHp_ - dmg);
+				} else if (localZ <= -1.20f) {
+					engineCoreHp_ = (std::max)(0.0f, engineCoreHp_ - dmg);
+				} else {
+					portWingHp_ = (std::max)(0.0f, portWingHp_ - dmg * (1.0f - 0.42f));
+					engineCoreHp_ = (std::max)(0.0f, engineCoreHp_ - dmg * 0.42f);
+				}
 			}
 			health_ = (std::min)({ portWingHp_, stbdWingHp_, engineCoreHp_ });
 
@@ -1148,19 +1267,28 @@ void Enemy::OnCollision(ICollisionBody3D* other) {
 		return;
 	}
 
-	// PlayerBullet との衝突 → パーツ被弾処理
+	// PlayerBullet との衝突 → メッシュ部位＆パーツ被弾処理
 	if (other->GetCollisionAttribute() & CollisionAttribute::kPlayerBullet) {
 		auto* bullet = dynamic_cast<Bullet*>(other);
-		Vector3 bulletPos = bullet ? bullet->GetPosition() : flightModel_.GetPosition();
+		Vector3 hitWorldPos = bullet ? bullet->GetPosition() : flightModel_.GetPosition();
 		float dmg = bullet ? bullet->GetDamage() : 10.0f;
 		if (dmg <= 0.001f) {
 			return;
 		}
 
+		HitResult res;
+		if (bullet && useVisualModel_ && flightModel_.GetDamageModel().HasMeshCollider()) {
+			res = flightModel_.ProcessBulletSegmentHit(bullet->GetPrevPosition(), bullet->GetPosition(), dmg, &hitWorldPos);
+			if (!res.isValid()) {
+				return;
+			}
+		} else {
+			res = flightModel_.ProcessBulletHit(hitWorldPos, dmg);
+		}
+
 		hitMarkerTriggered_ = true;
 		health_ = (std::max)(0.0f, health_ - dmg);
-		HitResult res = flightModel_.ProcessBulletHit(bulletPos, dmg);
-		EffectManager::GetInstance()->EmitHitEffect(bulletPos);
+		EffectManager::GetInstance()->EmitHitEffect(hitWorldPos);
 
 		if (health_ <= 0.0f || (aiType_ != AIType::CanyonDrone && flightModel_.GetAirframe().IsDestroyed())) {
 			health_ = 0.0f;

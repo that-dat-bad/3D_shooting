@@ -157,6 +157,15 @@ void AircraftVisualModel::ResetAllPartsVisible() {
 	}
 }
 
+void AircraftVisualModel::Clear() {
+	partNodes_.clear();
+}
+
+bool AircraftVisualModel::HasPart(DamagePart part) const {
+	auto it = partNodes_.find(part);
+	return it != partNodes_.end() && it->second.object != nullptr;
+}
+
 void AircraftVisualModel::Update(const Matrix4x4& parentWorldMatrix, float deltaTime) {
 	// プロペラ回転角の更新
 	if (propellerRpm_ > 0.001f) {

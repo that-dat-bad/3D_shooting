@@ -1,4 +1,5 @@
 #include "DamageModel.h"
+#include "../../engine/Physics/Collision3DManager.h"
 #include <cmath>
 #include <algorithm>
 #include <cstdlib>
@@ -74,25 +75,37 @@ void DamageModel::Initialize()
 
 
 	// --- サブコライダー定義 ---
-	subColliders_.clear();
-	subColliders_ = {
-		// パーツ 中心座標 半径
-		{ DamagePart::Engine1,  { 0.0f,  0.0f,   5.0f },  { 0.8f,  0.6f,  1.5f } },
-		{ DamagePart::Propeller1, { 0.0f, 0.0f,  6.5f },  { 2.0f,  2.0f,  0.2f } },
-		{ DamagePart::Fuse,     { 0.0f,  0.0f,   0.0f },  { 0.95f, 0.95f, 7.5f } },
-		{ DamagePart::Pilot,    { 0.0f,  0.5f,   1.0f },  { 0.4f,  0.5f,  0.6f } },
-		{ DamagePart::Fuse1,    { 0.0f,  0.1f,  -1.0f },  { 0.5f,  0.5f,  1.5f } },
-		{ DamagePart::Tail,     { 0.0f,  0.1f,  -4.0f },  { 0.3f,  0.3f,  2.0f } },
-		{ DamagePart::Fin,      { 0.0f,  0.8f,  -5.0f },  { 0.1f,  0.6f,  0.6f } },
-		{ DamagePart::Wing_L,   {-2.0f, -0.1f,   0.0f },  { 1.5f,  0.15f, 1.2f } },
-		{ DamagePart::Wing_R,   { 2.0f, -0.1f,   0.0f },  { 1.5f,  0.15f, 1.2f } },
-		{ DamagePart::Wing1_L,  {-4.5f, -0.1f,  -0.2f },  { 1.2f,  0.12f, 1.0f } },
-		{ DamagePart::Wing1_R,  { 4.5f, -0.1f,  -0.2f },  { 1.2f,  0.12f, 1.0f } },
-		{ DamagePart::Wing2_L,  {-6.5f, -0.1f,  -0.4f },  { 1.0f,  0.1f,  0.8f } },
-		{ DamagePart::Wing2_R,  { 6.5f, -0.1f,  -0.4f },  { 1.0f,  0.1f,  0.8f } },
-		{ DamagePart::Tank1,    {-2.5f, -0.15f,  0.0f },  { 1.0f,  0.1f,  0.8f } },
-		{ DamagePart::Tank2,    { 2.5f, -0.15f,  0.0f },  { 1.0f,  0.1f,  0.8f } },
-	};
+	if (meshCollider_.IsValid()) {
+		subColliders_ = meshCollider_.GenerateSubColliders();
+	} else {
+		subColliders_.clear();
+		subColliders_ = {
+			// パーツ 中心座標 半径
+			{ DamagePart::Engine1,  { 0.0f,  0.0f,   5.0f },  { 0.8f,  0.6f,  1.5f } },
+			{ DamagePart::Propeller1, { 0.0f, 0.0f,  6.5f },  { 2.0f,  2.0f,  0.2f } },
+			{ DamagePart::Fuse,     { 0.0f,  0.0f,   0.0f },  { 0.95f, 0.95f, 7.5f } },
+			{ DamagePart::Pilot,    { 0.0f,  0.5f,   1.0f },  { 0.4f,  0.5f,  0.6f } },
+			{ DamagePart::Fuse1,    { 0.0f,  0.1f,  -1.0f },  { 0.5f,  0.5f,  1.5f } },
+			{ DamagePart::Tail,     { 0.0f,  0.1f,  -4.0f },  { 0.3f,  0.3f,  2.0f } },
+			{ DamagePart::Fin,      { 0.0f,  0.8f,  -5.0f },  { 0.1f,  0.6f,  0.6f } },
+			{ DamagePart::Wing_L,   {-2.0f, -0.1f,   0.0f },  { 1.5f,  0.15f, 1.2f } },
+			{ DamagePart::Wing_R,   { 2.0f, -0.1f,   0.0f },  { 1.5f,  0.15f, 1.2f } },
+			{ DamagePart::Wing1_L,  {-4.5f, -0.1f,  -0.2f },  { 1.2f,  0.12f, 1.0f } },
+			{ DamagePart::Wing1_R,  { 4.5f, -0.1f,  -0.2f },  { 1.2f,  0.12f, 1.0f } },
+			{ DamagePart::Wing2_L,  {-6.5f, -0.1f,  -0.4f },  { 1.0f,  0.1f,  0.8f } },
+			{ DamagePart::Wing2_R,  { 6.5f, -0.1f,  -0.4f },  { 1.0f,  0.1f,  0.8f } },
+			{ DamagePart::Tank1,    {-2.5f, -0.15f,  0.0f },  { 1.0f,  0.1f,  0.8f } },
+			{ DamagePart::Tank2,    { 2.5f, -0.15f,  0.0f },  { 1.0f,  0.1f,  0.8f } },
+		};
+	}
+}
+
+bool DamageModel::BuildMeshCollider(const Model* model, const MyMath::Vector3& baseRotation) {
+	if (!meshCollider_.BuildFromModel(model, baseRotation)) {
+		return false;
+	}
+	subColliders_ = meshCollider_.GenerateSubColliders();
+	return true;
 }
 
 
@@ -129,6 +142,33 @@ MyMath::Vector3 DamageModel::WorldToLocal(
 		relative.x + qw * t.x + tt.x,
 		relative.y + qw * t.y + tt.y,
 		relative.z + qw * t.z + tt.z
+	};
+}
+
+MyMath::Vector3 DamageModel::LocalToWorld(
+	const MyMath::Vector3& localPos,
+	const MyMath::Vector3& origin,
+	const MyMath::Quaternion& orientation) const
+{
+	MyMath::Vector3 qv = { orientation.x, orientation.y, orientation.z };
+	float qw = orientation.w;
+
+	MyMath::Vector3 t = {
+		2.0f * (qv.y * localPos.z - qv.z * localPos.y),
+		2.0f * (qv.z * localPos.x - qv.x * localPos.z),
+		2.0f * (qv.x * localPos.y - qv.y * localPos.x)
+	};
+
+	MyMath::Vector3 tt = {
+		qv.y * t.z - qv.z * t.y,
+		qv.z * t.x - qv.x * t.z,
+		qv.x * t.y - qv.y * t.x
+	};
+
+	return {
+		origin.x + localPos.x + qw * t.x + tt.x,
+		origin.y + localPos.y + qw * t.y + tt.y,
+		origin.z + localPos.z + qw * t.z + tt.z
 	};
 }
 
@@ -300,6 +340,96 @@ HitResult DamageModel::ProcessBulletHit(
 
 	DamagePart hitPart = TestHitPart(bulletWorldPos, aircraftPos, aircraftOrientation);
 	return ProcessHit(hitPart, rawDamage);
+}
+
+bool DamageModel::TestBulletSegmentHit(
+	const MyMath::Vector3& prevWorldPos,
+	const MyMath::Vector3& curWorldPos,
+	const MyMath::Vector3& aircraftPos,
+	const MyMath::Quaternion& aircraftOrientation,
+	MeshHitResult* outLocalHit) const
+{
+	if (!meshCollider_.IsValid()) {
+		return true;
+	}
+
+	const MyMath::Vector3 localStart = WorldToLocal(prevWorldPos, aircraftPos, aircraftOrientation);
+	const MyMath::Vector3 localEnd = WorldToLocal(curWorldPos, aircraftPos, aircraftOrientation);
+
+	MeshHitResult res = meshCollider_.IntersectSegmentLocal(
+		localStart,
+		localEnd,
+		0.35f,
+		[this](DamagePart p) { return !IsPartDestroyed(p); });
+
+	if (outLocalHit) {
+		*outLocalHit = res;
+	}
+	return res.hit;
+}
+
+HitResult DamageModel::ProcessBulletSegmentHit(
+	const MyMath::Vector3& prevWorldPos,
+	const MyMath::Vector3& curWorldPos,
+	const MyMath::Vector3& aircraftPos,
+	const MyMath::Quaternion& aircraftOrientation,
+	float rawDamage,
+	MyMath::Vector3* outWorldHitPos)
+{
+	if (isInvulnerable_) {
+		return HitResult{};
+	}
+
+	if (!meshCollider_.IsValid()) {
+		if (outWorldHitPos) {
+			*outWorldHitPos = curWorldPos;
+		}
+		return ProcessBulletHit(curWorldPos, aircraftPos, aircraftOrientation, rawDamage);
+	}
+
+	MeshHitResult meshHit;
+	if (!TestBulletSegmentHit(prevWorldPos, curWorldPos, aircraftPos, aircraftOrientation, &meshHit) || !meshHit.hit) {
+		return HitResult{};
+	}
+
+	if (outWorldHitPos) {
+		*outWorldHitPos = LocalToWorld(meshHit.localPoint, aircraftPos, aircraftOrientation);
+	}
+
+	HitResult result = ProcessHit(meshHit.part, rawDamage);
+
+	// 外装メッシュ命中後、内部モジュール（パイロット/エンジン/燃料タンク）への貫通判定
+	const MyMath::Vector3 localStart = WorldToLocal(prevWorldPos, aircraftPos, aircraftOrientation);
+	const MyMath::Vector3 localEnd = WorldToLocal(curWorldPos, aircraftPos, aircraftOrientation);
+	const MyMath::Vector3 segDelta = MyMath::Subtract(localEnd, localStart);
+	const float segLen = MyMath::Length(segDelta);
+	if (segLen > 1e-4f) {
+		Ray penRay;
+		penRay.origin = meshHit.localPoint;
+		penRay.direction = MyMath::Multiply(1.0f / segLen, segDelta);
+		penRay.maxDistance = 3.0f;
+
+		for (const auto& col : subColliders_) {
+			if (col.part != DamagePart::Pilot &&
+			    col.part != DamagePart::Engine1 &&
+			    col.part != DamagePart::Tank1 &&
+			    col.part != DamagePart::Tank2) {
+				continue;
+			}
+			if (col.part == meshHit.part || IsPartDestroyed(col.part)) {
+				continue;
+			}
+			const AABBCollider box = {
+				MyMath::Subtract(col.center, col.halfSize),
+				MyMath::Add(col.center, col.halfSize)
+			};
+			if (Collision3DManager::CheckRayAABB(penRay, box)) {
+				ProcessHit(col.part, rawDamage * 0.55f);
+			}
+		}
+	}
+
+	return result;
 }
 
 

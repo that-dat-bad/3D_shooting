@@ -18,6 +18,9 @@ void Engine::Initialize(const EngineData& data) {
 // --- 毎フレームの更新処理 ---
 void Engine::Update(float dt, float targetThrottle) {
 	// 1. 目標値が限界を超えないように安全対策
+	if (targetThrottle < 0.0f) {
+		targetThrottle = 0.0f;
+	}
 	if (targetThrottle > wepThrottleLimit_) {
 		targetThrottle = wepThrottleLimit_;
 	}
@@ -53,4 +56,16 @@ float Engine::GetThrustAtAltitude(float altitude, float engineDamageFactor) cons
 	damageFactor = (std::max)(damageFactor, 0.1f);
 
 	return baseThrust_ * currentThrottle_ * altFactor * damageFactor;
+}
+
+// --- アフターバーナー燃焼比率 (0.0f: 非WEP, 0.0f~1.0f: WEP出力) ---
+float Engine::GetAfterburnerRatio() const {
+	if (!IsWepActive()) {
+		return 0.0f;
+	}
+	const float span = wepThrottleLimit_ - normalThrottleLimit_;
+	if (span <= 0.001f) {
+		return 0.0f;
+	}
+	return std::clamp((currentThrottle_ - normalThrottleLimit_) / span, 0.0f, 1.0f);
 }

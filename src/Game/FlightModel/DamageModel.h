@@ -2,6 +2,9 @@
 #include <cstdint>
 #include <vector>
 #include "math/MyMath.h"
+#include "AircraftMeshCollider.h"
+
+class Model;
 
 // ============================================================
 // パーツ定義
@@ -109,6 +112,33 @@ public:
 
 	// 初期化
 	void Initialize();
+
+	// メッシュコライダー構築＆部位ボックス自動フィット
+	bool BuildMeshCollider(
+		const Model* model,
+		const MyMath::Vector3& baseRotation = { 0.0f, 3.14159265358979323846f, 0.0f }
+	);
+	const AircraftMeshCollider& GetMeshCollider() const { return meshCollider_; }
+	bool HasMeshCollider() const { return meshCollider_.IsValid(); }
+
+	// 線分（前フレーム→現フレーム）によるメッシュヒット判定
+	bool TestBulletSegmentHit(
+		const MyMath::Vector3& prevWorldPos,
+		const MyMath::Vector3& curWorldPos,
+		const MyMath::Vector3& aircraftPos,
+		const MyMath::Quaternion& aircraftOrientation,
+		MeshHitResult* outLocalHit = nullptr
+	) const;
+
+	// 線分によるメッシュ被弾処理（貫通内部モジュール判定付き）
+	HitResult ProcessBulletSegmentHit(
+		const MyMath::Vector3& prevWorldPos,
+		const MyMath::Vector3& curWorldPos,
+		const MyMath::Vector3& aircraftPos,
+		const MyMath::Quaternion& aircraftOrientation,
+		float rawDamage,
+		MyMath::Vector3* outWorldHitPos = nullptr
+	);
 
 	// ============================================================
 	// 被弾処理
@@ -229,6 +259,13 @@ private:
 		const MyMath::Quaternion& orientation
 	) const;
 
+	// ワールド座標変換
+	MyMath::Vector3 LocalToWorld(
+		const MyMath::Vector3& localPos,
+		const MyMath::Vector3& origin,
+		const MyMath::Quaternion& orientation
+	) const;
+
 	// OBB判定
 	static bool IsPointInBox(const MyMath::Vector3& point, const SubColliderDef& box);
 
@@ -238,6 +275,9 @@ private:
 
 	// サブコライダー群
 	std::vector<SubColliderDef> subColliders_;
+
+	// メッシュコライダー
+	AircraftMeshCollider meshCollider_;
 
 	// 無敵フラグ
 	bool isInvulnerable_ = false;

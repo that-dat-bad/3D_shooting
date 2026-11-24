@@ -77,11 +77,12 @@ void StageScene::InitializeAssets() {
 	// ============================
 	// 機体設定のロード
 	// ============================
-	std::string aircraftCfgPath = aircraftConfig_.GetCurrentFilePath();
+	std::string aircraftCfgPath = AircraftConfig::GetActiveConfigPath();
 	if (aircraftCfgPath.empty()) {
 		aircraftCfgPath = "Resources/aircraft/mig21.cfg";
 	}
-	if (!AsyncPreloadManager::GetInstance()->ApplyPreloadedAircraftConfig(aircraftConfig_)) {
+	if (!AsyncPreloadManager::GetInstance()->ApplyPreloadedAircraftConfig(aircraftConfig_) ||
+		aircraftConfig_.GetCurrentFilePath() != aircraftCfgPath) {
 		auto t0 = std::chrono::high_resolution_clock::now();
 		aircraftConfig_.LoadFromCfg(aircraftCfgPath);
 		auto t1 = std::chrono::high_resolution_clock::now();
@@ -91,6 +92,8 @@ void StageScene::InitializeAssets() {
 		Benchmark::Log(buf);
 	}
 	const auto& generalConfig = aircraftConfig_.GetGeneral();
+	loadedVisualModelPath_ = generalConfig.modelPath;
+	appliedAircraftConfigRevision_ = AircraftConfig::GetConfigRevision();
 
 	// ============================
 	// 描画オブジェクト・モデル・テクスチャの初期化
@@ -144,7 +147,12 @@ void StageScene::InitializeAssets() {
 	afterburner_->SetFlameColor({ 0.28f, 0.65f, 1.0f });
 	afterburner_->SetCoreColor({ 0.88f, 0.95f, 1.0f });
 	afterburner_->SetIntensity(0.0f);
-	afterburner_->LoadConfig("assets/configs/afterburner_m21.json");
+	{
+		const std::string& abPath = generalConfig.afterburnerConfigPath.empty()
+			? std::string("assets/configs/afterburner_m21.json")
+			: generalConfig.afterburnerConfigPath;
+		afterburner_->LoadConfig(abPath);
+	}
 
 	// スカイボックス
 	TextureManager::GetInstance()->LoadTexture("assets/textures/qwantani_dusk_2_puresky_2k.dds");
@@ -213,12 +221,43 @@ void StageScene::ResetGameplayState() {
 	}
 
 	// 機体設定の最新反映
-	std::string aircraftCfgPath = aircraftConfig_.GetCurrentFilePath();
-	if (aircraftCfgPath.empty()) {
-		aircraftCfgPath = "Resources/aircraft/mig21.cfg";
-	}
-	if (!AsyncPreloadManager::GetInstance()->ApplyPreloadedAircraftConfig(aircraftConfig_)) {
-		aircraftConfig_.LoadFromCfg(aircraftCfgPath);
+	const std::string activeCfgPath = AircraftConfig::GetActiveConfigPath();
+	const uint64_t latestRevision = AircraftConfig::GetConfigRevision();
+	const bool configNeedsReload = (latestRevision != appliedAircraftConfigRevision_) ||
+		(!activeCfgPath.empty() && activeCfgPath != aircraftConfig_.GetCurrentFilePath());
+
+	if (configNeedsReload) {
+		const std::string loadCfgPath = activeCfgPath.empty() ? std::string("Resources/aircraft/mig21.cfg") : activeCfgPath;
+		aircraftConfig_.LoadFromCfg(loadCfgPath);
+		appliedAircraftConfigRevision_ = latestRevision;
+
+		const auto& general = aircraftConfig_.GetGeneral();
+		if (!general.modelPath.empty() && general.modelPath != loadedVisualModelPath_) {
+			aircraftVisualModel_.Clear();
+			ModelManager::GetInstance()->LoadModel(general.modelPath);
+			aircraftVisualModel_.SetupFromSingleModel(general.modelPath);
+			if (!aircraftVisualModel_.IsPartVisible(DamagePart::Fuse)) {
+				aircraftVisualModel_.SetModelForPart(DamagePart::Fuse, general.modelPath);
+			}
+			loadedVisualModelPath_ = general.modelPath;
+		}
+		aircraftVisualModel_.SetMaterialProperties(
+			general.shininess,
+			general.specularIntensity,
+			general.environmentCoefficient);
+		aircraftVisualModel_.SetupCanopyMaterial();
+
+		if (afterburner_ && !general.afterburnerConfigPath.empty()) {
+			afterburner_->LoadConfig(general.afterburnerConfigPath);
+		}
+	} else {
+		std::string aircraftCfgPath = aircraftConfig_.GetCurrentFilePath();
+		if (aircraftCfgPath.empty()) {
+			aircraftCfgPath = "Resources/aircraft/mig21.cfg";
+		}
+		if (!AsyncPreloadManager::GetInstance()->ApplyPreloadedAircraftConfig(aircraftConfig_)) {
+			aircraftConfig_.LoadFromCfg(aircraftCfgPath);
+		}
 	}
 
 	const auto& airframeData = aircraftConfig_.GetAirframe();
@@ -226,11 +265,15 @@ void StageScene::ResetGameplayState() {
 	const auto& gunpodData = aircraftConfig_.GetGunpod();
 
 	flightModel_.Initialize(airframeData, engineData);
+	if (Model* playerModel = ModelManager::GetInstance()->FindModel(loadedVisualModelPath_)) {
+		flightModel_.BuildMeshCollider(playerModel, aircraftVisualModel_.GetBaseRotation());
+	}
 	flightModel_.SetPosition({ 0.0f, 100.0f, 0.0f });
 
 	float initialSpeed = 250.0f / 3.6f;
 	flightModel_.SetVelocity(Multiply(initialSpeed, flightModel_.GetForwardDirection()));
 	throttle_ = 0.6f;
+	wepDetentTimer_ = 0.0f;
 	flightModel_.SetThrottle(throttle_);
 
 	// 自機パーツをすべて可視状態に復元
@@ -284,14 +327,37 @@ void StageScene::ResetGameplayState() {
 	}
 
 	const auto& mission = missionManager.GetCurrentMission();
-	if (loadPath.find("mission_clear_demo") == std::string::npos) {
+	isFreeFlightMode_ = (loadPath.find("free_flight") != std::string::npos) ||
+		(mission.name == "Free Flight");
+	if (!isFreeFlightMode_ && loadPath.find("mission_clear_demo") == std::string::npos) {
 		MissionSyncManager::GetInstance()->Initialize();
 		MissionSyncManager::GetInstance()->SetActiveMissionFilePath(loadPath);
 		MissionSyncManager::GetInstance()->StartSync();
 	}
 	playerMaxHP_ = mission.playerHP;
 	playerHP_ = mission.playerHP;
-	flightModel_.SetPosition(mission.playerPosition);
+	Vector3 spawnPos = mission.playerPosition;
+	if (isFreeFlightMode_) {
+		if (spawnPos.y < 120.0f) {
+			spawnPos.y = 150.0f;
+		}
+		flightModel_.SetGroundElevation(0.0f);
+		flightModel_.SetWaterSurface(false, 0.0f, 0.0f);
+	} else if (terrainChunkManager_ && terrainChunkManager_->IsLoaded()) {
+		const auto surf = terrainChunkManager_->QuerySurfaceAt(spawnPos.x, spawnPos.z, -485.0f);
+		const float surfaceY = (surf.type == TerrainChunkManager::SurfaceType::Water)
+			? (std::max)(surf.landY, surf.waterY)
+			: surf.landY;
+		if (spawnPos.y < surfaceY + 120.0f) {
+			spawnPos.y = surfaceY + 250.0f;
+		}
+		flightModel_.SetGroundElevation(surf.landY);
+		flightModel_.SetWaterSurface(
+			surf.type == TerrainChunkManager::SurfaceType::Water,
+			surf.waterY,
+			surf.waterDepth);
+	}
+	flightModel_.SetPosition(spawnPos);
 	{
 		const float yawRad = mission.playerYawDeg * StageRadioDefaults::kDegToRad;
 		const float halfYaw = yawRad * StageRadioDefaults::kHalfAngleFactor;
@@ -304,20 +370,14 @@ void StageScene::ResetGameplayState() {
 		flightModel_.SetVelocity(Multiply(initialSpeed, flightModel_.GetForwardDirection()));
 		mouseAimController_.ResetToDirection(flightModel_.GetForwardDirection());
 	}
-	if (terrainChunkManager_ && terrainChunkManager_->IsLoaded()) {
-		flightModel_.SetGroundElevation(terrainChunkManager_->GetTerrainHeightAt(
-			mission.playerPosition.x,
-			mission.playerPosition.z,
-			-485.0f));
-	}
-	playerCamera_.Initialize(mission.playerPosition, flightModel_.GetForwardDirection());
+	playerCamera_.Initialize(spawnPos, flightModel_.GetForwardDirection());
 	GameResult::GetInstance().isHalcyonDaysTutorial = mission.isTutorialDebrief;
 	GameResult::GetInstance().isClearAutoDemo = mission.isClearAutoDemo;
 
 	static const std::vector<EnemySpawnData> kEmptyAirEnemies = {};
 	static const std::vector<GroundEnemySpawnData> kEmptyGroundEnemies = {};
 	enemyManager_.SetWaypointPaths(mission.waypointPaths);
-	enemyManager_.SetTerrainChunkManager(terrainChunkManager_);
+	enemyManager_.SetTerrainChunkManager(isFreeFlightMode_ ? nullptr : terrainChunkManager_);
 
 	enemyManager_.Initialize(
 		enableEnemies_ ? mission.enemies : kEmptyAirEnemies,
@@ -394,6 +454,8 @@ void StageScene::ResetGameplayState() {
 	combatBootSequence_.Start();
 	sortieIntroDuration_ = combatBootSequence_.GetCurrentDuration();
 	sortieIntroTimer_ = 0.0f;
+	wasInSortieIntro_ = (sortieIntroDuration_ > 0.0f);
+	flightModel_.SetInvulnerable(wasInSortieIntro_);
 	if (combatBootSequence_.IsWaitingForSpace()) {
 		Input::GetInstance()->UnlockCursor();
 		const float screenW = static_cast<float>(WinApp::kClientWidth);
@@ -537,7 +599,7 @@ void StageScene::Update() {
 	UpdatePostEffects(gameDeltaTime);
 
 	// 地形チャンクの更新
-	if (terrainChunkManager_) {
+	if (!isFreeFlightMode_ && terrainChunkManager_) {
 		terrainChunkManager_->Update(flightModel_.GetPosition());
 	}
 
@@ -610,7 +672,7 @@ void StageScene::Draw() {
 	enemyManager_.Draw(cam);
 
 	// 地面描画
-	if (terrainChunkManager_ && terrainChunkManager_->IsLoaded()) {
+	if (!isFreeFlightMode_ && terrainChunkManager_ && terrainChunkManager_->IsLoaded()) {
 		// 自機の地面投影シャドウ情報を SpotLight 経由で地形シェーダーへ渡す
 		SpotLight* shadowLight = Object3dCommon::GetInstance()->GetSpotLightData();
 		if (shadowLight) {

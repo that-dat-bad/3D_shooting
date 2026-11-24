@@ -33,7 +33,7 @@ public:
 
 
 	// ---setter --
-	void SetThrottleInput(float throttle) { targetThrottle_ = throttle; }                      // 0.0f ~ 1.0f
+	void SetThrottleInput(float throttle) { targetThrottle_ = throttle; }                      // 0.0f ~ wepThrottleLimit
 	void SetThrottle(float throttle) { engine_.SetThrottle(throttle); targetThrottle_ = throttle; }
 	void SetControlInput(float pitch, float roll, float yaw) { inputPitch_ = pitch; inputRoll_ = roll; inputYaw_ = yaw; }   // 各軸 -1.0f ~ 1.0f
 	void SetFlapInput(bool deploy) { airframe_.SetFlapDesired(deploy); }
@@ -47,6 +47,20 @@ public:
 	float GetSpeed() const { return MyMath::Length(velocity_); }
 	float GetTotalMass() const;
 	float GetCurrentThrottle() const { return engine_.GetCurrentThrottle(); }
+	float GetNormalThrottleLimit() const { return engine_.GetNormalThrottleLimit(); }
+	float GetWepThrottleLimit() const { return engine_.GetWepThrottleLimit(); }
+	bool  HasWep() const { return engine_.HasWep(); }
+	bool  IsWepActive() const {
+		return engine_.IsWepActive() &&
+			!airframe_.GetDamageModel().IsPartDestroyed(DamagePart::Engine1) &&
+			airframe_.GetCurrentInternalFuel() > 0.0f;
+	}
+	float GetAfterburnerIntensity() const {
+		if (!IsWepActive()) {
+			return 0.0f;
+		}
+		return 0.35f + 0.65f * engine_.GetAfterburnerRatio();
+	}
 	float GetCurrentFuel() const { return airframe_.GetCurrentInternalFuel(); }
 	float GetCurrentAoA() const { return currentAoA_; }
 	float GetCurrentG() const { return currentG_; }
@@ -75,6 +89,30 @@ public:
 	// オートパイロットモード
 	void SetAutopilot(bool autopilot) { isAutopilot_ = autopilot; }
 	bool IsAutopilot() const { return isAutopilot_; }
+
+	// メッシュコライダー構築
+	bool BuildMeshCollider(
+		const Model* model,
+		const MyMath::Vector3& baseRotation = { 0.0f, 3.14159265358979323846f, 0.0f }) {
+		return airframe_.GetDamageModel().BuildMeshCollider(model, baseRotation);
+	}
+
+	// 弾丸の線分メッシュヒット判定
+	bool TestBulletSegmentHit(
+		const MyMath::Vector3& prevWorldPos,
+		const MyMath::Vector3& curWorldPos,
+		MeshHitResult* outLocalHit = nullptr) const {
+		return airframe_.GetDamageModel().TestBulletSegmentHit(prevWorldPos, curWorldPos, position_, orientation_, outLocalHit);
+	}
+
+	// 弾丸の線分メッシュ被弾処理
+	HitResult ProcessBulletSegmentHit(
+		const MyMath::Vector3& prevWorldPos,
+		const MyMath::Vector3& curWorldPos,
+		float rawDamage,
+		MyMath::Vector3* outWorldHitPos = nullptr) {
+		return airframe_.GetDamageModel().ProcessBulletSegmentHit(prevWorldPos, curWorldPos, position_, orientation_, rawDamage, outWorldHitPos);
+	}
 
 	// 弾丸の被弾処理
 	HitResult ProcessBulletHit(const MyMath::Vector3& bulletWorldPos, float rawDamage) {

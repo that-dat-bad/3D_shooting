@@ -71,19 +71,20 @@ void TitleScene::InitializeUI(SpriteCommon* spriteCommon, bool fromCache) {
 	});
 
 	// FREE FLIGHT ボタン
-	editorButton_.Initialize(spriteCommon, "[02] FREE FLIGHT [LOCKED]", 21.0f);
+	editorButton_.Initialize(spriteCommon, "[02] FREE FLIGHT", 21.0f);
 	editorButton_.SetLeftAligned(true, 100.0f);
 	editorButton_.SetTextOffset({ 0.0f, 3.0f });
 	editorButton_.GetLabelText()->SetFontName("HackGen");
 	editorButton_.SetPosition({ buttonX, buttonStartY + buttonSpacing });
 	editorButton_.SetSize({ buttonWidth, buttonHeight });
-	editorButton_.SetNormalColor(btnLockedBg);
-	editorButton_.SetHoverColor(btnLockedBg);
-	editorButton_.SetSelectedColor(btnLockedBg);
-	editorButton_.SetTextColor(btnLockedText);
-	editorButton_.SetSelectedTextColor(btnLockedText);
+	editorButton_.SetNormalColor(btnNormalBg);
+	editorButton_.SetHoverColor(btnHoverBg);
+	editorButton_.SetSelectedColor(btnSelectedBg);
+	editorButton_.SetTextColor(btnNormalText);
+	editorButton_.SetSelectedTextColor(btnSelText);
 	editorButton_.SetOnClick([this]() {
-		lockedAlertTimer_ = 1.8f;
+		MissionManager::GetInstance().SetCurrentFilePath("Resources/missions/free_flight.json");
+		StartSortieSequence();
 	});
 
 	// SETTINGS ボタン
@@ -481,8 +482,8 @@ void TitleScene::UpdateMenuConsoleVisuals() {
 
 	startButton_.SetTextColor(normalGreen);
 	startButton_.SetSelectedTextColor(selectedGreen);
-	editorButton_.SetTextColor(lockedNormal);
-	editorButton_.SetSelectedTextColor(lockedSelected);
+	editorButton_.SetTextColor(normalGreen);
+	editorButton_.SetSelectedTextColor(selectedGreen);
 	settingsButton_.SetTextColor(lockedNormal);
 	settingsButton_.SetSelectedTextColor(lockedSelected);
 	exitButton_.SetTextColor(normalGreen);
@@ -490,14 +491,14 @@ void TitleScene::UpdateMenuConsoleVisuals() {
 
 	// 各ボタンのラベル文字列は左揃え固定インデント配置
 	startButton_.SetLabel("[01] MISSION SELECT");
-	editorButton_.SetLabel("[02] FREE FLIGHT [LOCKED]");
+	editorButton_.SetLabel("[02] FREE FLIGHT");
 	settingsButton_.SetLabel("[03] SYSTEM CONFIG [LOCKED]");
 	exitButton_.SetLabel("[04] ABORT / EXIT");
 
 	// 各ボタン枠スプライトの色動的更新
 	for (size_t i = 0; i < buttonBorders_.size(); ++i) {
 		bool isSel = (static_cast<int>(i) == selIdx);
-		bool isLocked = !isMissionSelectModalOpen_ && (i == 1 || i == 2);
+		bool isLocked = !isMissionSelectModalOpen_ && (i == 2);
 		MyMath::Vector4 outlineCol;
 		MyMath::Vector4 bracketCol;
 		MyMath::Vector4 indicatorCol;

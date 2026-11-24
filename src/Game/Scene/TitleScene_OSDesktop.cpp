@@ -389,8 +389,8 @@ void TitleScene::UpdateOSDesktop(float dt, const Vector2& mousePos, bool isLDown
 					MissionManager::GetInstance().SetCurrentFilePath(missionCards_[idx].filePath);
 				}
 			} else if (pendingStartMenuAction_ == 2) {
-				// ロック中のためシーン遷移しない
-				lockedAlertTimer_ = 1.8f;
+				MissionManager::GetInstance().SetCurrentFilePath("Resources/missions/free_flight.json");
+				StartSortieSequence();
 			} else if (pendingStartMenuAction_ == 3) {
 				if (osWindows_.size() >= 3) {
 					osWindows_[0].pos = osWindows_[0].normalPos;
@@ -441,7 +441,8 @@ void TitleScene::UpdateOSDesktop(float dt, const Vector2& mousePos, bool isLDown
 					isStartMenuOpen_ = false;
 				} else if (relY >= 60.0f && relY < 88.0f) {
 					// [02] FREE FLIGHT
-					lockedAlertTimer_ = 1.8f;
+					startMenuTransitionTimer_ = kStartMenuTransitionDuration;
+					pendingStartMenuAction_ = 2;
 					isStartMenuOpen_ = false;
 				} else if (relY >= 88.0f && relY < 116.0f) {
 					// [03] RESET WINDOW LAYOUT
@@ -637,7 +638,7 @@ void TitleScene::UpdateOSDesktop(float dt, const Vector2& mousePos, bool isLDown
 								} else if (b == 1) {
 									activeIntelTarget_ = 1;
 								} else if (b == 2) {
-									// [LOCKED]: FREE FLIGHT ロック警告通知
+									// [SORTIE >>]: FREE FLIGHT 出撃
 									editorButton_.Click();
 								}
 							} else if (selIdx == 2) {
@@ -829,7 +830,7 @@ void TitleScene::DrawOSTaskbar() {
 
 		const char* menuItems[] = {
 			"[01] EXECUTE MISSION SELECT",
-			"[02] FREE FLIGHT [LOCKED]",
+			"[02] FREE FLIGHT",
 			"[03] RESET WINDOW LAYOUT",
 			"[04] REBOOT TERMINAL",
 			"[05] SHUTDOWN SYSTEM"
@@ -979,7 +980,7 @@ void TitleScene::DrawOSWindowCam(const OSWindow& win) {
 		}
 	} else if (selIdx == 1) {
 		// ==========================================
-		// [02] FREE FLIGHT [LOCKED]: 作戦エリアの衛星マップ
+		// [02] FREE FLIGHT: 作戦エリアの衛星マップ
 		// ==========================================
 		bool satBlink = (std::fmod(animTimer_, 0.8f) < 0.50f);
 		Vector4 satCol = satBlink ? Vector4{ 0.20f, 0.85f, 1.0f, 0.98f } : Vector4{ 0.05f, 0.25f, 0.45f, 0.40f };
@@ -1333,7 +1334,7 @@ void TitleScene::DrawOSWindowTelemetry(const OSWindow& win) {
 		}
 	} else if (selIdx == 1) {
 		// ==========================================
-		// [02] FREE FLIGHT [LOCKED]: 敵戦力分析データ
+		// [02] FREE FLIGHT: 敵戦力分析データ
 		// ==========================================
 		tr->Print("HackGen", "THEATER INTEL : CONFLICT ZONE 07", curPos.x + 14.0f, cy, 12.0f, { 1.0f, 0.45f, 0.35f, 0.98f });
 		cy += 20.0f;
@@ -1525,11 +1526,11 @@ void TitleScene::DrawOSWindowTelemetry(const OSWindow& win) {
 		{ 1.0f, 0.80f, 0.30f, 0.95f }
 		});
 		actBtns.push_back({
-		"[LOCKED]",
+		"[SORTIE >>]",
 		false,
-		{ 0.12f, 0.08f, 0.06f, 0.85f }, { 0.50f, 0.35f, 0.20f, 0.80f },
-		{ 0.25f, 0.12f, 0.08f, 0.95f }, { 0.70f, 0.45f, 0.25f, 1.0f },
-		{ 0.85f, 0.55f, 0.35f, 0.95f }
+		{ 0.07f, 0.20f, 0.08f, 0.85f }, { 0.42f, 0.80f, 0.45f, 0.90f },
+		{ 0.14f, 0.40f, 0.16f, 0.98f }, { 0.72f, 0.94f, 0.75f, 1.0f },
+		{ 0.78f, 0.95f, 0.80f, 1.0f }
 		});
 	} else if (selIdx == 2) {
 		actBtns.push_back({

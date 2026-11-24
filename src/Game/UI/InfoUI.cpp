@@ -86,7 +86,7 @@ void InfoUI::Update(float dt, const FlightInfoUIData& data) {
 	// -------------------------------------------------------------
 	{
 		const int throttlePct = static_cast<int>(std::round(data_.throttle * InfoUIDefaults::kThrottlePercentScale));
-		const bool isWep = (data_.throttle > 1.01f);
+		const bool isWep = data_.isWepActive || (data_.throttle > data_.normalThrottleLimit + 0.005f);
 
 		Vector4 valCol = isWep ? InfoUIDefaults::kWepColor : baseTextColor;
 		valCol.w *= currentAlpha;

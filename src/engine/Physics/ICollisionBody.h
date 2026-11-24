@@ -41,6 +41,9 @@ public:
 
 	/// <summary>この判定ボディが有効かどうか</summary>
 	virtual bool IsCollisionActive() const { return true; }
+
+	/// <summary>広域判定通過後の詳細（メッシュ等）交差判定</summary>
+	virtual bool RefineCollision([[maybe_unused]] const ICollisionBody3D* other) const { return true; }
 };
 
 // ============================================================
@@ -78,4 +81,7 @@ public:
 
 	/// <summary>この判定ボディが有効かどうか</summary>
 	virtual bool IsCollisionActive() const { return true; }
+
+	/// <summary>広域判定通過後の詳細（メッシュ等）交差判定</summary>
+	virtual bool RefineCollision([[maybe_unused]] const ICollisionBody3D* other) const { return true; }
 };

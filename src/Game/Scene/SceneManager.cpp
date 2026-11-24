@@ -21,6 +21,7 @@ const char* SceneManager::GetSceneName(int sceneID) {
 	case SCENE::DEBUG: return "DEBUG";
 	case SCENE::MISSION_EDITOR: return "MISSION_EDITOR";
 	case SCENE::EFFECT_EDITOR: return "EFFECT_EDITOR";
+	case SCENE::AIRCRAFT_EDITOR: return "AIRCRAFT_EDITOR";
 	default: return "UNKNOWN";
 	}
 }
@@ -278,6 +279,8 @@ void SceneManager::Update() {
 		IScene::SetSceneID(SCENE::CLEAR);
 	} else if (Input::GetInstance()->TriggerKey(DIK_F9)) {
 		IScene::SetSceneID(SCENE::EFFECT_EDITOR);
+	} else if (Input::GetInstance()->TriggerKey(DIK_F10)) {
+		IScene::SetSceneID(SCENE::AIRCRAFT_EDITOR);
 	}
 
 	if (ImGui::BeginMainMenuBar()) {
@@ -300,6 +303,9 @@ void SceneManager::Update() {
 			if (ImGui::MenuItem("Effect Manager (F9)", nullptr, currentSceneID == SCENE::EFFECT_EDITOR)) {
 				IScene::SetSceneID(SCENE::EFFECT_EDITOR);
 			}
+			if (ImGui::MenuItem("Aircraft Editor (F10)", nullptr, currentSceneID == SCENE::AIRCRAFT_EDITOR)) {
+				IScene::SetSceneID(SCENE::AIRCRAFT_EDITOR);
+			}
 			ImGui::Separator();
 			if (ImGui::MenuItem("Scene Profiler (F2)", nullptr, showProfilerWindow_)) {
 				ToggleProfilerWindow();
@@ -318,6 +324,9 @@ void SceneManager::Update() {
 			}
 			if (ImGui::MenuItem("Effect Manager Scene (F9)", nullptr, currentSceneID == SCENE::EFFECT_EDITOR)) {
 				IScene::SetSceneID(SCENE::EFFECT_EDITOR);
+			}
+			if (ImGui::MenuItem("Aircraft Editor Scene (F10)", nullptr, currentSceneID == SCENE::AIRCRAFT_EDITOR)) {
+				IScene::SetSceneID(SCENE::AIRCRAFT_EDITOR);
 			}
 			ImGui::EndMenu();
 		}

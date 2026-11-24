@@ -48,17 +48,57 @@ void StageScene::UpdateFlightControls(float gameDeltaTime) {
 		const bool allowSteering = missionManager.IsPlayerSteeringAllowed();
 		const bool allowThrottle = missionManager.IsPlayerThrottleAllowed();
 
-		// --- スロットル ---
+		// --- スロットル (War Thunder風 100%ディテント + WEP制御) ---
 		if (allowThrottle) {
-			if (input->PushKey(DIK_W)) {
-				throttle_ += 0.8f * gameDeltaTime;
+			const float normalLimit = (std::max)(0.1f, flightModel_.GetNormalThrottleLimit());
+			const float wepLimit = (std::max)(normalLimit, flightModel_.GetWepThrottleLimit());
+			const bool hasWep = flightModel_.HasWep();
+
+			constexpr float kDryThrottleRate = 0.8f;
+			constexpr float kWepDetentDuration = 0.22f;
+			constexpr float kWepEpsilon = 0.005f;
+
+			const bool pushW = input->PushKey(DIK_W);
+			const bool triggerW = input->TriggerKey(DIK_W);
+			const bool pushS = input->PushKey(DIK_S);
+			const bool triggerS = input->TriggerKey(DIK_S);
+
+			if (pushS) {
+				wepDetentTimer_ = 0.0f;
+				if (triggerS && throttle_ > normalLimit + kWepEpsilon) {
+					throttle_ = normalLimit;
+				} else {
+					throttle_ -= kDryThrottleRate * gameDeltaTime;
+				}
+			} else if (pushW) {
+				if (throttle_ < normalLimit - 0.001f) {
+					throttle_ = (std::min)(throttle_ + kDryThrottleRate * gameDeltaTime, normalLimit);
+					wepDetentTimer_ = 0.0f;
+				} else if (hasWep) {
+					const float wepRate = (std::max)(kDryThrottleRate, (wepLimit - normalLimit) * 2.0f);
+					if (throttle_ <= normalLimit + kWepEpsilon) {
+						if (triggerW) {
+							wepDetentTimer_ = kWepDetentDuration;
+						} else {
+							wepDetentTimer_ += gameDeltaTime;
+						}
+						if (wepDetentTimer_ >= kWepDetentDuration) {
+							throttle_ += wepRate * gameDeltaTime;
+						}
+					} else {
+						throttle_ += wepRate * gameDeltaTime;
+					}
+				}
+			} else {
+				wepDetentTimer_ = 0.0f;
+				if (holdWForWep_ && throttle_ > normalLimit) {
+					throttle_ = normalLimit;
+				}
 			}
-			if (input->PushKey(DIK_S)) {
-				throttle_ -= 0.8f * gameDeltaTime;
-			}
-			if (throttle_ < 0.0f) { throttle_ = 0.0f; }
-			if (throttle_ > 1.0f) { throttle_ = 1.0f; }
+
+			throttle_ = std::clamp(throttle_, 0.0f, hasWep ? wepLimit : normalLimit);
 		} else {
+			wepDetentTimer_ = 0.0f;
 			throttle_ += (0.65f - throttle_) * std::clamp(gameDeltaTime * 2.5f, 0.0f, 1.0f);
 		}
 		flightModel_.SetThrottleInput(throttle_);
@@ -344,22 +384,26 @@ void StageScene::UpdateFlightAndEffects(float gameDeltaTime) {
 	// 環境の更新
 	environmentManager_.Update(CameraManager::GetInstance()->GetActiveCamera(), gameDeltaTime);
 
-	// 飛行モデルの更新
-	if (terrainChunkManager_ && terrainChunkManager_->IsLoaded()) {
-		const Vector3 curPos = flightModel_.GetPosition();
-		// クリア画面用の実飛行軌跡を記録
-		if (!isMissionCleared_ && !isGameOver_) {
-			auto& traj = GameResult::GetInstance().flightTrajectory;
-			if (traj.empty() || (traj.size() < 6000 && (missionElapsedTime_ - traj.back().timeSec) >= 0.05f)) {
-				TrajectorySample sample;
-				sample.pos = curPos;
-				sample.forward = flightModel_.GetForwardDirection();
-				sample.up = flightModel_.GetUpDirection();
-				sample.timeSec = missionElapsedTime_;
-				traj.push_back(sample);
-			}
+	// クリア画面用の実飛行軌跡を記録
+	const Vector3 curPos = flightModel_.GetPosition();
+	if (!isMissionCleared_ && !isGameOver_) {
+		auto& traj = GameResult::GetInstance().flightTrajectory;
+		if (traj.empty() || (traj.size() < 6000 && (missionElapsedTime_ - traj.back().timeSec) >= 0.05f)) {
+			TrajectorySample sample;
+			sample.pos = curPos;
+			sample.forward = flightModel_.GetForwardDirection();
+			sample.up = flightModel_.GetUpDirection();
+			sample.timeSec = missionElapsedTime_;
+			traj.push_back(sample);
 		}
-		const auto surf = terrainChunkManager_->QuerySurfaceAt(curPos.x, curPos.z, 0.0f);
+	}
+
+	// 飛行モデルの更新
+	if (isFreeFlightMode_) {
+		flightModel_.SetGroundElevation(0.0f);
+		flightModel_.SetWaterSurface(false, 0.0f, 0.0f);
+	} else if (terrainChunkManager_ && terrainChunkManager_->IsLoaded()) {
+		const auto surf = terrainChunkManager_->QuerySurfaceAt(curPos.x, curPos.z, -485.0f);
 		flightModel_.SetGroundElevation(surf.landY);
 		flightModel_.SetWaterSurface(
 			surf.type == TerrainChunkManager::SurfaceType::Water,
@@ -402,7 +446,16 @@ void StageScene::UpdateFlightAndEffects(float gameDeltaTime) {
 			}
 		}
 	}
-	flightModel_.Update(gameDeltaTime);
+	if (wasInSortieIntro_ && sortieIntroTimer_ >= sortieIntroDuration_) {
+		wasInSortieIntro_ = false;
+		if (!isGameOver_ && !isMissionCleared_) {
+			flightModel_.SetInvulnerable(false);
+		}
+	}
+
+	if (!combatBootSequence_.IsWaitingForSpace()) {
+		flightModel_.Update(gameDeltaTime);
+	}
 
 	// 部位破壊イベントのチェックと破片放出
 	CheckPartDestructionEvents();
@@ -410,15 +463,9 @@ void StageScene::UpdateFlightAndEffects(float gameDeltaTime) {
 	// ビジュアルモデルの更新
 	aircraftVisualModel_.Update(flightModel_.GetWorldMatrix(), gameDeltaTime);
 
-	// 自機アフターバーナーの更新
+	// 自機アフターバーナーの更新 (WEP時のみ点火)
 	if (afterburner_) {
-		float abIntensity = 0.0f;
-		if (throttle_ > 0.40f) {
-			abIntensity = (throttle_ - 0.40f) / 0.60f;
-			if (throttle_ > 1.0f) {
-				abIntensity += (throttle_ - 1.0f) * 2.5f;
-			}
-		}
+		const float abIntensity = flightModel_.GetAfterburnerIntensity();
 		afterburner_->Update(gameDeltaTime, abIntensity);
 	}
 
@@ -613,7 +660,7 @@ void StageScene::UpdateCombatAndMission(float gameDeltaTime) {
 			flightModel_.GetForwardDirection(),
 			enemyManager_
 		);
-		missileManager_.Update(gameDeltaTime, enemyManager_, terrainChunkManager_);
+		missileManager_.Update(gameDeltaTime, enemyManager_, isFreeFlightMode_ ? nullptr : terrainChunkManager_);
 	}
 
 	if (enemyManager_.GetLastHitMarkerTriggered()) {
@@ -716,7 +763,7 @@ void StageScene::UpdateCombatAndMission(float gameDeltaTime) {
 	}
 
 	// クリア判定
-	if (!isMissionCleared_ && !isMissionFailed_) {
+	if (!isFreeFlightMode_ && !isMissionCleared_ && !isMissionFailed_) {
 		if (missionManager.IsTriggerMissionFail() || missionManager.IsAnyPrimaryObjectiveFailed()) {
 			TriggerGameOver();
 		} else if (missionManager.IsTriggerMissionComplete() || missionManager.AreAllPrimaryObjectivesCompleted()) {
@@ -940,8 +987,20 @@ void StageScene::UpdateDebugAndStatusUI(float gameDeltaTime) {
 
 	ImGui::Separator();
 	ImGui::Text("=== Engine ===");
-	ImGui::Text("Throttle: %.0f%%", throttle_ * 100.0f);
+	const bool isThrottleWep = throttle_ > flightModel_.GetNormalThrottleLimit() + 0.005f;
+	if (isThrottleWep) {
+		ImGui::TextColored(ImVec4(1.0f, 0.45f, 0.20f, 1.0f), "Throttle: %.0f%% [WEP]", throttle_ * 100.0f);
+	} else {
+		ImGui::Text("Throttle: %.0f%%", throttle_ * 100.0f);
+	}
 	ImGui::Text("Engine Output: %.0f%%", flightModel_.GetCurrentThrottle() * 100.0f);
+	const float abIntensityDbg = flightModel_.GetAfterburnerIntensity();
+	if (abIntensityDbg > 0.001f) {
+		ImGui::TextColored(ImVec4(1.0f, 0.45f, 0.20f, 1.0f), "Afterburner: ON (%.0f%%)", abIntensityDbg * 100.0f);
+	} else {
+		ImGui::TextDisabled("Afterburner: OFF (0%%)");
+	}
+	ImGui::Checkbox("Hold W for WEP (Release -> 100%)", &holdWForWep_);
 	ImGui::Text("Fuel: %.1f kg", flightModel_.GetCurrentFuel());
 
 	ImGui::Separator();
@@ -1036,7 +1095,7 @@ void StageScene::UpdateDebugAndStatusUI(float gameDeltaTime) {
 	ImGui::Text("=== Controls ===");
 	ImGui::Text("Mouse: Aim direction (PID)");
 	ImGui::Text("LShift/LCtrl: Pitch | A/D: Roll | Q/E: Yaw (override)");
-	ImGui::Text("W/S: Throttle");
+	ImGui::Text("W/S: Throttle (Hold/Tap W at 100% -> WEP & A/B)");
 	ImGui::Text("F: Flaps | B: AirBrake");
 	ImGui::Text("M: Mouse Aim [%s]", mouseAimEnabled_ ? "ON" : "OFF");
 	ImGui::Text("I: Instructor [%s]", flightInstructor_.IsEnabled() ? "ON" : "OFF");
@@ -1374,7 +1433,7 @@ void StageScene::UpdatePostEffects(float deltaTime) {
 		}
 	}
 
-	const float groundY = (terrainChunkManager_ && terrainChunkManager_->IsLoaded())
+	const float groundY = (!isFreeFlightMode_ && terrainChunkManager_ && terrainChunkManager_->IsLoaded())
 		? terrainChunkManager_->GetTerrainHeightAt(flightModel_.GetPosition().x, flightModel_.GetPosition().z, 0.0f)
 		: flightModel_.GetGroundElevation();
 	const float currentAgl = (std::max)(0.0f, flightModel_.GetPosition().y - groundY);
@@ -1597,6 +1656,8 @@ void StageScene::UpdatePostEffects(float deltaTime) {
 	// 5. War Thunder風フライト計器UIの更新
 	FlightInfoUIData infoData{};
 	infoData.throttle = throttle_;
+	infoData.normalThrottleLimit = flightModel_.GetNormalThrottleLimit();
+	infoData.isWepActive = (throttle_ > infoData.normalThrottleLimit + 0.005f);
 	infoData.speed = flightModel_.GetSpeed();
 	infoData.currentAmmo = gunpod_.GetCurrentAmmo();
 	infoData.maxAmmo = gunpod_.GetMaxAmmo();

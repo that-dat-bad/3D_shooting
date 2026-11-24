@@ -362,6 +362,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="src\Game\Environment\Sun.h" />
     <ClInclude Include="src\Game\Environment\EnvironmentManager.h" />
     <ClInclude Include="src\Game\FlightModel\DamageModel.h" />
+    <ClInclude Include="src\Game\FlightModel\AircraftMeshCollider.h" />
     <ClInclude Include="src\Game\Graphics\AircraftVisualModel.h" />
     <ClInclude Include="src\Game\Graphics\Afterburner.h" />
     <ClInclude Include="src\Game\Graphics\DebrisManager.h" />
@@ -384,6 +385,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="src\Game\UI\InfoUI.h" />
     <ClInclude Include="src\Game\Mission\MissionSyncManager.h" />
     <ClInclude Include="src\Game\Scene\EffectEditorScene.h" />
+    <ClInclude Include="src\Game\Scene\AircraftEditorScene.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\Game\Graphics\AircraftVisualModel.cpp" />
@@ -399,6 +401,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
       <DeploymentContent>true</DeploymentContent>
     </ClCompile>
     <ClCompile Include="src\Game\FlightModel\DamageModel.cpp" />
+    <ClCompile Include="src\Game\FlightModel\AircraftMeshCollider.cpp" />
     <ClCompile Include="src\Game\FlightModel\Engine.cpp" />
     <ClCompile Include="src\Game\FlightModel\AirFrame.cpp" />
     <ClCompile Include="src\Game\FlightModel\FlightModel.cpp" />
@@ -526,6 +529,8 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="src\Game\UI\InfoUI.cpp" />
     <ClCompile Include="src\Game\Mission\MissionSyncManager.cpp" />
     <ClCompile Include="src\Game\Scene\EffectEditorScene.cpp" />
+    <ClCompile Include="src\Game\Scene\AircraftEditorScene.cpp" />
+    <ClCompile Include="src\Game\Scene\AircraftEditorScene_UI.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="external\imgui\LICENSE.txt" />

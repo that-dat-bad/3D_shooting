@@ -201,17 +201,37 @@ void StageScene::TriggerGameClear() {
 // ============================================================
 // PlayerCollisionBody のコールバック実装
 // ============================================================
+bool StageScene::PlayerCollisionBody::RefineCollision(const ICollisionBody3D* other) const {
+	if (!scene_ || !other) {
+		return false;
+	}
+	if (other->GetCollisionAttribute() & CollisionAttribute::kEnemyBullet) {
+		const auto* bullet = dynamic_cast<const Bullet*>(other);
+		if (!bullet) {
+			return false;
+		}
+		return scene_->flightModel_.TestBulletSegmentHit(bullet->GetPrevPosition(), bullet->GetPosition());
+	}
+	return true;
+}
+
 void StageScene::PlayerCollisionBody::OnCollision(ICollisionBody3D* other) {
 	if (!scene_ || scene_->isMissionFailed_ || scene_->isMissionCleared_) { return; }
 
-	// EnemyBullet との衝突 → サブコライダー被弾処理
+	// EnemyBullet との衝突 → メッシュ部位＆内部貫通被弾処理
 	if (other->GetCollisionAttribute() & CollisionAttribute::kEnemyBullet) {
 		auto* bullet = dynamic_cast<Bullet*>(other);
-		Vector3 bulletPos = bullet ? bullet->GetPosition() : scene_->flightModel_.GetPosition();
+		Vector3 hitPos = bullet ? bullet->GetPosition() : scene_->flightModel_.GetPosition();
 		float damage = bullet ? bullet->GetDamage() : 10.0f;
 
-		HitResult res = scene_->flightModel_.ProcessBulletHit(bulletPos, damage);
-		EffectManager::GetInstance()->EmitHitEffect(bulletPos);
+		HitResult res = bullet
+			? scene_->flightModel_.ProcessBulletSegmentHit(bullet->GetPrevPosition(), bullet->GetPosition(), damage, &hitPos)
+			: scene_->flightModel_.ProcessBulletHit(hitPos, damage);
+		if (!res.isValid()) {
+			return;
+		}
+
+		EffectManager::GetInstance()->EmitHitEffect(hitPos);
 
 		// カメラシェイク
 		if (CameraManager::GetInstance()->GetActiveCamera()) {
@@ -219,7 +239,7 @@ void StageScene::PlayerCollisionBody::OnCollision(ICollisionBody3D* other) {
 		}
 
 		if (res.fireStarted) {
-			EffectManager::GetInstance()->EmitDestroyEffect(bulletPos);
+			EffectManager::GetInstance()->EmitDestroyEffect(hitPos);
 		}
 
 		// 致命的ダメージでゲームオーバー

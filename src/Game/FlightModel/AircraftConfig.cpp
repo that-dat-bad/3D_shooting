@@ -21,6 +21,7 @@ bool AircraftConfig::LoadFromCfg(const std::string& filepath) {
 	// [General]
 	general_.name = cfg.GetString("General", "name", "MiG-21 Fishbed");
 	general_.modelPath = cfg.GetString("General", "modelPath", "Resources/models/m21.gltf");
+	general_.afterburnerConfigPath = cfg.GetString("General", "afterburnerConfigPath", "assets/configs/afterburner_m21.json");
 	general_.environmentCoefficient = cfg.GetFloat("General", "environmentCoefficient", 0.0f);
 	general_.specularIntensity = cfg.GetFloat("General", "specularIntensity", 1.0f);
 	general_.shininess = cfg.GetFloat("General", "shininess", 50.0f);
@@ -89,6 +90,7 @@ bool AircraftConfig::SaveToCfg(const std::string& filepath) const {
 	file << "[General]\n";
 	file << "name = " << general_.name << "\n";
 	file << "modelPath = " << general_.modelPath << "\n";
+	file << "afterburnerConfigPath = " << general_.afterburnerConfigPath << "\n";
 	file << "environmentCoefficient = " << general_.environmentCoefficient << "\n";
 	file << "specularIntensity = " << general_.specularIntensity << "\n";
 	file << "shininess = " << general_.shininess << "\n\n";
@@ -139,6 +141,7 @@ bool AircraftConfig::SaveToCfg(const std::string& filepath) const {
 	file << "maxAmmo = " << gunpod_.maxAmmo << "                  # 最大搭載弾数\n";
 	file << "fireRate = " << gunpod_.fireRate << "                 # 発射レート (発/秒)\n";
 
+	NotifyConfigModified();
 	return true;
 }
 
@@ -146,6 +149,7 @@ void AircraftConfig::CreateDefault(const std::string& filepath) {
 	// デフォルト値
 	general_.name = "MiG-21 Fishbed";
 	general_.modelPath = "Resources/models/m21.gltf";
+	general_.afterburnerConfigPath = "assets/configs/afterburner_m21.json";
 	general_.environmentCoefficient = 0.0f;
 	general_.specularIntensity = 1.0f;
 	general_.shininess = 50.0f;
@@ -206,4 +210,35 @@ std::vector<std::string> AircraftConfig::GetAvailableAircraftList(const std::str
 	catch (...) {}
 
 	return list;
+}
+
+namespace {
+	std::string& ActiveConfigPathStorage() {
+		static std::string sActiveConfigPath = "Resources/aircraft/mig21.cfg";
+		return sActiveConfigPath;
+	}
+
+	uint64_t& ConfigRevisionStorage() {
+		static uint64_t sConfigRevision = 1;
+		return sConfigRevision;
+	}
+}
+
+void AircraftConfig::SetActiveConfigPath(const std::string& path) {
+	if (!path.empty()) {
+		ActiveConfigPathStorage() = path;
+		++ConfigRevisionStorage();
+	}
+}
+
+const std::string& AircraftConfig::GetActiveConfigPath() {
+	return ActiveConfigPathStorage();
+}
+
+uint64_t AircraftConfig::GetConfigRevision() {
+	return ConfigRevisionStorage();
+}
+
+void AircraftConfig::NotifyConfigModified() {
+	++ConfigRevisionStorage();
 }

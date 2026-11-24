@@ -7,6 +7,7 @@
 #include "DebugScene.h"
 #include "MissionEditorScene.h"
 #include "EffectEditorScene.h"
+#include "AircraftEditorScene.h"
 #endif
 
 std::unique_ptr<IScene> SceneFactory::CreateScene(int sceneID) {
@@ -34,6 +35,9 @@ std::unique_ptr<IScene> SceneFactory::CreateScene(int sceneID) {
 		break;
 	case SCENE::EFFECT_EDITOR:
 		newScene = std::make_unique<EffectEditorScene>();
+		break;
+	case SCENE::AIRCRAFT_EDITOR:
+		newScene = std::make_unique<AircraftEditorScene>();
 		break;
 #endif
 	}

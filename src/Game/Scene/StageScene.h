@@ -145,10 +145,13 @@ private:
 	public:
 		StageScene* scene_ = nullptr;
 		SphereCollider GetSphereCollider() const override {
-			return { scene_->flightModel_.GetPosition(), scene_->playerCollisionRadius_ };
+			const auto& mc = scene_->flightModel_.GetDamageModel().GetMeshCollider();
+			const float radius = mc.IsValid() ? (mc.GetBoundingRadius() + 2.5f) : scene_->playerCollisionRadius_;
+			return { scene_->flightModel_.GetPosition(), radius };
 		}
 		uint32_t GetCollisionAttribute() const override { return CollisionAttribute::kPlayer; }
 		uint32_t GetCollisionMask() const override { return CollisionMask::kPlayer; }
+		bool RefineCollision(const ICollisionBody3D* other) const override;
 		void OnCollision(ICollisionBody3D* other) override;
 		bool IsCollisionActive() const override { return !scene_->isMissionFailed_ && !scene_->isMissionCleared_; }
 	};
@@ -198,6 +201,7 @@ private:
 	void DrawEndSequenceUI();
 
 	// ゲーム状態
+	bool isFreeFlightMode_ = false;
 	bool isMissionCleared_ = false;
 	bool isMissionFailed_ = false;
 	bool isGameOver_ = false;
@@ -239,9 +243,12 @@ private:
 	float playerMaxHP_ = 100.0f;
 	float playerHP_ = 100.0f;
 	float playerCollisionRadius_ = 2.0f; // プレイヤーの当たり判定の半径
+	bool wasInSortieIntro_ = false;
 
 	// スロットル入力状態
 	float throttle_ = 0.0f;
+	float wepDetentTimer_ = 0.0f;
+	bool holdWForWep_ = false;
 
 	// 翼端エフェクト用の前フレーム位置保存
 	MyMath::Vector3 lastLeftWingTip_{};
@@ -272,6 +279,8 @@ private:
 
 	// 機体設定
 	AircraftConfig aircraftConfig_;
+	uint64_t appliedAircraftConfigRevision_ = 0;
+	std::string loadedVisualModelPath_;
 	bool isAircraftTuningOpen_ = true;
 	int selectedAircraftConfigIndex_ = 0;
 	char tempAircraftConfigName_[128] = "mig21.cfg";

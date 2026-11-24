@@ -45,6 +45,8 @@ namespace InfoUIDefaults {
 // InfoUI更新用データ構造体
 struct FlightInfoUIData {
 	float throttle = 1.0f;           // スロットル値
+	float normalThrottleLimit = 1.0f;// 通常スロットル上限
+	bool isWepActive = false;        // WEP発動フラグ
 	float speed = 0.0f;              // 飛行速度 (m/s)
 	int currentAmmo = 0;             // 現在の残弾数
 	int maxAmmo = 500;               // 最大装填数

@@ -14,6 +14,7 @@
 #include "../Graphics/Afterburner.h"
 #include "../System/Waypoint.h"
 
+class Bullet;
 class EffectHandle;
 class TerrainChunkManager;
 
@@ -185,10 +186,16 @@ public:
 	}
 	uint32_t GetCollisionAttribute() const override { return CollisionAttribute::kEnemy; }
 	uint32_t GetCollisionMask() const override { return CollisionMask::kEnemy; }
+	bool RefineCollision(const ICollisionBody3D* other) const override;
 	void OnCollision(ICollisionBody3D* other) override;
 	bool IsCollisionActive() const override { return isAlive_ && !IsAlly() && !isInDivePass_; }
 
 private:
+	bool TestCanyonWesternBulletMeshHit(
+		const Bullet* bullet,
+		MeshHitResult* outLocalHit = nullptr,
+		MyMath::Vector3* outWorldHitPos = nullptr
+	) const;
 	// AI更新
 	void UpdateAI(float deltaTime);
 	void UpdateAllyWingman(float deltaTime);

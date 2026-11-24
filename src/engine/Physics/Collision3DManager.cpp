@@ -40,7 +40,9 @@ void Collision3DManager::CheckAllCollisions() {
 			}
 
 			// 形状に応じた衝突判定
-			if (CheckBodyCollision(bodyA, bodyB)) {
+			if (CheckBodyCollision(bodyA, bodyB) &&
+				bodyA->RefineCollision(bodyB) &&
+				bodyB->RefineCollision(bodyA)) {
 				// 双方のコールバックを呼ぶ
 				bodyA->OnCollision(bodyB);
 				bodyB->OnCollision(bodyA);

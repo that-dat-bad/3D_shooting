@@ -44,6 +44,15 @@ public:
 	// 全パーツを可視状態にリセット
 	void ResetAllPartsVisible();
 
+	// 登録済みパーツをクリア（モデル再読み込み時用）
+	void Clear();
+
+	// 指定パーツがロード済みか判定
+	bool HasPart(DamagePart part) const;
+
+	// 登録されているパーツ数を取得
+	size_t GetPartCount() const { return partNodes_.size(); }
+
 	// プロペラ回転速度の設定 (rad/sec)
 	void SetPropellerRpm(float rpm) { propellerRpm_ = rpm; }
 

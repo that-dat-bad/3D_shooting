@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdint>
 #include <string>
 #include <vector>
 #include "AirFrame.h"
@@ -9,6 +10,7 @@
 struct AircraftGeneralConfig {
 	std::string name = "MiG-21 Fishbed";
 	std::string modelPath = "Resources/models/m21.gltf";
+	std::string afterburnerConfigPath = "assets/configs/afterburner_m21.json";
 	float environmentCoefficient = 0.45f;
 	float specularIntensity = 1.35f;
 	float shininess = 48.0f;
@@ -51,6 +53,12 @@ public:
 
 	const std::string& GetCurrentFilePath() const { return currentFilePath_; }
 	void SetCurrentFilePath(const std::string& path) { currentFilePath_ = path; }
+
+	// アクティブ機体設定・リビジョン管理（エディタ⇔ステージ連携用）
+	static void SetActiveConfigPath(const std::string& path);
+	static const std::string& GetActiveConfigPath();
+	static uint64_t GetConfigRevision();
+	static void NotifyConfigModified();
 
 private:
 	AircraftGeneralConfig general_{};

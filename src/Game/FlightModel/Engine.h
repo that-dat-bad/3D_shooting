@@ -32,6 +32,11 @@ public:
 	float GetThrustAtAltitude(float altitude, float engineDamageFactor) const;
 	float GetFuelConsumptionRate() const { return baseFuelFlowRate_ * currentThrottle_; }
 	float GetCurrentThrottle() const { return currentThrottle_; }
+	float GetNormalThrottleLimit() const { return normalThrottleLimit_; }
+	float GetWepThrottleLimit() const { return wepThrottleLimit_; }
+	bool HasWep() const { return wepThrottleLimit_ > normalThrottleLimit_ + 0.005f; }
+	bool IsWepActive() const { return HasWep() && currentThrottle_ > normalThrottleLimit_ + 0.005f; }
+	float GetAfterburnerRatio() const;
 	void SetThrottle(float throttle) { currentThrottle_ = throttle; }
 
 private:

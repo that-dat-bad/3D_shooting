@@ -13,6 +13,7 @@ enum SCENE {
 	DEBUG,
 	MISSION_EDITOR,
 	EFFECT_EDITOR,
+	AIRCRAFT_EDITOR,
 };
 
 /// <summary>

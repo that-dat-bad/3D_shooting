@@ -141,6 +141,7 @@ public:
 	static Animation LoadAnimationFile(const std::string& directoryPath, const std::string& filename, const std::string& animationName);
 	static std::vector<std::string> LoadAnimationNames(const std::string& directoryPath, const std::string& filename, const std::string& animationName = "");
 	ModelData GetModelData() const { return modelData_; }
+	const ModelData& GetModelDataRef() const { return modelData_; }
 
 	// <summary>
 	// 事前パース済みモデルデータからの初期化
