@@ -411,18 +411,25 @@ void StageScene::ResetGameplayState() {
 	}
 	countermeasures_.Reset(60);
 	aeroVapor_.Reset();
+	afterburnerParticles_.Reset();
 	ambientWeather_.Reset(AmbientWeatherSystem::WeatherPreset::IceDust);
 
-	// 地形標高連動のGPU多段階爆発フックを登録
-	EffectManager::GetInstance()->SetDestroyEffectHook([this](const Vector3& pos) {
-		float floorY = 0.0f;
+	auto querySurfaceFloorY = [this](const Vector3& pos) -> float {
 		if (!isFreeFlightMode_ && terrainChunkManager_ && terrainChunkManager_->IsLoaded()) {
 			const auto surf = terrainChunkManager_->QuerySurfaceAt(pos.x, pos.z, -485.0f);
-			floorY = (surf.type == TerrainChunkManager::SurfaceType::Water)
+			return (surf.type == TerrainChunkManager::SurfaceType::Water)
 				? (std::max)(surf.landY, surf.waterY)
 				: surf.landY;
 		}
-		GpuExplosionEmitter::EmitMultiStage(pos, floorY, 1.0f, GpuExplosionEmitter::ScalePreset::Tactical);
+		return 0.0f;
+	};
+
+	// 地形標高連動のGPU多段階爆発・着弾跳弾スパークフックを登録
+	EffectManager::GetInstance()->SetDestroyEffectHook([querySurfaceFloorY](const Vector3& pos) {
+		GpuExplosionEmitter::EmitMultiStage(pos, querySurfaceFloorY(pos), 1.0f, GpuExplosionEmitter::ScalePreset::Tactical);
+	});
+	EffectManager::GetInstance()->SetHitEffectHook([querySurfaceFloorY](const Vector3& pos) {
+		GunCombatEffectEmitter::EmitBulletRicochet(pos, querySurfaceFloorY(pos));
 	});
 
 	// ゲーム状態リセット

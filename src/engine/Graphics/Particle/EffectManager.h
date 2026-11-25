@@ -268,6 +268,8 @@ public:
 	void EmitDestroyEffect(const Vector3& position);
 	// 破壊エフェクト発生時の外部GPU演出フック登録（nullptrで解除）
 	void SetDestroyEffectHook(std::function<void(const Vector3&)> hook) { destroyEffectHook_ = std::move(hook); }
+	// ヒットエフェクト発生時の外部GPU演出フック登録（nullptrで解除）
+	void SetHitEffectHook(std::function<void(const Vector3&)> hook) { hitEffectHook_ = std::move(hook); }
 	// マズルフラッシュ発生
 	// position: 発生座標
 	void EmitMuzzleFlash(const Vector3& position, const Vector3& direction);
@@ -318,6 +320,7 @@ private:
 	bool isInitialized_ = false;
 	bool gpuUpdatePaused_ = false;
 	std::function<void(const Vector3&)> destroyEffectHook_;
+	std::function<void(const Vector3&)> hitEffectHook_;
 
 #ifdef USE_IMGUI
 	int selectedPresetIndex_ = 0;

@@ -32,7 +32,9 @@
 #include "../Graphics/Afterburner.h"
 #include "../Effect/CountermeasureSystem.h"
 #include "../Effect/AeroVaporSystem.h"
+#include "../Effect/AfterburnerParticleEmitter.h"
 #include "../Effect/AmbientWeatherSystem.h"
+#include "../Effect/GunCombatEffectEmitter.h"
 #include "../Mission/ParticleDemoController.h"
 
 namespace StageRadioDefaults {
@@ -270,6 +272,7 @@ private:
 	// GPUパーティクル連携エフェクト群（単一責務モジュール委譲）
 	CountermeasureSystem countermeasures_;
 	AeroVaporSystem aeroVapor_;
+	AfterburnerParticleEmitter afterburnerParticles_;
 	AmbientWeatherSystem ambientWeather_;
 	ParticleDemoController particleDemo_;
 

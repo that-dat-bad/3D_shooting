@@ -346,6 +346,7 @@ void StageScene::UpdateCombatFiring(float gameDeltaTime) {
 			Vector3 bulletVelocity = Add(aircraftVelocity, muzzleVelocity);
 
 			bulletManager_.SpawnBullet(firePos, bulletVelocity, 10.0f);
+			GunCombatEffectEmitter::EmitMuzzleGas(firePos, fireDir, aircraftVelocity, aircraftUp);
 
 			// --- 薬莢の放出エフェクト ---
 			{
@@ -532,6 +533,16 @@ void StageScene::UpdateFlightAndEffects(float gameDeltaTime) {
 	if (afterburner_) {
 		const float abIntensity = flightModel_.GetAfterburnerIntensity();
 		afterburner_->Update(gameDeltaTime, abIntensity);
+		if (!isGameOver_ && (combatBootSequence_.IsFinished() || sortieIntroTimer_ >= 4.50f)) {
+			afterburnerParticles_.Update(
+				gameDeltaTime,
+				*afterburner_,
+				flightModel_.GetWorldMatrix(),
+				flightModel_.GetVelocity(),
+				abIntensity);
+		} else {
+			afterburnerParticles_.Reset();
+		}
 	}
 
 	// 破片オブジェクト群の物理シミュレーション更新

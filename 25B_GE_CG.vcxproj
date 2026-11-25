@@ -393,6 +393,8 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="src\Game\Effect\GpuExplosionEmitter.h" />
     <ClInclude Include="src\Game\Effect\CountermeasureSystem.h" />
     <ClInclude Include="src\Game\Effect\AeroVaporSystem.h" />
+    <ClInclude Include="src\Game\Effect\AfterburnerParticleEmitter.h" />
+    <ClInclude Include="src\Game\Effect\GunCombatEffectEmitter.h" />
     <ClInclude Include="src\Game\Effect\AmbientWeatherSystem.h" />
     <ClInclude Include="src\Game\Effect\VirtualFlybyJet.h" />
     <ClInclude Include="src\Game\Effect\ParticleContestShowcase.h" />
@@ -548,6 +550,8 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="src\Game\Effect\GpuExplosionEmitter.cpp" />
     <ClCompile Include="src\Game\Effect\CountermeasureSystem.cpp" />
     <ClCompile Include="src\Game\Effect\AeroVaporSystem.cpp" />
+    <ClCompile Include="src\Game\Effect\AfterburnerParticleEmitter.cpp" />
+    <ClCompile Include="src\Game\Effect\GunCombatEffectEmitter.cpp" />
     <ClCompile Include="src\Game\Effect\AmbientWeatherSystem.cpp" />
     <ClCompile Include="src\Game\Effect\VirtualFlybyJet.cpp" />
     <ClCompile Include="src\Game\Effect\ParticleContestShowcase.cpp" />

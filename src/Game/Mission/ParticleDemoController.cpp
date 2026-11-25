@@ -197,7 +197,15 @@ void ParticleDemoController::Update(const DemoContext& ctx) {
 	}
 
 	// 全編アフターバーナー／高出力でベイパー・衝撃波・排気炎を見せる
-	output_.throttle = (elapsed_ < 2.5f) ? ctx.normalThrottleLimit : ctx.wepThrottleLimit;
+	// 15.8〜16.35s だけ一時的にドライ出力へ落とし、Phase 4突入時にWEP再点火スパークを見せる
+	const bool briefThrottleDip = (elapsed_ >= 15.8f && elapsed_ < 16.35f);
+	if (elapsed_ < 2.5f) {
+		output_.throttle = ctx.normalThrottleLimit;
+	} else if (briefThrottleDip) {
+		output_.throttle = ctx.normalThrottleLimit * 0.85f;
+	} else {
+		output_.throttle = ctx.wepThrottleLimit;
+	}
 	float bankOffset = 0.0f;
 	float minPitchBias = -0.35f;
 

@@ -1055,6 +1055,9 @@ void EffectManager::EmitHitEffect(const Vector3& position) {
 	}
 
 	AddEffect(std::make_unique<BillboardParticleEffect>(position, "HitSpark", 20));
+	if (hitEffectHook_) {
+		hitEffectHook_(position);
+	}
 }
 
 void EffectManager::EmitHitPlaneEffect(const Vector3& position) {
