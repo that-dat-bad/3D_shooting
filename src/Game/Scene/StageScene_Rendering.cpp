@@ -321,111 +321,6 @@ void StageScene::DrawMissionMessages() {
 }
 
 // ============================================================
-// ベイパーコーンエフェクトの描画
-// ============================================================
-void StageScene::DrawVaporConeEffect(Camera* cam) {
-	float speed = flightModel_.GetSpeed();
-	float speedKmH = speed * 3.6f; // m/s から km/h に変換
-	if (speedKmH < 1000.0f || speedKmH > 1200.0f) {
-		return;
-	}
-
-	// 1000km/hで0.0、1100km/hで最大、1200km/hで0.0になるフェードイン・アウト係数
-	float speedFactor = 0.0f;
-	if (speedKmH < 1100.0f) {
-		speedFactor = (speedKmH - 1000.0f) / 100.0f;
-	} else {
-		speedFactor = (1200.0f - speedKmH) / 100.0f;
-	}
-
-	// 経過時間を用いたゆらぎの計算
-	float t = totalTime_ * 40.0f; // 高速で揺らす
-
-	// 基本位置・姿勢
-	Vector3 aircraftPos = flightModel_.GetPosition();
-	Vector3 forward = flightModel_.GetForwardDirection();
-	MyMath::Quaternion aircraftQ = flightModel_.GetOrientation();
-
-	// クォータニオンの乗算ヘルパー
-	auto qMul = [](const MyMath::Quaternion& a, const MyMath::Quaternion& b) -> MyMath::Quaternion {
-		return {
-			a.w * b.x + a.x * b.w + a.y * b.z - a.z * b.y,
-			a.w * b.y - a.x * b.z + a.y * b.w + a.z * b.x,
-			a.w * b.z + a.x * b.y - a.y * b.x + a.z * b.w,
-			a.w * b.w - a.x * b.x - a.y * b.y - a.z * b.z
-		};
-	};
-
-	// 軸と角度からクォータニオンを作成するヘルパー
-	auto makeRotation = [](const MyMath::Vector3& axis, float angle) -> MyMath::Quaternion {
-		float halfAngle = angle * 0.5f;
-		float sinHalf = sinf(halfAngle);
-		Vector3 normAxis = Normalize(axis);
-		return {
-			normAxis.x * sinHalf,
-			normAxis.y * sinHalf,
-			normAxis.z * sinHalf,
-			cosf(halfAngle)
-		};
-	};
-
-	// 描画用のテクスチャ取得
-	uint32_t coneTex = TextureManager::GetInstance()->GetTextureIndexByFilePath("assets/textures/circle2.png");
-
-	// -------------------------------------------------------------
-	// コーン1
-	// -------------------------------------------------------------
-	{
-		float scaleNoise = 1.0f + 0.08f * sinf(t * 1.3f);
-		float lengthNoise = 1.0f + 0.12f * cosf(t * 0.9f);
-		float offsetNoise = 0.15f * sinf(t * 1.7f);
-
-		float radius = 5.0f * scaleNoise;
-		float length = 4.0f * lengthNoise;
-		Vector3 scale = { radius, length, radius };
-
-		Vector3 pos = Add(aircraftPos, Multiply(-0.8f + offsetNoise, forward));
-
-		MyMath::Quaternion localPitch = makeRotation({1.0f, 0.0f, 0.0f}, 3.14159265f / 2.0f);
-		MyMath::Quaternion localYaw = makeRotation({0.0f, 1.0f, 0.0f}, 0.03f * sinf(t * 0.8f));
-		MyMath::Quaternion localRoll = makeRotation({0.0f, 0.0f, 1.0f}, t * 0.2f);
-		MyMath::Quaternion localRot = qMul(localRoll, qMul(localYaw, localPitch));
-		MyMath::Quaternion finalRot = qMul(aircraftQ, localRot);
-
-		float alpha = 0.22f * speedFactor * (0.8f + 0.2f * sinf(t * 2.1f));
-		Vector4 color = { 0.92f, 0.96f, 1.0f, alpha };
-
-		PrimitiveModel::GetInstance()->DrawCone(scale, finalRot, pos, color, coneTex, cam, BlendMode::kNormal);
-	}
-
-	// -------------------------------------------------------------
-	// コーン2
-	// -------------------------------------------------------------
-	{
-		float scaleNoise = 1.0f + 0.06f * sinf(t * 1.5f + 1.0f);
-		float lengthNoise = 1.0f + 0.10f * cosf(t * 1.1f + 0.5f);
-		float offsetNoise = 0.10f * sinf(t * 2.0f + 2.0f);
-
-		float radius = 3.5f * scaleNoise;
-		float length = 5.0f * lengthNoise;
-		Vector3 scale = { radius, length, radius };
-
-		Vector3 pos = Add(aircraftPos, Multiply(-0.4f + offsetNoise, forward));
-
-		MyMath::Quaternion localPitch = makeRotation({1.0f, 0.0f, 0.0f}, 3.14159265f / 2.0f);
-		MyMath::Quaternion localYaw = makeRotation({0.0f, 1.0f, 0.0f}, 0.02f * sinf(t * 1.2f + 0.3f));
-		MyMath::Quaternion localRoll = makeRotation({0.0f, 0.0f, 1.0f}, -t * 0.15f);
-		MyMath::Quaternion localRot = qMul(localRoll, qMul(localYaw, localPitch));
-		MyMath::Quaternion finalRot = qMul(aircraftQ, localRot);
-
-		float alpha = 0.28f * speedFactor * (0.85f + 0.15f * cosf(t * 1.9f));
-		Vector4 color = { 0.95f, 0.98f, 1.0f, alpha };
-
-		PrimitiveModel::GetInstance()->DrawCone(scale, finalRot, pos, color, coneTex, cam, BlendMode::kNormal);
-	}
-}
-
-// ============================================================
 // 追従マズルフラッシュの描画
 // ============================================================
 void StageScene::DrawMuzzleFlashEffect(Camera* cam) {
@@ -434,8 +329,16 @@ void StageScene::DrawMuzzleFlashEffect(Camera* cam) {
 	}
 
 	Vector3 aircraftPos = flightModel_.GetPosition();
+	Vector3 right = flightModel_.GetRightDirection();
+	Vector3 up = flightModel_.GetUpDirection();
 	Vector3 forward = flightModel_.GetForwardDirection();
-	Vector3 muzzlePos = Add(aircraftPos, Multiply(8.0f, forward));
+	Vector3 muzzlePos = Add(
+		aircraftPos,
+		Add(
+			Add(Multiply(lastMuzzleLocalOffset_.x, right), Multiply(lastMuzzleLocalOffset_.y, up)),
+			Multiply(lastMuzzleLocalOffset_.z, forward)
+		)
+	);
 	
 	float t = 1.0f - (muzzleFlashTimer_ / 0.08f); // 0.0 -> 1.0
 	if (t < 0.0f) { t = 0.0f; }

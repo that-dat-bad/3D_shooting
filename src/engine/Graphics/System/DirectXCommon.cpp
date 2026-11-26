@@ -316,7 +316,7 @@ void DirectXCommon::CreateDepthStencilView()
 	dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
 	device_->CreateDepthStencilView(depthStencilResource_.Get(), &dsvDesc, GetDSVHandle());
 
-	dsvDesc.Flags = D3D12_DSV_FLAG_READ_ONLY_DEPTH;
+	dsvDesc.Flags = D3D12_DSV_FLAG_READ_ONLY_DEPTH | D3D12_DSV_FLAG_READ_ONLY_STENCIL;
 	device_->CreateDepthStencilView(depthStencilResource_.Get(), &dsvDesc, GetReadOnlyDSVHandle());
 }
 
@@ -500,6 +500,24 @@ Microsoft::WRL::ComPtr<IDxcBlob> DirectXCommon::CompileShader(const std::wstring
 		auto csoTime = std::filesystem::last_write_time(csoPath);
 		if (csoTime >= hlslTime) {
 			needsCompile = false;
+			// #include された同一ディレクトリの .hlsli 更新も検知してキャッシュ不整合を防ぐ
+			std::ifstream srcStream(hlslPath);
+			std::string line;
+			while (std::getline(srcStream, line)) {
+				const size_t incPos = line.find("#include");
+				if (incPos == std::string::npos) {
+					continue;
+				}
+				const size_t q1 = line.find('"', incPos);
+				const size_t q2 = (q1 != std::string::npos) ? line.find('"', q1 + 1) : std::string::npos;
+				if (q1 != std::string::npos && q2 != std::string::npos && q2 > q1 + 1) {
+					const std::filesystem::path incPath = hlslPath.parent_path() / line.substr(q1 + 1, q2 - q1 - 1);
+					if (std::filesystem::exists(incPath) && std::filesystem::last_write_time(incPath) > csoTime) {
+						needsCompile = true;
+						break;
+					}
+				}
+			}
 		}
 	}
 

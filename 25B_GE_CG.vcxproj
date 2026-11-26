@@ -282,7 +282,9 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="src\engine\Debug\UIEditorWindow.h" />
     <ClInclude Include="src\engine\Graphics\Particle\ParticleEmitter.h" />
     <ClInclude Include="src\engine\Graphics\Particle\ParticleManager.h" />
+    <ClInclude Include="src\engine\Graphics\Particle\GPUParticleTypes.h" />
     <ClInclude Include="src\engine\Graphics\Particle\GPUParticleManager.h" />
+    <ClInclude Include="src\engine\Graphics\Particle\EffectGpuPresetBridge.h" />
     <ClInclude Include="src\engine\Graphics\Particle\EffectManager.h" />
     <ClInclude Include="src\engine\Graphics\Camera\Camera.h" />
     <ClInclude Include="src\engine\Graphics\Camera\CameraManager.h" />
@@ -364,6 +366,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="src\Game\FlightModel\DamageModel.h" />
     <ClInclude Include="src\Game\FlightModel\AircraftMeshCollider.h" />
     <ClInclude Include="src\Game\Graphics\AircraftVisualModel.h" />
+    <ClInclude Include="src\Game\Graphics\AeroVaporMeshRenderer.h" />
     <ClInclude Include="src\Game\Graphics\Afterburner.h" />
     <ClInclude Include="src\Game\Graphics\DebrisManager.h" />
     <ClInclude Include="src\engine\Graphics\UI\UIElement.h" />
@@ -386,9 +389,18 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="src\Game\Mission\MissionSyncManager.h" />
     <ClInclude Include="src\Game\Scene\EffectEditorScene.h" />
     <ClInclude Include="src\Game\Scene\AircraftEditorScene.h" />
+    <ClInclude Include="src\Game\Effect\GpuExplosionEmitter.h" />
+    <ClInclude Include="src\Game\Effect\CountermeasureSystem.h" />
+    <ClInclude Include="src\Game\Effect\AeroVaporSystem.h" />
+    <ClInclude Include="src\Game\Effect\AfterburnerParticleEmitter.h" />
+    <ClInclude Include="src\Game\Effect\GunCombatEffectEmitter.h" />
+    <ClInclude Include="src\Game\Effect\AmbientWeatherSystem.h" />
+    <ClInclude Include="src\Game\Effect\VirtualFlybyJet.h" />
+    <ClInclude Include="src\Game\Effect\ParticleContestShowcase.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\Game\Graphics\AircraftVisualModel.cpp" />
+    <ClCompile Include="src\Game\Graphics\AeroVaporMeshRenderer.cpp" />
     <ClCompile Include="src\Game\Graphics\Afterburner.cpp" />
     <ClCompile Include="src\Game\Graphics\DebrisManager.cpp" />
     <ClCompile Include="src\Game\Environment\Sun.cpp" />
@@ -420,6 +432,8 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="src\engine\Graphics\Particle\ParticleEmitter.cpp" />
     <ClCompile Include="src\engine\Graphics\Particle\ParticleManager.cpp" />
     <ClCompile Include="src\engine\Graphics\Particle\GPUParticleManager.cpp" />
+    <ClCompile Include="src\engine\Graphics\Particle\GPUParticleManager_Pipeline.cpp" />
+    <ClCompile Include="src\engine\Graphics\Particle\EffectGpuPresetBridge.cpp" />
     <ClCompile Include="src\engine\Graphics\Particle\EffectManager.cpp" />
     <ClCompile Include="src\engine\Graphics\Camera\Camera.cpp" />
     <ClCompile Include="src\engine\Graphics\Camera\CameraManager.cpp" />
@@ -531,6 +545,14 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="src\Game\Scene\EffectEditorScene.cpp" />
     <ClCompile Include="src\Game\Scene\AircraftEditorScene.cpp" />
     <ClCompile Include="src\Game\Scene\AircraftEditorScene_UI.cpp" />
+    <ClCompile Include="src\Game\Effect\GpuExplosionEmitter.cpp" />
+    <ClCompile Include="src\Game\Effect\CountermeasureSystem.cpp" />
+    <ClCompile Include="src\Game\Effect\AeroVaporSystem.cpp" />
+    <ClCompile Include="src\Game\Effect\AfterburnerParticleEmitter.cpp" />
+    <ClCompile Include="src\Game\Effect\GunCombatEffectEmitter.cpp" />
+    <ClCompile Include="src\Game\Effect\AmbientWeatherSystem.cpp" />
+    <ClCompile Include="src\Game\Effect\VirtualFlybyJet.cpp" />
+    <ClCompile Include="src\Game\Effect\ParticleContestShowcase.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="external\imgui\LICENSE.txt" />

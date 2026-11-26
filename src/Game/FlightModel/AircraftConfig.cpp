@@ -1,5 +1,6 @@
 #include "AircraftConfig.h"
 #include "../../engine/io/ConfigFile.h"
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -67,6 +68,17 @@ bool AircraftConfig::LoadFromCfg(const std::string& filepath) {
 	gunpod_.ammoWeight = cfg.GetFloat("Gunpod", "ammoWeight", 0.1f);
 	gunpod_.maxAmmo = cfg.GetInt("Gunpod", "maxAmmo", 500);
 	gunpod_.fireRate = cfg.GetFloat("Gunpod", "fireRate", 25.0f);
+
+	const int muzzleCount = std::clamp(cfg.GetInt("Gunpod", "muzzleCount", 1), 1, GunPodData::kMaxMuzzles);
+	gunpod_.muzzleOffsets.resize(static_cast<size_t>(muzzleCount));
+	for (int i = 0; i < muzzleCount; ++i) {
+		const std::string prefix = "muzzle" + std::to_string(i);
+		gunpod_.muzzleOffsets[static_cast<size_t>(i)] = {
+			cfg.GetFloat("Gunpod", prefix + "X", 0.0f),
+			cfg.GetFloat("Gunpod", prefix + "Y", 0.0f),
+			cfg.GetFloat("Gunpod", prefix + "Z", 8.0f)
+		};
+	}
 
 	return true;
 }
@@ -141,6 +153,17 @@ bool AircraftConfig::SaveToCfg(const std::string& filepath) const {
 	file << "maxAmmo = " << gunpod_.maxAmmo << "                  # 最大搭載弾数\n";
 	file << "fireRate = " << gunpod_.fireRate << "                 # 発射レート (発/秒)\n";
 
+	const std::vector<MyMath::Vector3> defaultMuzzles = { { 0.0f, 0.0f, 8.0f } };
+	const auto& muzzles = gunpod_.muzzleOffsets.empty() ? defaultMuzzles : gunpod_.muzzleOffsets;
+	const int muzzleCount = std::clamp(static_cast<int>(muzzles.size()), 1, GunPodData::kMaxMuzzles);
+	file << "muzzleCount = " << muzzleCount << "                # 機関砲砲口数 (1~" << GunPodData::kMaxMuzzles << ")\n";
+	for (int i = 0; i < muzzleCount; ++i) {
+		const auto& m = muzzles[static_cast<size_t>(i)];
+		file << "muzzle" << i << "X = " << m.x << "\n";
+		file << "muzzle" << i << "Y = " << m.y << "\n";
+		file << "muzzle" << i << "Z = " << m.z << "\n";
+	}
+
 	NotifyConfigModified();
 	return true;
 }
@@ -188,6 +211,7 @@ void AircraftConfig::CreateDefault(const std::string& filepath) {
 	gunpod_.ammoWeight = 0.1f;
 	gunpod_.maxAmmo = 500;
 	gunpod_.fireRate = 25.0f;
+	gunpod_.muzzleOffsets = { { 0.0f, 0.0f, 8.0f } };
 
 	SaveToCfg(filepath);
 }

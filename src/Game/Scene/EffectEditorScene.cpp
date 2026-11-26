@@ -65,6 +65,8 @@ void EffectEditorScene::Initialize() {
 	if (previewHandle_) {
 		previewHandle_->SetPosition(emitOrigin_);
 	}
+
+	contestShowcase_.Initialize(camera);
 }
 
 void EffectEditorScene::Update() {
@@ -143,6 +145,7 @@ void EffectEditorScene::Update() {
 			if (GPUParticleManager::GetInstance() && GPUParticleManager::GetInstance()->IsInitialized()) {
 				GPUParticleManager::GetInstance()->ClearAllParticles();
 			}
+			contestShowcase_.OnParticlesCleared();
 		}
 	}
 
@@ -150,6 +153,9 @@ void EffectEditorScene::Update() {
 	if (simulateConditionTrue_ && previewHandle_) {
 		previewHandle_->emit(emitOrigin_);
 	}
+
+	// パーティクルコンテスト・ショーケース更新
+	contestShowcase_.Update(1.0f / 60.0f, camera, emitOrigin_);
 
 	// エフェクトマネージャの更新
 	EffectManager::GetInstance()->Update();
@@ -307,6 +313,7 @@ void EffectEditorScene::Draw() {
 
 	Object3dCommon::GetInstance()->SetupCommonState();
 	DrawReferenceGridAndHeightLimit(camera);
+	contestShowcase_.Draw(camera);
 	EffectManager::GetInstance()->SetGpuUpdatePaused(false);
 	EffectManager::GetInstance()->Draw(camera);
 }
@@ -326,6 +333,7 @@ void EffectEditorScene::DrawUI() {
 }
 
 void EffectEditorScene::Finalize() {
+	contestShowcase_.Finalize();
 	simulateConditionTrue_ = false;
 	if (previewHandle_) {
 		EffectManager::GetInstance()->DeleteHandle(previewHandle_);

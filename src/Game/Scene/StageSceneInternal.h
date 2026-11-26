@@ -14,6 +14,7 @@
 #include "../../engine/Graphics/Particle/EffectManager.h"
 #include "../../engine/Graphics/Particle/ParticleManager.h"
 #include "../../engine/Graphics/Particle/GPUParticleManager.h"
+#include "../Effect/GpuExplosionEmitter.h"
 #include "../../engine/Physics/Collision3DManager.h"
 #include "../Environment/TerrainSyncManager.h"
 #include "../Environment/TerrainChunkManager.h"

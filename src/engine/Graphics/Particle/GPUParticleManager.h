@@ -11,67 +11,26 @@
 #include "../System/BlendMode.h"
 #include "../System/DirectXCommon.h"
 #include "../System/SrvManager.h"
+#include "GPUParticleTypes.h"
 #include "ParticleManager.h"
 
 /// <summary>
-/// GPU駆動型パーティクルシステム管理クラス
+/// GPU駆動型パーティクルシステム管理クラス（65,536粒子 Compute + 2バケット ExecuteIndirect）
 /// </summary>
 class GPUParticleManager {
 public:
-	static constexpr uint32_t kMaxParticles = 65536u;
-	static constexpr uint32_t kMaxEmitRequests = 64u;
-	static constexpr uint32_t kInitThreadGroupSize = 256u;
-	static constexpr uint32_t kEmitThreadGroupSize = 64u;
-	static constexpr uint32_t kUpdateThreadGroupSize = 256u;
-	static constexpr size_t kCbAlignment = 256u;
-	static constexpr uint32_t kParticleFlagFadeOut = 1u;
+	static constexpr uint32_t kMaxParticles = GPUParticleConstants::kMaxParticles;
+	static constexpr uint32_t kMaxEmitRequests = GPUParticleConstants::kMaxEmitRequests;
+	static constexpr uint32_t kMaxWakeFields = GPUParticleConstants::kMaxWakeFields;
+	static constexpr uint32_t kInitThreadGroupSize = GPUParticleConstants::kInitThreadGroupSize;
+	static constexpr uint32_t kEmitThreadGroupSize = GPUParticleConstants::kEmitThreadGroupSize;
+	static constexpr uint32_t kUpdateThreadGroupSize = GPUParticleConstants::kUpdateThreadGroupSize;
+	static constexpr size_t kCbAlignment = GPUParticleConstants::kPerViewCbAlignment;
+	static constexpr size_t kPerFrameCbAlignment = GPUParticleConstants::kPerFrameCbAlignment;
+	static constexpr uint32_t kParticleFlagFadeOut = GPUParticleFlags::kFadeOut;
 
-	struct ParticleCS {
-		Vector3 translate;
-		float rotation;
-		Vector3 scale;
-		float lifeTime;
-		Vector3 velocity;
-		float currentTime;
-		Vector3 acceleration;
-		float rotationSpeed;
-		Vector4 color;
-		float startScale;
-		float endScale;
-		float scaleEasing;
-		float startAlpha;
-		float spawnY;
-		float maxRiseHeight;
-		uint32_t flags;
-		uint32_t padding;
-	};
-	static_assert(sizeof(ParticleCS) == 112, "ParticleCS size must match HLSL (112 bytes)");
-
-	struct GpuEmitRequest {
-		Vector3 origin;
-		float randomPositionRange;
-		Vector3 minVelocity;
-		float minLifeTime;
-		Vector3 maxVelocity;
-		float maxLifeTime;
-		Vector3 acceleration;
-		float maxRiseHeight;
-		Vector4 minColor;
-		Vector4 maxColor;
-		float minScale;
-		float maxScale;
-		float endScale;
-		float scaleEasing;
-		float minRotation;
-		float maxRotation;
-		float minRotationSpeed;
-		float maxRotationSpeed;
-		uint32_t startOffset;
-		uint32_t count;
-		uint32_t flags;
-		uint32_t seedSalt;
-	};
-	static_assert(sizeof(GpuEmitRequest) == 144, "GpuEmitRequest size must match HLSL (144 bytes)");
+	using ParticleCS = ::ParticleCS;
+	using GpuEmitRequest = ::GpuEmitRequest;
 
 	static GPUParticleManager* GetInstance();
 
@@ -95,7 +54,28 @@ public:
 		hasCustomTexture_ = true;
 	}
 
-	// 複数エミッタ対応キュー発生
+	// カメラクリップ距離（ソフトパーティクル深度線形化用）
+	void SetCameraClipParams(float nearClip, float farClip) {
+		cameraNearClip_ = nearClip;
+		cameraFarClip_ = farClip;
+	}
+
+	// グローバル基準床高さ（バウンド用フォールバック）
+	void SetDefaultFloorY(float floorY) { defaultFloorY_ = floorY; }
+	float GetDefaultFloorY() const { return defaultFloorY_; }
+
+	// 航空機ウェイク場の登録（フレーム単位で反映）
+	void SetWakeField(uint32_t slot, const GpuWakeField& field);
+	void ClearWakeFields();
+
+	// カメラ追従環境パーティクル空間の設定
+	void SetAmbientVolume(const GpuAmbientVolume& volume) { ambientVolume_ = volume; }
+	const GpuAmbientVolume& GetAmbientVolume() const { return ambientVolume_; }
+
+	// 高機能GPUパーティクル発生（黒体放射・カールノイズ・ストレッチ・バウンド・ウェイク対応）
+	void EnqueueRichEmit(const GpuParticleEmitDesc& desc);
+
+	// 既存 .effect / 複数エミッタ互換API
 	void EnqueueEmit(const Vector3& position, const ParticleParameters& params, uint32_t count);
 
 	// 既存単一エミッタ互換API（DebugScene等向け）
@@ -107,8 +87,12 @@ public:
 	void SetReadbackDebugEnabled(bool enabled) { enableReadbackDebug_ = enabled; }
 	bool IsReadbackDebugEnabled() const { return enableReadbackDebug_; }
 	uint32_t GetDebugAliveCount() const { return debugInstanceCount_; }
+	uint32_t GetDebugAlphaAliveCount() const { return debugAlphaInstanceCount_; }
+	uint32_t GetDebugAdditiveAliveCount() const { return debugAdditiveInstanceCount_; }
+	int32_t GetDebugFreeCount() const { return debugFreeListIndex_ + 1; }
 	uint32_t GetMaxParticles() const { return kMaxParticles; }
 	uint32_t GetLastFrameEmitCount() const { return lastFrameEmitCount_; }
+	uint32_t GetLastFrameDroppedEmitRequests() const { return lastFrameDroppedEmitRequests_; }
 
 	void DrawImGui();
 
@@ -137,16 +121,19 @@ private:
 	Microsoft::WRL::ComPtr<ID3D12Resource> particleBuffer_;
 	Microsoft::WRL::ComPtr<ID3D12Resource> freeListIndexBuffer_;
 	Microsoft::WRL::ComPtr<ID3D12Resource> freeListBuffer_;
-	Microsoft::WRL::ComPtr<ID3D12Resource> aliveListBuffer_;
+	Microsoft::WRL::ComPtr<ID3D12Resource> aliveListAlphaBuffer_;
+	Microsoft::WRL::ComPtr<ID3D12Resource> aliveListAddBuffer_;
 	Microsoft::WRL::ComPtr<ID3D12Resource> indirectArgsBuffer_;
 
 	uint32_t particleSrvIndex_ = 0;
-	uint32_t aliveListSrvIndex_ = 0;
+	uint32_t aliveListAlphaSrvIndex_ = 0;
+	uint32_t aliveListAddSrvIndex_ = 0;
 
 	uint32_t particleUavIndex_ = 0;
 	uint32_t freeListIndexUavIndex_ = 0;
 	uint32_t freeListUavIndex_ = 0;
-	uint32_t aliveListUavIndex_ = 0;
+	uint32_t aliveListAlphaUavIndex_ = 0;
+	uint32_t aliveListAddUavIndex_ = 0;
 	uint32_t indirectArgsUavIndex_ = 0;
 
 	static constexpr uint32_t kFrameCount = DirectXCommon::kSwapChainBufferCount_;
@@ -160,16 +147,30 @@ private:
 		float deltaTime;
 		uint32_t requestCount;
 		uint32_t totalEmitCount;
+		GpuAmbientVolume ambient;
+		GpuWakeField wakeFields[kMaxWakeFields];
+		float defaultFloorY;
+		uint32_t activeWakeCount;
+		float globalCurlTimeScale;
+		float pad0;
 	};
-	static_assert(sizeof(PerFrame) == 16, "PerFrame size must match HLSL (16 bytes)");
+	static_assert(sizeof(PerFrame) == 320, "PerFrame size must match HLSL (320 bytes)");
+	static_assert(sizeof(PerFrame) <= kPerFrameCbAlignment, "PerFrame must fit inside CB stride");
 	Microsoft::WRL::ComPtr<ID3D12Resource> perFrameBuffer_;
 	uint8_t* perFrameMapped_ = nullptr;
 
 	struct PerView {
 		Matrix4x4 viewProjection;
 		Matrix4x4 billboardMatrix;
+		Vector3 cameraPosition;
+		float nearClip;
+		float farClip;
+		float time;
+		uint32_t hasDepthTexture;
+		float pad0;
 	};
-	static_assert(sizeof(PerView) == 128, "PerView size must match HLSL (128 bytes)");
+	static_assert(sizeof(PerView) == 160, "PerView size must match HLSL (160 bytes)");
+	static_assert(sizeof(PerView) <= kCbAlignment, "PerView must fit inside CB stride");
 	Microsoft::WRL::ComPtr<ID3D12Resource> perViewBuffer_;
 	uint8_t* perViewMapped_ = nullptr;
 
@@ -182,13 +183,22 @@ private:
 	D3D12_VERTEX_BUFFER_VIEW vertexBufferView_{};
 
 	uint32_t textureSrvIndex_ = 0;
+	uint32_t nullDepthSrvIndex_ = 0;
 	bool hasCustomTexture_ = false;
 	float time_ = 0.0f;
 	float deltaTime_ = 1.0f / 60.0f;
+	float cameraNearClip_ = 0.1f;
+	float cameraFarClip_ = 100000.0f;
+	float defaultFloorY_ = 0.0f;
+
+	std::array<GpuWakeField, kMaxWakeFields> wakeFields_{};
+	GpuAmbientVolume ambientVolume_{};
 
 	std::vector<GpuEmitRequest> pendingEmitRequests_;
 	uint32_t seedCounter_ = 1u;
 	uint32_t lastFrameEmitCount_ = 0u;
+	uint32_t pendingDroppedEmitRequests_ = 0u;
+	uint32_t lastFrameDroppedEmitRequests_ = 0u;
 
 	// 既存API互換用
 	Vector3 legacyTranslate_ = { 0.0f, 0.0f, 0.0f };
@@ -209,6 +219,8 @@ private:
 	bool enableReadbackDebug_ = false;
 	int32_t debugFreeListIndex_ = static_cast<int32_t>(kMaxParticles - 1u);
 	uint32_t debugInstanceCount_ = 0u;
+	uint32_t debugAlphaInstanceCount_ = 0u;
+	uint32_t debugAdditiveInstanceCount_ = 0u;
 
 	Vector3 guiEmitTranslate_ = { 0.0f, 0.0f, 0.0f };
 	int guiEmitCount_ = 1024;

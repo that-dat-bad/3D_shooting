@@ -57,7 +57,8 @@ void EnemyManager::SpawnAirEnemies(const std::vector<EnemySpawnData>& spawnList)
 			cachedAirframe_, cachedEngine_, cachedGunpod_,
 			playerFlightModel_, bulletManager_,
 			data.aiType,
-			data.behaviorTreeJson
+			data.behaviorTreeJson,
+			data.colliderModelPath
 		);
 		if (const WaypointPath* path = FindWaypointPathByName(data.waypointPathName)) {
 			enemy->SetWaypointPath(*path);

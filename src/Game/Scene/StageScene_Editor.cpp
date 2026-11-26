@@ -122,6 +122,14 @@ void StageScene::DrawAircraftTuningEditor() {
 			ImGui::SliderFloat("Ammo Weight (kg/rd)", &gunpod.ammoWeight, 0.01f, 1.0f);
 			ImGui::DragInt("Max Ammo", &gunpod.maxAmmo, 10, 50, 5000);
 			ImGui::SliderFloat("Fire Rate (rds/s)", &gunpod.fireRate, 5.0f, 100.0f);
+			if (gunpod.muzzleOffsets.empty()) {
+				gunpod.muzzleOffsets.push_back({ 0.0f, 0.0f, 8.0f });
+			}
+			for (int i = 0; i < static_cast<int>(gunpod.muzzleOffsets.size()); ++i) {
+				char label[32];
+				snprintf(label, sizeof(label), "Muzzle %d Offset", i + 1);
+				ImGui::DragFloat3(label, &gunpod.muzzleOffsets[static_cast<size_t>(i)].x, 0.05f, -20.0f, 20.0f, "%.2f m");
+			}
 		}
 
 		ImGui::Separator();
@@ -138,6 +146,7 @@ void StageScene::DrawAircraftTuningEditor() {
 			flightModel_.SetOrientation(curOri);
 
 			gunpod_.Initialize(gunpod);
+			lastMuzzleLocalOffset_ = gunpod_.GetLastFiredMuzzleOffset();
 		}
 
 		if (ImGui::Button("Save & Restart Stage", ImVec2(-1, 35))) {

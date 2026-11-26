@@ -1,6 +1,7 @@
 #include "Game.h"
 #include <cassert>
 #include "../../engine/Graphics/Model/PrimitiveModel.h"
+#include "../Graphics/AeroVaporMeshRenderer.h"
 #include "PostProcess/PostEffect.h"
 
 #include "../../engine/Graphics/Particle/GPUParticleManager.h"
@@ -34,6 +35,7 @@ void Game::Initialize() {
 	Object3dCommon::GetInstance()->Initialize(DirectXCommon::GetInstance());
 	SkyboxCommon::GetInstance()->Initialize(DirectXCommon::GetInstance(), srvManager.get());
 	PrimitiveModel::GetInstance()->Initialize(DirectXCommon::GetInstance());
+	AeroVaporMeshRenderer::GetInstance()->Initialize(DirectXCommon::GetInstance(), srvManager.get());
 	AudioManager::GetInstance()->Initialize();
 
 	FontManager::GetInstance()->Initialize();
@@ -151,6 +153,7 @@ void Game::Draw() {
 	DirectXCommon::GetInstance()->PreDraw();
 	srvManager->PreDraw();
 	PrimitiveModel::GetInstance()->Reset(); // プリミティブの描画カウントをリセット
+	AeroVaporMeshRenderer::GetInstance()->Reset();
 	// 3Dオブジェクト・パーティクル描画
 	Object3dCommon::GetInstance()->SetupCommonState();
 	sceneManager->Draw();
@@ -221,6 +224,7 @@ void Game::Finalize() {
 	TextRenderer::GetInstance()->Finalize();
 	FontManager::GetInstance()->Finalize();
 
+	AeroVaporMeshRenderer::GetInstance()->Finalize();
 	PrimitiveModel::GetInstance()->Finalize();
 	SkyboxCommon::GetInstance()->Finalize();
 	Object3dCommon::GetInstance()->Finalize();

@@ -468,6 +468,73 @@ void AircraftEditorScene::DrawArmamentTab() {
 		ImGui::Separator();
 		ImGui::Text("Total Ammo Mass: %.1f kg (Pod Loaded: %.1f kg)", totalAmmoMass, totalGunMass);
 		ImGui::Text("Rate of Fire: %.0f RPM | Trigger Time: %.1f sec", rpm, burstSec);
+
+		ImGui::Separator();
+		if (gun.muzzleOffsets.empty()) {
+			gun.muzzleOffsets.push_back({ 0.0f, 0.0f, 8.0f });
+		}
+		selectedMuzzleIndex_ = std::clamp(selectedMuzzleIndex_, 0, static_cast<int>(gun.muzzleOffsets.size()) - 1);
+
+		ImGui::Text("Gun Muzzle Offsets (Local: +X=Right, +Y=Up, +Z=Fwd)");
+		ImGui::Checkbox("Show Gun Muzzles in 3D", &showGunMuzzles_);
+
+		const int muzzleCount = static_cast<int>(gun.muzzleOffsets.size());
+		const bool canAdd = (muzzleCount < GunPodData::kMaxMuzzles);
+
+		if (!canAdd) { ImGui::BeginDisabled(); }
+		if (ImGui::Button("+ Add Muzzle")) {
+			gun.muzzleOffsets.push_back(gun.muzzleOffsets[static_cast<size_t>(selectedMuzzleIndex_)]);
+			selectedMuzzleIndex_ = static_cast<int>(gun.muzzleOffsets.size()) - 1;
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("+ Mirror L/R")) {
+			Vector3 mirrored = gun.muzzleOffsets[static_cast<size_t>(selectedMuzzleIndex_)];
+			mirrored.x = -mirrored.x;
+			gun.muzzleOffsets.push_back(mirrored);
+			selectedMuzzleIndex_ = static_cast<int>(gun.muzzleOffsets.size()) - 1;
+		}
+		if (!canAdd) { ImGui::EndDisabled(); }
+
+		ImGui::SameLine();
+		const bool canRemove = (gun.muzzleOffsets.size() > 1);
+		if (!canRemove) { ImGui::BeginDisabled(); }
+		if (ImGui::Button("Remove")) {
+			gun.muzzleOffsets.erase(gun.muzzleOffsets.begin() + selectedMuzzleIndex_);
+			selectedMuzzleIndex_ = std::clamp(selectedMuzzleIndex_, 0, static_cast<int>(gun.muzzleOffsets.size()) - 1);
+		}
+		if (!canRemove) { ImGui::EndDisabled(); }
+
+		ImGui::SameLine();
+		if (ImGui::Button("Reset")) {
+			gun.muzzleOffsets[static_cast<size_t>(selectedMuzzleIndex_)] = { 0.0f, 0.0f, 8.0f };
+		}
+
+		if (hasRaycastSample_ && lastRaycastHit_.hit) {
+			if (ImGui::Button("Snap Selected to Last L-Click Hit")) {
+				gun.muzzleOffsets[static_cast<size_t>(selectedMuzzleIndex_)] = lastRaycastHit_.localPoint;
+				showGunMuzzles_ = true;
+			}
+		}
+
+		for (int i = 0; i < static_cast<int>(gun.muzzleOffsets.size()); ++i) {
+			ImGui::PushID(2000 + i);
+			bool isSelected = (selectedMuzzleIndex_ == i);
+			char radioLabel[32];
+			snprintf(radioLabel, sizeof(radioLabel), "##sel%d", i);
+			if (ImGui::RadioButton(radioLabel, isSelected)) {
+				selectedMuzzleIndex_ = i;
+			}
+			ImGui::SameLine();
+			char dragLabel[32];
+			snprintf(dragLabel, sizeof(dragLabel), "Muzzle %d", i + 1);
+			if (ImGui::DragFloat3(dragLabel, &gun.muzzleOffsets[static_cast<size_t>(i)].x, 0.05f, -20.0f, 20.0f, "%.2f m")) {
+				selectedMuzzleIndex_ = i;
+			}
+			if (ImGui::IsItemClicked()) {
+				selectedMuzzleIndex_ = i;
+			}
+			ImGui::PopID();
+		}
 	}
 
 	if (ImGui::CollapsingHeader("Missile Pylons (Standard Layout)", ImGuiTreeNodeFlags_DefaultOpen)) {
@@ -768,6 +835,8 @@ void AircraftEditorScene::DrawViewportBarWindow() {
 	ImGui::Checkbox("Pylons", &showPylons_);
 	ImGui::SameLine();
 	ImGui::Checkbox("Nozzle Axis", &showNozzleGizmo_);
+	ImGui::SameLine();
+	ImGui::Checkbox("Gun Muzzles", &showGunMuzzles_);
 
 	const auto& eng = aircraftConfig_.GetEngine();
 	const float normalLimit = eng.normalThrottleLimit;
